@@ -1,0 +1,6 @@
+{
+  "name": "CareerPilot AI",
+  "description": "A personal career operating system that intelligently connects your goals, skills, roadmap, projects, evidence, CV, applications, and interviews.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

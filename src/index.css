@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-main: #F8F9FC;
+    --surface-main: #FFFFFF;
+    --surface-secondary: #F1F3F8;
+    --surface-elevated: #FFFFFF;
+    --text-primary: #111827;
+    --text-secondary: #667085;
+    --text-muted: #98A2B3;
+    --border-subtle: #E5E7EB;
+    --border-strong: #D1D5DB;
+    --accent-primary: #6D5EF5;
+    --accent-secondary: #5B5BD6;
+    --accent-soft: #8B7CF6;
+    --accent-surface: #F0EEFF;
+    --color-success: #16A34A;
+    --color-warning: #D97706;
+    --color-danger: #DC2626;
+    --color-info: #2563EB;
+  }
+
+  .dark {
+    --bg-main: #0B0D12;
+    --surface-main: #12151C;
+    --surface-secondary: #1E232D;
+    --surface-elevated: #181C24;
+    --text-primary: #F8FAFC;
+    --text-secondary: #A7AFBE;
+    --text-muted: #737C8C;
+    --border-subtle: #272D38;
+    --border-strong: #363E4D;
+    --accent-primary: #8B7CF6;
+    --accent-secondary: #9A8CFF;
+    --accent-soft: #A79BFF;
+    --accent-surface: #1E1B38;
+    --color-success: #22C55E;
+    --color-warning: #F59E0B;
+    --color-danger: #EF4444;
+    --color-info: #60A5FA;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  [dir="rtl"] body, [dir="rtl"] {
+    font-family: 'IBM Plex Sans Arabic', 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  /* Custom scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+  }
+}

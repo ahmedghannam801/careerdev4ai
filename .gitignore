@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.careerpilot_state.json
+secrets/
+credentials/
+local_db/
+*.tmp
+*.upload
