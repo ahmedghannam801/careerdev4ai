@@ -375,7 +375,7 @@ exit code                           0 on success, non-zero on any failure
 | 7 | Clean all test-created users, profiles, domain rows and Storage objects | `tests/cleanup.mjs`, swept before and after the run |
 | 8 | Exit non-zero if any test fails | The runner propagates the test runner's exit code (verified: exit 1 with a deliberately failing test) |
 | 9 | Never depend on a manually running server | The runner owns the server's whole lifecycle |
-| 10 | Never touch production/user data | Only `cp-test-*` identities and rows by explicit id are removed; the `skills` catalogue is swept by a before/after id diff, so a skill that already existed is never touched; `.careerpilot_state.json` is verified byte-unchanged |
+| 10 | Never touch production/user data | Only `cp-test-*` identities and rows by explicit id are removed; the `skills` catalogue is swept by a before/after id diff, so a skill that already existed is never touched; `.careerpilot_state.json` is verified byte-unchanged (or, on a fresh checkout, verified to hold only the server's own bootstrap data and then removed again) |
 
 **Deterministic configuration**
 
@@ -404,6 +404,13 @@ The runner's own sweep runs at the **start** of a run (so a run interrupted earl
 The end-of-run verification is explicit: the runner re-reads the auth user list and the bucket listing and fails the run if any test identity or orphaned folder remains.
 
 `.careerpilot_state.json` is unchanged (`users: ['user-default-1']`, `userStates: ['user-default-1']`); the runner compares the file byte-for-byte before and after the run and fails if it changed.
+
+Two cases are handled, because they are genuinely different:
+
+- **The file existed before the run** → it must be byte-identical afterwards. Any change fails the run.
+- **The file did not exist before the run** (a fresh checkout) → `server.ts` writes it during its own bootstrap, seeding the single default account. That is normal server startup, not test contamination. The runner checks that the new file contains *only* what the bootstrap creates (`users: ['user-default-1']`, no unexpected user state), then removes it again so the checkout is left exactly as it was found.
+
+The second case was found by running the suite from a pristine clone of the commit: the first version of the check treated "the file appeared" as contamination and failed the run — which would also have failed the committed CI workflow, where the checkout has no state file. The check still fails, with a clear message, when the suite genuinely writes to the file (verified with a deliberate contamination probe).
 
 **Independently re-verified after the final run** (direct reads against the live project, not the runner's own report):
 
