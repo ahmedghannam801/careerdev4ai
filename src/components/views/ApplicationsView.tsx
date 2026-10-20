@@ -60,7 +60,7 @@ export const ApplicationsView: React.FC = () => {
     'offer'
   ];
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company.trim() || !role.trim()) return;
 
@@ -77,7 +77,7 @@ export const ApplicationsView: React.FC = () => {
       notes: notes.trim()
     });
 
-    logActivity({
+    await logActivity({
       actionType: 'applied_job',
       title: 'Created Application',
       subtitle: `${role} at ${company}`,

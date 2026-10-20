@@ -149,8 +149,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     setUsernameCheckMessage(res.message);
   };
 
-  const handleSaveBasic = () => {
-    updateProfile({
+  const handleSaveBasic = async () => {
+    await updateProfile({
       name: basicForm.name,
       preferredName: basicForm.preferredName,
       email: basicForm.email,

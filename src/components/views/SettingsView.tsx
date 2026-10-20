@@ -22,6 +22,7 @@ import {
   Laptop
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { getAccessToken } from '../../lib/supabase';
 
 export const SettingsView: React.FC = () => {
   const { 
@@ -69,11 +70,12 @@ export const SettingsView: React.FC = () => {
     e.preventDefault();
     if (!currentPassword || !newPassword) return;
     try {
+      const token = await getAccessToken();
       const res = await fetch('/api/account/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ currentPassword, newPassword })
       });
@@ -98,11 +100,12 @@ export const SettingsView: React.FC = () => {
     e.preventDefault();
     if (!newEmail || !newEmail.includes('@')) return;
     try {
+      const token = await getAccessToken();
       const res = await fetch('/api/account/change-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ newEmail })
       });
@@ -126,11 +129,10 @@ export const SettingsView: React.FC = () => {
     if (deleteConfirmText !== 'DELETE') return;
     setIsDeleting(true);
     try {
+      const token = await getAccessToken();
       const res = await fetch('/api/account/delete', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (res.ok) {
         localStorage.clear();
@@ -316,7 +318,7 @@ export const SettingsView: React.FC = () => {
                 <div>
                   <div className="text-xs font-bold text-[var(--text-primary)]">Current Active Session</div>
                   <div className="text-[11px] text-[var(--text-muted)] font-mono">
-                    Token: {authToken ? `${authToken.slice(0, 8)}...${authToken.slice(-6)}` : 'Active'} • Chrome / macOS
+                    Token: {authToken ? `${authToken.slice(0, 8)}...${authToken.slice(-6)}` : 'Supabase session'} • Chrome / macOS
                   </div>
                 </div>
               </div>

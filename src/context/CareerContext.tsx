@@ -46,6 +46,91 @@ import { LEARNING_RESOURCES } from '../data/learningResources';
 import { PROJECTS_CATALOG } from '../data/projectsCatalog';
 import { JOBS_CATALOG } from '../data/jobsData';
 import { translations, Language } from '../translations';
+import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
+import {
+  fetchActivities,
+  postActivity,
+  fetchSecondaryGoals,
+  postSecondaryGoal,
+  patchSecondaryGoal,
+  deleteSecondaryGoal,
+  fetchCareerMilestones,
+  postCareerMilestone,
+  patchCareerMilestone,
+  deleteCareerMilestone,
+  fetchCoverLetters,
+  postCoverLetter,
+  patchCoverLetter,
+  deleteCoverLetter,
+  type ActivityDTO,
+  type SecondaryGoalDTO,
+  type CareerMilestoneDTO,
+  type CoverLetterDTO,
+} from '../lib/domainApi';
+import {
+  fetchCvs,
+  postCv,
+  patchCv,
+  deleteCv,
+  fetchCvVersions,
+  postCvVersion,
+  patchCvVersion,
+  deleteCvVersion,
+  fetchProjects,
+  postProject,
+  patchProject,
+  deleteProject,
+  fetchEvidence,
+  postEvidence,
+  patchEvidence,
+  deleteEvidence,
+  fetchCertifications,
+  postCertification,
+  patchCertification,
+  deleteCertification,
+  fetchLanguages,
+  postLanguage,
+  patchLanguage,
+  deleteLanguage,
+  fetchProfileLinks,
+  postProfileLink,
+  patchProfileLink,
+  deleteProfileLink,
+  fetchCareerIdentity,
+  putCareerIdentity,
+  fetchSavedRoles,
+  postSavedRole,
+  deleteSavedRole,
+  fetchJobApplications,
+  postJobApplication,
+  patchJobApplication,
+  deleteJobApplication,
+  fetchInterviewSessions,
+  postInterviewSession,
+  patchInterviewSession,
+  deleteInterviewSession,
+  type CvDTO,
+  type CvVersionDTO,
+  type ProjectDTO,
+  type EvidenceDTO,
+  type CertificationDTO,
+  type LanguageDTO,
+  type ProfileLinkDTO,
+  type CareerIdentityDTO,
+  type SavedRoleDTO,
+  type JobApplicationDTO,
+  type InterviewSessionDTO,
+} from '../lib/coreApi';
+import {
+  fetchRoadmap,
+  patchRoadmapTaskStatus,
+  enrollInRoadmap as enrollInRoadmapApi,
+  addRoadmapTask,
+  fetchProfile,
+  patchProfile,
+  type RoadmapDTO,
+  type ProfileDTO,
+} from '../lib/roadmapApi';
 
 export interface UserProfile {
   name: string;
@@ -100,7 +185,7 @@ interface CareerContextType {
 
   // Profile & Persona
   profile: UserProfile;
-  updateProfile: (updates: Partial<UserProfile>) => void;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   setCareerState: (state: CareerState) => void;
   setCareerGoal: (goal: CareerGoal, customText?: string) => void;
   completeOnboarding: () => void;
@@ -136,9 +221,8 @@ interface CareerContextType {
 
   // Documents & Cover Letters
   documents: CareerDocument[];
-  addDocument: (doc: Omit<CareerDocument, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateDocument: (id: string, updates: Partial<CareerDocument>) => void;
-  deleteDocument: (id: string) => void;
+  addDocument: (doc: Omit<CareerDocument, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  deleteDocument: (id: string) => Promise<void>;
   coverLetters: CoverLetter[];
   saveCoverLetter: (cl: Omit<CoverLetter, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
   deleteCoverLetter: (id: string) => void;
@@ -384,25 +468,479 @@ function generateInitialRoadmap(role: TargetRole): RoadmapPhase[] {
   ];
 }
 
-export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Authentication State
-  const [authToken, setAuthToken] = useState<string | null>(() => {
-    return localStorage.getItem('careerpilot_token') || 'demo-session-token-123';
-  });
+// Maps a Supabase Auth user to the application's account shape.
+// The id is always auth.users.id — the same value as public.profiles.id.
+function toUserAccount(
+  user: { id: string; email?: string; user_metadata?: Record<string, any> },
+  token?: string
+): UserAccount {
+  const meta = user.user_metadata || {};
+  return {
+    id: user.id,
+    email: user.email || '',
+    name: meta.name || meta.full_name || (user.email ? user.email.split('@')[0] : 'User'),
+    avatarUrl: meta.avatar_url || undefined,
+    token,
+    createdAt: meta.created_at || new Date().toISOString(),
+  };
+}
 
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    const saved = localStorage.getItem('careerpilot_user');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
+// ---- DTO -> local domain type mappers (B.3.6) ----
+
+function toSecondaryGoal(dto: SecondaryGoalDTO): SecondaryCareerGoal {
+  return {
+    id: dto.id,
+    title: dto.title,
+    description: dto.description ?? '',
+    priority: dto.priority,
+    deadline: dto.deadline ?? '',
+    status: dto.status,
+    progressPercent: dto.progressPercent,
+  };
+}
+
+function toCareerMilestone(dto: CareerMilestoneDTO): CareerMilestoneItem {
+  return {
+    id: dto.id,
+    title: dto.title,
+    category: dto.category as CareerMilestoneItem['category'],
+    dateAchieved: dto.dateAchieved,
+    notes: dto.notes ?? undefined,
+    verified: dto.verified,
+  };
+}
+
+function toCoverLetter(dto: CoverLetterDTO): CoverLetter {
+  return {
+    id: dto.id,
+    title: dto.title,
+    company: dto.company,
+    role: dto.role,
+    jobDescription: dto.jobDescription ?? undefined,
+    content: dto.content,
+    keyHighlights: dto.keyHighlights,
+    targetJobId: dto.targetJobId ?? undefined,
+    applicationId: dto.applicationId ?? undefined,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+  };
+}
+
+/** Derives the human-readable activity timestamp from the real DB timestamp. */
+function formatActivityTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) {
+    return `Today, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `Yesterday, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function toActivity(dto: ActivityDTO): UserActivityItem {
+  return {
+    id: dto.id,
+    timestamp: formatActivityTimestamp(dto.createdAt),
+    actionType: dto.actionType as UserActivityItem['actionType'],
+    title: dto.title,
+    subtitle: dto.subtitle ?? '',
+    relatedObject: dto.relatedObject ?? undefined,
+    linkView: dto.linkView ?? undefined,
+  };
+}
+
+const emptyCVProfile: CVProfile = {
+  fullName: '',
+  email: '',
+  phone: '',
+  location: '',
+  title: '',
+  summary: '',
+  experiences: [],
+  education: [],
+  projects: [],
+  skillsList: [],
+  certifications: [],
+};
+
+// ---- DTO -> local roadmap shape (B.3.7.1) ----
+
+function toRoadmapPhases(dto: RoadmapDTO | null): RoadmapPhase[] {
+  if (!dto) return [];
+  return dto.phases.map((phase) => ({
+    id: phase.id,
+    phaseNumber: phase.phaseNumber,
+    title: phase.title,
+    description: phase.description ?? '',
+    isUnlocked: phase.isUnlocked,
+    milestones: phase.milestones.map((milestone) => ({
+      id: milestone.id,
+      title: milestone.title,
+      description: milestone.description ?? '',
+      completedTasksCount: milestone.completedTasksCount,
+      tasks: milestone.tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description ?? '',
+        status: task.status,
+        skillId: task.skillId ?? undefined,
+        skillName: task.skillName ?? '',
+        deadline: task.deadline ?? undefined,
+        resourceId: task.resourceId ?? undefined,
+        resourceTitle: task.resourceTitle ?? undefined,
+        evidenceId: task.evidenceId ?? undefined,
+        estimatedHours: task.estimatedHours ?? 0,
+      })),
+    })),
+  }));
+}
+
+// ---- DTO -> local domain type mappers (B.3.7) ----
+
+function toCareerProject(dto: ProjectDTO): CareerProject {
+  return {
+    id: dto.id,
+    title: dto.title,
+    goal: dto.goal ?? '',
+    description: dto.description ?? '',
+    difficulty: (dto.difficulty as CareerProject['difficulty']) ?? 'Intermediate',
+    skills: dto.skills,
+    tasks: dto.tasks,
+    deliverables: dto.deliverables,
+    status: (dto.status as CareerProject['status']) ?? 'idea',
+    repositoryUrl: dto.repositoryUrl ?? undefined,
+    demoUrl: dto.demoUrl ?? undefined,
+    documentation: dto.documentation ?? undefined,
+    createdAt: dto.createdAt,
+    completedAt: dto.completedAt ?? undefined,
+  };
+}
+
+function toEvidenceItem(dto: EvidenceDTO): EvidenceItem {
+  return {
+    id: dto.id,
+    title: dto.title,
+    type: (dto.type as EvidenceItem['type']) ?? 'project',
+    description: dto.description ?? '',
+    url: dto.url ?? undefined,
+    skillNames: dto.skillNames,
+    projectId: dto.projectId ?? undefined,
+    verified: dto.verified,
+    dateAdded: dto.dateAdded ?? new Date().toISOString().split('T')[0],
+  };
+}
+
+function toCVVersion(dto: CvVersionDTO): CVVersion {
+  return {
+    id: dto.id,
+    name: dto.name,
+    targetRoleTitle: dto.targetRoleTitle ?? '',
+    createdAt: dto.createdAt,
+    profile: (dto.profileJson as CVProfile) ?? emptyCVProfile,
+    atsAnalysis: dto.atsAnalysis as CVVersion['atsAnalysis'],
+  };
+}
+
+function toTargetRole(dto: SavedRoleDTO): TargetRole {
+  const payload = (dto.payload as TargetRole | null) ?? null;
+  return (
+    payload ?? {
+      id: dto.roleId,
+      title: dto.title,
+      category: dto.category ?? '',
+      level: (dto.level as TargetRole['level']) ?? 'Mid',
+      overview: '',
+      responsibilities: [],
+      requiredSkills: [],
+      preferredSkills: [],
+      tools: [],
+      experienceExpectation: '',
+      salaryRange: '',
+      typicalProjects: [],
+      certifications: [],
+      interviewTopics: [],
+      careerProgression: [],
+      relatedRoles: [],
     }
-    return {
-      id: 'user-default-1',
-      name: 'Sarah Jenkins',
-      email: 'sarah.jenkins@example.com',
-      avatarUrl: '/src/assets/images/career_user_avatar_1792417629788.jpg',
-      createdAt: '2026-10-01'
+  );
+}
+
+function toJobApplication(dto: JobApplicationDTO): JobApplication {
+  return {
+    id: dto.id,
+    jobId: dto.jobId ?? undefined,
+    company: dto.company,
+    role: dto.role,
+    location: dto.location ?? '',
+    workMode: dto.workMode ?? '',
+    stage: (dto.stage as ApplicationStage) ?? 'saved',
+    appliedDate: dto.appliedDate ?? undefined,
+    lastUpdated: dto.lastUpdated ?? dto.createdAt,
+    nextAction: dto.nextAction ?? undefined,
+    nextActionDate: dto.nextActionDate ?? undefined,
+    notes: dto.notes ?? '',
+    salaryDiscussed: dto.salaryDiscussed ?? undefined,
+    interviewStageDetails: dto.interviewStageDetails ?? undefined,
+  };
+}
+
+function toInterviewSession(dto: InterviewSessionDTO): MockInterviewSession {
+  return {
+    id: dto.id,
+    roleTitle: dto.roleTitle ?? '',
+    type: (dto.type as MockInterviewSession['type']) ?? 'behavioral',
+    question: dto.question,
+    userAnswer: dto.userAnswer ?? '',
+    aiFeedback: dto.aiFeedback as MockInterviewSession['aiFeedback'],
+    createdAt: dto.createdAt,
+  };
+}
+
+function toCertification(dto: CertificationDTO): UserCertificationEntry {
+  return {
+    id: dto.id,
+    name: dto.name,
+    provider: dto.issuer ?? '',
+    issueDate: dto.issueDate ?? '',
+    expiryDate: dto.expiryDate ?? undefined,
+    credentialId: dto.credentialId ?? undefined,
+    credentialUrl: dto.url ?? undefined,
+  };
+}
+
+function toLanguage(dto: LanguageDTO): UserLanguageEntry {
+  return {
+    id: dto.id,
+    language: dto.name,
+    proficiency: (dto.proficiency as UserLanguageEntry['proficiency']) ?? 'Professional',
+  };
+}
+
+function toProfessionalLinks(links: ProfileLinkDTO[]): ProfessionalLinks {
+  const map: Record<string, string> = {};
+  for (const link of links) map[link.kind] = link.url;
+  return {
+    linkedin: map['linkedin'],
+    github: map['github'],
+    portfolio: map['portfolio'],
+    personalWebsite: map['personalWebsite'],
+    behance: map['behance'],
+    dribbble: map['dribbble'],
+    twitter: map['twitter'],
+  };
+}
+
+export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Authentication State — Supabase Auth is the only identity source.
+  // No demo fallback: an unauthenticated visitor has no session and no user.
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+
+  // Session restoration + automatic token refresh.
+  // Supabase persists the session and refreshes it on expiry; this listener
+  // keeps the in-memory token and user in sync with it.
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setIsAuthReady(true);
+      return;
+    }
+    const supabase = getBrowserSupabase();
+
+    supabase.auth.getSession().then(({ data }) => {
+      const session = data.session;
+      if (session) {
+        setAuthToken(session.access_token);
+        setCurrentUser(toUserAccount(session.user, session.access_token));
+      } else {
+        setAuthToken(null);
+        setCurrentUser(null);
+      }
+      setIsAuthReady(true);
+    });
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session) {
+          setAuthToken(session.access_token);
+          setCurrentUser(toUserAccount(session.user, session.access_token));
+        } else {
+          setAuthToken(null);
+          setCurrentUser(null);
+        }
+        setIsAuthReady(true);
+      }
+    );
+
+    return () => {
+      subscription.subscription.unsubscribe();
     };
-  });
+  }, []);
+
+  // B.3.6 — Backend hydration for the persisted domains.
+  // Runs whenever an authenticated session is present. The database is the
+  // source of truth; localStorage is not consulted for these domains.
+  useEffect(() => {
+    if (!authToken) return;
+    let cancelled = false;
+
+    const hydrate = async () => {
+      try {
+        const [
+          roadmapRecord,
+          profileRecord,
+          goalList,
+          milestoneList,
+          activityList,
+          coverLetterList,
+          projectList,
+          evidenceList,
+          cvList,
+          cvVersionList,
+          certificationList,
+          languageList,
+          linkList,
+          identityRecord,
+          savedRoleList,
+          applicationList,
+          interviewList,
+        ] = await Promise.all([
+          fetchRoadmap(),
+          fetchProfile(),
+          fetchSecondaryGoals(),
+          fetchCareerMilestones(),
+          fetchActivities(),
+          fetchCoverLetters(),
+          fetchProjects(),
+          fetchEvidence(),
+          fetchCvs(),
+          fetchCvVersions(),
+          fetchCertifications(),
+          fetchLanguages(),
+          fetchProfileLinks(),
+          fetchCareerIdentity(),
+          fetchSavedRoles(),
+          fetchJobApplications(),
+          fetchInterviewSessions(),
+        ]);
+        if (cancelled) return;
+        // The roadmap tables and the profile tables are the source of truth for
+        // those two domains (not the aggregate /api/state payload).
+        if (roadmapRecord) {
+          setRoadmapPhases(toRoadmapPhases(roadmapRecord));
+          setIsEnrolledInRoadmap(roadmapRecord.isEnrolled);
+        }
+        if (profileRecord) {
+          setProfile(prev => ({
+            ...prev,
+            name: profileRecord.fullName ?? prev.name,
+            preferredName: profileRecord.preferredName ?? undefined,
+            email: prev.email,
+            phone: profileRecord.phone ?? prev.phone,
+            avatarUrl: profileRecord.avatarUrl ?? prev.avatarUrl,
+            location: profileRecord.location ?? prev.location,
+            city: profileRecord.city ?? prev.city,
+            country: profileRecord.country ?? prev.country,
+            timezone: profileRecord.timezone ?? prev.timezone,
+            currentTitle: profileRecord.currentTitle ?? prev.currentTitle,
+            currentPosition: profileRecord.currentPosition ?? prev.currentPosition,
+            currentCompany: profileRecord.currentCompany ?? prev.currentCompany,
+            headline: profileRecord.headline ?? prev.headline,
+            bio: profileRecord.bio ?? prev.bio,
+            professionalSummary: profileRecord.professionalSummary ?? prev.professionalSummary,
+            careerGoal: (profileRecord.careerGoal as UserProfile['careerGoal']) ?? prev.careerGoal,
+            customGoalText: profileRecord.customGoalText ?? prev.customGoalText,
+            industry: profileRecord.targetIndustry ?? prev.industry,
+            username: profileRecord.username ?? prev.username,
+            userType: (profileRecord.userType as UserProfile['careerState']) ?? prev.careerState,
+            onboardingCompleted: profileRecord.onboardingCompleted,
+            certifications: profileRecord.certifications.map(c => ({
+              id: c.id,
+              name: c.name,
+              provider: c.issuer ?? '',
+              issueDate: c.issueDate ?? '',
+              expiryDate: c.expiryDate ?? undefined,
+              credentialId: c.credentialId ?? undefined,
+              credentialUrl: c.url ?? undefined,
+            })),
+            languages: profileRecord.languages.map(l => ({
+              id: l.id,
+              language: l.name,
+              proficiency: (l.proficiency as UserLanguageEntry['proficiency']) ?? 'Professional',
+            })),
+            links: {
+              linkedin: profileRecord.links.find(l => l.kind === 'linkedin')?.url,
+              github: profileRecord.links.find(l => l.kind === 'github')?.url,
+              portfolio: profileRecord.links.find(l => l.kind === 'portfolio')?.url,
+              personalWebsite: profileRecord.links.find(l => l.kind === 'personalWebsite')?.url,
+              behance: profileRecord.links.find(l => l.kind === 'behance')?.url,
+              dribbble: profileRecord.links.find(l => l.kind === 'dribbble')?.url,
+              twitter: profileRecord.links.find(l => l.kind === 'twitter')?.url,
+            },
+          }));
+        }
+        setSecondaryGoals(goalList.map(toSecondaryGoal));
+        setMilestones(milestoneList.map(toCareerMilestone));
+        setActivities(activityList.map(toActivity));
+        setCoverLetters(coverLetterList.map(toCoverLetter));
+        setProjects(projectList.map(toCareerProject));
+        setEvidenceItems(evidenceList.map(toEvidenceItem));
+        setCvVersions(cvVersionList.map(toCVVersion));
+        // certifications / languages / links / careerIdentity live inside `profile`.
+        setProfile(prev => ({
+          ...prev,
+          certifications: certificationList.map(toCertification),
+          languages: languageList.map(toLanguage),
+          links: toProfessionalLinks(linkList),
+          ...(identityRecord
+            ? {
+                careerIdentity: {
+                  whoYouAre: identityRecord.whoYouAre ?? prev.careerIdentity?.whoYouAre ?? '',
+                  whereYoureGoing:
+                    identityRecord.whereYoureGoing ?? prev.careerIdentity?.whereYoureGoing ?? '',
+                  why: identityRecord.why ?? prev.careerIdentity?.why ?? '',
+                  whatYoureMissing:
+                    identityRecord.whatYoureMissing ?? prev.careerIdentity?.whatYoureMissing ?? '',
+                  whatYoureBuilding:
+                    identityRecord.whatYoureBuilding ?? prev.careerIdentity?.whatYoureBuilding ?? '',
+                  howYourePresenting:
+                    identityRecord.howYourePresenting ?? prev.careerIdentity?.howYourePresenting ?? '',
+                  whereApplying:
+                    identityRecord.whereApplying ?? prev.careerIdentity?.whereApplying ?? '',
+                },
+              }
+            : {}),
+        }));
+        setSavedRoles(savedRoleList.map(toTargetRole));
+        setApplications(applicationList.map(toJobApplication));
+        setInterviewSessions(interviewList.map(toInterviewSession));
+        const active = cvList.find(c => c.isActive) ?? cvList[0];
+        if (active) {
+          setActiveCvId(active.id);
+          const activeVersion = cvVersionList.find(v => v.cvId === active.id);
+          if (activeVersion) setActiveCV((activeVersion.profileJson as CVProfile) ?? activeCV);
+        }
+      } catch (error) {
+        if (!cancelled) console.error('Failed to hydrate career data:', error);
+      }
+    };
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken]);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');
@@ -529,7 +1067,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return TARGET_ROLES[0];
   });
 
-  const [savedRoles, setSavedRoles] = useState<TargetRole[]>([TARGET_ROLES[0], TARGET_ROLES[1]]);
+  // Saved roles — PostgreSQL is the source of truth (B.3.7).
+  const [savedRoles, setSavedRoles] = useState<TargetRole[]>([]);
 
   // Skills
   const [skills, setSkills] = useState<UserSkill[]>(() => {
@@ -555,31 +1094,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [enrolledResourceIds, setEnrolledResourceIds] = useState<string[]>(['res-react-docs', 'res-ts-handbook']);
 
   // Projects & Evidence
-  const [projects, setProjects] = useState<CareerProject[]>(PROJECTS_CATALOG);
-  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([
-    {
-      id: 'ev-1',
-      title: 'Accessible Design System Repository',
-      type: 'github',
-      description: 'Production React & TypeScript library with 95% unit test coverage and automated CI workflow.',
-      url: 'https://github.com/example/accessible-ui-system',
-      skillNames: ['React', 'TypeScript', 'Tailwind CSS', 'Git & Version Control'],
-      projectId: 'proj-design-system',
-      verified: true,
-      dateAdded: '2026-09-15'
-    },
-    {
-      id: 'ev-2',
-      title: 'SaaS Churn Analysis & Dashboard',
-      type: 'demo',
-      description: 'Interactive Tableau dashboard demonstrating SQL cohort queries and churn drivers.',
-      url: 'https://public.tableau.com/views/saas-retention-demo',
-      skillNames: ['SQL', 'Data Visualization (Tableau/Power BI)'],
-      projectId: 'proj-churn-dashboard',
-      verified: true,
-      dateAdded: '2026-09-06'
-    }
-  ]);
+  // Projects — PostgreSQL is the source of truth (B.3.7).
+  const [projects, setProjects] = useState<CareerProject[]>([]);
+  // Evidence — PostgreSQL is the source of truth (B.3.7).
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
 
   // CV Studio
   const [activeCV, setActiveCV] = useState<CVProfile>({
@@ -630,29 +1148,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     certifications: ['Meta Front-End Developer Professional Certificate']
   });
 
-  const [cvVersions, setCvVersions] = useState<CVVersion[]>([
-    {
-      id: 'cv-v1',
-      name: 'Frontend Engineer Master v1',
-      targetRoleTitle: 'Frontend Engineer',
-      createdAt: '2026-10-10',
-      profile: activeCV,
-      atsAnalysis: {
-        overallScore: 84,
-        breakdown: { keywordsMatch: 86, impactAndMetrics: 82, formattingStructure: 92, experienceRelevance: 78 },
-        matchedKeywords: ['React', 'TypeScript', 'Accessibility', 'Core Web Vitals', 'REST APIs', 'Tailwind CSS'],
-        missingKeywords: ['Next.js', 'Playwright', 'GraphQL', 'CI/CD Pipelines'],
-        actionableImprovements: [
-          {
-            section: 'Experience',
-            currentText: 'Collaborated closely with product designers to establish WCAG 2.1 AA...',
-            suggestedText: 'Spearheaded WCAG 2.1 AA accessibility compliance across customer portal, reducing accessibility audit violations by 90%.',
-            reason: 'Quantifies business outcome with Google X-Y-Z formula.'
-          }
-        ]
-      }
-    }
-  ]);
+  // CVs and CV versions — PostgreSQL is the source of truth (B.3.7).
+  const [cvVersions, setCvVersions] = useState<CVVersion[]>([]);
+  const [activeCvId, setActiveCvId] = useState<string>('');
   const [isOptimizingCV, setIsOptimizingCV] = useState(false);
   const [isUploadingCv, setIsUploadingCv] = useState(false);
 
@@ -752,280 +1250,313 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isCopilotTyping, setIsCopilotTyping] = useState(false);
   const [pendingAiAction, setPendingAiAction] = useState<AiProposedAction | null>(null);
 
-  // Secondary Goals
-  const [secondaryGoals, setSecondaryGoals] = useState<SecondaryCareerGoal[]>(() => {
-    const saved = localStorage.getItem('careerpilot_secondary_goals');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
+  // Secondary Goals — PostgreSQL is the source of truth (B.3.6).
+  const [secondaryGoals, setSecondaryGoals] = useState<SecondaryCareerGoal[]>([]);
+
+  const addSecondaryGoal = async (goal: Omit<SecondaryCareerGoal, 'id'>) => {
+    try {
+      const dto = await postSecondaryGoal({
+        title: goal.title,
+        description: goal.description,
+        priority: goal.priority,
+        deadline: goal.deadline,
+        status: goal.status,
+        progressPercent: goal.progressPercent,
+      });
+      setSecondaryGoals(prev => [toSecondaryGoal(dto), ...prev]);
+      void logActivity({
+        actionType: 'goal_updated',
+        title: 'Created Secondary Goal',
+        subtitle: goal.title,
+        linkView: 'my-career'
+      });
+    } catch (error) {
+      console.error('Failed to create secondary goal:', error);
     }
-    return [
-      {
-        id: 'sg-1',
-        title: 'Publish Accessible Design System Open-Source Library',
-        description: 'Package component primitives to npm with automated Storybook documentation.',
-        priority: 'high',
-        deadline: '2026-11-20',
-        status: 'active',
-        progressPercent: 65
-      },
-      {
-        id: 'sg-2',
-        title: 'Master Automated E2E Testing with Playwright',
-        description: 'Complete cross-browser test suites and CI integration to eliminate manual testing friction.',
-        priority: 'medium',
-        deadline: '2026-12-05',
-        status: 'active',
-        progressPercent: 30
-      }
-    ];
-  });
-
-  const addSecondaryGoal = (goal: Omit<SecondaryCareerGoal, 'id'>) => {
-    const newGoal: SecondaryCareerGoal = { ...goal, id: `sg-${Date.now()}` };
-    setSecondaryGoals(prev => [newGoal, ...prev]);
-    logActivity({
-      actionType: 'goal_updated',
-      title: 'Created Secondary Goal',
-      subtitle: goal.title,
-      linkView: 'my-career'
-    });
   };
 
-  const updateSecondaryGoal = (id: string, updates: Partial<SecondaryCareerGoal>) => {
-    setSecondaryGoals(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g));
-  };
-
-  const deleteSecondaryGoal = (id: string) => {
-    setSecondaryGoals(prev => prev.filter(g => g.id !== id));
-  };
-
-  // Career Milestones
-  const [milestones, setMilestones] = useState<CareerMilestoneItem[]>(() => {
-    const saved = localStorage.getItem('careerpilot_milestones');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
+  const updateSecondaryGoal = async (id: string, updates: Partial<SecondaryCareerGoal>) => {
+    try {
+      const dto = await patchSecondaryGoal(id, {
+        title: updates.title,
+        description: updates.description,
+        priority: updates.priority,
+        deadline: updates.deadline,
+        status: updates.status,
+        progressPercent: updates.progressPercent,
+      });
+      setSecondaryGoals(prev => prev.map(g => (g.id === id ? toSecondaryGoal(dto) : g)));
+    } catch (error) {
+      console.error('Failed to update secondary goal:', error);
     }
-    return [
-      { id: 'ms-1', title: 'Graduated Computer Science B.S.', category: 'role', dateAchieved: '2022-05-15', verified: true, notes: 'GPA 3.8 / 4.0' },
-      { id: 'ms-2', title: 'First Web Engineering Internship at Apex Agency', category: 'internship', dateAchieved: '2022-06-01', verified: true },
-      { id: 'ms-3', title: 'Earned Meta Front-End Developer Certification', category: 'certification', dateAchieved: '2024-02-18', verified: true },
-      { id: 'ms-4', title: 'Joined Meridian Tech Labs as Frontend Developer', category: 'role', dateAchieved: '2024-03-01', verified: true },
-      { id: 'ms-5', title: 'Shipped Accessible Design System v1', category: 'project', dateAchieved: '2026-09-15', verified: true },
-      { id: 'ms-6', title: 'Secured Technical Interview at Vanguard Systems', category: 'interview', dateAchieved: '2026-10-15', verified: true }
-    ];
-  });
-
-  const addMilestone = (milestone: Omit<CareerMilestoneItem, 'id'>) => {
-    const item: CareerMilestoneItem = { ...milestone, id: `ms-${Date.now()}` };
-    setMilestones(prev => [item, ...prev]);
-    logActivity({
-      actionType: 'added_evidence',
-      title: 'Career Milestone Recorded',
-      subtitle: milestone.title,
-      linkView: 'my-career'
-    });
   };
 
-  const deleteMilestone = (id: string) => {
-    setMilestones(prev => prev.filter(m => m.id !== id));
-  };
-
-  // Activity Center
-  const [activities, setActivities] = useState<UserActivityItem[]>(() => {
-    const saved = localStorage.getItem('careerpilot_activities');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
+  const deleteSecondaryGoal = async (id: string) => {
+    try {
+      await deleteSecondaryGoal(id);
+      setSecondaryGoals(prev => prev.filter(g => g.id !== id));
+    } catch (error) {
+      console.error('Failed to delete secondary goal:', error);
     }
-    return [
-      {
-        id: 'act-1',
-        timestamp: 'Today, 10:45 AM',
-        actionType: 'completed_task',
-        title: 'Completed Roadmap Task',
-        subtitle: 'Advanced Type Safety & Generics Handbook Drill',
-        relatedObject: 'TypeScript',
-        linkView: 'roadmap'
-      },
-      {
-        id: 'act-2',
-        timestamp: 'Yesterday, 3:20 PM',
-        actionType: 'applied_job',
-        title: 'Job Application Submitted',
-        subtitle: 'Frontend Engineer at Vanguard Systems',
-        relatedObject: 'Vanguard Systems',
-        linkView: 'applications'
-      },
-      {
-        id: 'act-3',
-        timestamp: 'Oct 17, 2:15 PM',
-        actionType: 'mock_interview',
-        title: 'Mock Interview Evaluated',
-        subtitle: 'STAR Answer Scored 9/10 with Gemini AI',
-        relatedObject: 'Frontend Engineer',
-        linkView: 'interviews'
-      },
-      {
-        id: 'act-4',
-        timestamp: 'Oct 15, 11:00 AM',
+  };
+
+  // Career Milestones — PostgreSQL is the source of truth (B.3.6).
+  const [milestones, setMilestones] = useState<CareerMilestoneItem[]>([]);
+
+  const addMilestone = async (milestone: Omit<CareerMilestoneItem, 'id'>) => {
+    try {
+      const dto = await postCareerMilestone({
+        title: milestone.title,
+        category: milestone.category,
+        dateAchieved: milestone.dateAchieved,
+        notes: milestone.notes,
+        verified: milestone.verified,
+      });
+      setMilestones(prev => [toCareerMilestone(dto), ...prev]);
+      void logActivity({
         actionType: 'added_evidence',
-        title: 'Attached Proof of Skill',
-        subtitle: 'Accessible Design System Repository verified',
-        relatedObject: 'React & TypeScript',
-        linkView: 'evidence'
-      }
-    ];
-  });
-
-  const logActivity = (item: Omit<UserActivityItem, 'id' | 'timestamp'>) => {
-    const newAct: UserActivityItem = {
-      ...item,
-      id: `act-${Date.now()}`,
-      timestamp: 'Just now'
-    };
-    setActivities(prev => [newAct, ...prev]);
+        title: 'Career Milestone Recorded',
+        subtitle: milestone.title,
+        linkView: 'my-career'
+      });
+    } catch (error) {
+      console.error('Failed to create career milestone:', error);
+    }
   };
 
-  // Documents Center
-  const [documents, setDocuments] = useState<CareerDocument[]>(() => {
-    const saved = localStorage.getItem('careerpilot_documents');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
+  const deleteMilestone = async (id: string) => {
+    try {
+      await deleteCareerMilestone(id);
+      setMilestones(prev => prev.filter(m => m.id !== id));
+    } catch (error) {
+      console.error('Failed to delete career milestone:', error);
     }
-    return [
-      {
-        id: 'doc-1',
-        name: 'Sarah Jenkins - Frontend Engineer CV.pdf',
+  };
+
+  // Activity Center — PostgreSQL is the source of truth (B.3.6).
+  // The activity timestamp is a REAL timestamp in the database; the
+  // human-readable string is derived here for display.
+  const [activities, setActivities] = useState<UserActivityItem[]>([]);
+
+  const logActivity = async (item: Omit<UserActivityItem, 'id' | 'timestamp'>) => {
+    try {
+      const dto = await postActivity({
+        actionType: item.actionType,
+        title: item.title,
+        subtitle: item.subtitle,
+        relatedObject: item.relatedObject,
+        linkView: item.linkView,
+      });
+      setActivities(prev => [toActivity(dto), ...prev]);
+    } catch (error) {
+      console.error('Failed to record activity:', error);
+    }
+  };
+
+  // Cover Letters Studio — PostgreSQL is the source of truth (B.3.6).
+  // This is the canonical record; no duplicate CareerDocument is written.
+  const [coverLetters, setCoverLetters] = useState<CoverLetter[]>([]);
+
+  const saveCoverLetter = async (
+    cl: Omit<CoverLetter, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
+  ) => {
+    try {
+      if (cl.id) {
+        const dto = await patchCoverLetter(cl.id, {
+          title: cl.title,
+          company: cl.company,
+          role: cl.role,
+          jobDescription: cl.jobDescription,
+          content: cl.content,
+          keyHighlights: cl.keyHighlights,
+          targetJobId: cl.targetJobId,
+          applicationId: cl.applicationId,
+        });
+        setCoverLetters(prev => prev.map(item => (item.id === cl.id ? toCoverLetter(dto) : item)));
+      } else {
+        const dto = await postCoverLetter({
+          title: cl.title,
+          company: cl.company,
+          role: cl.role,
+          jobDescription: cl.jobDescription,
+          content: cl.content,
+          keyHighlights: cl.keyHighlights,
+          targetJobId: cl.targetJobId,
+          applicationId: cl.applicationId,
+        });
+        setCoverLetters(prev => [toCoverLetter(dto), ...prev]);
+        void logActivity({
+          actionType: 'document_saved',
+          title: 'Created Tailored Cover Letter',
+          subtitle: `${cl.role} at ${cl.company}`,
+          linkView: 'documents'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save cover letter:', error);
+    }
+  };
+
+  const deleteCoverLetter = async (id: string) => {
+    try {
+      await deleteCoverLetter(id);
+      setCoverLetters(prev => prev.filter(c => c.id !== id));
+    } catch (error) {
+      console.error('Failed to delete cover letter:', error);
+    }
+  };
+
+  // Documents Center — derived view-model (B.3.6).
+  // There is no `documents` table: CareerDocument is composed from the
+  // canonical sources (cvVersions, coverLetters, profile.certifications,
+  // projects). It is a compatibility representation, not a stored entity.
+  const [documents, setDocuments] = useState<CareerDocument[]>([]);
+
+  // Recompute the derived document list whenever its sources change.
+  useEffect(() => {
+    const derived: CareerDocument[] = [];
+
+    for (const version of cvVersions) {
+      derived.push({
+        id: `cv-${version.id}`,
+        name: version.name,
         type: 'cv',
-        format: 'pdf',
-        size: '142 KB',
-        updatedAt: '2026-10-18',
-        createdAt: '2026-10-10',
-        relatedRoleId: 'frontend-engineer',
-        isPublic: true,
-        contentPreview: 'Detail-oriented Frontend Engineer with 2+ years of experience building accessible, high-performance web applications...'
-      },
-      {
-        id: 'doc-2',
-        name: 'Vanguard Systems - Tailored Cover Letter.pdf',
-        type: 'cover_letter',
-        format: 'pdf',
-        size: '85 KB',
-        updatedAt: '2026-10-17',
-        createdAt: '2026-10-17',
-        relatedRoleId: 'frontend-engineer',
-        relatedApplicationId: 'app-1',
+        format: 'link',
+        size: '—',
+        updatedAt: version.createdAt,
+        createdAt: version.createdAt,
         isPublic: false,
-        contentPreview: 'Dear Hiring Team at Vanguard Systems, I am writing to express my strong enthusiasm for the Frontend Engineer position...'
-      },
-      {
-        id: 'doc-3',
-        name: 'Meta Front-End Developer Certificate.pdf',
-        type: 'certificate',
-        format: 'pdf',
-        size: '1.2 MB',
-        updatedAt: '2024-02-18',
-        createdAt: '2024-02-18',
-        isPublic: true,
-        contentPreview: 'Professional certification verifying React, Web Fundamentals, and UX Development mastery.'
-      },
-      {
-        id: 'doc-4',
-        name: 'Accessible UI Design System Case Study.pdf',
-        type: 'portfolio',
-        format: 'pdf',
-        size: '3.4 MB',
-        updatedAt: '2026-09-20',
-        createdAt: '2026-09-20',
-        isPublic: true,
-        contentPreview: 'Deep technical architecture guide outlining keyboard focus management, WCAG 2.1 compliance, and automated testing.'
-      }
-    ];
-  });
-
-  const addDocument = (doc: Omit<CareerDocument, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newDoc: CareerDocument = {
-      ...doc,
-      id: `doc-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0]
-    };
-    setDocuments(prev => [newDoc, ...prev]);
-    logActivity({
-      actionType: 'document_saved',
-      title: 'Added Document',
-      subtitle: doc.name,
-      linkView: 'documents'
-    });
-  };
-
-  const updateDocument = (id: string, updates: Partial<CareerDocument>) => {
-    setDocuments(prev => prev.map(d => d.id === id ? { ...d, ...updates, updatedAt: new Date().toISOString().split('T')[0] } : d));
-  };
-
-  const deleteDocument = (id: string) => {
-    setDocuments(prev => prev.filter(d => d.id !== id));
-  };
-
-  // Cover Letters Studio
-  const [coverLetters, setCoverLetters] = useState<CoverLetter[]>(() => {
-    const saved = localStorage.getItem('careerpilot_cover_letters');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    return [
-      {
-        id: 'cl-1',
-        title: 'Vanguard Systems — Frontend Engineer',
-        company: 'Vanguard Systems',
-        role: 'Frontend Engineer (React / TypeScript)',
-        jobDescription: 'Seeking experienced Frontend Engineer to build high-scale, accessible web systems using modern React 19, strict TypeScript, and automated testing.',
-        content: `Dear Hiring Team at Vanguard Systems,\n\nI am writing to express my strong enthusiasm for the Frontend Engineer position. With my background in architecting accessible, high-performance web applications at Meridian Tech Labs and my dedication to engineering velocity, I am excited about the prospect of contributing directly to Vanguard Systems' mission.\n\nThroughout my work, I have consistently translated complex product requirements into reliable, clean component architectures. My hands-on experience spearheading a 25+ component WCAG 2.1 AA design system and optimizing Largest Contentful Paint from 3.2s to 1.1s directly matches your emphasis on performance and scale. What excites me most about Vanguard Systems is your focus on resilient enterprise software, and I am eager to bring my problem-solving mindset and technical discipline to your frontend team.\n\nThank you for considering my application. I look forward to the opportunity to discuss how my skill set aligns with your engineering roadmap.\n\nWarm regards,\nSarah Jenkins`,
-        createdAt: '2026-10-17',
-        updatedAt: '2026-10-17',
-        keyHighlights: [
-          'Spearheading accessible design systems (WCAG 2.1 AA)',
-          'Core Web Vitals performance optimization (3.2s to 1.1s LCP)',
-          'Strict TypeScript and agile squad delivery'
-        ],
-        targetJobId: 'job-fe-01',
-        applicationId: 'app-1'
-      }
-    ];
-  });
-
-  const saveCoverLetter = (cl: Omit<CoverLetter, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
-    if (cl.id) {
-      setCoverLetters(prev => prev.map(item => item.id === cl.id ? {
-        ...item,
-        ...cl,
-        updatedAt: new Date().toISOString().split('T')[0]
-      } : item));
-    } else {
-      const newCl: CoverLetter = {
-        ...cl,
-        id: `cl-${Date.now()}`,
-        createdAt: new Date().toISOString().split('T')[0],
-        updatedAt: new Date().toISOString().split('T')[0]
-      };
-      setCoverLetters(prev => [newCl, ...prev]);
-      logActivity({
-        actionType: 'document_saved',
-        title: 'Created Tailored Cover Letter',
-        subtitle: `${cl.role} at ${cl.company}`,
-        linkView: 'documents'
+        contentPreview: version.profile.summary,
       });
     }
+
+    for (const letter of coverLetters) {
+      derived.push({
+        id: `cl-${letter.id}`,
+        name: letter.title,
+        type: 'cover_letter',
+        format: 'link',
+        size: '—',
+        updatedAt: letter.updatedAt,
+        createdAt: letter.createdAt,
+        relatedApplicationId: letter.applicationId,
+        isPublic: false,
+        contentPreview: letter.content.slice(0, 200),
+      });
+    }
+
+    for (const cert of profile.certifications) {
+      derived.push({
+        id: `cert-${cert.id}`,
+        name: cert.name,
+        type: 'certificate',
+        format: 'link',
+        size: '—',
+        updatedAt: cert.issueDate,
+        createdAt: cert.issueDate,
+        isPublic: true,
+        contentPreview: `${cert.provider} — issued ${cert.issueDate}`,
+      });
+    }
+
+    for (const project of projects) {
+      derived.push({
+        id: `proj-${project.id}`,
+        name: project.title,
+        type: 'portfolio',
+        format: 'link',
+        size: '—',
+        updatedAt: project.createdAt,
+        createdAt: project.createdAt,
+        isPublic: false,
+        contentPreview: project.description,
+      });
+    }
+
+    setDocuments(derived);
+  }, [cvVersions, coverLetters, profile.certifications, projects]);
+
+  // Adding a document routes it to the canonical source for its type
+  // (there is no standalone documents entity).
+  const addDocument = async (
+    doc: Omit<CareerDocument, 'id' | 'createdAt' | 'updatedAt'>
+  ) => {
+    try {
+      if (doc.type === 'cover_letter') {
+        await saveCoverLetter({
+          title: doc.name,
+          company: doc.relatedRoleId ?? 'Unknown',
+          role: doc.relatedRoleId ?? 'Unknown',
+          content: doc.contentPreview ?? '',
+          keyHighlights: [],
+          applicationId: doc.relatedApplicationId,
+        });
+        return;
+      }
+      if (doc.type === 'certificate') {
+        updateProfile({
+          certifications: [
+            ...profile.certifications,
+            {
+              id: `cert-${Date.now()}`,
+              name: doc.name,
+              provider: 'Unknown',
+              issueDate: new Date().toISOString().split('T')[0],
+            },
+          ],
+        });
+        return;
+      }
+      if (doc.type === 'portfolio') {
+        await addProject({
+          title: doc.name,
+          goal: doc.contentPreview ?? '',
+          description: doc.contentPreview ?? '',
+          difficulty: 'Intermediate',
+          skills: [],
+          tasks: [],
+          deliverables: [],
+          status: 'planned',
+        });
+        return;
+      }
+      // 'cv' and 'supporting' have no writable canonical source in this phase.
+      console.warn(`No canonical store for document type "${doc.type}" — ignored.`);
+    } catch (error) {
+      console.error('Failed to add document:', error);
+    }
   };
 
-  const deleteCoverLetter = (id: string) => {
-    setCoverLetters(prev => prev.filter(c => c.id !== id));
+  // Removing a derived document removes the underlying canonical record.
+  const deleteDocument = async (id: string) => {
+    try {
+      if (id.startsWith('cl-')) {
+        await deleteCoverLetter(id.slice(3));
+      } else if (id.startsWith('cv-')) {
+        const version = cvVersions.find(v => `cv-${v.id}` === id);
+        if (version) await deleteCVVersion(version.id);
+      } else if (id.startsWith('cert-')) {
+        // Certifications are part of the profile record.
+        updateProfile({
+          certifications: profile.certifications.filter(c => `cert-${c.id}` !== id),
+        });
+      } else if (id.startsWith('proj-')) {
+        await deleteProject(id.slice(5));
+      }
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+    }
   };
 
   const generateAiCoverLetter = async (company: string, jobTitle: string, jobDesc: string, tone = 'Professional & Confident') => {
     try {
+      const token = await getAccessToken();
       const res = await fetch('/api/generate-cover-letter', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           company,
           jobTitle,
@@ -1054,9 +1585,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // AI Summary Assistant
   const suggestAiSummary = async (): Promise<string> => {
     try {
+      const token = await getAccessToken();
       const res = await fetch('/api/suggest-summary', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           name: profile.name,
           targetRoleTitle: targetRole.title,
@@ -1076,10 +1611,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Username validation
   const validateUsername = async (username: string): Promise<{ available: boolean; message: string }> => {
     try {
+      const token = await getAccessToken();
       const res = await fetch(`/api/profile/check-username?username=${encodeURIComponent(username)}`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       const data = await res.json();
       return {
@@ -1091,32 +1625,48 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  // CV Version Controls
-  const duplicateCVVersion = (versionId: string) => {
+  // CV Version Controls — PostgreSQL is the source of truth (B.3.7).
+  const duplicateCVVersion = async (versionId: string) => {
     const existing = cvVersions.find(v => v.id === versionId);
     if (!existing) return;
-    const duplicated: CVVersion = {
-      ...existing,
-      id: `cv-v${Date.now()}`,
-      name: `${existing.name} (Copy)`,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setCvVersions(prev => [...prev, duplicated]);
-    logActivity({
-      actionType: 'uploaded_cv',
-      title: 'Duplicated CV Version',
-      subtitle: duplicated.name,
-      linkView: 'cv-studio'
-    });
+    try {
+      if (!existing.cvId) return;
+      const dto = await postCvVersion({
+        cvId: existing.cvId,
+        name: `${existing.name} (Copy)`,
+        targetRoleTitle: existing.targetRoleTitle,
+        profileJson: existing.profile,
+        atsAnalysis: existing.atsAnalysis,
+      });
+      setCvVersions(prev => [toCVVersion(dto), ...prev]);
+      void logActivity({
+        actionType: 'uploaded_cv',
+        title: 'Duplicated CV Version',
+        subtitle: dto.name,
+        linkView: 'cv-studio'
+      });
+    } catch (error) {
+      console.error('Failed to duplicate CV version:', error);
+    }
   };
 
-  const renameCVVersion = (versionId: string, newName: string) => {
-    setCvVersions(prev => prev.map(v => v.id === versionId ? { ...v, name: newName } : v));
+  const renameCVVersion = async (versionId: string, newName: string) => {
+    try {
+      const dto = await patchCvVersion(versionId, { name: newName });
+      setCvVersions(prev => prev.map(v => (v.id === versionId ? toCVVersion(dto) : v)));
+    } catch (error) {
+      console.error('Failed to rename CV version:', error);
+    }
   };
 
-  const deleteCVVersion = (versionId: string) => {
+  const deleteCVVersion = async (versionId: string) => {
     if (cvVersions.length <= 1) return;
-    setCvVersions(prev => prev.filter(v => v.id !== versionId));
+    try {
+      await deleteCvVersion(versionId);
+      setCvVersions(prev => prev.filter(v => v.id !== versionId));
+    } catch (error) {
+      console.error('Failed to delete CV version:', error);
+    }
   };
 
   // Job Bookmarks
@@ -1332,12 +1882,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Persistence to server & localStorage
   const syncStateToServer = async () => {
     try {
+      // The roadmap is owned by the dedicated /api/roadmap endpoints and is
+      // deliberately NOT part of this aggregate payload, so the two can never
+      // disagree about which copy is authoritative.
       const statePayload = {
         profile,
         targetRole,
         savedRoles,
         skills,
-        roadmapPhases,
         projects,
         evidenceItems,
         activeCV,
@@ -1346,11 +1898,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         interviewSessions,
         settings
       };
+      const token = await getAccessToken();
       await fetch('/api/state', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(statePayload)
       });
@@ -1359,6 +1912,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
+  // The server is the source of truth for these domains (POST /api/state plus the
+  // domain endpoints). localStorage is kept only as a local cache for the
+  // first paint before the backend hydration completes — it is never read as
+  // authoritative state.
   useEffect(() => {
     localStorage.setItem('careerpilot_profile', JSON.stringify(profile));
     localStorage.setItem('careerpilot_target_role', JSON.stringify(targetRole));
@@ -1518,20 +2075,19 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Authentication Handlers
   const login = async (email: string, password: string) => {
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setAuthToken(data.token);
-        setCurrentUser(data.user);
-        localStorage.setItem('careerpilot_token', data.token);
-        localStorage.setItem('careerpilot_user', JSON.stringify(data.user));
-        return { success: true };
+      if (!isSupabaseConfigured) {
+        return { success: false, error: 'Authentication is not configured' };
       }
-      return { success: false, error: data.error || 'Invalid credentials' };
+      const { data, error } = await getBrowserSupabase().auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error || !data.session) {
+        return { success: false, error: error?.message || 'Invalid credentials' };
+      }
+      setAuthToken(data.session.access_token);
+      setCurrentUser(toUserAccount(data.user, data.session.access_token));
+      return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message || 'Connection failed' };
     }
@@ -1539,31 +2095,41 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const register = async (name: string, email: string, password: string) => {
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setAuthToken(data.token);
-        setCurrentUser(data.user);
-        setProfile(prev => ({ ...prev, name, email }));
-        localStorage.setItem('careerpilot_token', data.token);
-        localStorage.setItem('careerpilot_user', JSON.stringify(data.user));
-        return { success: true };
+      if (!isSupabaseConfigured) {
+        return { success: false, error: 'Authentication is not configured' };
       }
-      return { success: false, error: data.error || 'Registration failed' };
+      const { data, error } = await getBrowserSupabase().auth.signUp({
+        email,
+        password,
+        options: {
+          // Display name is carried in user metadata; the authoritative id is
+          // always auth.users.id (== public.profiles.id).
+          data: { name },
+        },
+      });
+      if (error) {
+        return { success: false, error: error.message || 'Registration failed' };
+      }
+      if (!data.session) {
+        // Email confirmation is required before a session exists.
+        return {
+          success: false,
+          error: 'Account created. Please confirm your email to sign in.',
+        };
+      }
+      setAuthToken(data.session.access_token);
+      if (data.user) setCurrentUser(toUserAccount(data.user, data.session.access_token));
+      setProfile(prev => ({ ...prev, name, email }));
+      return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message || 'Connection failed' };
     }
   };
 
   const logout = () => {
-    fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    }).catch(() => {});
+    if (isSupabaseConfigured) {
+      getBrowserSupabase().auth.signOut().catch(() => {});
+    }
     setAuthToken(null);
     setCurrentUser(null);
     localStorage.removeItem('careerpilot_token');
@@ -1592,17 +2158,113 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setRoadmapPhases(generateInitialRoadmap(role));
   };
 
-  const saveRole = (role: TargetRole) => {
-    if (!savedRoles.some(r => r.id === role.id)) {
-      setSavedRoles(prev => [...prev, role]);
+  const saveRole = async (role: TargetRole) => {
+    try {
+      const dto = await postSavedRole({
+        roleId: role.id,
+        title: role.title,
+        category: role.category,
+        level: role.level,
+        payload: role,
+      });
+      setSavedRoles(prev =>
+        prev.some(r => r.id === role.id) ? prev : [...prev, toTargetRole(dto)]
+      );
+    } catch (error) {
+      console.error('Failed to save role:', error);
     }
   };
 
-  const removeSavedRole = (roleId: string) => {
-    setSavedRoles(prev => prev.filter(r => r.id !== roleId));
+  const removeSavedRole = async (roleId: string) => {
+    try {
+      await deleteSavedRole(roleId);
+      setSavedRoles(prev => prev.filter(r => r.id !== roleId));
+    } catch (error) {
+      console.error('Failed to remove saved role:', error);
+    }
   };
 
-  const updateProfile = (updates: Partial<UserProfile>) => {
+  // Profile writes are backend-first: the server is the source of truth, and
+  // the local state is only updated once the server has accepted the change.
+  // Fields the dedicated profile API owns are mapped to their column names;
+  // the rest (educations, experiences, and the aggregated preferences) keep
+  // flowing through the aggregate /api/state sync.
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    const payload: Record<string, unknown> = {};
+
+    if (updates.name !== undefined) payload.fullName = updates.name;
+    if (updates.preferredName !== undefined) payload.preferredName = updates.preferredName;
+    if (updates.phone !== undefined) payload.phone = updates.phone;
+    if (updates.location !== undefined) payload.location = updates.location;
+    if (updates.city !== undefined) payload.city = updates.city;
+    if (updates.country !== undefined) payload.country = updates.country;
+    if (updates.timezone !== undefined) payload.timezone = updates.timezone;
+    if (updates.headline !== undefined) payload.headline = updates.headline;
+    if (updates.currentTitle !== undefined) payload.currentTitle = updates.currentTitle;
+    if (updates.currentPosition !== undefined) payload.currentPosition = updates.currentPosition;
+    if (updates.currentCompany !== undefined) payload.currentCompany = updates.currentCompany;
+    if (updates.professionalSummary !== undefined)
+      payload.professionalSummary = updates.professionalSummary;
+    if (updates.bio !== undefined) payload.bio = updates.bio;
+    if (updates.username !== undefined) payload.username = updates.username;
+    if (updates.industry !== undefined) payload.targetIndustry = updates.industry;
+    if (updates.isPublic !== undefined) payload.isPublic = updates.isPublic;
+    if (updates.links !== undefined) {
+      payload.links = {
+        linkedin: updates.links.linkedin,
+        github: updates.links.github,
+        portfolio: updates.links.portfolio,
+        personalWebsite: updates.links.personalWebsite,
+        behance: updates.links.behance,
+        dribbble: updates.links.dribbble,
+        twitter: updates.links.twitter,
+      };
+    }
+    if (updates.onboardingCompleted !== undefined)
+      payload.onboardingCompleted = updates.onboardingCompleted;
+
+    if (Object.keys(payload).length > 0) {
+      try {
+        const saved = await patchProfile(payload as Partial<ProfileDTO>);
+        if (saved) {
+          setProfile(prev => ({
+            ...prev,
+            name: saved.fullName ?? prev.name,
+            preferredName: saved.preferredName ?? prev.preferredName,
+            phone: saved.phone ?? prev.phone,
+            location: saved.location ?? prev.location,
+            city: saved.city ?? prev.city,
+            country: saved.country ?? prev.country,
+            timezone: saved.timezone ?? prev.timezone,
+            headline: saved.headline ?? prev.headline,
+            currentTitle: saved.currentTitle ?? prev.currentTitle,
+            currentPosition: saved.currentPosition ?? prev.currentPosition,
+            currentCompany: saved.currentCompany ?? prev.currentCompany,
+            professionalSummary: saved.professionalSummary ?? prev.professionalSummary,
+            bio: saved.bio ?? prev.bio,
+            username: saved.username ?? prev.username,
+            industry: saved.targetIndustry ?? prev.industry,
+            links: {
+              linkedin: saved.links.find(l => l.kind === 'linkedin')?.url,
+              github: saved.links.find(l => l.kind === 'github')?.url,
+              portfolio: saved.links.find(l => l.kind === 'portfolio')?.url,
+              personalWebsite: saved.links.find(l => l.kind === 'personalWebsite')?.url,
+              behance: saved.links.find(l => l.kind === 'behance')?.url,
+              dribbble: saved.links.find(l => l.kind === 'dribbble')?.url,
+              twitter: saved.links.find(l => l.kind === 'twitter')?.url,
+            },
+            isPublic: saved.isPublic,
+            onboardingCompleted: saved.onboardingCompleted,
+          }));
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to persist profile update:', error);
+      }
+    }
+
+    // Fields the dedicated API does not own still update locally and are synced
+    // through the aggregate endpoint.
     setProfile(prev => ({ ...prev, ...updates }));
   };
 
@@ -1640,6 +2302,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       lastUpdated: new Date().toISOString().split('T')[0]
     };
     setSkills(prev => [...prev, newSkill]);
+    void logActivity({
+      actionType: 'acquired_skill',
+      title: 'Added Skill',
+      subtitle: newSkill.name,
+      linkView: 'skills',
+    });
   };
 
   const removeSkill = (skillId: string) => {
@@ -1649,9 +2317,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const refreshAiAnalysis = async () => {
     setIsAnalyzing(true);
     try {
+      const token = await getAccessToken();
       const res = await fetch('/api/analyze-career', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           targetRole,
           userSkills: skills,
@@ -1669,29 +2341,48 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const updateTaskStatus = (taskId: string, status: RoadmapTaskStatus) => {
-    setRoadmapPhases(prevPhases => {
-      return prevPhases.map(phase => {
-        const updatedMilestones = phase.milestones.map(milestone => {
-          const updatedTasks = milestone.tasks.map(t => {
-            if (t.id === taskId) {
-              return { ...t, status };
-            }
-            return t;
-          });
-          const completedCount = updatedTasks.filter(t => t.status === 'completed').length;
-          return {
-            ...milestone,
-            tasks: updatedTasks,
-            completedTasksCount: completedCount
-          };
+  // Task status is the roadmap's progress mutation — it goes to the server first
+  // so progress is persisted, and the local state is replaced by the server's
+  // authoritative roadmap on success.
+  const updateTaskStatus = async (taskId: string, status: RoadmapTaskStatus) => {
+    try {
+      const roadmap = await patchRoadmapTaskStatus(taskId, status);
+      if (roadmap) {
+        setRoadmapPhases(toRoadmapPhases(roadmap));
+      } else {
+        // The task id is a local (non-persisted) id: fall back to the local
+        // update so the UI still responds for a task that has no server row.
+        setRoadmapPhases(prevPhases =>
+          prevPhases.map(phase => ({
+            ...phase,
+            milestones: phase.milestones.map(milestone => {
+              const updatedTasks = milestone.tasks.map(t =>
+                t.id === taskId ? { ...t, status } : t
+              );
+              return {
+                ...milestone,
+                tasks: updatedTasks,
+                completedTasksCount: updatedTasks.filter(t => t.status === 'completed').length,
+              };
+            }),
+          }))
+        );
+      }
+      if (status === 'completed') {
+        const task = roadmapPhases
+          .flatMap(p => p.milestones)
+          .flatMap(m => m.tasks)
+          .find(t => t.id === taskId);
+        void logActivity({
+          actionType: 'completed_task',
+          title: 'Completed Roadmap Task',
+          subtitle: task?.title ?? 'Roadmap task',
+          linkView: 'roadmap',
         });
-        return {
-          ...phase,
-          milestones: updatedMilestones
-        };
-      });
-    });
+      }
+    } catch (error) {
+      console.error('Failed to update roadmap task:', error);
+    }
   };
 
   const addTask = (phaseId: string, milestoneId: string, task: Omit<RoadmapTask, 'id'>) => {
@@ -1716,8 +2407,18 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
   };
 
-  const enrollInRoadmap = () => {
-    setIsEnrolledInRoadmap(true);
+  const enrollInRoadmap = async () => {
+    try {
+      const roadmap = await enrollInRoadmapApi();
+      if (roadmap) {
+        setRoadmapPhases(toRoadmapPhases(roadmap));
+        setIsEnrolledInRoadmap(true);
+      } else {
+        setIsEnrolledInRoadmap(true);
+      }
+    } catch (error) {
+      console.error('Failed to enroll in roadmap:', error);
+    }
   };
 
   const toggleResourceEnrollment = (resourceId: string) => {
@@ -1726,50 +2427,135 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
   };
 
-  const addProject = (project: Omit<CareerProject, 'id' | 'createdAt'>) => {
-    const newProj: CareerProject = {
-      ...project,
-      id: `proj-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setProjects(prev => [newProj, ...prev]);
+  const addProject = async (project: Omit<CareerProject, 'id' | 'createdAt'>) => {
+    try {
+      const dto = await postProject({
+        title: project.title,
+        goal: project.goal,
+        description: project.description,
+        difficulty: project.difficulty,
+        status: project.status,
+        repositoryUrl: project.repositoryUrl,
+        demoUrl: project.demoUrl,
+        documentation: project.documentation,
+        tasks: project.tasks,
+        deliverables: project.deliverables,
+        skills: project.skills,
+      });
+      setProjects(prev => [toCareerProject(dto), ...prev]);
+      void logActivity({
+        actionType: 'added_project',
+        title: 'Added Project',
+        subtitle: project.title,
+        linkView: 'projects'
+      });
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    }
   };
 
-  const updateProject = (projectId: string, updates: Partial<CareerProject>) => {
-    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p));
+  const updateProject = async (projectId: string, updates: Partial<CareerProject>) => {
+    try {
+      const dto = await patchProject(projectId, {
+        title: updates.title,
+        goal: updates.goal,
+        description: updates.description,
+        difficulty: updates.difficulty,
+        status: updates.status,
+        repositoryUrl: updates.repositoryUrl,
+        demoUrl: updates.demoUrl,
+        documentation: updates.documentation,
+        tasks: updates.tasks,
+        deliverables: updates.deliverables,
+        skills: updates.skills,
+      });
+      setProjects(prev => prev.map(p => (p.id === projectId ? toCareerProject(dto) : p)));
+    } catch (error) {
+      console.error('Failed to update project:', error);
+    }
   };
 
-  const deleteProject = (projectId: string) => {
-    setProjects(prev => prev.filter(p => p.id !== projectId));
+  const deleteProject = async (projectId: string) => {
+    try {
+      await deleteProject(projectId);
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+    }
   };
 
-  const addEvidence = (evidence: Omit<EvidenceItem, 'id' | 'dateAdded'>) => {
-    const newEv: EvidenceItem = {
-      ...evidence,
-      id: `ev-${Date.now()}`,
-      dateAdded: new Date().toISOString().split('T')[0]
-    };
-    setEvidenceItems(prev => [newEv, ...prev]);
+  const addEvidence = async (evidence: Omit<EvidenceItem, 'id' | 'dateAdded'>) => {
+    try {
+      const dto = await postEvidence({
+        title: evidence.title,
+        type: evidence.type,
+        description: evidence.description,
+        url: evidence.url,
+        verified: evidence.verified,
+        projectId: evidence.projectId,
+        skillNames: evidence.skillNames,
+      });
+      setEvidenceItems(prev => [toEvidenceItem(dto), ...prev]);
+      void logActivity({
+        actionType: 'added_evidence',
+        title: 'Added Evidence',
+        subtitle: evidence.title,
+        linkView: 'evidence'
+      });
+    } catch (error) {
+      console.error('Failed to create evidence:', error);
+    }
   };
 
-  const deleteEvidence = (evidenceId: string) => {
-    setEvidenceItems(prev => prev.filter(e => e.id !== evidenceId));
+  const updateEvidence = async (
+    evidenceId: string,
+    updates: Partial<EvidenceItem>
+  ) => {
+    try {
+      const dto = await patchEvidence(evidenceId, {
+        title: updates.title,
+        type: updates.type,
+        description: updates.description,
+        url: updates.url,
+        verified: updates.verified,
+        dateAdded: updates.dateAdded,
+        projectId: updates.projectId,
+        skillNames: updates.skillNames,
+      });
+      setEvidenceItems(prev =>
+        prev.map(e => (e.id === evidenceId ? toEvidenceItem(dto) : e))
+      );
+    } catch (error) {
+      console.error('Failed to update evidence:', error);
+    }
+  };
+
+  const deleteEvidence = async (evidenceId: string) => {
+    try {
+      await deleteEvidence(evidenceId);
+      setEvidenceItems(prev => prev.filter(e => e.id !== evidenceId));
+    } catch (error) {
+      console.error('Failed to delete evidence:', error);
+    }
   };
 
   const updateCV = (updates: Partial<CVProfile>) => {
     setActiveCV(prev => ({ ...prev, ...updates }));
   };
 
-  const saveCVVersion = (name: string) => {
-    const newVer: CVVersion = {
-      id: `cv-v-${Date.now()}`,
-      name,
-      targetRoleTitle: targetRole.title,
-      createdAt: new Date().toISOString().split('T')[0],
-      profile: activeCV,
-      atsAnalysis: cvVersions[0]?.atsAnalysis
-    };
-    setCvVersions(prev => [newVer, ...prev]);
+  const saveCVVersion = async (name: string) => {
+    try {
+      const dto = await postCvVersion({
+        cvId: activeCvId,
+        name,
+        targetRoleTitle: targetRole.title,
+        profileJson: activeCV,
+        atsAnalysis: cvVersions[0]?.atsAnalysis,
+      });
+      setCvVersions(prev => [toCVVersion(dto), ...prev]);
+    } catch (error) {
+      console.error('Failed to save CV version:', error);
+    }
   };
 
   // Real CV Upload Pipeline implementation
@@ -1780,8 +2566,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       formData.append('file', file);
       formData.append('targetRoleTitle', targetRole.title);
 
+      const token = await getAccessToken();
       const res = await fetch('/api/resumes/upload', {
         method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData
       });
 
@@ -1823,9 +2611,13 @@ Experience: ${activeCV.experiences.map(e => `${e.role} at ${e.company} (${e.peri
 Education: ${activeCV.education.map(ed => `${ed.degree} in ${ed.field} - ${ed.institution}`).join('\n')}
 Skills: ${activeCV.skillsList.join(', ')}
 `;
+      const token = await getAccessToken();
       const res = await fetch('/api/optimize-cv', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           cvText,
           targetRoleTitle: targetRole.title,
@@ -1849,40 +2641,87 @@ Skills: ${activeCV.skillsList.join(', ')}
     }
   };
 
-  const addApplication = (application: Omit<JobApplication, 'id' | 'lastUpdated'>) => {
-    const newApp: JobApplication = {
-      ...application,
-      id: `app-${Date.now()}`,
-      lastUpdated: new Date().toISOString().split('T')[0]
-    };
-    setApplications(prev => [newApp, ...prev]);
+  const addApplication = async (
+    application: Omit<JobApplication, 'id' | 'lastUpdated'>
+  ) => {
+    try {
+      const dto = await postJobApplication({
+        jobId: application.jobId,
+        company: application.company,
+        role: application.role,
+        location: application.location,
+        workMode: application.workMode,
+        stage: application.stage,
+        appliedDate: application.appliedDate,
+        nextAction: application.nextAction,
+        nextActionDate: application.nextActionDate,
+        notes: application.notes,
+        salaryDiscussed: application.salaryDiscussed,
+        interviewStageDetails: application.interviewStageDetails,
+      });
+      setApplications(prev => [toJobApplication(dto), ...prev]);
+    } catch (error) {
+      console.error('Failed to create job application:', error);
+    }
   };
 
-  const updateApplicationStage = (id: string, stage: ApplicationStage) => {
-    setApplications(prev => prev.map(a => a.id === id ? { ...a, stage, lastUpdated: new Date().toISOString().split('T')[0] } : a));
+  const updateApplicationStage = async (id: string, stage: ApplicationStage) => {
+    try {
+      const dto = await patchJobApplication(id, { stage });
+      setApplications(prev => prev.map(a => (a.id === id ? toJobApplication(dto) : a)));
+    } catch (error) {
+      console.error('Failed to update application stage:', error);
+    }
   };
 
-  const updateApplicationNotes = (id: string, notes: string, nextAction?: string, nextActionDate?: string) => {
-    setApplications(prev => prev.map(a => a.id === id ? {
-      ...a,
-      notes,
-      nextAction: nextAction !== undefined ? nextAction : a.nextAction,
-      nextActionDate: nextActionDate !== undefined ? nextActionDate : a.nextActionDate,
-      lastUpdated: new Date().toISOString().split('T')[0]
-    } : a));
+  const updateApplicationNotes = async (
+    id: string,
+    notes: string,
+    nextAction?: string,
+    nextActionDate?: string
+  ) => {
+    try {
+      const dto = await patchJobApplication(id, {
+        notes,
+        nextAction,
+        nextActionDate,
+      });
+      setApplications(prev => prev.map(a => (a.id === id ? toJobApplication(dto) : a)));
+    } catch (error) {
+      console.error('Failed to update application notes:', error);
+    }
   };
 
-  const deleteApplication = (id: string) => {
-    setApplications(prev => prev.filter(a => a.id !== id));
+  const deleteApplication = async (id: string) => {
+    try {
+      await deleteJobApplication(id);
+      setApplications(prev => prev.filter(a => a.id !== id));
+    } catch (error) {
+      console.error('Failed to delete job application:', error);
+    }
   };
 
-  const saveInterviewSession = (session: Omit<MockInterviewSession, 'id' | 'createdAt'>) => {
-    const newSession: MockInterviewSession = {
-      ...session,
-      id: `mock-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setInterviewSessions(prev => [newSession, ...prev]);
+  const saveInterviewSession = async (
+    session: Omit<MockInterviewSession, 'id' | 'createdAt'>
+  ) => {
+    try {
+      const dto = await postInterviewSession({
+        roleTitle: session.roleTitle,
+        type: session.type,
+        question: session.question,
+        userAnswer: session.userAnswer,
+        aiFeedback: session.aiFeedback,
+      });
+      setInterviewSessions(prev => [toInterviewSession(dto), ...prev]);
+      void logActivity({
+        actionType: 'mock_interview',
+        title: 'Completed Mock Interview',
+        subtitle: session.roleTitle,
+        linkView: 'interviews'
+      });
+    } catch (error) {
+      console.error('Failed to save interview session:', error);
+    }
   };
 
   const sendCopilotMessage = async (text: string) => {
@@ -1908,9 +2747,13 @@ Skills: ${activeCV.skillsList.join(', ')}
         activeProjectTitle: projects.find(p => p.status === 'in_progress')?.title
       };
 
+      const token = await getAccessToken();
       const res = await fetch('/api/copilot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ userPrompt: text, context })
       });
 
@@ -2064,7 +2907,6 @@ Skills: ${activeCV.skillsList.join(', ')}
         logActivity,
         documents,
         addDocument,
-        updateDocument,
         deleteDocument,
         coverLetters,
         saveCoverLetter,

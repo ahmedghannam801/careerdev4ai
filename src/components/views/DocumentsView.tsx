@@ -27,7 +27,6 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
   const { 
     documents, 
     addDocument, 
-    updateDocument, 
     deleteDocument, 
     cvVersions, 
     duplicateCVVersion, 
@@ -138,17 +137,10 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
       keyHighlights: clHighlights,
       applicationId: selectedAppForCl || undefined
     });
-    // Also save into documents center
-    addDocument({
-      name: `${clForm.company} - Cover Letter.pdf`,
-      type: 'cover_letter',
-      format: 'pdf',
-      size: '95 KB',
-      isPublic: false,
-      contentPreview: activeClDraft.slice(0, 200) + '...',
-      relatedApplicationId: selectedAppForCl || undefined
-    });
-    alert('Cover letter saved to My Documents and Cover Letter Studio!');
+    // The cover letter is stored once, in `cover_letters` (the canonical
+    // source). The "My Documents" entry is derived from it — no duplicate
+    // record is written.
+    alert('Cover letter saved!');
   };
 
   return (

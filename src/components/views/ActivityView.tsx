@@ -23,7 +23,6 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
   const getActionIcon = (type: ActivityActionType) => {
     switch (type) {
       case 'completed_task':
-      case 'completed_course':
         return CheckCircle2;
       case 'applied_job':
       case 'saved_job':
@@ -48,7 +47,7 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
   const filteredActivities = filterType === 'all'
     ? activities
     : activities.filter(a => {
-        if (filterType === 'roadmap') return a.actionType === 'completed_task' || a.actionType === 'completed_course';
+        if (filterType === 'roadmap') return a.actionType === 'completed_task';
         if (filterType === 'jobs') return a.actionType === 'applied_job' || a.actionType === 'saved_job';
         if (filterType === 'interviews') return a.actionType === 'mock_interview';
         if (filterType === 'skills') return a.actionType === 'acquired_skill' || a.actionType === 'added_evidence';

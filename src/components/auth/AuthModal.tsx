@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { getBrowserSupabase } from '../../lib/supabase';
 
 export const AuthModal: React.FC = () => {
   const { authModalOpen, setAuthModalOpen, login, register } = useCareer();
@@ -43,11 +44,14 @@ export const AuthModal: React.FC = () => {
       }
     } else if (mode === 'forgot') {
       try {
-        await fetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
+        const { error } = await getBrowserSupabase().auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
         });
+        if (error) {
+          setLoading(false);
+          setError(error.message || 'Failed to send reset link');
+          return;
+        }
         setLoading(false);
         setSuccessMsg('If an account matches this email, a reset link has been dispatched.');
       } catch (err) {

@@ -6,9 +6,15 @@ coverage/
 *.log
 .env*
 !.env.example
+!.env.test.example
+.env.test
+
 .careerpilot_state.json
 secrets/
 credentials/
 local_db/
 *.tmp
 *.upload
+
+# Local Supabase CLI state (project ref, pooler URL — machine specific)
+supabase/.temp/

@@ -227,6 +227,8 @@ export interface ATSAnalysis {
 
 export interface CVVersion {
   id: string;
+  /** Owning CV (public.cvs.id) — links a version snapshot to its CV document. */
+  cvId?: string;
   name: string;
   targetRoleTitle: string;
   createdAt: string;
@@ -474,7 +476,6 @@ export interface SecondaryCareerGoal {
 
 export type ActivityActionType = 
   | 'completed_task' 
-  | 'completed_course' 
   | 'added_project' 
   | 'uploaded_cv' 
   | 'applied_job' 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Target, Sparkles, CheckCircle2, AlertCircle, Play, History, ArrowRight, HelpCircle } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { getAccessToken } from '../../lib/supabase';
 import { INTERVIEW_QUESTIONS_BANK, QuestionItem } from '../../data/interviewBank';
 
 export const InterviewsView: React.FC = () => {
@@ -20,9 +21,13 @@ export const InterviewsView: React.FC = () => {
     setIsEvaluating(true);
 
     try {
+      const token = await getAccessToken();
       const res = await fetch('/api/mock-interview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           roleTitle: targetRole.title,
           interviewType: activeQuestion.category,

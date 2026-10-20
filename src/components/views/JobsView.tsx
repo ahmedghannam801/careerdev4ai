@@ -59,7 +59,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
     return { matched, missing, matchPercentage };
   };
 
-  const handleTrackApplication = (job: JobListing, noteText?: string) => {
+  const handleTrackApplication = async (job: JobListing, noteText?: string) => {
     addApplication({
       jobId: job.id,
       company: job.company,
@@ -70,7 +70,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       notes: noteText || 'Saved from Job Market matches.',
       nextAction: 'Tailor CV in CV Studio and apply'
     });
-    logActivity({
+    await logActivity({
       actionType: 'saved_job',
       title: 'Converted Job to Application',
       subtitle: `${job.title} at ${job.company}`,

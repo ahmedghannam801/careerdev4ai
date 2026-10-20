@@ -1,0 +1,299 @@
+// The test runner.
+//
+// `npm test` runs this file. It owns the whole lifecycle of a test run:
+//
+//   1. load the test environment (and fail clearly if a credential is missing)
+//   2. clean up anything a previous, interrupted run left behind
+//   3. start exactly ONE isolated API server and wait until it is healthy
+//   4. run every test file against that server
+//   5. stop the server
+//   6. clean up everything this run created
+//   7. exit non-zero if any test failed
+//
+// Design notes that matter on Windows:
+//
+//   * The server is a direct child of this process (see server-harness.mjs), so
+//     it can always be terminated. Nothing is left running after the run.
+//   * The ports are chosen by the OS at run time, so a development server, a
+//     stale process or a second concurrent run cannot collide with the suite.
+//   * The restart test needs a port of its own; it is given a second, separate
+//     free port so restarting it never collides with the shared server.
+//
+// This file is plain ESM JavaScript: it must be runnable before any TypeScript
+// tooling is known to be healthy, so that a loader problem is reported as a
+// loader problem and not as a mysterious test failure.
+
+import { spawn } from 'child_process';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { setTimeout as sleep } from 'timers/promises';
+import { loadTestEnv, REPO_ROOT } from './env.mjs';
+import { startServer, findFreePort, resolveTsxLoaderUrl } from './server-harness.mjs';
+import {
+  createAdminClient,
+  deleteAllTestIdentities,
+  listTestIdentities,
+  deleteSkillsById,
+  listSkillIds,
+  removeTestStorageFolders,
+  listOrphanedStorageFolders,
+} from './cleanup.mjs';
+
+const TESTS_DIR = join(REPO_ROOT, 'tests');
+
+/** The legacy JSON state file the suite must never write to. */
+const STATE_FILE = join(REPO_ROOT, '.careerpilot_state.json');
+
+function log(message) {
+  console.log(`[test] ${message}`);
+}
+
+function fail(message) {
+  console.error(`[test] ${message}`);
+}
+
+/**
+ * The server the current run started, kept at module scope so that an
+ * interrupt can stop it. Without this the server would survive the runner and
+ * keep holding its port.
+ */
+let activeServer = null;
+
+/** Reads a file's bytes for the unchanged-check, or null when it is absent. */
+function readFileOrNull(path) {
+  if (!existsSync(path)) return null;
+  return readFileSync(path);
+}
+
+/**
+ * Runs the test files with Node's built-in test runner.
+ *
+ * The tsx loader is passed with --import so that each test file — which runs in
+ * its own child process — can import TypeScript directly. The file list is
+ * passed explicitly rather than as a glob: Node's own glob handling has
+ * changed between releases, and an explicit list is unambiguous.
+ */
+function runTestFiles(files, { baseUrl, env }) {
+  return new Promise((resolve) => {
+    const loader = resolveTsxLoaderUrl();
+    const child = spawn(
+      process.execPath,
+      [
+        '--import',
+        loader,
+        '--test',
+        '--test-concurrency=1',
+        '--test-reporter=spec',
+        ...files,
+      ],
+      {
+        cwd: REPO_ROOT,
+        env: { ...process.env, ...env, TEST_API_BASE_URL: baseUrl },
+        stdio: ['ignore', 'inherit', 'inherit'],
+        windowsHide: true,
+      }
+    );
+
+    child.on('close', (code) => resolve(code ?? 1));
+    child.on('error', (error) => {
+      fail(`Could not start the test runner: ${error.message}`);
+      resolve(1);
+    });
+  });
+}
+
+async function main() {
+  let exitCode = 0;
+  let server = null;
+  let admin = null;
+  let skillIdsBefore = new Set();
+  const createdUserIds = [];
+
+  // The state file must be byte-identical after the run.
+  const stateBefore = readFileOrNull(STATE_FILE);
+
+  // Fail fast and clearly if the environment is not configured.
+  let env;
+  try {
+    env = loadTestEnv();
+  } catch (error) {
+    fail(error.message);
+    return 1;
+  }
+
+  admin = createAdminClient(env);
+
+  // A previous run may have been interrupted. Sweep before starting so the
+  // suite starts from a clean slate.
+  try {
+    const stale = await listTestIdentities(admin);
+    if (stale.length > 0) {
+      log(`sweeping ${stale.length} leftover test identit${stale.length === 1 ? 'y' : 'ies'} from an earlier run`);
+    }
+    skillIdsBefore = await listSkillIds(admin);
+    const removedIds = await deleteAllTestIdentities(admin);
+    createdUserIds.push(...removedIds);
+  } catch (error) {
+    fail(`Could not clean up before the run: ${error.message}`);
+    return 1;
+  }
+
+  // Find the test files.
+  const testFiles = [
+    join(TESTS_DIR, 'auth.test.ts'),
+    join(TESTS_DIR, 'domains.test.ts'),
+    join(TESTS_DIR, 'persistence.test.ts'),
+    join(TESTS_DIR, 'restart.test.ts'),
+  ].filter((file) => existsSync(file));
+
+  if (testFiles.length === 0) {
+    fail('No test files were found in tests/.');
+    return 1;
+  }
+
+  // Pick free ports up front so the shared server and the restart server can
+  // never collide with each other or with anything already running.
+  let sharedPort;
+  let restartPort;
+  try {
+    sharedPort = await findFreePort();
+    restartPort = await findFreePort();
+    while (restartPort === sharedPort) restartPort = await findFreePort();
+  } catch (error) {
+    fail(`Could not reserve a test port: ${error.message}`);
+    return 1;
+  }
+
+  try {
+    log(`starting an isolated server on port ${sharedPort}`);
+    server = await startServer({ port: sharedPort, env });
+    activeServer = server;
+    log(`server ready at ${server.baseUrl}`);
+  } catch (error) {
+    fail(`Could not start the test server: ${error.message}`);
+    return 1;
+  }
+
+  try {
+    const code = await runTestFiles(testFiles, {
+      baseUrl: server.baseUrl,
+      env: {
+        ...env,
+        TEST_API_PORT: String(sharedPort),
+        TEST_RESTART_PORT: String(restartPort),
+        // The restart test starts its own server on TEST_RESTART_PORT.
+        TEST_API_BASE_URL: server.baseUrl,
+      },
+    });
+    exitCode = code;
+  } finally {
+    log('stopping the test server');
+    await server.stop();
+    activeServer = null;
+    server = null;
+  }
+
+  // ---- Cleanup ------------------------------------------------------------
+  //
+  // Everything the run created is removed here, whether the tests passed or
+  // failed. The skill catalogue is swept by comparing against the snapshot
+  // taken before the run: only rows that are new are removed, so a skill that
+  // already existed for a real user is never touched.
+  log('cleaning up the data this run created');
+  try {
+    const skillIdsAfter = await listSkillIds(admin);
+    const newSkillIds = [...skillIdsAfter].filter((id) => !skillIdsBefore.has(id));
+    if (newSkillIds.length > 0) {
+      await deleteSkillsById(admin, newSkillIds);
+      log(`removed ${newSkillIds.length} catalogue skill row(s) created by this run`);
+    }
+
+    const removedIds = await deleteAllTestIdentities(admin);
+    createdUserIds.push(...removedIds);
+
+    // Storage folders of the identities this run created, plus the folders of
+    // any identity an earlier interrupted run left behind.
+    const storageIds = [...new Set(createdUserIds)];
+    const removedObjects = await removeTestStorageFolders(admin, storageIds);
+    if (removedObjects.length > 0) {
+      log(`removed ${removedObjects.length} storage object(s)`);
+    }
+  } catch (error) {
+    fail(`Cleanup failed: ${error.message}`);
+    exitCode = exitCode === 0 ? 1 : exitCode;
+  }
+
+  // ---- Verification -------------------------------------------------------
+  const stateAfter = readFileOrNull(STATE_FILE);
+  if (
+    (stateBefore === null) !== (stateAfter === null) ||
+    (stateBefore !== null && !stateBefore.equals(stateAfter))
+  ) {
+    fail('.careerpilot_state.json was modified by the test run. It must never be written to.');
+    exitCode = exitCode === 0 ? 1 : exitCode;
+  } else {
+    log('.careerpilot_state.json is unchanged');
+  }
+
+  // Give a just-deleted identity a moment to disappear from the auth list.
+  await sleep(500);
+  try {
+    const remaining = await listTestIdentities(admin);
+    if (remaining.length > 0) {
+      fail(`${remaining.length} test identity/identities still exist after cleanup:`);
+      for (const { email } of remaining) fail(`  - ${email}`);
+      exitCode = exitCode === 0 ? 1 : exitCode;
+    } else {
+      log('no test identities remain');
+    }
+
+    // A bucket folder whose owner no longer exists is unreachable by any
+    // authenticated user. The suite removes a folder *before* it removes the
+    // identity, so this run cannot have produced one; anything reported here
+    // predates the suite and is reported rather than silently deleted.
+    const orphaned = await listOrphanedStorageFolders(admin);
+    if (orphaned.length > 0) {
+      fail(`${orphaned.length} orphaned CV storage folder(s) found (owner no longer exists):`);
+      for (const name of orphaned) fail(`  - ${name}`);
+      exitCode = exitCode === 0 ? 1 : exitCode;
+    } else {
+      log('no orphaned storage objects remain');
+    }
+  } catch (error) {
+    fail(`Could not verify the cleanup: ${error.message}`);
+    exitCode = exitCode === 0 ? 1 : exitCode;
+  }
+
+  if (exitCode === 0) {
+    log('PASS');
+  } else {
+    fail('FAIL');
+  }
+  return exitCode;
+}
+
+// Never leave a stray server behind, whatever happens: an interrupt must stop
+// the server before the runner exits, or the port would stay occupied.
+let shuttingDown = false;
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.error(`\n[test] received ${signal} — stopping the test server`);
+    const stop = activeServer
+      ? activeServer.stop()
+      : Promise.resolve();
+    stop
+      .catch(() => {})
+      .finally(() => process.exit(130));
+  });
+}
+
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((error) => {
+    fail(error?.stack ?? String(error));
+    process.exitCode = 1;
+  });
