@@ -216,6 +216,13 @@ async function main() {
     join(TESTS_DIR, 'auth.test.ts'),
     join(TESTS_DIR, 'domains.test.ts'),
     join(TESTS_DIR, 'persistence.test.ts'),
+    join(TESTS_DIR, 'regression.test.ts'),
+    join(TESTS_DIR, 'lifecycle.test.ts'),
+    join(TESTS_DIR, 'roadmap.test.ts'),
+    join(TESTS_DIR, 'skills.test.ts'),
+    join(TESTS_DIR, 'notifications.test.ts'),
+    join(TESTS_DIR, 'security.test.ts'),
+    join(TESTS_DIR, 'coverage.test.ts'),
     join(TESTS_DIR, 'restart.test.ts'),
   ].filter((file) => existsSync(file));
 

@@ -33,6 +33,13 @@ export interface TestUser {
   email: string;
   password: string;
   token: string;
+  /**
+   * A browser client bound to THIS user's session.
+   *
+   * Each test user gets its own client so that signing one out cannot
+   * invalidate another test's session — the shared `anon` client would.
+   */
+  client: SupabaseClient;
 }
 
 export async function createTestUser(label: string): Promise<TestUser> {
@@ -52,7 +59,12 @@ export async function createTestUser(label: string): Promise<TestUser> {
     .from('profiles')
     .upsert({ id: data.user.id, full_name: `Test ${label}` }, { onConflict: 'id' });
 
-  const { data: session, error: signInError } = await anon.auth.signInWithPassword({
+  // A dedicated client per user: signing one user out must not affect
+  // another user's session.
+  const client = createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: session, error: signInError } = await client.auth.signInWithPassword({
     email,
     password,
   });
@@ -60,7 +72,13 @@ export async function createTestUser(label: string): Promise<TestUser> {
     throw new Error(`signIn failed: ${signInError?.message}`);
   }
 
-  return { id: data.user.id, email, password, token: session.session.access_token };
+  return {
+    id: data.user.id,
+    email,
+    password,
+    token: session.session.access_token,
+    client,
+  };
 }
 
 /**
@@ -102,6 +120,60 @@ export async function deleteStorageObject(path: string): Promise<void> {
   await admin.storage.from('cv-files').remove([path]);
 }
 
+/**
+ * Signs a test user out and back in, returning a FRESH access token.
+ *
+ * This proves that a user's data survives a logout/login cycle: the token is
+ * a new session, so the server reads the rows from the database rather than
+ * from any in-memory state.
+ */
+export async function reauthenticate(user: TestUser): Promise<string> {
+  const { data, error } = await user.client.auth.signInWithPassword({
+    email: user.email,
+    password: user.password,
+  });
+  if (error || !data?.session) {
+    throw new Error(`reauthenticate failed: ${error?.message}`);
+  }
+  return data.session.access_token;
+}
+
+/** Signs a test user's session out. */
+export async function signOut(user: TestUser): Promise<void> {
+  const { error } = await user.client.auth.signOut();
+  if (error) throw new Error(`signOut failed: ${error.message}`);
+}
+
+/** Reads a user's `experiences` rows straight from the database. */
+export async function readExperienceRows(userId: string): Promise<any[]> {
+  const { data, error } = await admin
+    .from('experiences')
+    .select('*')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return (data ?? []) as any[];
+}
+
+/** Reads a user's `educations` rows straight from the database. */
+export async function readEducationRows(userId: string): Promise<any[]> {
+  const { data, error } = await admin
+    .from('educations')
+    .select('*')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return (data ?? []) as any[];
+}
+
+/** Reads a user's `user_skills` rows straight from the database. */
+export async function readUserSkillRows(userId: string): Promise<any[]> {
+  const { data, error } = await admin
+    .from('user_skills')
+    .select('*')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return (data ?? []) as any[];
+}
+
 export interface ApiResponse {
   status: number;
   body: any;
@@ -121,10 +193,43 @@ export async function api(
     `http://127.0.0.1:${process.env.TEST_API_PORT ?? '3111'}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
+  // A GET/HEAD request must not carry a body — fetch rejects it outright.
+  const hasBody = options.body !== undefined && method !== 'GET' && method !== 'HEAD';
   const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: hasBody ? JSON.stringify(options.body) : undefined,
+  });
+  let body: any = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  return { status: res.status, body };
+}
+
+/**
+ * The same request as `api`, but WITHOUT an Authorization header.
+ *
+ * Used to prove that a route is genuinely public, and — more importantly —
+ * that a private resource stays private from an anonymous caller.
+ */
+export async function apiAnonymous(
+  method: string,
+  path: string,
+  options: { body?: unknown; baseUrl?: string } = {}
+): Promise<ApiResponse> {
+  const baseUrl =
+    options.baseUrl ??
+    process.env.TEST_API_BASE_URL ??
+    `http://127.0.0.1:${process.env.TEST_API_PORT ?? '3111'}`;
+  // A GET/HEAD request must not carry a body — fetch rejects it outright.
+  const hasBody = options.body !== undefined && method !== 'GET' && method !== 'HEAD';
+  const res = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: hasBody ? JSON.stringify(options.body) : undefined,
   });
   let body: any = null;
   try {

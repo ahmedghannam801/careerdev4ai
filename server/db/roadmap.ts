@@ -92,6 +92,24 @@ export interface CreateRoadmapTaskInput {
   estimatedHours?: number;
 }
 
+/**
+ * The shape the frontend sends when it persists a whole roadmap tree.
+ *
+ * It mirrors the frontend's `RoadmapPhase` view-model, minus the local-only
+ * ids: the ids are assigned by the database.
+ */
+export interface RoadmapTreePhaseInput {
+  phaseNumber: number;
+  title: string;
+  description?: string;
+  isUnlocked?: boolean;
+  milestones: Array<{
+    title: string;
+    description?: string;
+    tasks: CreateRoadmapTaskInput[];
+  }>;
+}
+
 interface RoadmapRow {
   id: string;
   title: string;
@@ -292,6 +310,139 @@ export async function createRoadmap(
     .single();
   if (error) throw error;
   return toRoadmapDTO(data as RoadmapRow, []);
+}
+
+/**
+ * Creates a phase on a roadmap owned by the given profile.
+ *
+ * Ownership: the roadmap must belong to the profile. A profile has at most one
+ * roadmap (UNIQUE profile_id), so the roadmap id is the profile's roadmap.
+ */
+export async function addPhase(
+  profileId: string,
+  roadmapId: string,
+  input: { phaseNumber: number; title: string; description?: string; isUnlocked?: boolean }
+): Promise<RoadmapPhaseDTO | null> {
+  const { data: roadmap } = await getSupabaseServer()
+    .from('roadmaps')
+    .select('id')
+    .eq('id', roadmapId)
+    .eq('profile_id', profileId)
+    .maybeSingle();
+  if (!roadmap) return null;
+
+  const { count } = await getSupabaseServer()
+    .from('roadmap_phases')
+    .select('id', { count: 'exact', head: true })
+    .eq('roadmap_id', roadmapId);
+  const sortOrder = count ?? 0;
+
+  const { data, error } = await getSupabaseServer()
+    .from('roadmap_phases')
+    .insert({
+      roadmap_id: roadmapId,
+      phase_number: input.phaseNumber,
+      title: input.title,
+      description: input.description ?? null,
+      is_unlocked: input.isUnlocked ?? true,
+      sort_order: sortOrder,
+    })
+    .select('id, roadmap_id, phase_number, title, description, is_unlocked, sort_order')
+    .single();
+  if (error) throw error;
+  return toPhaseDTO(data as PhaseRow, []);
+}
+
+/**
+ * Creates a milestone on a phase of a roadmap owned by the given profile.
+ *
+ * Ownership is proven by walking phase -> roadmap -> profile, so a caller
+ * cannot attach a milestone to another user's phase.
+ */
+export async function addMilestone(
+  profileId: string,
+  phaseId: string,
+  input: { title: string; description?: string }
+): Promise<RoadmapMilestoneDTO | null> {
+  const { data: phase } = await getSupabaseServer()
+    .from('roadmap_phases')
+    .select('id, roadmap_id')
+    .eq('id', phaseId)
+    .maybeSingle();
+  if (!phase) return null;
+
+  const { data: roadmap } = await getSupabaseServer()
+    .from('roadmaps')
+    .select('id, profile_id')
+    .eq('id', (phase as { roadmap_id: string }).roadmap_id)
+    .maybeSingle();
+  if (!roadmap || (roadmap as { profile_id: string }).profile_id !== profileId) return null;
+
+  const { count } = await getSupabaseServer()
+    .from('roadmap_milestones')
+    .select('id', { count: 'exact', head: true })
+    .eq('phase_id', phaseId);
+  const sortOrder = count ?? 0;
+
+  const { data, error } = await getSupabaseServer()
+    .from('roadmap_milestones')
+    .insert({
+      phase_id: phaseId,
+      title: input.title,
+      description: input.description ?? null,
+      sort_order: sortOrder,
+    })
+    .select('id, phase_id, title, description, sort_order')
+    .single();
+  if (error) throw error;
+  return toMilestoneDTO(data as MilestoneRow, []);
+}
+
+/**
+ * Creates a complete roadmap — phases, milestones and tasks — in one call.
+ *
+ * The frontend used to generate this tree locally and never persist it, which
+ * meant a new user had no roadmap row at all. The tree is written bottom-up so
+ * every foreign key is satisfied in order, and the returned DTO carries the
+ * REAL database ids so the client can address the persisted rows.
+ *
+ * A profile has at most one roadmap (UNIQUE profile_id), so an existing
+ * roadmap is replaced: its phases cascade away with it.
+ */
+export async function createRoadmapWithTree(
+  profileId: string,
+  input: CreateRoadmapInput & { phases?: RoadmapTreePhaseInput[] }
+): Promise<RoadmapDTO> {
+  const existing = await getRoadmap(profileId);
+  if (existing) {
+    await deleteRoadmap(profileId);
+  }
+
+  const roadmap = await createRoadmap(profileId, input);
+
+  for (const phaseInput of input.phases ?? []) {
+    const phase = await addPhase(profileId, roadmap.id, {
+      phaseNumber: phaseInput.phaseNumber,
+      title: phaseInput.title,
+      description: phaseInput.description,
+      isUnlocked: phaseInput.isUnlocked,
+    });
+    if (!phase) continue;
+
+    for (const milestoneInput of phaseInput.milestones ?? []) {
+      const milestone = await addMilestone(profileId, phase.id, {
+        title: milestoneInput.title,
+        description: milestoneInput.description,
+      });
+      if (!milestone) continue;
+
+      for (const taskInput of milestoneInput.tasks ?? []) {
+        await addTask(profileId, phase.id, milestone.id, taskInput);
+      }
+    }
+  }
+
+  return (await getRoadmap(profileId)) ?? roadmap;
 }
 
 /** Enrols the profile in its roadmap (the app shows an enrolment gate). */

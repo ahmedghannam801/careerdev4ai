@@ -2,8 +2,6 @@ import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
-import crypto from 'crypto';
 import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { verifySupabaseToken } from './server/auth/supabase-auth.ts';
@@ -16,13 +14,45 @@ import {
   listRoadmaps,
   getRoadmap,
   createRoadmap,
+  createRoadmapWithTree,
   enrollInRoadmap,
   updateTaskStatus,
   addTask,
   deleteRoadmap,
   ROADMAP_TASK_STATUSES,
   type RoadmapTaskStatus,
+  type RoadmapTreePhaseInput,
 } from './server/db/roadmap.ts';
+import {
+  listExperiences,
+  getExperience,
+  createExperience,
+  updateExperience,
+  deleteExperience,
+} from './server/db/experiences.ts';
+import {
+  listEducations,
+  getEducation,
+  createEducation,
+  updateEducation,
+  deleteEducation,
+} from './server/db/educations.ts';
+import {
+  getUserSkills,
+  resolveSkillId,
+  setUserSkillLevel,
+  deleteUserSkill,
+} from './server/db/userSkills.ts';
+import {
+  listNotifications,
+  createNotification,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
+  clearNotifications,
+  NOTIFICATION_TYPES,
+  type NotificationType,
+} from './server/db/notifications.ts';
 import { getProfileDto, updateProfileDto } from './server/db/profile.ts';
 import {
   createCv,
@@ -148,6 +178,37 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
+// CORS (B.3.9 finding P-2).
+//
+// The API is served from the same origin as the app, so no cross-origin
+// access is needed in production. Rather than leaving the behaviour
+// undefined — which would silently break if a separate frontend origin were
+// ever introduced, or silently open up if a permissive default were added
+// later — the allowed origins are declared explicitly.
+//
+// A request whose Origin is not allowed gets no CORS headers, which the
+// browser refuses. Same-origin and server-to-server requests are unaffected.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+
+app.use((req: Request, res: Response, next: () => void) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    res.setHeader('Access-Control-Max-Age', '600');
+  }
+  if (req.method === 'OPTIONS') {
+    // Preflight is answered here; no route handler needs to run.
+    return res.status(204).end();
+  }
+  next();
+});
+
 // Multer in-memory storage for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -155,6 +216,19 @@ const upload = multer({
 });
 
 // Initialize Gemini Client
+//
+// B.3.9 finding P-3: the key is validated at startup so a missing key is
+// reported clearly instead of surfacing as a confusing failure on the first
+// AI request. The application still starts — the AI routes are the only ones
+// that need the key — but the problem is stated plainly at boot.
+if (!process.env.GEMINI_API_KEY) {
+  console.warn(
+    '[server] GEMINI_API_KEY is not set. The AI routes (/api/copilot, ' +
+      '/api/analyze-career, /api/optimize-cv, /api/mock-interview, ' +
+      '/api/suggest-summary, /api/generate-cover-letter) will fail until it is configured.'
+  );
+}
+
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
   httpOptions: {
@@ -164,201 +238,19 @@ const ai = new GoogleGenAI({
   },
 });
 
-// Persistent database file
-const DATA_FILE = path.join(__dirname, '.careerpilot_state.json');
-
-interface DatabaseStore {
-  users: Record<string, {
-    id: string;
-    email: string;
-    name: string;
-    passwordHash: string;
-    salt: string;
-    createdAt: string;
-  }>;
-  sessions: Record<string, string>; // token -> userId
-  userStates: Record<string, any>;   // userId -> careerState
-}
-
-function loadDatabase(): DatabaseStore {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const content = fs.readFileSync(DATA_FILE, 'utf-8');
-      const parsed = JSON.parse(content);
-      if (parsed.users && parsed.sessions) {
-        return parsed;
-      }
-      // Migrate legacy state if needed
-      return {
-        users: {},
-        sessions: {},
-        userStates: { default: parsed }
-      };
-    }
-  } catch (e) {
-    console.error('Error reading database file:', e);
-  }
-  return { users: {}, sessions: {}, userStates: {} };
-}
-
-function saveDatabase(db: DatabaseStore) {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf-8');
-  } catch (e) {
-    console.error('Error writing database file:', e);
-  }
-}
-
-// Password hashing helper
-function hashPassword(password: string, salt: string): string {
-  return crypto.scryptSync(password, salt, 64).toString('hex');
-}
-
-// Seed default user account if not exists
-const db = loadDatabase();
-const DEFAULT_EMAIL = 'sarah.jenkins@example.com';
-if (!Object.values(db.users).some(u => u.email === DEFAULT_EMAIL)) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const user = {
-    id: 'user-default-1',
-    email: DEFAULT_EMAIL,
-    name: 'Sarah Jenkins',
-    passwordHash: hashPassword('password123', salt),
-    salt,
-    createdAt: new Date().toISOString()
-  };
-  db.users[user.id] = user;
-  db.sessions['demo-session-token-123'] = user.id;
-  saveDatabase(db);
-}
-
 // Health Check
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// AUTH: Register
-app.post('/api/auth/register', (req: Request, res: Response) => {
-  try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required' });
-    }
-
-    const currentDb = loadDatabase();
-    const existing = Object.values(currentDb.users).find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      return res.status(409).json({ error: 'An account with this email already exists' });
-    }
-
-    const salt = crypto.randomBytes(16).toString('hex');
-    const newUser = {
-      id: `user-${Date.now()}`,
-      email: email.toLowerCase(),
-      name,
-      passwordHash: hashPassword(password, salt),
-      salt,
-      createdAt: new Date().toISOString()
-    };
-
-    const token = crypto.randomBytes(32).toString('hex');
-    currentDb.users[newUser.id] = newUser;
-    currentDb.sessions[token] = newUser.id;
-    saveDatabase(currentDb);
-
-    return res.json({
-      success: true,
-      token,
-      user: { id: newUser.id, name: newUser.name, email: newUser.email }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    return res.status(500).json({ error: 'Failed to register account' });
-  }
-});
-
-// AUTH: Login
-app.post('/api/auth/login', (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    const currentDb = loadDatabase();
-    const user = Object.values(currentDb.users).find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const checkHash = hashPassword(password, user.salt);
-    if (checkHash !== user.passwordHash) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = crypto.randomBytes(32).toString('hex');
-    currentDb.sessions[token] = user.id;
-    saveDatabase(currentDb);
-
-    return res.json({
-      success: true,
-      token,
-      user: { id: user.id, name: user.name, email: user.email }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    return res.status(500).json({ error: 'Failed to authenticate' });
-  }
-});
-
-// AUTH: Current User Session
-app.get('/api/auth/me', async (req: Request, res: Response) => {
-  // Authoritative identity: verified Supabase Auth token only.
-  const auth = await verifySupabaseToken(req.headers.authorization);
-  if (auth.status !== 'valid') {
-    return res.status(401).json({ error: 'Missing session token' });
-  }
-
-  const profile = await getProfile(auth.userId);
-  return res.json({
-    success: true,
-    user: profile
-      ? {
-          id: profile.id,
-          name: profile.full_name,
-          email: auth.email,
-          avatarUrl: profile.avatar_url,
-        }
-      : {
-          id: auth.userId,
-          name: null,
-          email: auth.email,
-        },
-  });
-});
-
-// AUTH: Logout
-app.post('/api/auth/logout', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.replace('Bearer ', '');
-  if (token) {
-    const currentDb = loadDatabase();
-    delete currentDb.sessions[token];
-    saveDatabase(currentDb);
-  }
-  return res.json({ success: true, message: 'Logged out successfully' });
-});
-
-// AUTH: Reset Password Request
-app.post('/api/auth/reset-password', (req: Request, res: Response) => {
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
-  }
-  return res.json({ success: true, message: 'Password reset link sent if account exists.' });
-});
-
 // Persistent State Load
+//
+// DEPRECATED — read-only. The aggregate payload is a compatibility view for
+// the profile/preferences columns only. Every domain that has a dedicated
+// endpoint (projects, evidence, CVs, roadmap, skills, experiences, education,
+// certifications, languages, links, career identity, saved roles, job
+// applications, interviews, activities, secondary goals, milestones, cover
+// letters) is read from ITS OWN table, never from this payload.
 app.get('/api/state', async (req: Request, res: Response) => {
   try {
     // Authoritative identity: verified Supabase Auth token only.
@@ -375,6 +267,19 @@ app.get('/api/state', async (req: Request, res: Response) => {
 });
 
 // Persistent State Save
+//
+// DEPRECATED and NON-DESTRUCTIVE.
+//
+// This endpoint used to DELETE every one of the caller's `experiences` and
+// `educations` rows and re-insert whatever the payload contained. Combined
+// with the frontend's demo-seeded initial profile and its unconditional
+// auto-sync, that destroyed a real user's employment and education history on
+// first load (B.3.8 finding C-1).
+//
+// The endpoint is kept only as a compatibility shim for the profile and
+// preferences columns. It NEVER replaces a collection: the collection-owning
+// fields are reported as unmapped so the caller can see they were not applied,
+// and the caller must use the dedicated endpoints for them.
 app.post('/api/state', async (req: Request, res: Response) => {
   try {
     // Authoritative identity: verified Supabase Auth token only.
@@ -388,15 +293,262 @@ app.post('/api/state', async (req: Request, res: Response) => {
       // Report, never silently drop.
       console.warn('Unmapped state fields (no column in current schema):', unmapped.join(', '));
     }
-    await saveState(auth.userId, stateData);
+    const { unmappedCollections } = await saveState(auth.userId, stateData);
+    if (unmappedCollections.length > 0) {
+      // These collections are owned by their own endpoints. They are reported
+      // so the caller knows they were NOT applied here — this endpoint never
+      // replaces them.
+      console.warn(
+        'Collections ignored by the aggregate endpoint (use their own endpoints):',
+        unmappedCollections.join(', ')
+      );
+    }
     return res.json({
       success: true,
       message: 'State saved successfully',
+      deprecated: true,
       ...(unmapped.length > 0 ? { unmappedFields: unmapped } : {}),
+      ...(unmappedCollections.length > 0 ? { unmappedCollections } : {}),
     });
   } catch (error) {
     console.error('Error writing state:', error);
     return res.status(500).json({ error: 'Failed to persist state' });
+  }
+});
+
+// ---- Experiences ----
+//
+// Dedicated persistence for public.experiences. The owner is always the
+// verified Supabase Auth user id; a client-supplied user id is never used.
+app.get('/api/experiences', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const experiences = await listExperiences(req.authUser!.id);
+    return res.json({ success: true, experiences });
+  } catch (error) {
+    console.error('Failed to list experiences:', error);
+    return res.status(500).json({ error: 'Failed to load experiences' });
+  }
+});
+
+app.get('/api/experiences/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const experience = await getExperience(req.authUser!.id, req.params.id);
+    if (!experience) return res.status(404).json({ error: 'Experience not found' });
+    return res.json({ success: true, experience });
+  } catch (error) {
+    console.error('Failed to load experience:', error);
+    return res.status(500).json({ error: 'Failed to load experience' });
+  }
+});
+
+app.post('/api/experiences', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const role = str(body.role, 200);
+    if (!role) return res.status(400).json({ error: 'Role is required' });
+    const company = str(body.company, 200);
+    if (!company) return res.status(400).json({ error: 'Company is required' });
+    const experience = await createExperience(req.authUser!.id, {
+      role,
+      company,
+      employmentType: str(body.employmentType, 60) ?? undefined,
+      location: str(body.location, 200) ?? undefined,
+      startDate: str(body.startDate, 40) ?? undefined,
+      endDate: str(body.endDate, 40) ?? undefined,
+      isCurrent: typeof body.isCurrent === 'boolean' ? body.isCurrent : undefined,
+      description: str(body.description, 5000) ?? undefined,
+      achievements: Array.isArray(body.achievements)
+        ? body.achievements.filter((a: unknown) => typeof a === 'string').slice(0, 50)
+        : undefined,
+    });
+    return res.status(201).json({ success: true, experience });
+  } catch (error) {
+    console.error('Failed to create experience:', error);
+    return res.status(500).json({ error: 'Failed to create experience' });
+  }
+});
+
+app.patch('/api/experiences/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const body = req.body ?? {};
+    const experience = await updateExperience(req.authUser!.id, req.params.id, {
+      role: str(body.role, 200) ?? undefined,
+      company: str(body.company, 200) ?? undefined,
+      employmentType: str(body.employmentType, 60) ?? undefined,
+      location: str(body.location, 200) ?? undefined,
+      startDate: str(body.startDate, 40) ?? undefined,
+      endDate: str(body.endDate, 40) ?? undefined,
+      isCurrent: typeof body.isCurrent === 'boolean' ? body.isCurrent : undefined,
+      description: str(body.description, 5000) ?? undefined,
+      achievements: Array.isArray(body.achievements)
+        ? body.achievements.filter((a: unknown) => typeof a === 'string').slice(0, 50)
+        : undefined,
+    });
+    if (!experience) return res.status(404).json({ error: 'Experience not found' });
+    return res.json({ success: true, experience });
+  } catch (error) {
+    console.error('Failed to update experience:', error);
+    return res.status(500).json({ error: 'Failed to update experience' });
+  }
+});
+
+app.delete('/api/experiences/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const deleted = await deleteExperience(req.authUser!.id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Experience not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete experience:', error);
+    return res.status(500).json({ error: 'Failed to delete experience' });
+  }
+});
+
+// ---- Education ----
+//
+// Dedicated persistence for public.educations.
+app.get('/api/educations', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const educations = await listEducations(req.authUser!.id);
+    return res.json({ success: true, educations });
+  } catch (error) {
+    console.error('Failed to list educations:', error);
+    return res.status(500).json({ error: 'Failed to load education' });
+  }
+});
+
+app.get('/api/educations/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const education = await getEducation(req.authUser!.id, req.params.id);
+    if (!education) return res.status(404).json({ error: 'Education not found' });
+    return res.json({ success: true, education });
+  } catch (error) {
+    console.error('Failed to load education:', error);
+    return res.status(500).json({ error: 'Failed to load education' });
+  }
+});
+
+app.post('/api/educations', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const institution = str(body.institution, 200);
+    if (!institution) return res.status(400).json({ error: 'Institution is required' });
+    const education = await createEducation(req.authUser!.id, {
+      institution,
+      degree: str(body.degree, 200) ?? undefined,
+      field: str(body.field, 200) ?? undefined,
+      startDate: str(body.startDate, 40) ?? undefined,
+      endDate: str(body.endDate, 40) ?? undefined,
+      isCurrent: typeof body.isCurrent === 'boolean' ? body.isCurrent : undefined,
+      description: str(body.description, 5000) ?? undefined,
+      gpa: str(body.gpa, 40) ?? undefined,
+      coursework: Array.isArray(body.coursework)
+        ? body.coursework.filter((c: unknown) => typeof c === 'string').slice(0, 50)
+        : undefined,
+    });
+    return res.status(201).json({ success: true, education });
+  } catch (error) {
+    console.error('Failed to create education:', error);
+    return res.status(500).json({ error: 'Failed to create education' });
+  }
+});
+
+app.patch('/api/educations/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const body = req.body ?? {};
+    const education = await updateEducation(req.authUser!.id, req.params.id, {
+      institution: str(body.institution, 200) ?? undefined,
+      degree: str(body.degree, 200) ?? undefined,
+      field: str(body.field, 200) ?? undefined,
+      startDate: str(body.startDate, 40) ?? undefined,
+      endDate: str(body.endDate, 40) ?? undefined,
+      isCurrent: typeof body.isCurrent === 'boolean' ? body.isCurrent : undefined,
+      description: str(body.description, 5000) ?? undefined,
+      gpa: str(body.gpa, 40) ?? undefined,
+      coursework: Array.isArray(body.coursework)
+        ? body.coursework.filter((c: unknown) => typeof c === 'string').slice(0, 50)
+        : undefined,
+    });
+    if (!education) return res.status(404).json({ error: 'Education not found' });
+    return res.json({ success: true, education });
+  } catch (error) {
+    console.error('Failed to update education:', error);
+    return res.status(500).json({ error: 'Failed to update education' });
+  }
+});
+
+app.delete('/api/educations/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const deleted = await deleteEducation(req.authUser!.id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Education not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete education:', error);
+    return res.status(500).json({ error: 'Failed to delete education' });
+  }
+});
+
+// ---- User skills ----
+//
+// Dedicated persistence for the caller's skill levels (public.user_skills).
+// `public.skills` is a GLOBAL catalogue: a skill name is resolved to its
+// catalogue id, creating the catalogue row only when it does not exist yet.
+app.get('/api/user-skills', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const skills = await getUserSkills(req.authUser!.id);
+    return res.json({ success: true, skills });
+  } catch (error) {
+    console.error('Failed to list user skills:', error);
+    return res.status(500).json({ error: 'Failed to load skills' });
+  }
+});
+
+app.post('/api/user-skills', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const name = str(body.name, 200);
+    if (!name) return res.status(400).json({ error: 'Skill name is required' });
+    const proficiency = body.proficiency ?? body.currentLevel ?? body.level;
+    if (typeof proficiency !== 'number' || !Number.isInteger(proficiency)) {
+      return res.status(400).json({ error: 'Proficiency must be an integer' });
+    }
+    if (proficiency < 1 || proficiency > 5) {
+      return res.status(400).json({ error: 'Proficiency must be between 1 and 5' });
+    }
+
+    const skillId = await resolveSkillId(name, str(body.category, 60) ?? undefined);
+    if (!skillId) return res.status(400).json({ error: 'Could not resolve skill' });
+
+    const yearsExperience =
+      typeof body.yearsExperience === 'number' && Number.isFinite(body.yearsExperience)
+        ? body.yearsExperience
+        : undefined;
+
+    const skill = await setUserSkillLevel(req.authUser!.id, skillId, {
+      proficiency,
+      years_experience: yearsExperience,
+    });
+    return res.status(201).json({ success: true, skill });
+  } catch (error) {
+    console.error('Failed to save user skill:', error);
+    return res.status(500).json({ error: 'Failed to save skill' });
+  }
+});
+
+app.delete('/api/user-skills/:skillId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.skillId)) return res.status(400).json({ error: 'Invalid skill id' });
+    const deleted = await deleteUserSkill(req.authUser!.id, req.params.skillId);
+    if (!deleted) return res.status(404).json({ error: 'Skill not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete user skill:', error);
+    return res.status(500).json({ error: 'Failed to delete skill' });
   }
 });
 
@@ -626,15 +778,76 @@ Return only valid JSON.`;
     });
   } catch (error: any) {
     console.error('CV Upload Error:', error);
+    // The detail is logged server-side, never returned: an upstream message
+    // can carry internal paths, provider payloads or stack frames.
     return res.status(500).json({
       error: 'Failed to process and analyze CV upload',
-      details: error?.message || 'Server error'
     });
   }
 });
 
+/**
+ * A small, in-process rate limiter for the AI routes.
+ *
+ * Those routes call Gemini with the application's key, so an authenticated
+ * user could otherwise drive unbounded spend. The limiter is keyed on the
+ * VERIFIED user id (never a client-supplied value), so one user cannot exhaust
+ * another's budget by spoofing a header.
+ *
+ * It is deliberately dependency-free: the audit asked for a small, targeted
+ * change rather than a new dependency or a new architecture.
+ */
+interface RateBucket {
+  count: number;
+  resetAt: number;
+}
+
+const AI_RATE_LIMIT = 30;           // requests ...
+const AI_RATE_WINDOW_MS = 60_000;   // ... per minute
+const rateBuckets = new Map<string, RateBucket>();
+
+// Buckets are pruned periodically so the map cannot grow without bound.
+const rateSweep = setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateBuckets) {
+    if (bucket.resetAt <= now) rateBuckets.delete(key);
+  }
+}, AI_RATE_WINDOW_MS);
+// The sweep must not hold the process open.
+rateSweep.unref?.();
+
+/**
+ * Express middleware that limits a caller to a fixed number of requests per
+ * window. Must run AFTER `requireAuth`, so the verified user id is available.
+ */
+function rateLimit(limit: number, windowMs: number) {
+  return (req: Request, res: Response, next: () => void) => {
+    const key = req.authUser?.id ?? req.ip ?? 'anonymous';
+    const now = Date.now();
+    let bucket = rateBuckets.get(key);
+
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      rateBuckets.set(key, bucket);
+    }
+
+    bucket.count += 1;
+    if (bucket.count > limit) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+      res.setHeader('Retry-After', String(retryAfterSeconds));
+      return res.status(429).json({
+        error: 'Too many requests. Please slow down and try again shortly.',
+      });
+    }
+    next();
+  };
+}
+
+/** The limiter applied to the Gemini-backed routes. */
+const aiRateLimit = rateLimit(AI_RATE_LIMIT, AI_RATE_WINDOW_MS);
+
 // AI Copilot with Contextual Page Understanding & Action Proposals
-app.post('/api/copilot', requireAuth, async (req: Request, res: Response) => {
+app.post('/api/copilot', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { userPrompt, context } = req.body;
     if (!userPrompt) {
@@ -715,7 +928,7 @@ Rules:
 });
 
 // AI Career Analysis Endpoint
-app.post('/api/analyze-career', requireAuth, async (req: Request, res: Response) => {
+app.post('/api/analyze-career', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { targetRole, userSkills, careerState } = req.body;
 
@@ -776,7 +989,7 @@ Return valid JSON schema:
 });
 
 // AI CV ATS & Content Optimization Endpoint
-app.post('/api/optimize-cv', requireAuth, async (req: Request, res: Response) => {
+app.post('/api/optimize-cv', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { cvText, targetRoleTitle, targetRoleSkills } = req.body;
     const prompt = `Evaluate CV for role "${targetRoleTitle}". Required: ${JSON.stringify(targetRoleSkills || [])}.
@@ -819,7 +1032,7 @@ Return JSON schema:
 });
 
 // AI Mock Interview Evaluation Endpoint
-app.post('/api/mock-interview', requireAuth, async (req: Request, res: Response) => {
+app.post('/api/mock-interview', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { roleTitle, interviewType, question, userAnswer } = req.body;
     const prompt = `Evaluate interview answer for "${roleTitle}". Type: ${interviewType}.
@@ -860,7 +1073,7 @@ Return JSON schema:
   }
 });
 // AI Professional Summary Suggestion
-app.post('/api/suggest-summary', requireAuth, async (req: Request, res: Response) => {
+app.post('/api/suggest-summary', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { name, targetRoleTitle, careerState, yearsExperience, skills, keyAchievements } = req.body;
     const prompt = `Write a high-impact, professional, authentic 3-4 sentence professional summary for a resume/profile.
@@ -895,7 +1108,7 @@ Requirements:
 });
 
 // AI Cover Letter Generation Endpoint
-app.post('/api/generate-cover-letter', requireAuth, async (req: Request, res: Response) => {
+app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { company, jobTitle, jobDescription, candidateName, experiences, skills, projects, tone } = req.body;
     const prompt = `Write a tailored, compelling cover letter for:
@@ -969,11 +1182,15 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
       return res.status(404).json({ error: 'Public profile not found' });
     }
 
-    // NOTE: the current schema has no visibility column (profiles has no
-    // is_public / visibility field), so the previous "isPublic" privacy gate
-    // cannot be evaluated. This endpoint fails closed rather than exposing
-    // profiles whose visibility state is unknown. Adding a visibility column
-    // requires a schema change, which is out of scope for this phase.
+    // Privacy gate. `profiles.is_public` IS a real column (boolean NOT NULL
+    // DEFAULT false): it is exposed by ProfileDTO.isPublic and is writable
+    // through PATCH /api/profile. A profile that has not opted in is private.
+    //
+    // 404 rather than 403: a 403 would confirm that the username exists,
+    // which is itself a disclosure.
+    if (!profile.is_public) {
+      return res.status(404).json({ error: 'Public profile not found' });
+    }
 
     const { data: experiences } = await getSupabaseServer()
       .from('experiences')
@@ -987,6 +1204,14 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
       .from('user_skills')
       .select('proficiency, skill:skills(name, category)')
       .eq('user_id', profile.id);
+    const { data: certifications } = await getSupabaseServer()
+      .from('profile_certifications')
+      .select('name, issuer, issue_date, expiry_date, url')
+      .eq('profile_id', profile.id);
+    const { data: projects } = await getSupabaseServer()
+      .from('projects')
+      .select('title, description, repository_url, demo_url')
+      .eq('profile_id', profile.id);
 
     const safeProfile = {
       name: profile.full_name,
@@ -1013,13 +1238,24 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
         endDate: e.end_date,
         isCurrent: e.is_current,
       })),
-      certifications: [],
+      certifications: (certifications ?? []).map((c: any) => ({
+        name: c.name,
+        issuer: c.issuer ?? undefined,
+        issueDate: c.issue_date ?? undefined,
+        expiryDate: c.expiry_date ?? undefined,
+        credentialUrl: c.url ?? undefined,
+      })),
       skills: (userSkills ?? []).map((us: any) => ({
         name: us.skill?.name,
         level: us.proficiency,
         category: us.skill?.category,
       })),
-      projects: [],
+      projects: (projects ?? []).map((p: any) => ({
+        title: p.title,
+        description: p.description ?? undefined,
+        repositoryUrl: p.repository_url ?? undefined,
+        demoUrl: p.demo_url ?? undefined,
+      })),
       links: {},
     };
     return res.json({ success: true, profile: safeProfile });
@@ -1108,6 +1344,159 @@ const str = (v: unknown, max = 500): string | null =>
 const isUuid = (v: unknown): v is string =>
   typeof v === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+/**
+
+/**
+ * Validates and normalizes a roadmap tree sent by the client.
+ *
+ * Everything is length-capped and the task status is checked against the
+ * server's own allow-list, so an arbitrary payload cannot reach the database.
+ * Malformed entries are skipped rather than failing the whole request.
+ */
+function parseRoadmapTree(raw: unknown): RoadmapTreePhaseInput[] {
+  if (!Array.isArray(raw)) return [];
+  const phases: RoadmapTreePhaseInput[] = [];
+
+  for (const phaseRaw of raw.slice(0, 50)) {
+    if (!phaseRaw || typeof phaseRaw !== 'object') continue;
+    const phase = phaseRaw as Record<string, unknown>;
+    const title = str(phase.title, 200);
+    if (!title) continue;
+    const phaseNumber =
+      typeof phase.phaseNumber === 'number' && Number.isInteger(phase.phaseNumber)
+        ? phase.phaseNumber
+        : phases.length + 1;
+
+    const milestones: RoadmapTreePhaseInput['milestones'] = [];
+    for (const milestoneRaw of Array.isArray(phase.milestones) ? phase.milestones.slice(0, 50) : []) {
+      if (!milestoneRaw || typeof milestoneRaw !== 'object') continue;
+      const milestone = milestoneRaw as Record<string, unknown>;
+      const milestoneTitle = str(milestone.title, 200);
+      if (!milestoneTitle) continue;
+
+      const tasks: RoadmapTreePhaseInput['milestones'][number]['tasks'] = [];
+      for (const taskRaw of Array.isArray(milestone.tasks) ? milestone.tasks.slice(0, 200) : []) {
+        if (!taskRaw || typeof taskRaw !== 'object') continue;
+        const task = taskRaw as Record<string, unknown>;
+        const taskTitle = str(task.title, 300);
+        if (!taskTitle) continue;
+        const status = str(task.status, 30) as RoadmapTaskStatus | null;
+        tasks.push({
+          title: taskTitle,
+          description: str(task.description, 5000) ?? undefined,
+          status: status && ROADMAP_TASK_STATUSES.includes(status) ? status : 'not_started',
+          skillName: str(task.skillName, 200) ?? undefined,
+          deadline: str(task.deadline, 40) ?? undefined,
+          resourceId: str(task.resourceId, 100) ?? undefined,
+          resourceTitle: str(task.resourceTitle, 200) ?? undefined,
+          estimatedHours:
+            typeof task.estimatedHours === 'number' && Number.isInteger(task.estimatedHours)
+              ? task.estimatedHours
+              : undefined,
+        });
+      }
+
+      milestones.push({
+        title: milestoneTitle,
+        description: str(milestone.description, 5000) ?? undefined,
+        tasks,
+      });
+    }
+
+    phases.push({
+      phaseNumber,
+      title,
+      description: str(phase.description, 5000) ?? undefined,
+      isUnlocked: typeof phase.isUnlocked === 'boolean' ? phase.isUnlocked : true,
+      milestones,
+    });
+  }
+
+  return phases;
+}
+
+// ---- Notifications ----
+//
+// The drawer used to render two hard-coded entries that lived only in React
+// state. The notifications are now real rows, owned by the caller.
+app.get('/api/notifications', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const notifications = await listNotifications(req.authUser!.id);
+    return res.json({ success: true, notifications });
+  } catch (error) {
+    console.error('Failed to list notifications:', error);
+    return res.status(500).json({ error: 'Failed to load notifications' });
+  }
+});
+
+app.post('/api/notifications', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const title = str(body.title, 200);
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+    const type = str(body.type, 40) as NotificationType | null;
+    if (type && !NOTIFICATION_TYPES.includes(type)) {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+    const notification = await createNotification(req.authUser!.id, {
+      title,
+      message: str(body.message, 1000) ?? undefined,
+      type: type ?? undefined,
+      linkView: str(body.linkView, 60) ?? undefined,
+    });
+    return res.status(201).json({ success: true, notification });
+  } catch (error) {
+    console.error('Failed to create notification:', error);
+    return res.status(500).json({ error: 'Failed to create notification' });
+  }
+});
+
+app.patch('/api/notifications/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const marked = await markNotificationRead(req.authUser!.id, req.params.id);
+    if (!marked) return res.status(404).json({ error: 'Notification not found' });
+    const notifications = await listNotifications(req.authUser!.id);
+    return res.json({ success: true, notifications });
+  } catch (error) {
+    console.error('Failed to mark notification read:', error);
+    return res.status(500).json({ error: 'Failed to update notification' });
+  }
+});
+
+app.post('/api/notifications/read-all', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const count = await markAllNotificationsRead(req.authUser!.id);
+    const notifications = await listNotifications(req.authUser!.id);
+    return res.json({ success: true, marked: count, notifications });
+  } catch (error) {
+    console.error('Failed to mark notifications read:', error);
+    return res.status(500).json({ error: 'Failed to update notifications' });
+  }
+});
+
+app.delete('/api/notifications', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const count = await clearNotifications(req.authUser!.id);
+    return res.json({ success: true, cleared: count });
+  } catch (error) {
+    console.error('Failed to clear notifications:', error);
+    return res.status(500).json({ error: 'Failed to clear notifications' });
+  }
+});
+
+app.delete('/api/notifications/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const deleted = await deleteNotification(req.authUser!.id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Notification not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete notification:', error);
+    return res.status(500).json({ error: 'Failed to delete notification' });
+  }
+});
 
 // ---- Activities ----
 app.get('/api/activities', requireAuth, async (req: Request, res: Response) => {
@@ -2323,11 +2712,23 @@ app.post('/api/roadmap', requireAuth, async (req: Request, res: Response) => {
     const body = req.body ?? {};
     const title = str(body.title, 200);
     if (!title) return res.status(400).json({ error: 'Title is required' });
-    const roadmap = await createRoadmap(req.authUser!.id, {
+
+    // The whole roadmap tree may be sent in one call: phases -> milestones ->
+    // tasks. It is written bottom-up so every foreign key is satisfied, and
+    // the returned roadmap carries the REAL database ids.
+    //
+    // A profile has at most one roadmap (UNIQUE profile_id), so creating one
+    // always REPLACES the previous roadmap — otherwise the insert would
+    // violate the unique constraint. The replacement happens in both branches.
+    const phases = parseRoadmapTree(body.phases);
+
+    const roadmap = await createRoadmapWithTree(req.authUser!.id, {
       title,
       targetRoleTitle: str(body.targetRoleTitle, 200) ?? undefined,
       isEnrolled: typeof body.isEnrolled === 'boolean' ? body.isEnrolled : undefined,
+      phases,
     });
+
     return res.status(201).json({ success: true, roadmap });
   } catch (error) {
     console.error('Failed to create roadmap:', error);
@@ -2491,6 +2892,16 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
     console.error('Failed to update profile:', error);
     return res.status(500).json({ error: 'Failed to update profile' });
   }
+});
+
+// Unknown API routes must not fall through to the SPA.
+//
+// The production build serves index.html for every unmatched path, which is
+// the right behaviour for a client-side route but wrong for the API: an
+// unknown /api/... path would answer 200 with HTML instead of 404 with JSON.
+// This handler runs before the SPA fallback and covers every API path.
+app.use('/api', (req: Request, res: Response) => {
+  res.status(404).json({ error: 'Not found' });
 });
 
 // Mount Vite in dev or static files in production

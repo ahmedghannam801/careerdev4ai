@@ -155,6 +155,50 @@ export async function fetchRoadmap(): Promise<RoadmapDTO | null> {
   return data.roadmap ?? null;
 }
 
+/**
+ * Creates (or replaces) the caller's roadmap, optionally with its whole
+ * phase -> milestone -> task tree.
+ *
+ * A profile has at most one roadmap, so this replaces any existing one. The
+ * returned roadmap carries the REAL database ids, so the caller can address
+ * the persisted rows afterwards.
+ */
+export async function createRoadmap(input: {
+  title: string;
+  targetRoleTitle?: string;
+  isEnrolled?: boolean;
+  phases?: Array<{
+    phaseNumber: number;
+    title: string;
+    description?: string;
+    isUnlocked?: boolean;
+    milestones: Array<{
+      title: string;
+      description?: string;
+      tasks: Array<{
+        title: string;
+        description?: string;
+        status?: RoadmapTaskStatus;
+        skillName?: string;
+        deadline?: string;
+        estimatedHours?: number;
+      }>;
+    }>;
+  }>;
+}): Promise<RoadmapDTO | null> {
+  const data = await request<{ success: boolean; roadmap: RoadmapDTO | null }>('/api/roadmap', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return data.roadmap ?? null;
+}
+
+/** Deletes the caller's persisted roadmap. */
+export async function deleteRoadmap(): Promise<boolean> {
+  await request<{ success: boolean }>('/api/roadmap', { method: 'DELETE' });
+  return true;
+}
+
 export async function patchRoadmapTaskStatus(
   taskId: string,
   status: RoadmapTaskStatus

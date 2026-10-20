@@ -123,6 +123,8 @@ import {
 } from '../lib/coreApi';
 import {
   fetchRoadmap,
+  createRoadmap as createRoadmapApi,
+  deleteRoadmap as deleteRoadmapApi,
   patchRoadmapTaskStatus,
   enrollInRoadmap as enrollInRoadmapApi,
   addRoadmapTask,
@@ -131,6 +133,27 @@ import {
   type RoadmapDTO,
   type ProfileDTO,
 } from '../lib/roadmapApi';
+import {
+  fetchExperiences,
+  postExperience,
+  patchExperience,
+  deleteExperience as deleteExperienceApi,
+  fetchEducations,
+  postEducation,
+  patchEducation,
+  deleteEducation as deleteEducationApi,
+  fetchUserSkills,
+  postUserSkill,
+  deleteUserSkill as deleteUserSkillApi,
+  type ExperienceDTO,
+  type EducationDTO,
+} from '../lib/careerHistoryApi';
+import {
+  fetchNotifications,
+  markNotificationRead as markNotificationReadApi,
+  clearNotifications as clearNotificationsApi,
+  type NotificationDTO,
+} from '../lib/notificationsApi';
 
 export interface UserProfile {
   name: string;
@@ -640,8 +663,75 @@ function toEvidenceItem(dto: EvidenceDTO): EvidenceItem {
   };
 }
 
-function toCVVersion(dto: CvVersionDTO): CVVersion {
+/**
+ * Maps an experience row to the frontend's view-model.
+ *
+ * The `description` column carries the role description and the achievements
+ * newline-joined (that is how the server stores the extra frontend fields).
+ */
+function toUserExperience(dto: ExperienceDTO): UserExperienceEntry {
+  const lines = (dto.description ?? '').split('\n');
+  const description = lines[0] ?? '';
+  const achievements = lines.slice(1).filter((line) => line.trim().length > 0);
   return {
+    id: dto.id,
+    role: dto.role,
+    company: dto.company,
+    employmentType:
+      (dto.employmentType as UserExperienceEntry['employmentType']) ?? 'Full-time',
+    location: dto.location ?? '',
+    startDate: dto.startDate ?? '',
+    endDate: dto.endDate ?? '',
+    isCurrent: dto.isCurrent,
+    description,
+    achievements,
+    skillsUsed: [],
+  };
+}
+
+/**
+ * Maps an education row to the frontend's view-model.
+ *
+ * The `description` column carries the notes and the "GPA: ..." line.
+ */
+function toUserEducation(dto: EducationDTO): UserEducationEntry {
+  const lines = (dto.description ?? '').split('\n');
+  const gpaLine = lines.find((line) => line.startsWith('GPA: '));
+  const notes = lines.filter(
+    (line) => line.trim().length > 0 && !line.startsWith('GPA: ')
+  );
+  return {
+    id: dto.id,
+    institution: dto.institution,
+    degree: dto.degree ?? '',
+    field: dto.field ?? '',
+    startDate: dto.startDate ?? '',
+    endDate: dto.endDate ?? '',
+    current: dto.isCurrent,
+    gpa: gpaLine ? gpaLine.slice('GPA: '.length) : undefined,
+    coursework: notes.length > 0 ? notes : undefined,
+  };
+}
+
+/**
+ * Maps a notification row to the frontend's view-model.
+ *
+ * The database stores a `read_at` timestamp (NULL = unread); the frontend
+ * model is a boolean plus a human-readable timestamp.
+ */
+function toUserNotification(dto: NotificationDTO): UserNotification {
+  return {
+    id: dto.id,
+    title: dto.title,
+    message: dto.message ?? '',
+    type: dto.type as UserNotification['type'],
+    read: dto.read,
+    timestamp: dto.createdAt,
+    linkAction: dto.linkView ?? undefined,
+  };
+}
+
+function toCVVersion(dto: CvVersionDTO): CVVersion {  return {
     id: dto.id,
     name: dto.name,
     targetRoleTitle: dto.targetRoleTitle ?? '',
@@ -815,6 +905,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           savedRoleList,
           applicationList,
           interviewList,
+          experienceList,
+          educationList,
+          userSkillList,
+          notificationList,
         ] = await Promise.all([
           fetchRoadmap(),
           fetchProfile(),
@@ -833,6 +927,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           fetchSavedRoles(),
           fetchJobApplications(),
           fetchInterviewSessions(),
+          fetchExperiences(),
+          fetchEducations(),
+          fetchUserSkills(),
+          fetchNotifications(),
         ]);
         if (cancelled) return;
         // The roadmap tables and the profile tables are the source of truth for
@@ -931,6 +1029,38 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           const activeVersion = cvVersionList.find(v => v.cvId === active.id);
           if (activeVersion) setActiveCV((activeVersion.profileJson as CVProfile) ?? activeCV);
         }
+
+        // Experiences and education now come from their own tables. The
+        // profile DTO does not carry them, so they are hydrated separately —
+        // the server is the source of truth, exactly as for every other
+        // domain (B.3.9, finding C-1).
+        setProfile(prev => ({
+          ...prev,
+          experiences: experienceList.map(toUserExperience),
+          education: educationList.map(toUserEducation),
+        }));
+
+        // Skill levels are stored per user in public.user_skills. The
+        // persisted level wins over the demo seed.
+        if (userSkillList.length > 0) {
+          setSkills(prevSkills =>
+            prevSkills.map(skill => {
+              const stored = userSkillList.find(
+                us => (us.skill?.name ?? '').toLowerCase() === skill.name.toLowerCase()
+              );
+              if (!stored || stored.proficiency === null) return skill;
+              return { ...skill, currentLevel: stored.proficiency };
+            })
+          );
+        }
+
+        // The notifications are real rows, not the two hard-coded entries
+        // the drawer used to show.
+        setNotifications(notificationList.map(toUserNotification));
+
+        // Hydration is complete: only now may the localStorage cache be
+        // written, and only then does the app trust the server's view.
+        setIsHydrated(true);
       } catch (error) {
         if (!cancelled) console.error('Failed to hydrate career data:', error);
       }
@@ -1080,13 +1210,15 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
 
   // Roadmap
-  const [roadmapPhases, setRoadmapPhases] = useState<RoadmapPhase[]>(() => {
-    const saved = localStorage.getItem('careerpilot_roadmap');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    return generateInitialRoadmap(TARGET_ROLES[0]);
-  });
+  //
+  // The roadmap is NOT cached in localStorage (B.3.9, finding M-5). The
+  // cache used to hold the locally generated tree, which is not the server's
+  // roadmap: it contained local-only task ids that meant nothing to the
+  // database. The roadmap now lives only in PostgreSQL and is hydrated from
+  // GET /api/roadmap.
+  const [roadmapPhases, setRoadmapPhases] = useState<RoadmapPhase[]>(() =>
+    generateInitialRoadmap(TARGET_ROLES[0])
+  );
   const [isEnrolledInRoadmap, setIsEnrolledInRoadmap] = useState(true);
 
   // Learning
@@ -1212,26 +1344,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   ]);
 
   // Notifications
-  const [notifications, setNotifications] = useState<UserNotification[]>([
-    {
-      id: 'notif-1',
-      title: 'Upcoming Technical Interview',
-      message: 'Round 2 Technical Interview with Vanguard Systems scheduled for October 22.',
-      type: 'interview',
-      read: false,
-      timestamp: '2 hours ago',
-      linkAction: 'applications'
-    },
-    {
-      id: 'notif-2',
-      title: 'Roadmap Task Due Soon',
-      message: 'Refactor component props to strict generic types by Oct 25.',
-      type: 'roadmap',
-      read: false,
-      timestamp: '1 day ago',
-      linkAction: 'roadmap'
-    }
-  ]);
+  //
+  // The notifications are real, owned rows in public.notifications. They used
+  // to be two hard-coded entries in React state, which meant the read/unread
+  // state was lost on every reload and real users saw fabricated content
+  // (B.3.9, finding M-1).
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
 
   // Copilot & AI Proposed Action
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([
@@ -1880,50 +1998,39 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [settings.theme, settings.language]);
 
   // Persistence to server & localStorage
-  const syncStateToServer = async () => {
-    try {
-      // The roadmap is owned by the dedicated /api/roadmap endpoints and is
-      // deliberately NOT part of this aggregate payload, so the two can never
-      // disagree about which copy is authoritative.
-      const statePayload = {
-        profile,
-        targetRole,
-        savedRoles,
-        skills,
-        projects,
-        evidenceItems,
-        activeCV,
-        cvVersions,
-        applications,
-        interviewSessions,
-        settings
-      };
-      const token = await getAccessToken();
-      await fetch('/api/state', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(statePayload)
-      });
-    } catch (e) {
-      console.warn('Background state sync to server failed:', e);
-    }
-  };
+  //
+  // B.3.9 (finding C-1): the aggregate POST /api/state is NO LONGER called
+  // from an automatic whole-profile sync. It used to fire on every change to
+  // `profile` — including the mount, before hydration finished — and the
+  // server's replace-all handler deleted the caller's real `experiences` and
+  // `educations` rows and re-inserted the demo seed persona in their place.
+  //
+  // Every domain now has a dedicated endpoint and an explicit, awaited
+  // mutation:
+  //   profile            -> PATCH /api/profile
+  //   experiences        -> /api/experiences
+  //   education          -> /api/educations
+  //   skills             -> /api/user-skills
+  //   roadmap            -> /api/roadmap
+  //   notifications      -> /api/notifications
+  //   CVs / versions     -> /api/cvs, /api/cv-versions
+  //   projects, evidence, certifications, languages, links, career identity,
+  //   saved roles, job applications, interviews, activities, secondary goals,
+  //   career milestones, cover letters -> their own endpoints
+  //
+  // The only thing this effect does now is keep the localStorage cache
+  // up to date. It is a CACHE, never a source of truth, and it is only
+  // written for an authenticated session whose hydration has completed.
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  // The server is the source of truth for these domains (POST /api/state plus the
-  // domain endpoints). localStorage is kept only as a local cache for the
-  // first paint before the backend hydration completes — it is never read as
-  // authoritative state.
   useEffect(() => {
+    // Never cache a pre-hydration value: it would be the demo seed.
+    if (!isHydrated) return;
     localStorage.setItem('careerpilot_profile', JSON.stringify(profile));
     localStorage.setItem('careerpilot_target_role', JSON.stringify(targetRole));
     localStorage.setItem('careerpilot_skills', JSON.stringify(skills));
-    localStorage.setItem('careerpilot_roadmap', JSON.stringify(roadmapPhases));
     localStorage.setItem('careerpilot_settings', JSON.stringify(settings));
-    syncStateToServer();
-  }, [profile, targetRole, skills, roadmapPhases, settings, projects, evidenceItems, applications]);
+  }, [isHydrated, profile, targetRole, skills, settings]);
 
   // Compute Career Analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -2137,7 +2244,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Target Role Change Handler
-  const setPrimaryTargetRole = (roleId: string) => {
+  const setPrimaryTargetRole = async (roleId: string) => {
     const role = TARGET_ROLES.find(r => r.id === roleId);
     if (!role) return;
     setTargetRole(role);
@@ -2155,7 +2262,50 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
     });
 
-    setRoadmapPhases(generateInitialRoadmap(role));
+    // The roadmap is persisted server-side (B.3.9, finding H-1). It used to be
+    // generated locally and never written, so a new user had no roadmap row
+    // and the locally generated tree was lost on the next load.
+    //
+    // The tree is sent to POST /api/roadmap, which writes the phases,
+    // milestones and tasks and returns the roadmap with the REAL database ids.
+    // The local state is then replaced by the server's roadmap.
+    const generated = generateInitialRoadmap(role);
+    try {
+      const roadmap = await createRoadmapApi({
+        title: `${role.title} Roadmap`,
+        targetRoleTitle: role.title,
+        phases: generated.map((phase, phaseIndex) => ({
+          phaseNumber: phase.phaseNumber ?? phaseIndex + 1,
+          title: phase.title,
+          description: phase.description,
+          isUnlocked: phase.isUnlocked,
+          milestones: phase.milestones.map(milestone => ({
+            title: milestone.title,
+            description: milestone.description,
+            tasks: milestone.tasks.map(task => ({
+              title: task.title,
+              description: task.description,
+              status: task.status,
+              skillName: task.skillName,
+              deadline: task.deadline,
+              estimatedHours: task.estimatedHours,
+            })),
+          })),
+        })),
+      });
+      if (roadmap) {
+        setRoadmapPhases(toRoadmapPhases(roadmap));
+        setIsEnrolledInRoadmap(roadmap.isEnrolled);
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to persist roadmap:', error);
+    }
+
+    // The server is unreachable: keep the generated tree locally so the UI
+    // still responds. It will be replaced by the server's roadmap on the next
+    // successful load.
+    setRoadmapPhases(generated);
   };
 
   const saveRole = async (role: TargetRole) => {
@@ -2170,6 +2320,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setSavedRoles(prev =>
         prev.some(r => r.id === role.id) ? prev : [...prev, toTargetRole(dto)]
       );
+      void logActivity({
+        actionType: 'saved_job',
+        title: 'Saved a target role',
+        subtitle: role.title,
+        linkView: 'jobs',
+      });
     } catch (error) {
       console.error('Failed to save role:', error);
     }
@@ -2223,6 +2379,19 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (updates.onboardingCompleted !== undefined)
       payload.onboardingCompleted = updates.onboardingCompleted;
 
+    // Experiences and education are collections: they are owned by their own
+    // endpoints, NOT by the profile PATCH and NOT by the aggregate endpoint.
+    // Each entry is reconciled against the server: a row the server knows is
+    // updated, a row the server does not know is created, and a row that has
+    // been removed locally is deleted. Nothing is ever sent as a
+    // replace-the-whole-collection payload.
+    if (updates.experiences !== undefined) {
+      await reconcileExperiences(updates.experiences);
+    }
+    if (updates.education !== undefined) {
+      await reconcileEducations(updates.education);
+    }
+
     if (Object.keys(payload).length > 0) {
       try {
         const saved = await patchProfile(payload as Partial<ProfileDTO>);
@@ -2263,9 +2432,132 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     }
 
-    // Fields the dedicated API does not own still update locally and are synced
-    // through the aggregate endpoint.
+    // Fields the dedicated API does not own still update locally. The
+    // collections above have already been reconciled with the server.
     setProfile(prev => ({ ...prev, ...updates }));
+  };
+
+  /**
+   * Reconciles the local experience list with the server.
+   *
+   * The server's rows are the source of truth. An entry whose id is a server
+   * id is updated, an entry with a local id is created, and a server row that
+   * is no longer in the local list is deleted. The local list is then replaced
+   * by the server's response, so the ids are always the real ones.
+   */
+  const reconcileExperiences = async (entries: UserExperienceEntry[]) => {
+    try {
+      const serverRows = await fetchExperiences();
+      const serverIds = new Set(serverRows.map((row) => row.id));
+      const localIds = new Set(entries.map((entry) => entry.id));
+
+      for (const entry of entries) {
+        if (serverIds.has(entry.id)) {
+          await patchExperience(entry.id, {
+            role: entry.role,
+            company: entry.company,
+            employmentType: entry.employmentType,
+            location: entry.location,
+            startDate: entry.startDate,
+            endDate: entry.endDate,
+            isCurrent: entry.isCurrent,
+            description: entry.description,
+            achievements: entry.achievements,
+          });
+        } else {
+          await postExperience({
+            role: entry.role,
+            company: entry.company,
+            employmentType: entry.employmentType,
+            location: entry.location,
+            startDate: entry.startDate,
+            endDate: entry.endDate,
+            isCurrent: entry.isCurrent,
+            description: entry.description,
+            achievements: entry.achievements,
+          });
+        }
+      }
+
+      // A server row is deleted only when the LOCAL list the user was
+      // actually shown contained it. A row that the local list never had is
+      // left alone: it belongs to data the user has not seen (for example a
+      // row created in another session), and silently removing it would be
+      // the same class of data loss as the bug being fixed.
+      const previouslyKnownIds = new Set(
+        profile.experiences.map((entry) => entry.id).filter((id) => serverIds.has(id))
+      );
+      for (const row of serverRows) {
+        if (previouslyKnownIds.has(row.id) && !localIds.has(row.id)) {
+          await deleteExperienceApi(row.id);
+        }
+      }
+
+      const refreshed = await fetchExperiences();
+      setProfile(prev => ({
+        ...prev,
+        experiences: refreshed.map(toUserExperience),
+      }));
+    } catch (error) {
+      console.error('Failed to persist experiences:', error);
+    }
+  };
+
+  /**
+   * Reconciles the local education list with the server. See
+   * `reconcileExperiences` for the same contract.
+   */
+  const reconcileEducations = async (entries: UserEducationEntry[]) => {
+    try {
+      const serverRows = await fetchEducations();
+      const serverIds = new Set(serverRows.map((row) => row.id));
+      const localIds = new Set(entries.map((entry) => entry.id));
+
+      for (const entry of entries) {
+        if (serverIds.has(entry.id)) {
+          await patchEducation(entry.id, {
+            institution: entry.institution,
+            degree: entry.degree,
+            field: entry.field,
+            startDate: entry.startDate,
+            endDate: entry.endDate,
+            isCurrent: entry.current,
+            gpa: entry.gpa,
+            coursework: entry.coursework,
+          });
+        } else {
+          await postEducation({
+            institution: entry.institution,
+            degree: entry.degree,
+            field: entry.field,
+            startDate: entry.startDate,
+            endDate: entry.endDate,
+            isCurrent: entry.current,
+            gpa: entry.gpa,
+            coursework: entry.coursework,
+          });
+        }
+      }
+
+      for (const row of serverRows) {
+        // See reconcileExperiences: only a row the user was shown may be
+        // removed.
+        const previouslyKnownIds = new Set(
+          profile.education.map((entry) => entry.id).filter((id) => serverIds.has(id))
+        );
+        if (previouslyKnownIds.has(row.id) && !localIds.has(row.id)) {
+          await deleteEducationApi(row.id);
+        }
+      }
+
+      const refreshed = await fetchEducations();
+      setProfile(prev => ({
+        ...prev,
+        education: refreshed.map(toUserEducation),
+      }));
+    } catch (error) {
+      console.error('Failed to persist education:', error);
+    }
   };
 
   const setCareerState = (state: CareerState) => {
@@ -2280,27 +2572,45 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setProfile(prev => ({ ...prev, onboardingCompleted: true }));
   };
 
-  const updateSkillLevel = (skillId: string, currentLevel: number) => {
-    setSkills(prev => prev.map(s => {
-      if (s.id === skillId) {
-        return {
-          ...s,
-          currentLevel,
-          gap: Math.max(0, s.targetLevel - currentLevel),
-          lastUpdated: new Date().toISOString().split('T')[0]
-        };
-      }
-      return s;
-    }));
+  // ---- Skills ----
+  //
+  // Skill levels are persisted per user in public.user_skills through
+  // /api/user-skills. The local state is only updated AFTER the server
+  // confirms the write, so the level the UI shows is the level that is stored
+  // (B.3.9, finding H-2).
+  const updateSkillLevel = async (skillId: string, currentLevel: number) => {
+    const skill = skills.find(s => s.id === skillId);
+    if (!skill) return;
+    try {
+      await postUserSkill({ name: skill.name, proficiency: currentLevel });
+      setSkills(prev => prev.map(s => {
+        if (s.id === skillId) {
+          return {
+            ...s,
+            currentLevel,
+            gap: Math.max(0, s.targetLevel - currentLevel),
+            lastUpdated: new Date().toISOString().split('T')[0]
+          };
+        }
+        return s;
+      }));
+    } catch (error) {
+      console.error('Failed to persist skill level:', error);
+    }
   };
 
-  const addCustomSkill = (skill: Omit<UserSkill, 'id' | 'gap' | 'lastUpdated'>) => {
+  const addCustomSkill = async (skill: Omit<UserSkill, 'id' | 'gap' | 'lastUpdated'>) => {
     const newSkill: UserSkill = {
       ...skill,
       id: `sk-custom-${Date.now()}`,
       gap: Math.max(0, skill.targetLevel - skill.currentLevel),
       lastUpdated: new Date().toISOString().split('T')[0]
     };
+    try {
+      await postUserSkill({ name: newSkill.name, proficiency: newSkill.currentLevel });
+    } catch (error) {
+      console.error('Failed to persist skill:', error);
+    }
     setSkills(prev => [...prev, newSkill]);
     void logActivity({
       actionType: 'acquired_skill',
@@ -2310,8 +2620,18 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
   };
 
-  const removeSkill = (skillId: string) => {
+  const removeSkill = async (skillId: string) => {
     setSkills(prev => prev.filter(s => s.id !== skillId));
+    // The server-side link is keyed by the catalogue id, not the local id.
+    // The local id is only the catalogue id for skills that came from the
+    // server, so it is used directly when it is a UUID.
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(skillId)) {
+      try {
+        await deleteUserSkillApi(skillId);
+      } catch (error) {
+        console.error('Failed to delete skill:', error);
+      }
+    }
   };
 
   const refreshAiAnalysis = async () => {
@@ -2660,6 +2980,12 @@ Skills: ${activeCV.skillsList.join(', ')}
         interviewStageDetails: application.interviewStageDetails,
       });
       setApplications(prev => [toJobApplication(dto), ...prev]);
+      void logActivity({
+        actionType: 'applied_job',
+        title: `Applied to ${application.company}`,
+        subtitle: application.role,
+        linkView: 'applications',
+      });
     } catch (error) {
       console.error('Failed to create job application:', error);
     }
@@ -2819,12 +3145,22 @@ Skills: ${activeCV.skillsList.join(', ')}
     setPendingAiAction(null);
   };
 
-  const markNotificationRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const markNotificationRead = async (id: string) => {
+    try {
+      const refreshed = await markNotificationReadApi(id);
+      setNotifications(refreshed.map(toUserNotification));
+    } catch (error) {
+      console.error('Failed to mark notification read:', error);
+    }
   };
 
-  const clearNotifications = () => {
-    setNotifications([]);
+  const clearNotifications = async () => {
+    try {
+      await clearNotificationsApi();
+      setNotifications([]);
+    } catch (error) {
+      console.error('Failed to clear notifications:', error);
+    }
   };
 
   const updateSettings = (updates: Partial<UserSettings>) => {

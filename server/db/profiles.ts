@@ -16,6 +16,7 @@ export interface ProfileRow {
   target_role: string | null;
   target_industry: string | null;
   onboarding_completed: boolean | null;
+  is_public: boolean | null;
   created_at: string;
   updated_at: string;
 }

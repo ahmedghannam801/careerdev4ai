@@ -10,7 +10,6 @@ let userA: TestUser;
 let userB: TestUser;
 
 const PROTECTED_ROUTES: Array<[string, string]> = [
-  ['GET', '/api/auth/me'],
   ['GET', '/api/state'],
   ['GET', '/api/profile'],
   ['GET', '/api/roadmap'],
@@ -57,9 +56,9 @@ describe('authentication', () => {
   });
 
   test('a valid token is accepted', async () => {
-    const res = await api('GET', '/api/auth/me', { token: userA.token });
+    const res = await api('GET', '/api/profile', { token: userA.token });
     assert.equal(res.status, 200);
-    assert.equal(res.body?.user?.id, userA.id);
+    assert.equal(res.body?.profile?.id, userA.id);
   });
 });
 

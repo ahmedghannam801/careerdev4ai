@@ -47,6 +47,7 @@ const CV_BUCKET = 'cv-files';
 const PROFILE_SCOPED_TABLES = [
   { table: 'user_preferences', column: 'user_id' },
   { table: 'user_skills', column: 'user_id' },
+  { table: 'notifications', column: 'profile_id' },
   { table: 'profile_career_identity', column: 'profile_id' },
   { table: 'profile_certifications', column: 'profile_id' },
   { table: 'profile_languages', column: 'profile_id' },

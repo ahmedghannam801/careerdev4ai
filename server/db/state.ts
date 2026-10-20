@@ -89,9 +89,13 @@ function toDate(value: any): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }
 
-export async function saveState(userId: string, payload: StatePayload): Promise<void> {
+export async function saveState(
+  userId: string,
+  payload: StatePayload
+): Promise<{ unmappedCollections: string[] }> {
   const p = payload.profile || {};
   const s = payload.settings || {};
+  const unmappedCollections: string[] = [];
 
   const profileUpdates: Record<string, any> = {};
   if (p.fullName !== undefined) profileUpdates.full_name = p.fullName ?? null;
@@ -117,48 +121,23 @@ export async function saveState(userId: string, payload: StatePayload): Promise<
     await upsertPreferences(userId, prefUpdates);
   }
 
+  // `experiences` and `educations` are NOT written here any more.
+  //
+  // This endpoint used to DELETE every one of the caller's rows in both tables
+  // and re-insert whatever the payload contained. Combined with the frontend's
+  // demo-seeded initial profile and its unconditional auto-sync, that replaced
+  // a real user's employment and education history with the demo persona
+  // (B.3.8 finding C-1).
+  //
+  // The aggregate endpoint is now a compatibility shim for the single-value
+  // profile and preferences columns only. The collections are owned by
+  // /api/experiences and /api/educations, and are reported as unmapped so the
+  // caller can see they were not applied here.
   if (Array.isArray(p.experiences)) {
-    const { error: deleteError } = await getSupabaseServer()
-      .from('experiences')
-      .delete()
-      .eq('user_id', userId);
-    if (deleteError) throw deleteError;
-    for (const exp of p.experiences) {
-      const { error } = await getSupabaseServer().from('experiences').insert({
-        user_id: userId,
-        company: exp.company ?? null,
-        job_title: exp.role ?? exp.jobTitle ?? null,
-        location: exp.location ?? null,
-        description: Array.isArray(exp.bullets)
-          ? exp.bullets.join('\n')
-          : (exp.description ?? null),
-        start_date: toDate(exp.period ?? exp.startDate),
-        end_date: toDate(exp.endDate),
-        is_current: exp.isCurrent ?? false,
-      });
-      if (error) throw error;
-    }
+    unmappedCollections.push('experiences');
   }
-
   if (Array.isArray(p.education)) {
-    const { error: deleteError } = await getSupabaseServer()
-      .from('educations')
-      .delete()
-      .eq('user_id', userId);
-    if (deleteError) throw deleteError;
-    for (const ed of p.education) {
-      const { error } = await getSupabaseServer().from('educations').insert({
-        user_id: userId,
-        institution: ed.institution ?? null,
-        degree: ed.degree ?? null,
-        field_of_study: ed.field ?? ed.fieldOfStudy ?? null,
-        start_date: toDate(ed.period ?? ed.startDate),
-        end_date: toDate(ed.endDate),
-        is_current: ed.isCurrent ?? false,
-        description: ed.gpa ?? null,
-      });
-      if (error) throw error;
-    }
+    unmappedCollections.push('education');
   }
 
   if (Array.isArray(payload.skills)) {
@@ -188,6 +167,8 @@ export async function saveState(userId: string, payload: StatePayload): Promise<
       }
     }
   }
+
+  return { unmappedCollections };
 }
 
 export async function loadState(userId: string): Promise<any> {
