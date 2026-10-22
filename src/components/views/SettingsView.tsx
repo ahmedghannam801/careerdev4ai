@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Globe, 
   Moon, 
@@ -22,7 +22,30 @@ import {
   Laptop
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { getAccessToken } from '../../lib/supabase';
+import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
+
+/**
+ * A short, honest description of the browser this session is running in.
+ * It used to be the hard-coded "Chrome / macOS", which described somebody
+ * else's machine rather than the user's.
+ */
+const getClientLabel = (): string => {
+  if (typeof navigator === 'undefined') return 'Unknown client';
+  const ua = navigator.userAgent || '';
+  const browser = /\bEdg\//.test(ua) ? 'Edge'
+    : /\bOPR\//.test(ua) ? 'Opera'
+    : /\bChrome\//.test(ua) ? 'Chrome'
+    : /\bFirefox\//.test(ua) ? 'Firefox'
+    : /\bSafari\//.test(ua) ? 'Safari'
+    : 'Browser';
+  const os = /Windows/i.test(ua) ? 'Windows'
+    : /Mac OS X|Macintosh/i.test(ua) ? 'macOS'
+    : /Android/i.test(ua) ? 'Android'
+    : /iPhone|iPad|iOS/i.test(ua) ? 'iOS'
+    : /Linux/i.test(ua) ? 'Linux'
+    : 'Unknown OS';
+  return `${browser} / ${os}`;
+};
 
 export const SettingsView: React.FC = () => {
   const { 
@@ -63,8 +86,33 @@ export const SettingsView: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Username validation state
-  const [usernameInput, setUsernameInput] = useState(profile.username || 'sarah-jenkins');
+  const [usernameInput, setUsernameInput] = useState(profile.username || '');
   const [usernameStatus, setUsernameStatus] = useState<{ available?: boolean; text: string } | null>(null);
+
+  // "Member Since" is the user's own account creation date, read from the
+  // Supabase auth session. It was a hard-coded "October 2026" before.
+  const [memberSince, setMemberSince] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    getBrowserSupabase()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const created = data.session?.user?.created_at;
+        if (!created) return;
+        const parsed = new Date(created);
+        if (Number.isNaN(parsed.getTime())) return;
+        setMemberSince(parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+      })
+      .catch(() => {
+        // The creation date is informational only — a failure to read it
+        // must not break the account tab.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +183,17 @@ export const SettingsView: React.FC = () => {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (res.ok) {
-        localStorage.clear();
+        // B.4 finding L-1: `localStorage.clear()` also wiped the Supabase
+        // auth session. The account is already deleted, so the session is
+        // dead anyway; the cache keys are cleared explicitly instead.
+        for (const key of [
+          'careerpilot_profile',
+          'careerpilot_target_role',
+          'careerpilot_skills',
+          'careerpilot_settings',
+        ]) {
+          localStorage.removeItem(key);
+        }
         window.location.reload();
       } else {
         alert('Failed to delete account');
@@ -241,7 +299,7 @@ export const SettingsView: React.FC = () => {
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Member Since</span>
-                <p className="font-mono text-[var(--text-primary)]">October 2026</p>
+                <p className="font-mono text-[var(--text-primary)]">{memberSince || 'Not available'}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
@@ -318,7 +376,7 @@ export const SettingsView: React.FC = () => {
                 <div>
                   <div className="text-xs font-bold text-[var(--text-primary)]">Current Active Session</div>
                   <div className="text-[11px] text-[var(--text-muted)] font-mono">
-                    Token: {authToken ? `${authToken.slice(0, 8)}...${authToken.slice(-6)}` : 'Supabase session'} • Chrome / macOS
+                    Token: {authToken ? `${authToken.slice(0, 8)}...${authToken.slice(-6)}` : 'Supabase session'} • {getClientLabel()}
                   </div>
                 </div>
               </div>

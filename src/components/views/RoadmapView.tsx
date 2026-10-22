@@ -1,11 +1,44 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Clock, SkipForward, AlertCircle, Circle, Calendar, Sparkles, Filter, Plus } from 'lucide-react';
+import { CheckCircle2, Clock, SkipForward, AlertCircle, Circle, Calendar, Sparkles, Filter, Plus, BookOpen, ExternalLink } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { RoadmapTaskStatus, RoadmapTask } from '../../types/career';
 
-export const RoadmapView: React.FC = () => {
-  const { roadmapPhases, updateTaskStatus, isEnrolledInRoadmap, enrollInRoadmap, targetRole, t } = useCareer();
+interface RoadmapViewProps {
+  onNavigate?: (view: string) => void;
+}
+
+export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
+  const {
+    roadmapPhases,
+    updateTaskStatus,
+    isEnrolledInRoadmap,
+    enrollInRoadmap,
+    targetRole,
+    t,
+    learningCatalog,
+    learningRecommendations,
+    getLearningItem,
+    saveLearningCourse,
+    startLearningCourse,
+  } = useCareer();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const coursesForSkill = (skillName: string | null) => {
+    if (!skillName) return [];
+    const normalized = skillName.toLowerCase();
+    const recommended = learningRecommendations.filter((rec) =>
+      rec.course.skills.some((skill) => skill.name.toLowerCase() === normalized)
+    );
+    if (recommended.length > 0) {
+      return recommended.slice(0, 2).map((rec) => ({ course: rec.course, rec }));
+    }
+    return learningCatalog
+      .filter((course) =>
+        course.skills.some((skill) => skill.name.toLowerCase() === normalized)
+      )
+      .slice(0, 2)
+      .map((course) => ({ course, rec: undefined }));
+  };
 
   const totalTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks)).length;
   const completedTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks.filter(t => t.status === 'completed'))).length;
@@ -129,6 +162,94 @@ export const RoadmapView: React.FC = () => {
                               <span>·</span>
                               <span>Est. {task.estimatedHours}h</span>
                             </div>
+
+                            {/* B.5 — a roadmap skill gap leads directly to
+                                concrete, persisted learning resources. */}
+                            {task.status !== 'completed' && (() => {
+                              const options = coursesForSkill(task.skillName ?? null);
+                              if (options.length === 0) return null;
+                              return (
+                                <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)]/60 p-2.5">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                                    <BookOpen className="h-3 w-3" />
+                                    Learning for this gap
+                                  </div>
+                                  <div className="mt-1.5 space-y-1.5">
+                                    {options.map(({ course, rec }) => {
+                                      const item = getLearningItem(course.id);
+                                      return (
+                                        <div
+                                          key={course.id}
+                                          className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between"
+                                        >
+                                          <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                              <span className="truncate text-[11px] font-medium text-[var(--text-primary)]">
+                                                {course.title}
+                                              </span>
+                                              {rec && (
+                                                <span className="rounded-full bg-[var(--accent-primary)]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--accent-primary)]">
+                                                  {Math.round(rec.score)}% match
+                                                </span>
+                                              )}
+                                              {item && (
+                                                <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[9px] text-[var(--text-muted)] capitalize">
+                                                  {item.status.replace('_', ' ')}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-[10px] text-[var(--text-muted)]">
+                                              {course.provider} · {course.availability.replace(/_/g, ' ')}
+                                            </div>
+                                          </div>
+                                          <div className="flex shrink-0 items-center gap-1.5">
+                                            {!item && (
+                                              <button
+                                                type="button"
+                                                onClick={() => void saveLearningCourse(course.id, rec?.reason)}
+                                                className="rounded border border-[var(--border-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                              >
+                                                Save
+                                              </button>
+                                            )}
+                                            {item?.status !== 'completed' && (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  void startLearningCourse(course.id, rec?.reason);
+                                                  updateTaskStatus(task.id, 'in_progress');
+                                                }}
+                                                className="rounded bg-[var(--accent-primary)] px-1.5 py-0.5 text-[10px] font-semibold text-white hover:opacity-90"
+                                              >
+                                                Start
+                                              </button>
+                                            )}
+                                            <a
+                                              href={course.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-[var(--text-muted)] hover:text-[var(--accent-primary)]"
+                                              aria-label={`Open ${course.title}`}
+                                            >
+                                              <ExternalLink className="h-3 w-3" />
+                                            </a>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  {onNavigate && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onNavigate('learning')}
+                                      className="mt-2 text-[10px] font-medium text-[var(--accent-primary)] hover:underline"
+                                    >
+                                      Open the Learning Hub →
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           {/* Action Selector: Status Controls */}

@@ -34,7 +34,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   onOpenCopilot 
 }) => {
   const [query, setQuery] = useState('');
-  const { skills, projects, jobs, learningResources, documents, secondaryGoals, targetRole } = useCareer();
+  const { skills, projects, jobs, learningCatalog, documents, secondaryGoals, targetRole } = useCareer();
 
   // Close on Escape, open on Cmd+K
   useEffect(() => {
@@ -56,10 +56,10 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
       skills: skills.filter(s => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q)).slice(0, 3),
       projects: projects.filter(p => p.title.toLowerCase().includes(q) || p.skills.some(s => s.toLowerCase().includes(q))).slice(0, 3),
       jobs: jobs.filter(j => j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)).slice(0, 3),
-      learning: learningResources.filter(l => l.title.toLowerCase().includes(q) || l.skill.toLowerCase().includes(q)).slice(0, 3),
+      learning: learningCatalog.filter(l => l.title.toLowerCase().includes(q) || l.provider.toLowerCase().includes(q) || l.skills.some(skill => skill.name.toLowerCase().includes(q))).slice(0, 3),
       docs: documents.filter(d => d.name.toLowerCase().includes(q) || d.type.toLowerCase().includes(q)).slice(0, 3)
     };
-  }, [query, skills, projects, jobs, learningResources, documents]);
+  }, [query, skills, projects, jobs, learningCatalog, documents]);
 
   if (!isOpen) return null;
 

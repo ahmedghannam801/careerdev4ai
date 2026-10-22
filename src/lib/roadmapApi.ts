@@ -106,6 +106,7 @@ export interface ProfileDTO {
   currentTitle: string | null;
   currentPosition: string | null;
   currentCompany: string | null;
+  yearsOfExperience: string | null;
   headline: string | null;
   bio: string | null;
   professionalSummary: string | null;

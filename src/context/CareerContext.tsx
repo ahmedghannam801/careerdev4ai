@@ -4,11 +4,11 @@ import {
   CareerGoal,
   TargetRole,
   UserSkill,
+  SkillCategory,
   CareerAnalysis,
   RoadmapPhase,
   RoadmapTask,
   RoadmapTaskStatus,
-  LearningResource,
   CareerProject,
   EvidenceItem,
   CVProfile,
@@ -42,7 +42,6 @@ import {
   ProfileCompletenessBreakdown
 } from '../types/career';
 import { TARGET_ROLES } from '../data/rolesData';
-import { LEARNING_RESOURCES } from '../data/learningResources';
 import { PROJECTS_CATALOG } from '../data/projectsCatalog';
 import { JOBS_CATALOG } from '../data/jobsData';
 import { translations, Language } from '../translations';
@@ -53,7 +52,7 @@ import {
   fetchSecondaryGoals,
   postSecondaryGoal,
   patchSecondaryGoal,
-  deleteSecondaryGoal,
+  deleteSecondaryGoal as deleteSecondaryGoalApi,
   fetchCareerMilestones,
   postCareerMilestone,
   patchCareerMilestone,
@@ -61,7 +60,7 @@ import {
   fetchCoverLetters,
   postCoverLetter,
   patchCoverLetter,
-  deleteCoverLetter,
+  deleteCoverLetter as deleteCoverLetterApi,
   type ActivityDTO,
   type SecondaryGoalDTO,
   type CareerMilestoneDTO,
@@ -79,11 +78,11 @@ import {
   fetchProjects,
   postProject,
   patchProject,
-  deleteProject,
+  deleteProject as deleteProjectApi,
   fetchEvidence,
   postEvidence,
   patchEvidence,
-  deleteEvidence,
+  deleteEvidence as deleteEvidenceApi,
   fetchCertifications,
   postCertification,
   patchCertification,
@@ -147,6 +146,7 @@ import {
   deleteUserSkill as deleteUserSkillApi,
   type ExperienceDTO,
   type EducationDTO,
+  type UserSkillDTO,
 } from '../lib/careerHistoryApi';
 import {
   fetchNotifications,
@@ -154,6 +154,29 @@ import {
   clearNotifications as clearNotificationsApi,
   type NotificationDTO,
 } from '../lib/notificationsApi';
+import {
+  fetchPreferences,
+  patchPreferences,
+  type PreferencesDTO,
+} from '../lib/preferencesApi';
+import { fetchBookmarks, createBookmark, deleteBookmark } from '../lib/bookmarksApi';
+import {
+  fetchLearningCatalog,
+  fetchLearningItems,
+  fetchLearningRecommendations,
+  saveLearningItem as saveLearningItemApi,
+  patchLearningItem as patchLearningItemApi,
+  deleteLearningItem as deleteLearningItemApi,
+} from '../lib/learningApi';
+import type {
+  LearningCourse,
+  LearningItem,
+  LearningRecommendation,
+  RecommendationResult,
+  LearningPreferences,
+  LearningStatus,
+  CourseFormat,
+} from '../types/learning';
 
 export interface UserProfile {
   name: string;
@@ -196,10 +219,40 @@ export interface UserProfile {
   };
 }
 
+/**
+ * The starting shape of a signed-in user's profile.
+ *
+ * Every field is empty: the values come from PostgreSQL once the session
+ * hydrates. A user with no profile row yet therefore sees blank fields
+ * instead of a demo persona (B.4 finding C-5).
+ */
+const emptyProfile: UserProfile = {
+  name: '',
+  email: '',
+  avatarUrl: '',
+  currentTitle: '',
+  location: '',
+  bio: '',
+  careerState: 'working_professional',
+  careerGoal: 'get_promoted',
+  onboardingCompleted: false,
+  education: [],
+  experiences: [],
+  certifications: [],
+  languages: [],
+  links: {},
+};
+
 interface CareerContextType {
   // Authentication
   currentUser: UserAccount | null;
   authToken: string | null;
+  /**
+   * True once the session restore has finished — either a session was found
+   * or none exists. The app must not decide whether to show the
+   * authenticated experience before this is true (B.4 finding C-1).
+   */
+  isAuthReady: boolean;
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -274,10 +327,31 @@ interface CareerContextType {
   isEnrolledInRoadmap: boolean;
   enrollInRoadmap: () => void;
 
-  // Learning
-  learningResources: LearningResource[];
-  enrolledResourceIds: string[];
-  toggleResourceEnrollment: (resourceId: string) => void;
+  // Learning Hub (B.5)
+  learningCatalog: LearningCourse[];
+  learningItems: LearningItem[];
+  learningRecommendations: LearningRecommendation[];
+  learningRecommendationMeta: {
+    aiUsed: boolean;
+    aiFallbackReason: string | null;
+    generatedAt: string | null;
+    targetRoleTitle: string | null;
+    weeklyHours: number;
+    budget: 'free_only' | 'low' | 'any';
+    preferredFormat: CourseFormat | 'any';
+    skillGapCount: number;
+    roadmapSkillCount: number;
+  };
+  isLearningLoading: boolean;
+  learningError: string | null;
+  refreshLearningRecommendations: (preferences?: LearningPreferences) => Promise<void>;
+  getLearningItem: (courseId: string) => LearningItem | undefined;
+  saveLearningCourse: (courseId: string, reason?: string) => Promise<void>;
+  dismissLearningCourse: (courseId: string, reason?: string) => Promise<void>;
+  startLearningCourse: (courseId: string, reason?: string) => Promise<void>;
+  completeLearningCourse: (courseId: string) => Promise<void>;
+  updateLearningProgress: (courseId: string, percent: number) => Promise<void>;
+  removeLearningCourse: (courseId: string) => Promise<void>;
 
   // Projects & Evidence
   projects: CareerProject[];
@@ -733,6 +807,9 @@ function toUserNotification(dto: NotificationDTO): UserNotification {
 
 function toCVVersion(dto: CvVersionDTO): CVVersion {  return {
     id: dto.id,
+    // The owning CV. Without it a version cannot be duplicated: the copy
+    // needs the cv_id to post a new snapshot against.
+    cvId: dto.cvId,
     name: dto.name,
     targetRoleTitle: dto.targetRoleTitle ?? '',
     createdAt: dto.createdAt,
@@ -909,6 +986,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           educationList,
           userSkillList,
           notificationList,
+          preferencesRecord,
+          bookmarkList,
+          learningCatalogList,
+          learningItemList,
+          learningRecommendationResult,
         ] = await Promise.all([
           fetchRoadmap(),
           fetchProfile(),
@@ -931,6 +1013,18 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           fetchEducations(),
           fetchUserSkills(),
           fetchNotifications(),
+          fetchPreferences(),
+          fetchBookmarks(),
+          // A learning-catalogue failure must never block the B.4 hydration.
+          fetchLearningCatalog().catch(() => []),
+          fetchLearningItems().catch(() => []),
+          fetchLearningRecommendations({ ai: false }).catch(() => ({
+            recommendations: [],
+            aiUsed: false,
+            aiFallbackReason: 'Learning recommendations could not be loaded.',
+            generatedAt: new Date().toISOString(),
+            context: undefined,
+          })),
         ]);
         if (cancelled) return;
         // The roadmap tables and the profile tables are the source of truth for
@@ -944,7 +1038,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             ...prev,
             name: profileRecord.fullName ?? prev.name,
             preferredName: profileRecord.preferredName ?? undefined,
-            email: prev.email,
             phone: profileRecord.phone ?? prev.phone,
             avatarUrl: profileRecord.avatarUrl ?? prev.avatarUrl,
             location: profileRecord.location ?? prev.location,
@@ -957,11 +1050,18 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             headline: profileRecord.headline ?? prev.headline,
             bio: profileRecord.bio ?? prev.bio,
             professionalSummary: profileRecord.professionalSummary ?? prev.professionalSummary,
+            // The address belongs to the auth identity, not to the profile
+            // row, so it comes from the session rather than from the DTO.
+            email: currentUser?.email ?? prev.email,
             careerGoal: (profileRecord.careerGoal as UserProfile['careerGoal']) ?? prev.careerGoal,
             customGoalText: profileRecord.customGoalText ?? prev.customGoalText,
             industry: profileRecord.targetIndustry ?? prev.industry,
             username: profileRecord.username ?? prev.username,
-            userType: (profileRecord.userType as UserProfile['careerState']) ?? prev.careerState,
+            // The column is `user_type`; the domain field is `careerState`.
+            // Writing it to `userType` left the persona at its default, so
+            // every user saw "Working Professional" whatever they chose.
+            careerState: (profileRecord.userType as UserProfile['careerState']) ?? prev.careerState,
+            yearsOfExperience: profileRecord.yearsOfExperience ?? prev.yearsOfExperience,
             onboardingCompleted: profileRecord.onboardingCompleted,
             certifications: profileRecord.certifications.map(c => ({
               id: c.id,
@@ -1041,22 +1141,59 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }));
 
         // Skill levels are stored per user in public.user_skills. The
-        // persisted level wins over the demo seed.
-        if (userSkillList.length > 0) {
-          setSkills(prevSkills =>
-            prevSkills.map(skill => {
-              const stored = userSkillList.find(
-                us => (us.skill?.name ?? '').toLowerCase() === skill.name.toLowerCase()
-              );
-              if (!stored || stored.proficiency === null) return skill;
-              return { ...skill, currentLevel: stored.proficiency };
-            })
-          );
+        // persisted level is the ONLY level; a skill the user has never
+        // rated stays at level 1 (B.4 finding C-5).
+        setUserSkillRows(userSkillList);
+        const levels: Record<string, number> = {};
+        for (const row of userSkillList) {
+          const name = (row.skill?.name ?? '').toLowerCase();
+          if (!name || row.proficiency === null) continue;
+          levels[name] = row.proficiency;
         }
+        setSkillLevels(levels);
 
         // The notifications are real rows, not the two hard-coded entries
         // the drawer used to show.
         setNotifications(notificationList.map(toUserNotification));
+
+        // The account-owned settings (the theme and the interface language)
+        // follow the user to another device.
+        if (preferencesRecord) {
+          setSettings(prev => ({
+            ...prev,
+            theme: (preferencesRecord.theme as UserSettings['theme']) ?? prev.theme,
+            language: (preferencesRecord.language as UserSettings['language']) ?? prev.language,
+          }));
+        }
+
+        // The job bookmarks are owned rows, not local state.
+        setBookmarkedJobIds(bookmarkList.map((bookmark) => bookmark.jobId));
+
+        // B.5 — catalogue, owned learning state and deterministic
+        // recommendations are all server data. AI explanations are requested
+        // when the Learning Hub is opened, not during every login hydration.
+        setLearningCatalog(learningCatalogList);
+        setLearningItems(learningItemList);
+        setLearningRecommendations(learningRecommendationResult.recommendations ?? []);
+        setLearningRecommendationMeta((prev) => ({
+          ...prev,
+          aiUsed: learningRecommendationResult.aiUsed,
+          aiFallbackReason: learningRecommendationResult.aiFallbackReason,
+          generatedAt: learningRecommendationResult.generatedAt,
+          targetRoleTitle: learningRecommendationResult.context?.targetRoleTitle ?? null,
+          weeklyHours: learningRecommendationResult.context?.weeklyHours ?? 5,
+          budget: learningRecommendationResult.context?.budget ?? 'free_only',
+          preferredFormat: learningRecommendationResult.context?.preferredFormat ?? 'any',
+          skillGapCount: learningRecommendationResult.context?.skillGapCount ?? 0,
+          roadmapSkillCount: learningRecommendationResult.context?.roadmapSkillCount ?? 0,
+        }));
+
+        // The target role is persisted as its title; the catalogue entry
+        // supplies the skill requirements and the roadmap the UI derives.
+        const persistedRole = profileRecord?.targetRole
+          ? TARGET_ROLES.find((role) => role.title === profileRecord.targetRole)
+          : undefined;
+        if (persistedRole) setTargetRole(persistedRole);
 
         // Hydration is complete: only now may the localStorage cache be
         // written, and only then does the app trust the server's view.
@@ -1076,138 +1213,96 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [activeView, setActiveView] = useState('dashboard');
 
   // Profile & Persona
-  const [profile, setProfile] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('careerpilot_profile');
-    if (saved) {
-      try { 
-        const parsed = JSON.parse(saved);
-        if (parsed.education && parsed.experiences) return parsed;
-      } catch {}
-    }
-    return {
-      name: 'Sarah Jenkins',
-      preferredName: 'Sarah',
-      email: 'sarah.jenkins@example.com',
-      phone: '+1 (555) 234-5678',
-      avatarUrl: '/src/assets/images/career_user_avatar_1792417629788.jpg',
-      currentTitle: 'Junior Frontend Developer',
-      currentPosition: 'Junior Frontend Developer',
-      currentCompany: 'Meridian Tech Labs',
-      yearsOfExperience: '2.5 years',
-      industry: 'Enterprise Software & Cloud Platforms',
-      location: 'San Francisco, CA / Remote',
-      country: 'United States',
-      city: 'San Francisco',
-      timezone: 'America/Los_Angeles (UTC-7)',
-      preferredLanguage: 'en',
-      headline: 'Frontend Engineer | Modern React, TypeScript & Accessible Design Systems',
-      bio: 'Frontend engineer passionate about accessible interfaces, component architectures, and web performance optimization.',
-      professionalSummary: 'Results-driven Frontend Engineer with 2+ years of experience building accessible, high-performance web applications using React, TypeScript, and modern CSS architectures. Passionate about design systems and engineering velocity.',
-      username: 'sarah-jenkins',
-      isPublic: true,
-      careerState: 'working_professional',
-      careerGoal: 'get_promoted',
-      onboardingCompleted: true,
-      education: [
-        {
-          id: 'edu-1',
-          institution: 'University of Texas at Austin',
-          degree: 'Bachelor of Science',
-          field: 'Computer Science',
-          startDate: '2018-09-01',
-          endDate: '2022-05-15',
-          current: false,
-          gpa: '3.8/4.0',
-          coursework: ['Data Structures & Algorithms', 'Web Application Development', 'Computer Networks', 'Human-Computer Interaction']
-        }
-      ],
-      experiences: [
-        {
-          id: 'exp-1',
-          role: 'Frontend Developer',
-          company: 'Meridian Tech Labs',
-          employmentType: 'Full-time',
-          location: 'San Francisco, CA / Hybrid',
-          startDate: '2024-03-01',
-          endDate: '',
-          isCurrent: true,
-          description: 'Design, develop, and maintain high-volume customer-facing React components and design systems.',
-          achievements: [
-            'Spearheaded 25+ reusable design system components adopted across 3 agile squads.',
-            'Optimized Largest Contentful Paint (LCP) from 3.2s to 1.1s, boosting conversion by 14%.'
-          ],
-          skillsUsed: ['React', 'TypeScript', 'Tailwind CSS', 'State Management']
-        },
-        {
-          id: 'exp-2',
-          role: 'Junior Web Developer (Internship)',
-          company: 'Apex Digital Agency',
-          employmentType: 'Internship',
-          location: 'Austin, TX',
-          startDate: '2022-06-01',
-          endDate: '2023-01-15',
-          isCurrent: false,
-          description: 'Developed client marketing portals and responsive landing experiences.',
-          achievements: [
-            'Delivered 8 responsive microsites with 100% Google Lighthouse accessibility scores.',
-            'Authored reusable CSS utility tokens reducing styling turnaround by 20%.'
-          ],
-          skillsUsed: ['JavaScript (ES6+)', 'HTML5 & Modern CSS', 'Git & Version Control']
-        }
-      ],
-      certifications: [
-        {
-          id: 'cert-1',
-          name: 'Meta Front-End Developer Professional Certificate',
-          provider: 'Meta / Coursera',
-          issueDate: '2024-02-18',
-          credentialId: 'META-FE-98327',
-          credentialUrl: 'https://coursera.org/verify/professional-cert/meta-frontend'
-        }
-      ],
-      languages: [
-        { id: 'lang-1', language: 'English', proficiency: 'Native' },
-        { id: 'lang-2', language: 'Spanish', proficiency: 'Professional' },
-        { id: 'lang-3', language: 'Arabic', proficiency: 'Basic' }
-      ],
-      links: {
-        linkedin: 'https://linkedin.com/in/sarah-jenkins-dev',
-        github: 'https://github.com/sarah-jenkins',
-        portfolio: 'https://sarahjenkins.dev',
-        personalWebsite: 'https://sarahjenkins.dev/blog'
-      },
-      careerIdentity: {
-        whoYouAre: 'Working Professional with strong frontend design system foundations',
-        whereYoureGoing: 'Mid-Level Frontend Engineer at a high-velocity product company',
-        why: 'Accelerate promotion, lead component architecture, and increase compensation',
-        whatYoureMissing: 'Automated testing suites (Jest/Playwright) and CI/CD deployment pipelines',
-        whatYoureBuilding: 'Accessible Design System component library with automated unit testing',
-        howYourePresenting: 'Targeted Mid-Level Frontend Engineer CV with 84% ATS match',
-        whereApplying: 'Vanguard Systems (Technical Interview stage) & Nexus Cloud'
-      }
-    };
-  });
+  //
+  // B.4 finding C-5: this used to be initialised with a hard-coded demo
+  // persona ("Sarah Jenkins", a full employment history, two certifications,
+  // three languages, a career identity) and `onboardingCompleted: true`.
+  // A brand-new signed-in user therefore saw another person's career data
+  // until the server hydration finished, and if the hydration failed they saw
+  // it permanently. The demo persona is now gone: an authenticated user
+  // starts from empty fields, and every value comes from PostgreSQL.
+  //
+  // B.4 finding M-5: the localStorage cache is no longer read back to seed
+  // the state. The cache is written for resilience, but a previous user's
+  // cached profile must never leak into the next session.
+  const [profile, setProfile] = useState<UserProfile>(emptyProfile);
 
   // Target Roles & Comparison
-  const [targetRole, setTargetRole] = useState<TargetRole>(() => {
-    const saved = localStorage.getItem('careerpilot_target_role');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    return TARGET_ROLES[0];
-  });
+  //
+  // B.4 finding M-5: the target role was initialised from localStorage. The
+  // cache must never seed the state, so it now starts from the first
+  // catalogue role and is replaced by the server's `targetRole` column once
+  // the session hydrates.
+  const [targetRole, setTargetRole] = useState<TargetRole>(TARGET_ROLES[0]);
 
   // Saved roles — PostgreSQL is the source of truth (B.3.7).
   const [savedRoles, setSavedRoles] = useState<TargetRole[]>([]);
 
   // Skills
-  const [skills, setSkills] = useState<UserSkill[]>(() => {
-    const saved = localStorage.getItem('careerpilot_skills');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
+  //
+  // The skill CATALOGUE (which skills exist and what the target role wants)
+  // comes from the role definition; the user's LEVELS come from
+  // public.user_skills. The list is therefore built by merging the role's
+  // required + preferred skills with the persisted levels, so a skill the
+  // user has never rated is shown at level 1 rather than at a fabricated
+  // value (B.4 finding C-5 / H-5).
+  const [skillLevels, setSkillLevels] = useState<Record<string, number>>({});
+  const [customSkills, setCustomSkills] = useState<UserSkill[]>([]);
+  // The raw /api/user-skills rows, kept so a skill's catalogue id (skill_id)
+  // can be resolved when it is removed.
+  const [userSkillRows, setUserSkillRows] = useState<UserSkillDTO[]>([]);
+
+  // The user's skill list, derived from two sources:
+  //   * the CATALOGUE — the required and preferred skills of the target role
+  //     plus any skill the user added themselves;
+  //   * the user's LEVELS — the proficiency values persisted in
+  //     public.user_skills, keyed by skill name.
+  //
+  // A skill the user has never rated is shown at level 1 with a gap to the
+  // role's target. The levels are never invented (B.4 finding C-5 / H-5).
+  const skills: UserSkill[] = useMemo(() => {
+    const role = targetRole;
+    const catalogue: Array<{ name: string; category: SkillCategory; targetLevel: number }> = [];
+
+    for (const req of role.requiredSkills ?? []) {
+      catalogue.push({
+        name: req.name,
+        category: (req.category as SkillCategory) ?? 'technical',
+        targetLevel: req.minLevel,
+      });
     }
-    return DEFAULT_INITIAL_SKILLS;
-  });
+    for (const pref of role.preferredSkills ?? []) {
+      if (catalogue.some((entry) => entry.name.toLowerCase() === pref.name.toLowerCase())) continue;
+      catalogue.push({
+        name: pref.name,
+        category: (pref.category as SkillCategory) ?? 'technical',
+        targetLevel: pref.minLevel,
+      });
+    }
+
+    const merged: UserSkill[] = catalogue.map((entry) => {
+      const level = skillLevels[entry.name.toLowerCase()] ?? 1;
+      return {
+        id: `skill-${entry.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        name: entry.name,
+        category: entry.category,
+        currentLevel: level,
+        targetLevel: entry.targetLevel,
+        gap: Math.max(0, entry.targetLevel - level),
+        source: skillLevels[entry.name.toLowerCase()] !== undefined ? 'self_reported' : 'ai_estimated',
+        evidenceIds: [],
+        lastUpdated: new Date().toISOString().split('T')[0],
+      };
+    });
+
+    // A skill the user added themselves that is not part of the role.
+    for (const custom of customSkills) {
+      if (merged.some((entry) => entry.name.toLowerCase() === custom.name.toLowerCase())) continue;
+      merged.push(custom);
+    }
+
+    return merged;
+  }, [targetRole, skillLevels, customSkills]);
 
   // Roadmap
   //
@@ -1216,14 +1311,34 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // roadmap: it contained local-only task ids that meant nothing to the
   // database. The roadmap now lives only in PostgreSQL and is hydrated from
   // GET /api/roadmap.
-  const [roadmapPhases, setRoadmapPhases] = useState<RoadmapPhase[]>(() =>
-    generateInitialRoadmap(TARGET_ROLES[0])
-  );
-  const [isEnrolledInRoadmap, setIsEnrolledInRoadmap] = useState(true);
+  //
+  // B.4 finding C-5: it also started with a generated demo tree, so a user
+  // with no roadmap row saw six phases of somebody else's plan. It now
+  // starts empty and is filled by the server's roadmap.
+  const [roadmapPhases, setRoadmapPhases] = useState<RoadmapPhase[]>([]);
+  const [isEnrolledInRoadmap, setIsEnrolledInRoadmap] = useState(false);
 
-  // Learning
-  const [learningResources] = useState<LearningResource[]>(LEARNING_RESOURCES);
-  const [enrolledResourceIds, setEnrolledResourceIds] = useState<string[]>(['res-react-docs', 'res-ts-handbook']);
+  // Learning Hub (B.5)
+  //
+  // The catalogue and every user action are persisted by the server. There is
+  // no local-only fallback: a save/dismiss/start/complete that fails is
+  // reported and the item state is reloaded from the server.
+  const [learningCatalog, setLearningCatalog] = useState<LearningCourse[]>([]);
+  const [learningItems, setLearningItems] = useState<LearningItem[]>([]);
+  const [learningRecommendations, setLearningRecommendations] = useState<LearningRecommendation[]>([]);
+  const [learningRecommendationMeta, setLearningRecommendationMeta] = useState({
+    aiUsed: false,
+    aiFallbackReason: null as string | null,
+    generatedAt: null as string | null,
+    targetRoleTitle: null as string | null,
+    weeklyHours: 5,
+    budget: 'free_only' as 'free_only' | 'low' | 'any',
+    preferredFormat: 'any' as CourseFormat | 'any',
+    skillGapCount: 0,
+    roadmapSkillCount: 0,
+  });
+  const [isLearningLoading, setIsLearningLoading] = useState(false);
+  const [learningError, setLearningError] = useState<string | null>(null);
 
   // Projects & Evidence
   // Projects — PostgreSQL is the source of truth (B.3.7).
@@ -1232,53 +1347,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
 
   // CV Studio
-  const [activeCV, setActiveCV] = useState<CVProfile>({
-    fullName: 'Sarah Jenkins',
-    email: 'sarah.jenkins@example.com',
-    phone: '+1 (555) 234-5678',
-    location: 'San Francisco, CA',
-    title: 'Frontend Engineer',
-    summary: 'Detail-oriented Frontend Engineer with 2+ years of experience building accessible, high-performance web applications using React, TypeScript, and modern CSS architectures.',
-    experiences: [
-      {
-        id: 'exp-1',
-        company: 'Meridian Tech Labs',
-        role: 'Frontend Developer',
-        period: '2024 - Present',
-        location: 'San Francisco, CA',
-        bullets: [
-          'Engineered 25+ reusable React and TypeScript components, accelerating feature shipment across 3 squads by 30%.',
-          'Optimized Largest Contentful Paint (LCP) from 3.2s to 1.1s by implementing route-based code splitting.',
-          'Collaborated closely with designers to establish WCAG 2.1 AA accessibility standards.'
-        ]
-      }
-    ],
-    education: [
-      {
-        id: 'edu-1',
-        institution: 'University of Texas at Austin',
-        degree: 'Bachelor of Science',
-        field: 'Computer Science',
-        period: '2018 - 2022',
-        gpa: '3.8/4.0'
-      }
-    ],
-    projects: [
-      {
-        id: 'cp-1',
-        title: 'Accessible Design System & Storybook',
-        role: 'Lead Architect',
-        link: 'https://github.com/example/accessible-ui-system',
-        technologies: ['React', 'TypeScript', 'Tailwind CSS', 'Playwright'],
-        bullets: [
-          'Constructed 15 accessible UI primitives with keyboard focus traps.',
-          'Implemented automated CI testing pipeline with Jest and Playwright.'
-        ]
-      }
-    ],
-    skillsList: ['React', 'TypeScript', 'JavaScript (ES6+)', 'HTML5 & Modern CSS', 'Tailwind CSS', 'Git & Version Control', 'REST & GraphQL APIs'],
-    certifications: ['Meta Front-End Developer Professional Certificate']
-  });
+  //
+  // B.4 finding C-5: the CV carried a fabricated candidate (Sarah Jenkins,
+  // Meridian Tech Labs, a Meta certificate). It now starts empty and is
+  // filled from the persisted CV / CV version rows.
+  const [activeCV, setActiveCV] = useState<CVProfile>(emptyCVProfile);
 
   // CVs and CV versions — PostgreSQL is the source of truth (B.3.7).
   const [cvVersions, setCvVersions] = useState<CVVersion[]>([]);
@@ -1287,61 +1360,17 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isUploadingCv, setIsUploadingCv] = useState(false);
 
   // Jobs & Applications
+  //
+  // B.4 finding H-5: the applications were seeded with two fabricated
+  // applications ("Vanguard Systems" at the interview stage, "Nexus Cloud")
+  // and the interviews with a fabricated mock-interview session. A brand-new
+  // user saw other people's career activity. Both lists now start empty and
+  // are filled from PostgreSQL.
   const [jobs] = useState<JobListing[]>(JOBS_CATALOG);
-  const [applications, setApplications] = useState<JobApplication[]>([
-    {
-      id: 'app-1',
-      jobId: 'job-fe-01',
-      company: 'Vanguard Systems',
-      role: 'Frontend Engineer (React / TypeScript)',
-      location: 'San Francisco, CA / Remote',
-      workMode: 'Remote',
-      stage: 'interview',
-      appliedDate: '2026-10-15',
-      lastUpdated: '2026-10-18',
-      nextAction: 'Round 2 Technical Interview with Lead Architect',
-      nextActionDate: '2026-10-22',
-      notes: 'Technical round covers React Fiber lifecycle, custom hooks, and live coding.',
-      interviewStageDetails: 'Technical Interview (Virtual)'
-    },
-    {
-      id: 'app-2',
-      jobId: 'job-fs-02',
-      company: 'Nexus Cloud Technologies',
-      role: 'Full-Stack Software Engineer',
-      location: 'Austin, TX',
-      workMode: 'Hybrid',
-      stage: 'applied',
-      appliedDate: '2026-10-16',
-      lastUpdated: '2026-10-16',
-      nextAction: 'Follow up if no recruiter reply by Oct 24',
-      notes: 'Applied directly through referral link.'
-    }
-  ]);
+  const [applications, setApplications] = useState<JobApplication[]>([]);
 
   // Interviews
-  const [interviewSessions, setInterviewSessions] = useState<MockInterviewSession[]>([
-    {
-      id: 'int-1',
-      roleTitle: 'Frontend Engineer',
-      type: 'star',
-      question: 'Describe a situation where a project you led faced an unexpected technical roadblock close to a deadline. How did you resolve it?',
-      userAnswer: 'During our Q3 customer portal release, our LCP score degraded to 4.2s due to an unbundled chart library. With 4 days to launch, I identified the bundle bloat, code-split the chart module asynchronously, and compressed assets with WebP. This brought LCP down to 1.2s and we launched on schedule.',
-      aiFeedback: {
-        score: 9,
-        strengths: ['Clear metrics (4.2s to 1.2s)', 'Methodical root-cause debugging under time constraints'],
-        improvements: ['Mention team post-mortem and automated CI bundle size limits.'],
-        starEvaluation: {
-          situation: 'Launch with performance regression near deadline.',
-          task: 'Diagnose and remediate bundle bloat in 4 days.',
-          action: 'Dynamic code splitting and WebP asset optimization.',
-          result: 'Achieved 1.2s LCP and launched on schedule.'
-        },
-        suggestedAnswer: 'During our release cycle, our LCP degraded to 4.2s due to an unbundled package. I surfaced the risk in daily standup, analyzed bundles using flamecharts, and dynamically code-split dependencies. LCP recovered to 1.2s, we deployed on time, and I added bundle size gating to our CI pipeline.'
-      },
-      createdAt: '2026-10-17'
-    }
-  ]);
+  const [interviewSessions, setInterviewSessions] = useState<MockInterviewSession[]>([]);
 
   // Notifications
   //
@@ -1352,19 +1381,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
 
   // Copilot & AI Proposed Action
-  const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([
-    {
-      id: 'cop-1',
-      sender: 'assistant',
-      text: 'Hello Sarah! I am your CareerPilot Advisor. Your primary target is Frontend Engineer, where you currently match 82% of core competencies. Your highest-leverage next move is closing the automated testing gap (Jest/Playwright) and preparing for your Vanguard Systems interview on Oct 22.',
-      timestamp: 'Just now',
-      suggestions: [
-        'What should I prioritize today?',
-        'Drill technical interview questions for React',
-        'How can I improve my CV ATS match score?'
-      ]
-    }
-  ]);
+  //
+  // B.4 finding C-5: the opening message greeted the user as "Sarah" and
+  // referenced a fabricated interview and an 82% match. The greeting is now
+  // built from the user's own persisted state.
+  const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([]);
   const [isCopilotTyping, setIsCopilotTyping] = useState(false);
   const [pendingAiAction, setPendingAiAction] = useState<AiProposedAction | null>(null);
 
@@ -1411,7 +1432,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const deleteSecondaryGoal = async (id: string) => {
     try {
-      await deleteSecondaryGoal(id);
+      await deleteSecondaryGoalApi(id);
       setSecondaryGoals(prev => prev.filter(g => g.id !== id));
     } catch (error) {
       console.error('Failed to delete secondary goal:', error);
@@ -1517,7 +1538,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const deleteCoverLetter = async (id: string) => {
     try {
-      await deleteCoverLetter(id);
+      await deleteCoverLetterApi(id);
       setCoverLetters(prev => prev.filter(c => c.id !== id));
     } catch (error) {
       console.error('Failed to delete cover letter:', error);
@@ -1788,9 +1809,33 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Job Bookmarks
-  const [bookmarkedJobIds, setBookmarkedJobIds] = useState<string[]>(['job-fe-01', 'job-fs-02']);
-  const toggleBookmarkJob = (jobId: string) => {
-    setBookmarkedJobIds(prev => prev.includes(jobId) ? prev.filter(id => id !== jobId) : [...prev, jobId]);
+  //
+  // B.4 finding H-5: the bookmarks were seeded with two job ids, so every
+  // user started with two "saved" jobs they never saved.
+  const [bookmarkedJobIds, setBookmarkedJobIds] = useState<string[]>([]);
+  const toggleBookmarkJob = async (jobId: string) => {
+    const wasBookmarked = bookmarkedJobIds.includes(jobId);
+    // The toggle is optimistic, and it is ROLLED BACK when the write fails:
+    // the UI must never claim a bookmark the database does not have.
+    setBookmarkedJobIds(prev =>
+      prev.includes(jobId) ? prev.filter(id => id !== jobId) : [...prev, jobId]
+    );
+    try {
+      if (wasBookmarked) {
+        await deleteBookmark(jobId);
+      } else {
+        await createBookmark(jobId);
+      }
+    } catch (error) {
+      console.error('Failed to persist job bookmark:', error);
+      setBookmarkedJobIds(prev =>
+        wasBookmarked
+          ? prev.includes(jobId)
+            ? prev
+            : [...prev, jobId]
+          : prev.filter(id => id !== jobId)
+      );
+    }
   };
 
   // AI & Notification & Privacy Preferences
@@ -2110,74 +2155,159 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setAnalysis(computeLocalAnalysis());
   }, [targetRole, skills]);
 
-  // Compute Daily Career Actions
-  const [dailyActions, setDailyActions] = useState<DailyCareerAction[]>([
-    {
-      id: 'da-1',
-      title: 'Complete Jest Reducer Unit Test Suite',
-      description: 'Strengthen test assertions to close the automated testing gap.',
-      category: 'roadmap',
-      priority: 'high',
-      completed: false,
-      actionView: 'roadmap',
-      reason: 'Directly addresses your primary skill gap for Frontend Engineer.'
-    },
-    {
-      id: 'da-2',
-      title: 'Refine STAR Story for Vanguard Systems Interview',
-      description: 'Practice the technical roadblock question in Mock Interview Simulator.',
-      category: 'interview',
-      priority: 'high',
-      completed: false,
-      actionView: 'interviews',
-      reason: 'Scheduled technical interview on October 22.'
-    },
-    {
-      id: 'da-3',
-      title: 'Deploy Storybook Documentation for Accessible UI Project',
-      description: 'Attach public live demo URL as verified portfolio evidence.',
-      category: 'project',
-      priority: 'medium',
-      completed: true,
-      actionView: 'projects',
-      reason: 'Provides verifiable proof for hiring managers.'
+  // Daily Career Actions
+  //
+  // The actions are derived, so "completed" is tracked separately: a set of
+  // ids the user has ticked off in this session.
+  const [completedDailyActionIds, setCompletedDailyActionIds] = useState<Set<string>>(new Set());
+  //
+  // B.4 finding C-5: these were three hard-coded tasks about "Jest reducer
+  // unit tests" and a "Vanguard Systems interview" — another person's plan.
+  // They are now DERIVED from the user's own roadmap, applications and skill
+  // gaps, so they describe the signed-in user's real work.
+  const dailyActions: DailyCareerAction[] = useMemo(() => {
+    const actions: DailyCareerAction[] = [];
+
+    // The next unfinished roadmap task is the highest-leverage action.
+    const nextTask = roadmapPhases
+      .flatMap((phase) => phase.milestones)
+      .flatMap((milestone) => milestone.tasks)
+      .find((task) => task.status !== 'completed' && task.status !== 'skipped');
+    if (nextTask) {
+      actions.push({
+        id: `da-roadmap-${nextTask.id}`,
+        title: nextTask.title,
+        description: nextTask.description || 'Continue your roadmap task.',
+        category: 'roadmap',
+        priority: 'high',
+        completed: false,
+        actionView: 'roadmap',
+        reason: `Your next roadmap task for ${targetRole.title}.`,
+      });
     }
-  ]);
 
+    // An application that is waiting on the candidate needs a follow-up.
+    const pendingApp = applications.find(
+      (app) => app.stage !== 'offer' && app.stage !== 'rejected' && app.stage !== 'withdrawn'
+    );
+    if (pendingApp) {
+      actions.push({
+        id: `da-application-${pendingApp.id}`,
+        title: `Follow up on ${pendingApp.company}`,
+        description: pendingApp.nextAction || `Keep your ${pendingApp.role} application moving.`,
+        category: 'job',
+        priority: 'high',
+        completed: false,
+        actionView: 'applications',
+        reason: `Your ${pendingApp.role} application at ${pendingApp.company} is at the "${pendingApp.stage}" stage.`,
+      });
+    }
+
+    // The largest remaining skill gap for the target role.
+    const biggestGap = analysis.criticalGaps[0];
+    if (biggestGap) {
+      actions.push({
+        id: `da-skill-${biggestGap.skill}`,
+        title: `Close your ${biggestGap.skill} gap`,
+        description: `Advance from level ${biggestGap.current} to ${biggestGap.target}.`,
+        category: 'skill',
+        priority: 'medium',
+        completed: false,
+        actionView: 'skills',
+        reason: biggestGap.reason,
+      });
+    }
+
+    return actions.map((action) => ({
+      ...action,
+      completed: completedDailyActionIds.has(action.id),
+    }));
+  }, [roadmapPhases, applications, analysis, targetRole, completedDailyActionIds]);
+
+  // The actions are derived, so "completed" is tracked separately: a set of
+  // ids the user has ticked off in this session.
   const toggleDailyAction = (id: string) => {
-    setDailyActions(prev => prev.map(a => a.id === id ? { ...a, completed: !a.completed } : a));
-  };
-
-  // Compute Weekly Career Review
-  const weeklyReview: WeeklyCareerReview = {
-    weekNumber: 42,
-    startDate: 'Oct 12, 2026',
-    endDate: 'Oct 19, 2026',
-    completedTasksCount: 4,
-    skillsAdvancedCount: 2,
-    applicationsCount: 2,
-    interviewsCount: 1,
-    keyAchievements: [
-      'Mastered TypeScript Generics and advanced discriminated unions',
-      'Advanced to Round 2 Technical Interview with Vanguard Systems',
-      'Reached 84% ATS match score in CV Studio'
-    ],
-    nextWeekPriorities: [
-      'Finalize Playwright cross-browser onboarding test workflow',
-      'Complete Vanguard Systems Lead Architect technical drill'
-    ],
-    healthScore: 88
+    setCompletedDailyActionIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   // Compute Career Health Dimensions (Explainable)
-  const careerHealth: CareerHealthDimensions = {
-    skillsConfidence: Math.round((skills.filter(s => s.gap === 0).length / skills.length) * 100),
-    evidenceCoverage: Math.min(100, evidenceItems.length * 25),
-    roadmapVelocity: 75,
-    cvAlignment: cvVersions[0]?.atsAnalysis?.overallScore || 84,
-    marketEngagement: Math.min(100, applications.length * 35),
-    overallHealth: 85
-  };
+  const careerHealth: CareerHealthDimensions = useMemo(() => {
+    const allTasks = roadmapPhases
+      .flatMap((phase) => phase.milestones)
+      .flatMap((milestone) => milestone.tasks);
+    const completedTasks = allTasks.filter((t) => t.status === 'completed').length;
+
+    const dimensions = {
+      skillsConfidence: skills.length > 0
+        ? Math.round((skills.filter(s => s.gap === 0).length / skills.length) * 100)
+        : 0,
+      evidenceCoverage: Math.min(100, evidenceItems.length * 25),
+      roadmapVelocity: allTasks.length > 0
+        ? Math.round((completedTasks / allTasks.length) * 100)
+        : 0,
+      cvAlignment: cvVersions[0]?.atsAnalysis?.overallScore ?? 0,
+      marketEngagement: Math.min(100, applications.length * 35),
+      overallHealth: 0,
+    };
+
+    // The overall health is the mean of the dimensions above it, so it can
+    // never be a hard-coded number.
+    dimensions.overallHealth = Math.round(
+      (dimensions.skillsConfidence +
+        dimensions.evidenceCoverage +
+        dimensions.roadmapVelocity +
+        dimensions.cvAlignment +
+        dimensions.marketEngagement) /
+        5
+    );
+
+    return dimensions;
+  }, [skills, evidenceItems, roadmapPhases, cvVersions, applications]);
+
+  // Weekly Career Review — derived from the user's own persisted data.
+  const weeklyReview: WeeklyCareerReview = useMemo(() => {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - 7);
+    const weekEnd = new Date(now);
+
+    const allTasks = roadmapPhases
+      .flatMap((phase) => phase.milestones)
+      .flatMap((milestone) => milestone.tasks);
+    const completedTasksCount = allTasks.filter((t) => t.status === 'completed').length;
+
+    // ISO-8601 week number.
+    const isoWeek = (() => {
+      const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    })();
+
+    return {
+      weekNumber: isoWeek,
+      startDate: weekStart.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+      endDate: weekEnd.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+      completedTasksCount,
+      skillsAdvancedCount: Object.keys(skillLevels).length,
+      applicationsCount: applications.length,
+      interviewsCount: interviewSessions.length,
+      keyAchievements: completedTasksCount > 0
+        ? [`Completed ${completedTasksCount} roadmap task${completedTasksCount === 1 ? '' : 's'}`]
+        : [],
+      nextWeekPriorities: allTasks
+        .filter((t) => t.status !== 'completed' && t.status !== 'skipped')
+        .slice(0, 2)
+        .map((t) => t.title),
+      healthScore: careerHealth.overallHealth,
+    };
+  }, [roadmapPhases, skillLevels, applications, interviewSessions, careerHealth.overallHealth]);
 
   // Authentication Handlers
   const login = async (email: string, password: string) => {
@@ -2215,19 +2345,36 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         },
       });
       if (error) {
+        // A duplicate address is reported as such rather than as a failure.
         return { success: false, error: error.message || 'Registration failed' };
       }
-      if (!data.session) {
-        // Email confirmation is required before a session exists.
-        return {
-          success: false,
-          error: 'Account created. Please confirm your email to sign in.',
-        };
+      if (data.session) {
+        setAuthToken(data.session.access_token);
+        if (data.user) setCurrentUser(toUserAccount(data.user, data.session.access_token));
+        setProfile(prev => ({ ...prev, name, email }));
+        return { success: true };
       }
-      setAuthToken(data.session.access_token);
-      if (data.user) setCurrentUser(toUserAccount(data.user, data.session.access_token));
-      setProfile(prev => ({ ...prev, name, email }));
-      return { success: true };
+
+      // B.4 finding C-4: the project requires email confirmation, so
+      // `signUp` returns NO session. The account IS created, but the user
+      // must confirm before they can sign in. The old code reported this as
+      // a FAILURE, so the modal stayed open with an error and the user had
+      // no way forward. The account is created and the user is told exactly
+      // what to do; a sign-in is also attempted in case the project has
+      // auto-confirmation enabled.
+      const signIn = await getBrowserSupabase().auth.signInWithPassword({ email, password });
+      if (signIn.data?.session) {
+        setAuthToken(signIn.data.session.access_token);
+        setCurrentUser(toUserAccount(signIn.data.user, signIn.data.session.access_token));
+        setProfile(prev => ({ ...prev, name, email }));
+        return { success: true };
+      }
+
+      return {
+        success: true,
+        error:
+          'Account created. Check your email to confirm the address, then sign in.',
+      };
     } catch (e: any) {
       return { success: false, error: e.message || 'Connection failed' };
     }
@@ -2241,6 +2388,47 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setCurrentUser(null);
     localStorage.removeItem('careerpilot_token');
     localStorage.removeItem('careerpilot_user');
+    // B.4 finding M-3: the React state was NOT cleared on sign-out, so the
+    // next user to sign in on the same tab saw the previous user's profile,
+    // roadmap, applications and notifications until the hydration finished.
+    // Every domain is reset to its empty state here.
+    setProfile({ ...emptyProfile });
+    setTargetRole(TARGET_ROLES[0]);
+    setSavedRoles([]);
+    setSkillLevels({});
+    setCustomSkills([]);
+    setUserSkillRows([]);
+    setRoadmapPhases([]);
+    setIsEnrolledInRoadmap(false);
+    setLearningCatalog([]);
+    setLearningItems([]);
+    setLearningRecommendations([]);
+    setLearningError(null);
+    setLearningRecommendationMeta((prev) => ({
+      ...prev,
+      aiUsed: false,
+      aiFallbackReason: null,
+      generatedAt: null,
+      targetRoleTitle: null,
+      skillGapCount: 0,
+      roadmapSkillCount: 0,
+    }));
+    setProjects([]);
+    setEvidenceItems([]);
+    setCvVersions([]);
+    setActiveCvId('');
+    setActiveCV(emptyCVProfile);
+    setApplications([]);
+    setInterviewSessions([]);
+    setNotifications([]);
+    setActivities([]);
+    setSecondaryGoals([]);
+    setMilestones([]);
+    setCoverLetters([]);
+    setDocuments([]);
+    setCopilotMessages([]);
+    setPendingAiAction(null);
+    setIsHydrated(false);
   };
 
   // Target Role Change Handler
@@ -2249,18 +2437,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (!role) return;
     setTargetRole(role);
 
-    setSkills(prevSkills => {
-      return prevSkills.map(s => {
-        const req = role.requiredSkills.find(r => r.name.toLowerCase() === s.name.toLowerCase());
-        const pref = role.preferredSkills.find(p => p.name.toLowerCase() === s.name.toLowerCase());
-        const target = req ? req.minLevel : pref ? pref.minLevel : 3;
-        return {
-          ...s,
-          targetLevel: target,
-          gap: Math.max(0, target - s.currentLevel)
-        };
-      });
-    });
+    // The skill target levels are derived from the role, so they follow the
+    // role automatically (B.4 finding M-2 — the levels are no longer a
+    // separate local list that has to be rewritten by hand).
+    // The user's own levels are untouched.
 
     // The roadmap is persisted server-side (B.3.9, finding H-1). It used to be
     // generated locally and never written, so a new user had no roadmap row
@@ -2271,6 +2451,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // The local state is then replaced by the server's roadmap.
     const generated = generateInitialRoadmap(role);
     try {
+      // The target role is persisted alongside the roadmap so the server's
+      // view of the user's target matches the UI's (B.4 finding M-2).
+      await patchProfile({ targetRole: role.title, targetIndustry: role.category });
       const roadmap = await createRoadmapApi({
         title: `${role.title} Roadmap`,
         targetRoleTitle: role.title,
@@ -2364,6 +2547,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (updates.bio !== undefined) payload.bio = updates.bio;
     if (updates.username !== undefined) payload.username = updates.username;
     if (updates.industry !== undefined) payload.targetIndustry = updates.industry;
+    if (updates.yearsOfExperience !== undefined)
+      payload.yearsOfExperience = updates.yearsOfExperience;
     if (updates.isPublic !== undefined) payload.isPublic = updates.isPublic;
     if (updates.links !== undefined) {
       payload.links = {
@@ -2391,6 +2576,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (updates.education !== undefined) {
       await reconcileEducations(updates.education);
     }
+    // Certifications and languages are collections too: they are owned by
+    // their own tables, not by the profile PATCH.
+    if (updates.certifications !== undefined) {
+      await reconcileCertifications(updates.certifications);
+    }
+    if (updates.languages !== undefined) {
+      await reconcileLanguages(updates.languages);
+    }
 
     if (Object.keys(payload).length > 0) {
       try {
@@ -2413,6 +2606,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             bio: saved.bio ?? prev.bio,
             username: saved.username ?? prev.username,
             industry: saved.targetIndustry ?? prev.industry,
+            yearsOfExperience: saved.yearsOfExperience ?? prev.yearsOfExperience,
             links: {
               linkedin: saved.links.find(l => l.kind === 'linkedin')?.url,
               github: saved.links.find(l => l.kind === 'github')?.url,
@@ -2427,14 +2621,39 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           }));
           return;
         }
+        // The server answered without a profile. Nothing was applied, so the
+        // local state must not be changed either.
+        throw new Error('The server did not return the updated profile');
       } catch (error) {
+        // B.4 finding M-1: the old code logged the failure and then fell
+        // through to `setProfile(prev => ({...prev, ...updates}))`, so the UI
+        // showed the change as saved even though the server had rejected it
+        // — and the caller closed its modal. The failure is now surfaced to
+        // the caller and the local state is left untouched.
         console.error('Failed to persist profile update:', error);
+        throw error;
       }
     }
 
-    // Fields the dedicated API does not own still update locally. The
-    // collections above have already been reconciled with the server.
-    setProfile(prev => ({ ...prev, ...updates }));
+    // Fields the dedicated API does not own still update locally.
+    //
+    // The collections are deliberately EXCLUDED. They were reconciled with
+    // the server above, and the server's rows — carrying the real ids —
+    // replaced the local list. Re-applying the local entries here would put
+    // the local ids back, and the next edit of the same entry would then
+    // CREATE a duplicate row instead of updating it.
+    //
+    // `email` is excluded too: it belongs to the auth identity, and the
+    // address is changed through /api/account/change-email.
+    const {
+      experiences: _experiences,
+      education: _education,
+      certifications: _certifications,
+      languages: _languages,
+      email: _email,
+      ...localOnly
+    } = updates;
+    setProfile(prev => ({ ...prev, ...localOnly }));
   };
 
   /**
@@ -2560,16 +2779,127 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const setCareerState = (state: CareerState) => {
+  /**
+   * Reconciles the local certification list with the server.
+   *
+   * The certifications live in their own table (public.profile_certifications),
+   * so the profile PATCH does not own them. The same contract as
+   * `reconcileExperiences`: a known row is updated, an unknown one is created,
+   * a row the user removed is deleted, and the local list is then replaced by
+   * the server's rows so the ids are always the real ones.
+   */
+  const reconcileCertifications = async (entries: UserCertificationEntry[]) => {
+    try {
+      const serverRows = await fetchCertifications();
+      const serverIds = new Set(serverRows.map((row) => row.id));
+      const localIds = new Set(entries.map((entry) => entry.id));
+
+      for (const entry of entries) {
+        const fields = {
+          name: entry.name,
+          issuer: entry.provider,
+          issueDate: entry.issueDate,
+          expiryDate: entry.expiryDate,
+          credentialId: entry.credentialId,
+          url: entry.credentialUrl,
+        };
+        if (serverIds.has(entry.id)) {
+          await patchCertification(entry.id, fields);
+        } else {
+          await postCertification(fields);
+        }
+      }
+
+      // A server row is deleted only when the local list the user was shown
+      // contained it. See reconcileExperiences.
+      const previouslyKnownIds = new Set(
+        profile.certifications.map((entry) => entry.id).filter((id) => serverIds.has(id))
+      );
+      for (const row of serverRows) {
+        if (previouslyKnownIds.has(row.id) && !localIds.has(row.id)) {
+          await deleteCertification(row.id);
+        }
+      }
+
+      const refreshed = await fetchCertifications();
+      setProfile(prev => ({
+        ...prev,
+        certifications: refreshed.map(toCertification),
+      }));
+    } catch (error) {
+      console.error('Failed to persist certifications:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Reconciles the local language list with the server. See
+   * `reconcileCertifications` for the same contract.
+   */
+  const reconcileLanguages = async (entries: UserLanguageEntry[]) => {
+    try {
+      const serverRows = await fetchLanguages();
+      const serverIds = new Set(serverRows.map((row) => row.id));
+      const localIds = new Set(entries.map((entry) => entry.id));
+
+      for (const entry of entries) {
+        const fields = { name: entry.language, proficiency: entry.proficiency };
+        if (serverIds.has(entry.id)) {
+          await patchLanguage(entry.id, fields);
+        } else {
+          await postLanguage(fields);
+        }
+      }
+
+      const previouslyKnownIds = new Set(
+        profile.languages.map((entry) => entry.id).filter((id) => serverIds.has(id))
+      );
+      for (const row of serverRows) {
+        if (previouslyKnownIds.has(row.id) && !localIds.has(row.id)) {
+          await deleteLanguage(row.id);
+        }
+      }
+
+      const refreshed = await fetchLanguages();
+      setProfile(prev => ({
+        ...prev,
+        languages: refreshed.map(toLanguage),
+      }));
+    } catch (error) {
+      console.error('Failed to persist languages:', error);
+      throw error;
+    }
+  };
+
+  // B.4 finding H-3: these were local-only setters, so the persona and the
+  // goal chosen during onboarding were lost on reload. They are persisted
+  // through PATCH /api/profile, which owns `user_type`, `career_goal` and
+  // `custom_goal_text`.
+  const setCareerState = async (state: CareerState) => {
     setProfile(prev => ({ ...prev, careerState: state }));
+    try {
+      await patchProfile({ userType: state });
+    } catch (error) {
+      console.error('Failed to persist career state:', error);
+    }
   };
 
-  const setCareerGoal = (goal: CareerGoal, customText?: string) => {
+  const setCareerGoal = async (goal: CareerGoal, customText?: string) => {
     setProfile(prev => ({ ...prev, careerGoal: goal, customGoalText: customText }));
+    try {
+      await patchProfile({ careerGoal: goal, customGoalText: customText ?? '' });
+    } catch (error) {
+      console.error('Failed to persist career goal:', error);
+    }
   };
 
-  const completeOnboarding = () => {
+  const completeOnboarding = async () => {
     setProfile(prev => ({ ...prev, onboardingCompleted: true }));
+    try {
+      await patchProfile({ onboardingCompleted: true });
+    } catch (error) {
+      console.error('Failed to persist onboarding completion:', error);
+    }
   };
 
   // ---- Skills ----
@@ -2583,16 +2913,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (!skill) return;
     try {
       await postUserSkill({ name: skill.name, proficiency: currentLevel });
-      setSkills(prev => prev.map(s => {
-        if (s.id === skillId) {
-          return {
-            ...s,
-            currentLevel,
-            gap: Math.max(0, s.targetLevel - currentLevel),
-            lastUpdated: new Date().toISOString().split('T')[0]
-          };
-        }
-        return s;
+      setSkillLevels(prev => ({
+        ...prev,
+        [skill.name.toLowerCase()]: currentLevel,
       }));
     } catch (error) {
       console.error('Failed to persist skill level:', error);
@@ -2609,9 +2932,18 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     try {
       await postUserSkill({ name: newSkill.name, proficiency: newSkill.currentLevel });
     } catch (error) {
+      // B.4 finding L-4: the skill was added to the local list even when the
+      // server refused the write, so the UI showed a skill that was not
+      // persisted. The local state is now only updated after the write
+      // succeeds.
       console.error('Failed to persist skill:', error);
+      throw error;
     }
-    setSkills(prev => [...prev, newSkill]);
+    setCustomSkills(prev => [...prev, newSkill]);
+    setSkillLevels(prev => ({
+      ...prev,
+      [newSkill.name.toLowerCase()]: newSkill.currentLevel,
+    }));
     void logActivity({
       actionType: 'acquired_skill',
       title: 'Added Skill',
@@ -2621,16 +2953,26 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const removeSkill = async (skillId: string) => {
-    setSkills(prev => prev.filter(s => s.id !== skillId));
-    // The server-side link is keyed by the catalogue id, not the local id.
-    // The local id is only the catalogue id for skills that came from the
-    // server, so it is used directly when it is a UUID.
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(skillId)) {
-      try {
-        await deleteUserSkillApi(skillId);
-      } catch (error) {
-        console.error('Failed to delete skill:', error);
+    const skill = skills.find(s => s.id === skillId);
+    if (!skill) return;
+    try {
+      // The server-side link is keyed by the catalogue skill id, which the
+      // /api/user-skills response exposes as `skill_id`. The local id is a
+      // slug, so the catalogue id is resolved by name.
+      const stored = userSkillRows.find(
+        (row) => (row.skill?.name ?? '').toLowerCase() === skill.name.toLowerCase()
+      );
+      if (stored?.skill_id) {
+        await deleteUserSkillApi(stored.skill_id);
       }
+      setSkillLevels(prev => {
+        const next = { ...prev };
+        delete next[skill.name.toLowerCase()];
+        return next;
+      });
+      setCustomSkills(prev => prev.filter(s => s.id !== skillId));
+    } catch (error) {
+      console.error('Failed to delete skill:', error);
     }
   };
 
@@ -2705,26 +3047,43 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const addTask = (phaseId: string, milestoneId: string, task: Omit<RoadmapTask, 'id'>) => {
-    const newTask: RoadmapTask = {
-      ...task,
-      id: `task-${Date.now()}`
-    };
-    setRoadmapPhases(prev => {
-      return prev.map(p => {
-        if (p.id !== phaseId) return p;
-        return {
-          ...p,
-          milestones: p.milestones.map(m => {
-            if (m.id !== milestoneId) return m;
+  const addTask = async (
+    phaseId: string,
+    milestoneId: string,
+    task: Omit<RoadmapTask, 'id'>
+  ) => {
+    try {
+      // The task is written server-side first: a task the database does not
+      // hold would vanish on the next reload.
+      const dto = await addRoadmapTask(phaseId, milestoneId, {
+        title: task.title,
+        description: task.description,
+        status: task.status,
+      });
+      if (dto) {
+        setRoadmapPhases(prev =>
+          prev.map(p => {
+            if (p.id !== phaseId) return p;
             return {
-              ...m,
-              tasks: [...m.tasks, newTask]
+              ...p,
+              milestones: p.milestones.map(m => {
+                if (m.id !== milestoneId) return m;
+                const tasks = [...m.tasks, { ...task, id: dto.id }];
+                return {
+                  ...m,
+                  tasks,
+                  completedTasksCount: tasks.filter(t => t.status === 'completed').length,
+                };
+              }),
             };
           })
-        };
-      });
-    });
+        );
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to persist roadmap task:', error);
+      throw error;
+    }
   };
 
   const enrollInRoadmap = async () => {
@@ -2741,10 +3100,112 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const toggleResourceEnrollment = (resourceId: string) => {
-    setEnrolledResourceIds(prev => 
-      prev.includes(resourceId) ? prev.filter(id => id !== resourceId) : [...prev, resourceId]
-    );
+  const applyLearningItem = (item: LearningItem) => {
+    setLearningItems((prev) => {
+      const next = prev.filter((entry) => entry.courseId !== item.courseId);
+      next.unshift(item);
+      return next;
+    });
+  };
+
+  const refreshLearningRecommendations = async (preferences: LearningPreferences = {}) => {
+    setIsLearningLoading(true);
+    try {
+      const result = await fetchLearningRecommendations(preferences);
+      setLearningRecommendations(result.recommendations ?? []);
+      setLearningRecommendationMeta((prev) => ({
+        ...prev,
+        aiUsed: result.aiUsed,
+        aiFallbackReason: result.aiFallbackReason,
+        generatedAt: result.generatedAt,
+        targetRoleTitle: result.context?.targetRoleTitle ?? prev.targetRoleTitle,
+        weeklyHours: result.context?.weeklyHours ?? prev.weeklyHours,
+        budget: result.context?.budget ?? prev.budget,
+        preferredFormat: result.context?.preferredFormat ?? prev.preferredFormat,
+        skillGapCount: result.context?.skillGapCount ?? prev.skillGapCount,
+        roadmapSkillCount: result.context?.roadmapSkillCount ?? prev.roadmapSkillCount,
+      }));
+      setLearningError(null);
+    } catch (error) {
+      setLearningError(error instanceof Error ? error.message : 'Failed to load recommendations');
+    } finally {
+      setIsLearningLoading(false);
+    }
+  };
+
+  const getLearningItem = (courseId: string) =>
+    learningItems.find((item) => item.courseId === courseId);
+
+  const persistLearningStatus = async (
+    courseId: string,
+    status: LearningStatus,
+    reason?: string
+  ) => {
+    setIsLearningLoading(true);
+    try {
+      const item = await saveLearningItemApi({
+        courseId,
+        status,
+        recommendationReason: reason ?? null,
+      });
+      applyLearningItem(item);
+      setLearningError(null);
+      // Refresh the deterministic ranking so dismissed/completed items leave
+      // the recommendation list immediately. AI explanations are not
+      // regenerated for every button press.
+      await refreshLearningRecommendations({ ai: false });
+    } catch (error) {
+      setLearningError(error instanceof Error ? error.message : 'Failed to save learning state');
+    } finally {
+      setIsLearningLoading(false);
+    }
+  };
+
+  const saveLearningCourse = (courseId: string, reason?: string) =>
+    persistLearningStatus(courseId, 'saved', reason);
+
+  const dismissLearningCourse = (courseId: string, reason?: string) =>
+    persistLearningStatus(courseId, 'dismissed', reason);
+
+  const startLearningCourse = (courseId: string, reason?: string) =>
+    persistLearningStatus(courseId, 'in_progress', reason);
+
+  const completeLearningCourse = async (courseId: string) => {
+    // Completion records evidence of learning. It deliberately does NOT
+    // modify public.user_skills: mastering a skill remains a separate,
+    // explicit action in the Skills Center.
+    await persistLearningStatus(courseId, 'completed');
+  };
+
+  const updateLearningProgress = async (courseId: string, percent: number) => {
+    const existing = getLearningItem(courseId);
+    setIsLearningLoading(true);
+    try {
+      const item = await patchLearningItemApi(courseId, {
+        progressPercent: Math.max(0, Math.min(100, Math.round(percent))),
+        status: existing?.status === 'saved' ? 'in_progress' : undefined,
+      });
+      applyLearningItem(item);
+      setLearningError(null);
+    } catch (error) {
+      setLearningError(error instanceof Error ? error.message : 'Failed to update progress');
+    } finally {
+      setIsLearningLoading(false);
+    }
+  };
+
+  const removeLearningCourse = async (courseId: string) => {
+    setIsLearningLoading(true);
+    try {
+      await deleteLearningItemApi(courseId);
+      setLearningItems((prev) => prev.filter((item) => item.courseId !== courseId));
+      setLearningError(null);
+      await refreshLearningRecommendations({ ai: false });
+    } catch (error) {
+      setLearningError(error instanceof Error ? error.message : 'Failed to remove learning item');
+    } finally {
+      setIsLearningLoading(false);
+    }
   };
 
   const addProject = async (project: Omit<CareerProject, 'id' | 'createdAt'>) => {
@@ -2797,7 +3258,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const deleteProject = async (projectId: string) => {
     try {
-      await deleteProject(projectId);
+      await deleteProjectApi(projectId);
       setProjects(prev => prev.filter(p => p.id !== projectId));
     } catch (error) {
       console.error('Failed to delete project:', error);
@@ -2852,7 +3313,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const deleteEvidence = async (evidenceId: string) => {
     try {
-      await deleteEvidence(evidenceId);
+      await deleteEvidenceApi(evidenceId);
       setEvidenceItems(prev => prev.filter(e => e.id !== evidenceId));
     } catch (error) {
       console.error('Failed to delete evidence:', error);
@@ -2865,8 +3326,17 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const saveCVVersion = async (name: string) => {
     try {
+      // A version belongs to a CV. A user who has never created one still
+      // gets a snapshot: the CV row is created first, and its REAL id is
+      // used. Posting against an empty cvId was rejected with 400.
+      let cvId = activeCvId;
+      if (!cvId) {
+        const created = await postCv({ name, targetRoleTitle: targetRole.title });
+        cvId = created.id;
+        setActiveCvId(created.id);
+      }
       const dto = await postCvVersion({
-        cvId: activeCvId,
+        cvId,
         name,
         targetRoleTitle: targetRole.title,
         profileJson: activeCV,
@@ -2875,6 +3345,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setCvVersions(prev => [toCVVersion(dto), ...prev]);
     } catch (error) {
       console.error('Failed to save CV version:', error);
+      throw error;
     }
   };
 
@@ -2900,8 +3371,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       if (data.cv) {
         setActiveCV(data.cv);
+        // The route creates the CV row and its first version and returns
+        // their real ids. Without them the version list would hold a fake
+        // id, and the next snapshot would have no CV to attach to.
+        if (data.cvId) setActiveCvId(data.cvId);
         const newVer: CVVersion = {
-          id: `cv-v-${Date.now()}`,
+          id: data.cvVersionId ?? `cv-v-${Date.now()}`,
+          cvId: data.cvId,
           name: `${file.name.replace(/\.[^/.]+$/, '')} (Uploaded)`,
           targetRoleTitle: targetRole.title,
           createdAt: new Date().toISOString().split('T')[0],
@@ -3165,6 +3641,18 @@ Skills: ${activeCV.skillsList.join(', ')}
 
   const updateSettings = (updates: Partial<UserSettings>) => {
     setSettings(prev => ({ ...prev, ...updates }));
+    // The theme and the interface language belong to the ACCOUNT, so they
+    // follow the user to another device. The remaining settings (the
+    // reminder toggles, the AI personalisation controls) are per-device UI
+    // preferences and deliberately stay in local state.
+    const accountOwned: Partial<PreferencesDTO> = {};
+    if (updates.theme !== undefined) accountOwned.theme = updates.theme;
+    if (updates.language !== undefined) accountOwned.language = updates.language;
+    if (Object.keys(accountOwned).length > 0) {
+      void patchPreferences(accountOwned).catch((error) => {
+        console.error('Failed to persist account settings:', error);
+      });
+    }
   };
 
   const t = (key: keyof typeof translations.en): string => {
@@ -3203,7 +3691,19 @@ Skills: ${activeCV.skillsList.join(', ')}
   };
 
   const resetAllData = () => {
-    localStorage.clear();
+    // B.4 finding L-1: `localStorage.clear()` also wiped the Supabase auth
+    // session, so "reset my data" silently signed the user out. Only the
+    // CareerPilot cache keys are removed; the auth session is left alone.
+    for (const key of [
+      'careerpilot_profile',
+      'careerpilot_target_role',
+      'careerpilot_skills',
+      'careerpilot_settings',
+      'careerpilot_token',
+      'careerpilot_user',
+    ]) {
+      localStorage.removeItem(key);
+    }
     window.location.reload();
   };
 
@@ -3212,6 +3712,7 @@ Skills: ${activeCV.skillsList.join(', ')}
       value={{
         currentUser,
         authToken,
+        isAuthReady,
         authModalOpen,
         setAuthModalOpen,
         login,
@@ -3265,9 +3766,20 @@ Skills: ${activeCV.skillsList.join(', ')}
         addTask,
         isEnrolledInRoadmap,
         enrollInRoadmap,
-        learningResources,
-        enrolledResourceIds,
-        toggleResourceEnrollment,
+        learningCatalog,
+        learningItems,
+        learningRecommendations,
+        learningRecommendationMeta,
+        isLearningLoading,
+        learningError,
+        refreshLearningRecommendations,
+        getLearningItem,
+        saveLearningCourse,
+        dismissLearningCourse,
+        startLearningCourse,
+        completeLearningCourse,
+        updateLearningProgress,
+        removeLearningCourse,
         projects,
         addProject,
         updateProject,

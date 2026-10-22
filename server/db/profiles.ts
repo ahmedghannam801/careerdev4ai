@@ -10,6 +10,7 @@ export interface ProfileRow {
   username: string | null;
   avatar_url: string | null;
   phone: string | null;
+  location: string | null;
   bio: string | null;
   user_type: string | null;
   career_goal: string | null;

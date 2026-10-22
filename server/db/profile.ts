@@ -31,6 +31,7 @@ export interface ProfileDTO {
   currentTitle: string | null;
   currentPosition: string | null;
   currentCompany: string | null;
+  yearsOfExperience: string | null;
   headline: string | null;
   bio: string | null;
   professionalSummary: string | null;
@@ -62,6 +63,7 @@ export interface UpdateProfileInput {
   currentTitle?: string;
   currentPosition?: string;
   currentCompany?: string;
+  yearsOfExperience?: string;
   headline?: string;
   bio?: string;
   professionalSummary?: string;
@@ -90,6 +92,7 @@ interface ProfileRow {
   current_title: string | null;
   current_position: string | null;
   current_company: string | null;
+  years_of_experience: string | null;
   headline: string | null;
   bio: string | null;
   professional_summary: string | null;
@@ -105,7 +108,7 @@ interface ProfileRow {
 }
 
 const SELECT_COLUMNS =
-  'id, full_name, preferred_name, username, avatar_url, phone, location, city, country, timezone, current_title, current_position, current_company, headline, bio, professional_summary, career_goal, custom_goal_text, target_role, target_industry, user_type, onboarding_completed, is_public, created_at, updated_at';
+  'id, full_name, preferred_name, username, avatar_url, phone, location, city, country, timezone, current_title, current_position, current_company, years_of_experience, headline, bio, professional_summary, career_goal, custom_goal_text, target_role, target_industry, user_type, onboarding_completed, is_public, created_at, updated_at';
 
 /** The profile row + its extension rows, as one typed DTO. */
 export async function getProfileDto(profileId: string): Promise<ProfileDTO | null> {
@@ -139,6 +142,7 @@ export async function getProfileDto(profileId: string): Promise<ProfileDTO | nul
     currentTitle: row.current_title,
     currentPosition: row.current_position,
     currentCompany: row.current_company,
+    yearsOfExperience: row.years_of_experience,
     headline: row.headline,
     bio: row.bio,
     professionalSummary: row.professional_summary,
@@ -177,6 +181,7 @@ export async function updateProfileDto(
     ['currentTitle', 'current_title'],
     ['currentPosition', 'current_position'],
     ['currentCompany', 'current_company'],
+    ['yearsOfExperience', 'years_of_experience'],
     ['headline', 'headline'],
     ['bio', 'bio'],
     ['professionalSummary', 'professional_summary'],

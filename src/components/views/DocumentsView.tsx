@@ -50,7 +50,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
     name: '',
     type: 'cv' as CareerDocument['type'],
     format: 'pdf' as CareerDocument['format'],
-    size: '150 KB',
+    size: '',
     isPublic: true,
     contentPreview: '',
     relatedApplicationId: ''
@@ -63,9 +63,9 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
 
   // Cover Letter Generator Studio Form
   const [clForm, setClForm] = useState({
-    company: 'Vanguard Systems',
-    jobTitle: 'Frontend Engineer (React / TypeScript)',
-    jobDescription: 'Seeking experienced Frontend Engineer to build high-scale, accessible web systems using modern React 19, strict TypeScript, and automated testing.',
+    company: '',
+    jobTitle: '',
+    jobDescription: '',
     tone: 'Professional & Confident'
   });
   const [isGeneratingCl, setIsGeneratingCl] = useState(false);
@@ -100,7 +100,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
       name: '',
       type: 'cv',
       format: 'pdf',
-      size: '150 KB',
+      size: '',
       isPublic: true,
       contentPreview: '',
       relatedApplicationId: ''
@@ -338,7 +338,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                       {version.name}
                     </h3>
                     <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 font-mono">
-                      ATS: {version.atsAnalysis?.overallScore || 84}%
+                      ATS: {version.atsAnalysis ? `${version.atsAnalysis.overallScore}%` : '—'}
                     </span>
                   </div>
                   <p className="text-xs text-[var(--text-secondary)]">
@@ -411,7 +411,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                   type="text"
                   value={clForm.company}
                   onChange={(e) => setClForm(prev => ({ ...prev, company: e.target.value }))}
-                  placeholder="e.g. Vanguard Systems"
+                  placeholder="e.g. Acme Corp"
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
@@ -471,7 +471,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
 
               <button
                 onClick={handleGenerateCoverLetter}
-                disabled={isGeneratingCl || !clForm.company}
+                disabled={isGeneratingCl || !clForm.company || !clForm.jobTitle}
                 className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-xs"
               >
                 <Sparkles className="w-3.5 h-3.5" />
@@ -561,7 +561,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                   type="text"
                   value={docForm.name}
                   onChange={(e) => setDocForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Sarah Jenkins - Fullstack Portfolio.pdf"
+                  placeholder="e.g. Portfolio - Fullstack.pdf"
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>

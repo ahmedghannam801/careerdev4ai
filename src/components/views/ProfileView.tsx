@@ -36,15 +36,16 @@ import {
 } from '../../types/career';
 
 export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
-  const { 
-    profile, 
-    updateProfile, 
-    profileCompleteness, 
-    skills, 
-    projects, 
-    suggestAiSummary, 
-    validateUsername, 
-    t 
+  const {
+    profile,
+    updateProfile,
+    profileCompleteness,
+    skills,
+    projects,
+    applications,
+    suggestAiSummary,
+    validateUsername,
+    t
   } = useCareer();
 
   // Modals state
@@ -56,6 +57,13 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   const [copiedLink, setCopiedLink] = useState(false);
   const [usernameCheckMessage, setUsernameCheckMessage] = useState('');
   const [isUsernameValid, setIsUsernameValid] = useState<boolean | null>(null);
+
+  // B.4: a rejected write must be visible. `updateProfile` throws when the
+  // backend refuses the change, so every handler below catches it, keeps its
+  // modal open, and shows the message here instead of closing as if the save
+  // had succeeded.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Form states for Experience modal
   const [expModalOpen, setExpModalOpen] = useState(false);
@@ -106,6 +114,12 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     proficiency: 'Professional' as const
   });
 
+  // True while one of the edit modals is open. A failed save is shown
+  // inside the modal that produced it; a failed deletion (which has no
+  // modal) is shown as a page-level banner.
+  const aModalIsOpen =
+    editBasicOpen || editSummaryOpen || expModalOpen || eduModalOpen || certModalOpen || langModalOpen;
+
   // Basic info form
   const [basicForm, setBasicForm] = useState({
     name: profile.name,
@@ -130,7 +144,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   });
 
   const handleCopyPublicLink = () => {
-    const url = `${window.location.origin}/#/profile/${profile.username || 'sarah-jenkins'}`;
+    const url = `${window.location.origin}/#/profile/${profile.username || 'your-username'}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -150,30 +164,39 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   };
 
   const handleSaveBasic = async () => {
-    await updateProfile({
-      name: basicForm.name,
-      preferredName: basicForm.preferredName,
-      email: basicForm.email,
-      phone: basicForm.phone,
-      location: basicForm.location,
-      city: basicForm.city,
-      country: basicForm.country,
-      timezone: basicForm.timezone,
-      headline: basicForm.headline,
-      currentPosition: basicForm.currentPosition,
-      currentCompany: basicForm.currentCompany,
-      yearsOfExperience: basicForm.yearsOfExperience,
-      industry: basicForm.industry,
-      username: basicForm.username,
-      isPublic: basicForm.isPublic,
-      links: {
-        linkedin: basicForm.linkedin,
-        github: basicForm.github,
-        portfolio: basicForm.portfolio,
-        personalWebsite: basicForm.personalWebsite
-      }
-    });
-    setEditBasicOpen(false);
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await updateProfile({
+        name: basicForm.name,
+        preferredName: basicForm.preferredName,
+        email: basicForm.email,
+        phone: basicForm.phone,
+        location: basicForm.location,
+        city: basicForm.city,
+        country: basicForm.country,
+        timezone: basicForm.timezone,
+        headline: basicForm.headline,
+        currentPosition: basicForm.currentPosition,
+        currentCompany: basicForm.currentCompany,
+        yearsOfExperience: basicForm.yearsOfExperience,
+        industry: basicForm.industry,
+        username: basicForm.username,
+        isPublic: basicForm.isPublic,
+        links: {
+          linkedin: basicForm.linkedin,
+          github: basicForm.github,
+          portfolio: basicForm.portfolio,
+          personalWebsite: basicForm.personalWebsite
+        }
+      });
+      setEditBasicOpen(false);
+    } catch (e: any) {
+      // The write was rejected: the modal stays open so the user can retry.
+      setSaveError(e?.message || 'Failed to save your profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleGenerateSummary = async () => {
@@ -188,11 +211,18 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     }
   };
 
-  const handleConfirmSummary = () => {
-    if (aiSummaryDraft.trim()) {
-      updateProfile({ professionalSummary: aiSummaryDraft.trim() });
+  const handleConfirmSummary = async () => {
+    if (!aiSummaryDraft.trim()) return;
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await updateProfile({ professionalSummary: aiSummaryDraft.trim() });
+      setEditSummaryOpen(false);
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to save your profile');
+    } finally {
+      setSaving(false);
     }
-    setEditSummaryOpen(false);
   };
 
   // Experience handlers
@@ -230,46 +260,59 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     setExpModalOpen(true);
   };
 
-  const handleSaveExp = () => {
+  const handleSaveExp = async () => {
     const achList = expForm.achievements.split('\n').map(s => s.trim()).filter(Boolean);
     const skillList = expForm.skillsUsed.split(',').map(s => s.trim()).filter(Boolean);
 
-    if (editingExp) {
-      const updated = profile.experiences.map(e => e.id === editingExp.id ? {
-        ...e,
-        role: expForm.role,
-        company: expForm.company,
-        employmentType: expForm.employmentType,
-        location: expForm.location,
-        startDate: expForm.startDate,
-        endDate: expForm.isCurrent ? 'Present' : expForm.endDate,
-        isCurrent: expForm.isCurrent,
-        description: expForm.description,
-        achievements: achList,
-        skillsUsed: skillList
-      } : e);
-      updateProfile({ experiences: updated });
-    } else {
-      const newExp: UserExperienceEntry = {
-        id: `exp-${Date.now()}`,
-        role: expForm.role,
-        company: expForm.company,
-        employmentType: expForm.employmentType,
-        location: expForm.location,
-        startDate: expForm.startDate,
-        endDate: expForm.isCurrent ? 'Present' : expForm.endDate,
-        isCurrent: expForm.isCurrent,
-        description: expForm.description,
-        achievements: achList,
-        skillsUsed: skillList
-      };
-      updateProfile({ experiences: [...profile.experiences, newExp] });
+    setSaveError(null);
+    setSaving(true);
+    try {
+      if (editingExp) {
+        const updated = profile.experiences.map(e => e.id === editingExp.id ? {
+          ...e,
+          role: expForm.role,
+          company: expForm.company,
+          employmentType: expForm.employmentType,
+          location: expForm.location,
+          startDate: expForm.startDate,
+          endDate: expForm.isCurrent ? 'Present' : expForm.endDate,
+          isCurrent: expForm.isCurrent,
+          description: expForm.description,
+          achievements: achList,
+          skillsUsed: skillList
+        } : e);
+        await updateProfile({ experiences: updated });
+      } else {
+        const newExp: UserExperienceEntry = {
+          id: `exp-${Date.now()}`,
+          role: expForm.role,
+          company: expForm.company,
+          employmentType: expForm.employmentType,
+          location: expForm.location,
+          startDate: expForm.startDate,
+          endDate: expForm.isCurrent ? 'Present' : expForm.endDate,
+          isCurrent: expForm.isCurrent,
+          description: expForm.description,
+          achievements: achList,
+          skillsUsed: skillList
+        };
+        await updateProfile({ experiences: [...profile.experiences, newExp] });
+      }
+      setExpModalOpen(false);
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to save your experience');
+    } finally {
+      setSaving(false);
     }
-    setExpModalOpen(false);
   };
 
-  const handleDeleteExp = (id: string) => {
-    updateProfile({ experiences: profile.experiences.filter(e => e.id !== id) });
+  const handleDeleteExp = async (id: string) => {
+    setSaveError(null);
+    try {
+      await updateProfile({ experiences: profile.experiences.filter(e => e.id !== id) });
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to delete this experience');
+    }
   };
 
   // Education handlers
@@ -303,93 +346,158 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     setEduModalOpen(true);
   };
 
-  const handleSaveEdu = () => {
+  const handleSaveEdu = async () => {
     const courseList = eduForm.coursework.split(',').map(s => s.trim()).filter(Boolean);
-    if (editingEdu) {
-      const updated = profile.education.map(e => e.id === editingEdu.id ? {
-        ...e,
-        institution: eduForm.institution,
-        degree: eduForm.degree,
-        field: eduForm.field,
-        startDate: eduForm.startDate,
-        endDate: eduForm.current ? 'Present' : eduForm.endDate,
-        current: eduForm.current,
-        gpa: eduForm.gpa,
-        coursework: courseList
-      } : e);
-      updateProfile({ education: updated });
-    } else {
-      const newEdu: UserEducationEntry = {
-        id: `edu-${Date.now()}`,
-        institution: eduForm.institution,
-        degree: eduForm.degree,
-        field: eduForm.field,
-        startDate: eduForm.startDate,
-        endDate: eduForm.current ? 'Present' : eduForm.endDate,
-        current: eduForm.current,
-        gpa: eduForm.gpa,
-        coursework: courseList
-      };
-      updateProfile({ education: [...profile.education, newEdu] });
+    setSaveError(null);
+    setSaving(true);
+    try {
+      if (editingEdu) {
+        const updated = profile.education.map(e => e.id === editingEdu.id ? {
+          ...e,
+          institution: eduForm.institution,
+          degree: eduForm.degree,
+          field: eduForm.field,
+          startDate: eduForm.startDate,
+          endDate: eduForm.current ? 'Present' : eduForm.endDate,
+          current: eduForm.current,
+          gpa: eduForm.gpa,
+          coursework: courseList
+        } : e);
+        await updateProfile({ education: updated });
+      } else {
+        const newEdu: UserEducationEntry = {
+          id: `edu-${Date.now()}`,
+          institution: eduForm.institution,
+          degree: eduForm.degree,
+          field: eduForm.field,
+          startDate: eduForm.startDate,
+          endDate: eduForm.current ? 'Present' : eduForm.endDate,
+          current: eduForm.current,
+          gpa: eduForm.gpa,
+          coursework: courseList
+        };
+        await updateProfile({ education: [...profile.education, newEdu] });
+      }
+      setEduModalOpen(false);
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to save your education');
+    } finally {
+      setSaving(false);
     }
-    setEduModalOpen(false);
   };
 
-  const handleDeleteEdu = (id: string) => {
-    updateProfile({ education: profile.education.filter(e => e.id !== id) });
+  const handleDeleteEdu = async (id: string) => {
+    setSaveError(null);
+    try {
+      await updateProfile({ education: profile.education.filter(e => e.id !== id) });
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to delete this education entry');
+    }
   };
 
   // Certification handlers
-  const handleSaveCert = () => {
-    if (editingCert) {
-      const updated = profile.certifications.map(c => c.id === editingCert.id ? {
-        ...c,
-        name: certForm.name,
-        provider: certForm.provider,
-        issueDate: certForm.issueDate,
-        expiryDate: certForm.expiryDate,
-        credentialId: certForm.credentialId,
-        credentialUrl: certForm.credentialUrl
-      } : c);
-      updateProfile({ certifications: updated });
-    } else {
-      const newCert: UserCertificationEntry = {
-        id: `cert-${Date.now()}`,
-        name: certForm.name,
-        provider: certForm.provider,
-        issueDate: certForm.issueDate,
-        expiryDate: certForm.expiryDate,
-        credentialId: certForm.credentialId,
-        credentialUrl: certForm.credentialUrl
-      };
-      updateProfile({ certifications: [...profile.certifications, newCert] });
+  const handleSaveCert = async () => {
+    setSaveError(null);
+    setSaving(true);
+    try {
+      if (editingCert) {
+        const updated = profile.certifications.map(c => c.id === editingCert.id ? {
+          ...c,
+          name: certForm.name,
+          provider: certForm.provider,
+          issueDate: certForm.issueDate,
+          expiryDate: certForm.expiryDate,
+          credentialId: certForm.credentialId,
+          credentialUrl: certForm.credentialUrl
+        } : c);
+        await updateProfile({ certifications: updated });
+      } else {
+        const newCert: UserCertificationEntry = {
+          id: `cert-${Date.now()}`,
+          name: certForm.name,
+          provider: certForm.provider,
+          issueDate: certForm.issueDate,
+          expiryDate: certForm.expiryDate,
+          credentialId: certForm.credentialId,
+          credentialUrl: certForm.credentialUrl
+        };
+        await updateProfile({ certifications: [...profile.certifications, newCert] });
+      }
+      setCertModalOpen(false);
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to save your certification');
+    } finally {
+      setSaving(false);
     }
-    setCertModalOpen(false);
   };
 
-  const handleDeleteCert = (id: string) => {
-    updateProfile({ certifications: profile.certifications.filter(c => c.id !== id) });
+  const handleDeleteCert = async (id: string) => {
+    setSaveError(null);
+    try {
+      await updateProfile({ certifications: profile.certifications.filter(c => c.id !== id) });
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to delete this certification');
+    }
   };
 
   // Language handlers
-  const handleSaveLang = () => {
+  const handleSaveLang = async () => {
     if (!langForm.language.trim()) return;
     const newLang: UserLanguageEntry = {
       id: `lang-${Date.now()}`,
       language: langForm.language.trim(),
       proficiency: langForm.proficiency
     };
-    updateProfile({ languages: [...profile.languages, newLang] });
-    setLangModalOpen(false);
-    setLangForm({ language: '', proficiency: 'Professional' });
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await updateProfile({ languages: [...profile.languages, newLang] });
+      setLangModalOpen(false);
+      setLangForm({ language: '', proficiency: 'Professional' });
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to save your language');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteLang = (id: string) => {
-    updateProfile({ languages: profile.languages.filter(l => l.id !== id) });
+  const handleDeleteLang = async (id: string) => {
+    setSaveError(null);
+    try {
+      await updateProfile({ languages: profile.languages.filter(l => l.id !== id) });
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to delete this language');
+    }
   };
+
+  /**
+   * Renders the message of a rejected write. `updateProfile` throws when the
+   * backend refuses the change, so without this the failure would be
+   * invisible and a rejected save would look exactly like a successful one.
+   */
+  const renderSaveError = () =>
+    saveError ? (
+      <p
+        className="text-[11px] font-medium text-[var(--color-danger)] bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 rounded-lg px-2.5 py-2"
+        role="alert"
+      >
+        {saveError}
+      </p>
+    ) : null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
+      {/* A failed DELETE has no modal of its own, so the error is surfaced
+          as a page-level banner. */}
+      {saveError && !aModalIsOpen && (
+        <div
+          className="text-xs font-medium text-[var(--color-danger)] bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 rounded-xl px-4 py-3"
+          role="alert"
+        >
+          {saveError}
+        </div>
+      )}
+
       {/* Top Profile Header Card */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
         {/* Subtle accent backdrop */}
@@ -442,7 +550,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                  {profile.location || 'San Francisco, CA'}
+                  {profile.location || 'Not set yet'}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-[var(--text-muted)]" />
@@ -596,7 +704,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               Who You Are
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
-              {profile.careerIdentity?.whoYouAre || `${profile.careerState.replace('_', ' ')} with web engineering foundations`}
+              {profile.careerIdentity?.whoYouAre || profile.careerState.replace('_', ' ')}
             </p>
           </div>
 
@@ -623,7 +731,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               What You're Missing
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
-              {profile.careerIdentity?.whatYoureMissing || 'Automated test suite (Jest/Playwright) and CI/CD pipelines'}
+              {profile.careerIdentity?.whatYoureMissing || 'Not set yet'}
             </p>
           </div>
 
@@ -632,7 +740,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               What You're Building
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
-              {profile.careerIdentity?.whatYoureBuilding || 'Accessible Design System & E2E Testing Suite'}
+              {profile.careerIdentity?.whatYoureBuilding || 'Not set yet'}
             </p>
           </div>
 
@@ -641,7 +749,10 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               Where You're Applying
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
-              {profile.careerIdentity?.whereApplying || 'Vanguard Systems & Nexus Cloud'}
+              {profile.careerIdentity?.whereApplying ||
+                (applications.length > 0
+                  ? applications.map(a => a.company).join(', ')
+                  : 'No applications yet')}
             </p>
           </div>
         </div>
@@ -1184,6 +1295,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               </div>
             </div>
 
+            {renderSaveError()}
+
             <div className="flex items-center justify-end gap-2 pt-4 border-t border-[var(--border-subtle)]">
               <button
                 onClick={() => setEditBasicOpen(false)}
@@ -1193,9 +1306,10 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               </button>
               <button
                 onClick={handleSaveBasic}
-                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold"
+                disabled={saving}
+                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold disabled:opacity-50"
               >
-                Save Changes
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
@@ -1246,6 +1360,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               />
             </div>
 
+            {renderSaveError()}
+
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button
                 onClick={() => setEditSummaryOpen(false)}
@@ -1255,10 +1371,10 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               </button>
               <button
                 onClick={handleConfirmSummary}
-                disabled={!aiSummaryDraft.trim()}
+                disabled={!aiSummaryDraft.trim() || saving}
                 className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold disabled:opacity-50"
               >
-                Approve & Save Summary
+                {saving ? 'Saving...' : 'Approve & Save Summary'}
               </button>
             </div>
           </div>
@@ -1296,7 +1412,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     type="text"
                     value={expForm.company}
                     onChange={(e) => setExpForm(prev => ({ ...prev, company: e.target.value }))}
-                    placeholder="e.g. Meridian Tech"
+                    placeholder="e.g. Acme Corp"
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   />
                 </div>
@@ -1404,6 +1520,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               </div>
             </div>
 
+            {renderSaveError()}
+
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button
                 onClick={() => setExpModalOpen(false)}
@@ -1413,10 +1531,10 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               </button>
               <button
                 onClick={handleSaveExp}
-                disabled={!expForm.role || !expForm.company}
+                disabled={!expForm.role || !expForm.company || saving}
                 className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold disabled:opacity-50"
               >
-                Save Experience
+                {saving ? 'Saving...' : 'Save Experience'}
               </button>
             </div>
           </div>
@@ -1590,12 +1708,17 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 />
               </div>
             </div>
+            {renderSaveError()}
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setEduModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">
                 Cancel
               </button>
-              <button onClick={handleSaveEdu} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold">
-                Save
+              <button
+                onClick={handleSaveEdu}
+                disabled={saving}
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
@@ -1663,12 +1786,17 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 />
               </div>
             </div>
+            {renderSaveError()}
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setCertModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">
                 Cancel
               </button>
-              <button onClick={handleSaveCert} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold">
-                Save
+              <button
+                onClick={handleSaveCert}
+                disabled={saving}
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
@@ -1706,9 +1834,16 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 </select>
               </div>
             </div>
+            {renderSaveError()}
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setLangModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveLang} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold">Add</button>
+              <button
+                onClick={handleSaveLang}
+                disabled={saving}
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Add'}
+              </button>
             </div>
           </div>
         </div>

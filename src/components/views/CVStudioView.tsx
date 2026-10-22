@@ -105,7 +105,7 @@ export const CVStudioView: React.FC = () => {
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          ATS Analysis & Recommendations ({latestAnalysis?.overallScore || 84}%)
+          ATS Analysis & Recommendations{latestAnalysis ? ` (${latestAnalysis.overallScore}%)` : ''}
         </button>
         <button
           onClick={() => setActiveTab('versions')}

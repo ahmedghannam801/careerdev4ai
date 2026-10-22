@@ -5,6 +5,26 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { verifySupabaseToken } from './server/auth/supabase-auth.ts';
+
+// Express request augmentation.
+//
+//  attaches the verified Supabase user to the request and the route
+// handlers read it as . TypeScript needs to be told that the
+// property exists on the base  type.
+//
+// The augmentation is additive and optional: a request that has not passed
+// through  simply has no user.
+//
+// B.4:  was not part of the TypeScript program before (the tsconfig
+//  listed the  DIRECTORY, not the root  file), so
+// none of the server code was ever type-checked. That gap is now closed.
+declare global {
+  namespace Express {
+    interface Request {
+      authUser?: { id: string; email?: string };
+    }
+  }
+}
 import { requireAuth } from './server/auth/require-auth.ts';
 import { getProfile, upsertProfile, findProfileByUsername } from './server/db/profiles.ts';
 import { changePassword, changeEmail, deleteAccount } from './server/db/account.ts';
@@ -54,12 +74,23 @@ import {
   type NotificationType,
 } from './server/db/notifications.ts';
 import { getProfileDto, updateProfileDto } from './server/db/profile.ts';
+import { getPreferences, upsertPreferences } from './server/db/preferences.ts';
 import {
-  createCv,
-  setActiveCv,
-  getCv as getCvRow,
-} from './server/db/cvs.ts';
-import { createCvVersion } from './server/db/cvVersions.ts';
+  listBookmarks,
+  createBookmark,
+  deleteBookmark,
+} from './server/db/bookmarks.ts';
+import {
+  listCourses,
+  getCourse,
+  listLearningItems,
+  upsertLearningItem,
+  updateLearningItem,
+  deleteLearningItem,
+} from './server/db/learning.ts';
+import { rankCourses, type LearningFormat, type LearningStatus } from './server/learning/recommendation.ts';
+import { enrichRecommendationsWithAi } from './server/learning/ai.ts';
+import { buildLearningContext } from './server/learning/context.ts';
 import {
   uploadCvFile,
   createCvFileDownloadUrl,
@@ -75,6 +106,8 @@ import {
   getCv,
   createCv,
   updateCv,
+  getCv as getCvRow,
+  setActiveCv,
   deleteCv,
 } from './server/db/cvs.ts';
 import {
@@ -85,6 +118,8 @@ import {
   deleteCvVersion,
 } from './server/db/cvVersions.ts';
 import {
+  type ProjectDifficulty,
+  type ProjectStatus,
   listProjects,
   getProject,
   createProject,
@@ -754,14 +789,14 @@ Return only valid JSON.`;
       : 'Uploaded CV';
     const cvRow = await createCv(userId, {
       name: cvName,
-      targetRoleTitle: req.body.targetRoleTitle || null,
-      storagePath: storedFile?.path ?? null,
+      targetRoleTitle: req.body.targetRoleTitle || undefined,
+      storagePath: storedFile?.path,
     });
     await setActiveCv(userId, cvRow.id);
     const version = await createCvVersion(userId, {
       cvId: cvRow.id,
       name: cvName,
-      targetRoleTitle: req.body.targetRoleTitle || null,
+      targetRoleTitle: req.body.targetRoleTitle || undefined,
       profileJson: parsedCV,
       atsAnalysis,
     });
@@ -1212,6 +1247,20 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
       .from('projects')
       .select('title, description, repository_url, demo_url')
       .eq('profile_id', profile.id);
+    // B.4 finding L-2: the public view hard-coded `location: null` and an
+    // empty `links` map even though the profile row and the profile_links
+    // table both carry them. A public profile therefore showed no location
+    // and no professional links.
+    const { data: publicLinks } = await getSupabaseServer()
+      .from('profile_links')
+      .select('kind, url')
+      .eq('profile_id', profile.id);
+    const linkMap: Record<string, string> = {};
+    for (const link of publicLinks ?? []) {
+      if (link && typeof link.kind === 'string' && typeof link.url === 'string') {
+        linkMap[link.kind] = link.url;
+      }
+    }
 
     const safeProfile = {
       name: profile.full_name,
@@ -1219,7 +1268,7 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
       headline: profile.target_role,
       bio: profile.bio,
       avatarUrl: profile.avatar_url,
-      location: null,
+      location: profile.location,
       targetRole: profile.target_role,
       careerState: profile.user_type,
       experiences: (experiences ?? []).map((e: any) => ({
@@ -1256,7 +1305,7 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
         repositoryUrl: p.repository_url ?? undefined,
         demoUrl: p.demo_url ?? undefined,
       })),
-      links: {},
+      links: linkMap,
     };
     return res.json({ success: true, profile: safeProfile });
   } catch (error) {
@@ -2088,8 +2137,8 @@ app.patch('/api/projects/:id', requireAuth, async (req: Request, res: Response) 
       goal: body.goal === null ? undefined : (str(body.goal, 4000) ?? undefined),
       description:
         body.description === null ? undefined : (str(body.description, 20000) ?? undefined),
-      difficulty: str(body.difficulty, 30) ?? undefined,
-      status: str(body.status, 30) ?? undefined,
+      difficulty: str(body.difficulty, 30) as ProjectDifficulty | undefined,
+      status: str(body.status, 30) as ProjectStatus | undefined,
       repositoryUrl:
         body.repositoryUrl === null ? undefined : (str(body.repositoryUrl, 500) ?? undefined),
       demoUrl: body.demoUrl === null ? undefined : (str(body.demoUrl, 500) ?? undefined),
@@ -2838,7 +2887,20 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
     const userType = str(body.userType, 30);
-    if (userType && !['student', 'graduate', 'working', 'career_shift'].includes(userType)) {
+    // B.4 finding H-4: this allow-list must match the CareerState vocabulary
+    // in src/types/career.ts. It previously listed 'graduate', 'working' and
+    // 'career_shift', none of which the onboarding UI can produce, so every
+    // onboarding submission was rejected with 400.
+    if (
+      userType &&
+      ![
+        'student',
+        'fresh_graduate',
+        'working_professional',
+        'career_switcher',
+        'exploring',
+      ].includes(userType)
+    ) {
       return res.status(400).json({ error: 'Invalid userType' });
     }
     const profile = await updateProfileDto(req.authUser!.id, {
@@ -2857,6 +2919,10 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
         body.currentPosition === null ? undefined : (str(body.currentPosition, 200) ?? undefined),
       currentCompany:
         body.currentCompany === null ? undefined : (str(body.currentCompany, 200) ?? undefined),
+      yearsOfExperience:
+        body.yearsOfExperience === null
+          ? undefined
+          : (str(body.yearsOfExperience, 50) ?? undefined),
       headline: body.headline === null ? undefined : (str(body.headline, 300) ?? undefined),
       bio: body.bio === null ? undefined : (str(body.bio, 20000) ?? undefined),
       professionalSummary:
@@ -2894,6 +2960,358 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// ---- Preferences (the settings that belong to the ACCOUNT) ----
+//
+// public.user_preferences holds the three settings that belong to the account
+// rather than to the browser: the theme, the interface language and the
+// notification switch. They follow the user to another device.
+//
+// The remaining settings in the interface (the reminder toggles, the AI
+// personalisation controls) are per-device UI preferences and deliberately
+// stay in local state.
+app.get('/api/preferences', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const preferences = await getPreferences(req.authUser!.id);
+    return res.json({
+      success: true,
+      preferences: preferences
+        ? {
+            theme: preferences.theme,
+            language: preferences.language,
+            notificationsEnabled: preferences.notifications_enabled,
+          }
+        : null,
+    });
+  } catch (error) {
+    console.error('Failed to load preferences:', error);
+    return res.status(500).json({ error: 'Failed to load preferences' });
+  }
+});
+
+app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const updates: { theme?: string; language?: string; notifications_enabled?: boolean } = {};
+
+    if (body.theme !== undefined) {
+      const theme = str(body.theme, 20);
+      if (!theme || !['light', 'dark', 'system'].includes(theme)) {
+        return res.status(400).json({ error: 'Invalid theme' });
+      }
+      updates.theme = theme;
+    }
+    if (body.language !== undefined) {
+      const language = str(body.language, 10);
+      if (!language || !['en', 'ar'].includes(language)) {
+        return res.status(400).json({ error: 'Invalid language' });
+      }
+      updates.language = language;
+    }
+    if (body.notificationsEnabled !== undefined) {
+      if (typeof body.notificationsEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'Invalid notificationsEnabled' });
+      }
+      updates.notifications_enabled = body.notificationsEnabled;
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No settings to update' });
+    }
+
+    const saved = await upsertPreferences(req.authUser!.id, updates);
+    return res.json({
+      success: true,
+      preferences: {
+        theme: saved.theme,
+        language: saved.language,
+        notificationsEnabled: saved.notifications_enabled,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to save preferences:', error);
+    return res.status(500).json({ error: 'Failed to save preferences' });
+  }
+});
+
+// ---- Job bookmarks ----
+//
+// The job catalogue is static (src/data/jobsData.ts), so a bookmark stores
+// only the catalogue id: there is no duplicated job data that could drift
+// from the catalogue. The owner is always the verified user id.
+app.get('/api/bookmarks', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const bookmarks = await listBookmarks(req.authUser!.id);
+    return res.json({ success: true, bookmarks });
+  } catch (error) {
+    console.error('Failed to load bookmarks:', error);
+    return res.status(500).json({ error: 'Failed to load bookmarks' });
+  }
+});
+
+app.post('/api/bookmarks', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const jobId = str(body.jobId, 100);
+    if (!jobId) return res.status(400).json({ error: 'jobId is required' });
+    const bookmark = await createBookmark(req.authUser!.id, jobId);
+    return res.status(201).json({ success: true, bookmark });
+  } catch (error) {
+    console.error('Failed to save bookmark:', error);
+    return res.status(500).json({ error: 'Failed to save bookmark' });
+  }
+});
+
+app.delete('/api/bookmarks/:jobId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const jobId = str(req.params.jobId, 100);
+    if (!jobId) return res.status(400).json({ error: 'Invalid jobId' });
+    const deleted = await deleteBookmark(req.authUser!.id, jobId);
+    if (!deleted) return res.status(404).json({ error: 'Bookmark not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete bookmark:', error);
+    return res.status(500).json({ error: 'Failed to delete bookmark' });
+  }
+});
+
+// ===========================================================================
+// B.5 — AI Learning Hub
+// ===========================================================================
+
+const LEARNING_STATUSES: LearningStatus[] = ['saved', 'in_progress', 'completed', 'dismissed'];
+const LEARNING_FORMATS: LearningFormat[] = [
+  'course',
+  'professional_certificate',
+  'learning_path',
+  'tutorial',
+  'video',
+  'playlist',
+];
+const LEARNING_BUDGETS = ['free_only', 'low', 'any'] as const;
+
+// The catalogue is public reference data. It contains no user state and no
+// secrets, and is intentionally cacheable.
+app.get('/api/learning/catalog', async (_req: Request, res: Response) => {
+  try {
+    const courses = await listCourses();
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.json({ courses, count: courses.length });
+  } catch (error) {
+    console.error('Failed to load learning catalogue:', error);
+    return res.status(500).json({ error: 'Failed to load learning catalogue' });
+  }
+});
+
+// The user's own learning state. The owner is always req.authUser.id; a
+// profile_id in the request body is ignored.
+app.get('/api/learning/items', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const items = await listLearningItems(req.authUser!.id);
+    return res.json({ items });
+  } catch (error) {
+    console.error('Failed to load learning items:', error);
+    return res.status(500).json({ error: 'Failed to load learning items' });
+  }
+});
+
+app.post('/api/learning/items', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const courseId = str(body.courseId, 120);
+    if (!courseId) return res.status(400).json({ error: 'Invalid courseId' });
+
+    const status = str(body.status, 30) as LearningStatus | null;
+    if (!status || !LEARNING_STATUSES.includes(status)) {
+      return res.status(400).json({ error: 'Invalid learning status' });
+    }
+
+    const progressPercent =
+      body.progressPercent === undefined || body.progressPercent === null
+        ? undefined
+        : Number(body.progressPercent);
+    if (
+      progressPercent !== undefined &&
+      (!Number.isFinite(progressPercent) || progressPercent < 0 || progressPercent > 100)
+    ) {
+      return res.status(400).json({ error: 'progressPercent must be between 0 and 100' });
+    }
+
+    const notes =
+      body.notes === null ? null : (str(body.notes, 2000) ?? undefined);
+    if (body.notes !== undefined && body.notes !== null && notes === undefined) {
+      return res.status(400).json({ error: 'notes is too long' });
+    }
+    const recommendationReason =
+      body.recommendationReason === null
+        ? null
+        : (str(body.recommendationReason, 1000) ?? undefined);
+
+    const course = await getCourse(courseId);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const item = await upsertLearningItem(req.authUser!.id, {
+      courseId,
+      status,
+      progressPercent: progressPercent === undefined ? undefined : Math.round(progressPercent),
+      notes,
+      recommendationReason,
+    });
+    return res.status(201).json({ success: true, item });
+  } catch (error) {
+    console.error('Failed to save learning item:', error);
+    return res.status(500).json({ error: 'Failed to save learning item' });
+  }
+});
+
+app.patch('/api/learning/items/:courseId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const courseId = str(req.params.courseId, 120);
+    if (!courseId) return res.status(400).json({ error: 'Invalid courseId' });
+    const body = req.body ?? {};
+
+    const status =
+      body.status === undefined ? undefined : (str(body.status, 30) as LearningStatus | null);
+    if (body.status !== undefined && (!status || !LEARNING_STATUSES.includes(status))) {
+      return res.status(400).json({ error: 'Invalid learning status' });
+    }
+
+    const progressPercent =
+      body.progressPercent === undefined || body.progressPercent === null
+        ? undefined
+        : Number(body.progressPercent);
+    if (
+      progressPercent !== undefined &&
+      (!Number.isFinite(progressPercent) || progressPercent < 0 || progressPercent > 100)
+    ) {
+      return res.status(400).json({ error: 'progressPercent must be between 0 and 100' });
+    }
+
+    const notes =
+      body.notes === null ? null : (str(body.notes, 2000) ?? undefined);
+    if (body.notes !== undefined && body.notes !== null && notes === undefined) {
+      return res.status(400).json({ error: 'notes is too long' });
+    }
+    const recommendationReason =
+      body.recommendationReason === null
+        ? null
+        : (str(body.recommendationReason, 1000) ?? undefined);
+
+    const item = await updateLearningItem(req.authUser!.id, courseId, {
+      status: status ?? undefined,
+      progressPercent: progressPercent === undefined ? undefined : Math.round(progressPercent),
+      notes,
+      recommendationReason,
+    });
+    if (!item) return res.status(404).json({ error: 'Learning item not found' });
+    return res.json({ success: true, item });
+  } catch (error) {
+    console.error('Failed to update learning item:', error);
+    return res.status(500).json({ error: 'Failed to update learning item' });
+  }
+});
+
+app.delete('/api/learning/items/:courseId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const courseId = str(req.params.courseId, 120);
+    if (!courseId) return res.status(400).json({ error: 'Invalid courseId' });
+    const deleted = await deleteLearningItem(req.authUser!.id, courseId);
+    if (!deleted) return res.status(404).json({ error: 'Learning item not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete learning item:', error);
+    return res.status(500).json({ error: 'Failed to delete learning item' });
+  }
+});
+
+/**
+ * Deterministic recommendations plus an optional AI explanation layer.
+ *
+ * The request may carry presentation preferences only. Career data comes from
+ * the authenticated user's persisted profile, skills, roadmap and learning
+ * state, and the AI only sees the already-ranked candidates.
+ */
+app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+
+    const weeklyHoursRaw = body.weeklyHours;
+    const weeklyHours =
+      weeklyHoursRaw === undefined || weeklyHoursRaw === null ? undefined : Number(weeklyHoursRaw);
+    if (weeklyHours !== undefined && (!Number.isFinite(weeklyHours) || weeklyHours < 1 || weeklyHours > 40)) {
+      return res.status(400).json({ error: 'weeklyHours must be between 1 and 40' });
+    }
+
+    const budget = body.budget === undefined ? undefined : str(body.budget, 20);
+    if (budget !== undefined && !LEARNING_BUDGETS.includes(budget as (typeof LEARNING_BUDGETS)[number])) {
+      return res.status(400).json({ error: 'Invalid budget preference' });
+    }
+
+    const preferredFormat =
+      body.preferredFormat === undefined ? undefined : str(body.preferredFormat, 40);
+    if (
+      preferredFormat !== undefined &&
+      preferredFormat !== 'any' &&
+      !LEARNING_FORMATS.includes(preferredFormat as LearningFormat)
+    ) {
+      return res.status(400).json({ error: 'Invalid learning format preference' });
+    }
+
+    const language = body.language === undefined ? undefined : str(body.language, 5);
+    if (language !== undefined && language !== 'en' && language !== 'ar') {
+      return res.status(400).json({ error: 'language must be en or ar' });
+    }
+
+    const limitRaw = body.limit;
+    const limit = limitRaw === undefined || limitRaw === null ? undefined : Number(limitRaw);
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 20)) {
+      return res.status(400).json({ error: 'limit must be between 1 and 20' });
+    }
+
+    const built = await buildLearningContext(req.authUser!.id, {
+      targetRoleId: str(body.targetRoleId, 120) ?? undefined,
+      targetRoleTitle: str(body.targetRoleTitle, 200) ?? undefined,
+      language: language as 'en' | 'ar' | undefined,
+      preferredFormat: preferredFormat as LearningFormat | 'any' | undefined,
+      weeklyHours,
+      budget: budget as (typeof LEARNING_BUDGETS)[number] | undefined,
+      focusSkill: str(body.focusSkill, 80) ?? undefined,
+      limit,
+    });
+
+    const deterministic = rankCourses(built.courses, built.context, { limit: built.limit });
+    let result;
+    if (body.ai === false) {
+      result = {
+        recommendations: deterministic,
+        aiUsed: false,
+        aiFallbackReason: null,
+        generatedAt: new Date().toISOString(),
+      };
+    } else {
+      result = await enrichRecommendationsWithAi(deterministic, built.context, {
+        ai: process.env.GEMINI_API_KEY ? ai : null,
+      });
+    }
+
+    return res.json({
+      ...result,
+      context: {
+        careerGoal: built.context.careerGoal,
+        targetRoleSlug: built.context.targetRole?.slug ?? null,
+        targetRoleTitle: built.context.targetRole?.title ?? null,
+        experienceLevel: built.context.experienceLevel,
+        weeklyHours: built.context.weeklyHours,
+        budget: built.context.budget,
+        preferredFormat: built.context.preferredFormat,
+        skillGapCount: built.context.userSkills.filter((skill) => skill.gap > 0).length,
+        roadmapSkillCount: built.context.roadmapSkills.length,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to generate learning recommendations:', error);
+    return res.status(500).json({ error: 'Failed to generate learning recommendations' });
+  }
+});
+
 // Unknown API routes must not fall through to the SPA.
 //
 // The production build serves index.html for every unmatched path, which is
@@ -2902,6 +3320,36 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
 // This handler runs before the SPA fallback and covers every API path.
 app.use('/api', (req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found' });
+});
+
+// Terminal error handler (B.4 finding H-1).
+//
+// Express's DEFAULT error handler serialises the thrown error — including
+// `err.stack` — into the response body as HTML. A rejected upload therefore
+// answered 500 with a full stack trace containing the server's filesystem
+// paths. The detail is still logged server-side, but the browser only ever
+// receives a generic JSON message.
+app.use((err: any, req: Request, res: Response, next: (e?: unknown) => void) => {
+  if (res.headersSent) return next(err);
+
+  // Multer's own errors: the file was too large, or the field count / field
+  // name was wrong. These are client mistakes, not server faults.
+  if (err?.name === 'MulterError') {
+    const code = err?.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    const message =
+      err?.code === 'LIMIT_FILE_SIZE'
+        ? 'File exceeds the maximum size'
+        : 'Malformed upload';
+    return res.status(code).json({ error: message });
+  }
+
+  // A malformed JSON body is rejected by express.json() with a SyntaxError.
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ error: 'Malformed JSON body' });
+  }
+
+  console.error('Unhandled request error:', err);
+  return res.status(500).json({ error: 'Internal server error' });
 });
 
 // Mount Vite in dev or static files in production

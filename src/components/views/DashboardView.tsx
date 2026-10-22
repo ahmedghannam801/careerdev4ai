@@ -25,6 +25,36 @@ interface DashboardViewProps {
   onOpenCopilot: () => void;
 }
 
+/**
+ * One entry of the "Upcoming Milestones" list. Every field is derived from
+ * the signed-in user's own records — an application in an interview stage, or
+ * a roadmap task that carries a deadline.
+ */
+interface MilestoneEntry {
+  id: string;
+  kind: 'interview' | 'deadline';
+  label: string;
+  date: string;
+  title: string;
+  detail: string;
+}
+
+/**
+ * Renders a date as "OCT 25". Accepts either a full ISO timestamp or a
+ * plain "YYYY-MM-DD" day (which is parsed as a LOCAL day, not UTC, so the
+ * day does not slip backwards for users behind UTC). Returns '' when there
+ * is no date.
+ */
+const formatMilestoneDate = (value?: string): string => {
+  if (!value) return '';
+  const dayOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const parsed = dayOnly
+    ? new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10)))
+    : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+};
+
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpenCopilot }) => {
   const { 
     profile, 
@@ -34,8 +64,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     skills, 
     applications, 
     projects, 
-    learningResources,
-    enrolledResourceIds,
     updateTaskStatus,
     dailyActions,
     toggleDailyAction,
@@ -52,11 +80,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
   const topTask = pendingTasks[0];
   const activeApplications = applications.filter(a => !['rejected', 'withdrawn', 'offer'].includes(a.stage));
+  const interviewCount = applications.filter(a => ['interview', 'technical', 'final'].includes(a.stage)).length;
   const activeProject = projects.find(p => p.status === 'in_progress') || projects[0];
 
   const totalTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks)).length;
   const completedTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks.filter(t => t.status === 'completed'))).length;
   const masteredSkillsCount = skills.filter(s => s.gap === 0).length;
+
+  // The month the milestones below belong to: the current one.
+  const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // "Upcoming Milestones" is built from the user's own records: the
+  // applications that are in an interview stage, and the roadmap tasks that
+  // carry a deadline. Nothing here is hard-coded.
+  const interviewMilestones: MilestoneEntry[] = applications
+    .filter(a => ['interview', 'technical', 'final'].includes(a.stage))
+    .map(a => ({
+      id: `milestone-interview-${a.id}`,
+      kind: 'interview' as const,
+      label: `${a.stage.charAt(0).toUpperCase()}${a.stage.slice(1)} Stage`,
+      date: a.nextActionDate || '',
+      title: a.company,
+      detail: a.interviewStageDetails || a.role
+    }));
+
+  const deadlineMilestones: MilestoneEntry[] = roadmapPhases
+    .flatMap(p => p.milestones.flatMap(m => m.tasks.map(task => ({ task, milestoneTitle: m.title }))))
+    .filter(({ task }) => !!task.deadline && task.status !== 'completed')
+    .map(({ task, milestoneTitle }) => ({
+      id: `milestone-deadline-${task.id}`,
+      kind: 'deadline' as const,
+      label: 'Roadmap Deadline',
+      date: task.deadline || '',
+      title: task.title,
+      detail: milestoneTitle
+    }));
+
+  const upcomingMilestones: MilestoneEntry[] = [...interviewMilestones, ...deadlineMilestones];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
@@ -197,9 +257,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
             {analysis.matchPercentage}%
           </div>
-          <div className="mt-1 text-[11px] text-[var(--color-success)] flex items-center gap-1">
-            <span>+8%</span>
-            <span className="text-[var(--text-muted)]">vs last assessment</span>
+          <div className="mt-1 text-[11px] text-[var(--text-muted)]">
+            measured against {targetRole.title} requirements
           </div>
         </div>
 
@@ -229,7 +288,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             {activeApplications.length}
           </div>
           <div className="mt-1 text-[11px] text-[var(--accent-primary)] font-medium">
-            1 interview scheduled
+            {interviewCount} interview{interviewCount === 1 ? '' : 's'} in progress
           </div>
         </div>
       </div>
@@ -372,33 +431,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 <Calendar className="w-4 h-4 text-[var(--accent-primary)]" />
                 <span>Upcoming Milestones</span>
               </h3>
-              <span className="text-xs text-[var(--text-muted)]">October 2026</span>
+              <span className="text-xs text-[var(--text-muted)]">{currentMonthLabel}</span>
             </div>
 
             <div className="space-y-3">
-              <div className="p-3 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-surface)]/40 space-y-1">
-                <div className="flex items-center justify-between text-xs font-semibold text-[var(--accent-primary)]">
-                  <span>Technical Round 2</span>
-                  <span className="font-mono">OCT 22</span>
+              {upcomingMilestones.length === 0 ? (
+                <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50">
+                  <p className="text-xs text-[var(--text-muted)]">No upcoming milestones yet.</p>
                 </div>
-                <div className="text-xs text-[var(--text-primary)] font-medium">Vanguard Systems</div>
-                <div className="text-[11px] text-[var(--text-secondary)]">React Fiber & custom hooks deep dive</div>
-                <button
-                  onClick={() => onNavigate('interviews')}
-                  className="mt-2 text-xs font-semibold text-[var(--accent-primary)] hover:underline block"
-                >
-                  Prepare STAR Answers →
-                </button>
-              </div>
-
-              <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 space-y-1">
-                <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-secondary)]">
-                  <span>Roadmap Deadline</span>
-                  <span className="font-mono">OCT 25</span>
-                </div>
-                <div className="text-xs text-[var(--text-primary)] font-medium">Refactor component generics</div>
-                <div className="text-[11px] text-[var(--text-muted)]">TypeScript strict typing milestone</div>
-              </div>
+              ) : (
+                upcomingMilestones.map((milestone) => (
+                  <div
+                    key={milestone.id}
+                    className={`p-3 rounded-lg border space-y-1 ${
+                      milestone.kind === 'interview'
+                        ? 'border-[var(--accent-primary)]/30 bg-[var(--accent-surface)]/40'
+                        : 'border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50'
+                    }`}
+                  >
+                    <div
+                      className={`flex items-center justify-between text-xs font-semibold ${
+                        milestone.kind === 'interview'
+                          ? 'text-[var(--accent-primary)]'
+                          : 'text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      <span>{milestone.label}</span>
+                      {milestone.date && <span className="font-mono">{formatMilestoneDate(milestone.date)}</span>}
+                    </div>
+                    <div className="text-xs text-[var(--text-primary)] font-medium">{milestone.title}</div>
+                    {milestone.detail && (
+                      <div className="text-[11px] text-[var(--text-muted)]">{milestone.detail}</div>
+                    )}
+                    {milestone.kind === 'interview' && (
+                      <button
+                        onClick={() => onNavigate('interviews')}
+                        className="mt-2 text-xs font-semibold text-[var(--accent-primary)] hover:underline block"
+                      >
+                        Prepare STAR Answers →
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -451,7 +526,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               >
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
-                  <span className="font-medium">CV Studio (ATS Score: {cvVersions[0]?.atsAnalysis?.overallScore || 84})</span>
+                  <span className="font-medium">
+                    CV Studio (ATS Score: {cvVersions[0]?.atsAnalysis?.overallScore ?? '—'})
+                  </span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               </button>

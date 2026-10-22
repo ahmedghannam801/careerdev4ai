@@ -63,6 +63,8 @@ const PROFILE_SCOPED_TABLES = [
   { table: 'secondary_goals', column: 'profile_id' },
   { table: 'career_milestones', column: 'profile_id' },
   { table: 'cover_letters', column: 'profile_id' },
+  { table: 'job_bookmarks', column: 'profile_id' },
+  { table: 'user_learning_items', column: 'profile_id' },
 ];
 
 export function createAdminClient(env) {

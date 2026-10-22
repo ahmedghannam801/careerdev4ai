@@ -23,7 +23,8 @@ import {
   User,
   Activity,
   FolderClosed,
-  MoreHorizontal
+  MoreHorizontal,
+  LogOut
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { GlobalSearchModal } from './GlobalSearchModal';
@@ -37,13 +38,18 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, children }) => {
-  const { profile, targetRole, settings, updateSettings, notifications, t } = useCareer();
+  const { profile, targetRole, settings, updateSettings, notifications, currentUser, logout, t } = useCareer();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // B.4 finding C-3: `logout()` existed in the context but had no UI
+  // trigger, so a signed-in user could never sign out.
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const displayName = currentUser?.name || profile.name || 'Signed in';
 
   // Global Ctrl/Cmd + K keyboard shortcut
   useEffect(() => {
@@ -275,16 +281,76 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               className="flex items-center gap-2 pl-2 border-l border-[var(--border-subtle)] group"
               title="View My Profile"
             >
-              <img
-                src={profile.avatarUrl}
-                alt={profile.name}
-                className="w-7 h-7 rounded-full object-cover border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)] transition-colors"
-                referrerPolicy="no-referrer"
-              />
+              {profile.avatarUrl ? (
+                <img
+                  src={profile.avatarUrl}
+                  alt={displayName}
+                  className="w-7 h-7 rounded-full object-cover border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)] transition-colors"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className="w-7 h-7 rounded-full bg-[var(--accent-surface)] text-[var(--accent-primary)] flex items-center justify-center text-[10px] font-bold border border-[var(--border-subtle)]">
+                  {displayName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
               <span className="hidden lg:inline text-xs font-medium text-[var(--text-primary)]">
-                {profile.name.split(' ')[0]}
+                {displayName.split(' ')[0]}
               </span>
             </button>
+
+            {/* Account menu — the sign-out control (B.4 finding C-3). */}
+            <div className="relative">
+              <button
+                onClick={() => setUserMenuOpen(prev => !prev)}
+                className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+                title="Account menu"
+                aria-label="Account menu"
+                aria-expanded={userMenuOpen}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+              {userMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setUserMenuOpen(false)}
+                    aria-hidden="true"
+                  />
+                  <div className="absolute right-0 top-full mt-2 z-50 w-60 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+                      <div className="text-xs font-bold text-[var(--text-primary)] truncate">
+                        {currentUser?.email || displayName}
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)] truncate">
+                        @{profile.username || 'no username set'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setUserMenuOpen(false); onNavigate('profile'); }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      <span>My Profile</span>
+                    </button>
+                    <button
+                      onClick={() => { setUserMenuOpen(false); onNavigate('settings'); }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Settings</span>
+                    </button>
+                    <button
+                      onClick={() => { setUserMenuOpen(false); logout(); }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center gap-2 border-t border-[var(--border-subtle)]"
+                      data-testid="logout-button"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign out</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -357,13 +423,22 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               </div>
             </div>
 
-            <button
-              onClick={() => { setCopilotOpen(true); setMobileMenuOpen(false); }}
-              className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] text-white text-xs font-semibold flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>{t('askCopilot')}</span>
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={() => { setCopilotOpen(true); setMobileMenuOpen(false); }}
+                className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] text-white text-xs font-semibold flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>{t('askCopilot')}</span>
+              </button>
+              <button
+                onClick={() => { setMobileMenuOpen(false); logout(); }}
+                className="w-full py-2.5 rounded-xl border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign out</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

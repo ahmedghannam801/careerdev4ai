@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { CareerProvider, useCareer } from './context/CareerContext';
 import { AppShell } from './components/layout/AppShell';
+import { AuthModal } from './components/auth/AuthModal';
 import { LandingView } from './components/views/LandingView';
 import { OnboardingView } from './components/views/OnboardingView';
 import { DashboardView } from './components/views/DashboardView';
@@ -29,7 +30,7 @@ import { DocumentsView } from './components/views/DocumentsView';
 import { ActivityView } from './components/views/ActivityView';
 
 function AppContent() {
-  const { profile, setActiveView } = useCareer();
+  const { profile, setActiveView, currentUser, isAuthReady, setAuthModalOpen } = useCareer();
   const [currentView, setCurrentView] = useState<string>(() => {
     // Check hash for direct view or public profile
     const hash = window.location.hash.replace('#/', '');
@@ -63,23 +64,54 @@ function AppContent() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [currentView, setActiveView]);
 
-  // Landing view
-  if (currentView === 'landing') {
+  // B.4 finding C-1 (session gate).
+  //
+  // The application used to render the authenticated AppShell for any
+  // visitor. An anonymous user therefore saw the whole dashboard — a demo
+  // persona, a demo roadmap, demo applications — and could browse every
+  // authenticated view without a session.
+  //
+  // The gate has three states:
+  //   * the session is still being restored -> a neutral loader;
+  //   * there is no session                -> the landing page only, with the
+  //                                            sign-in dialog offered;
+  //   * there is a session                 -> the authenticated experience.
+  if (!isAuthReady) {
     return (
-      <LandingView
-        onStartOnboarding={() => navigateTo('onboarding')}
-        onExploreRoles={() => navigateTo('roles')}
-        onOpenDashboard={() => navigateTo('dashboard')}
-      />
+      <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[var(--accent-primary)] text-white flex items-center justify-center font-bold text-sm">
+            CP
+          </div>
+          <div className="text-xs text-[var(--text-muted)]">Restoring your session…</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Landing view
+  if (!currentUser) {
+    return (
+      <>
+        <LandingView
+          onStartOnboarding={() => setAuthModalOpen(true)}
+          onExploreRoles={() => setAuthModalOpen(true)}
+          onOpenDashboard={() => setAuthModalOpen(true)}
+        />
+        <AuthModal />
+      </>
     );
   }
 
   // Progressive Onboarding
   if (currentView === 'onboarding') {
     return (
-      <OnboardingView
-        onComplete={() => navigateTo('dashboard')}
-      />
+      <>
+        <OnboardingView
+          onComplete={() => navigateTo('dashboard')}
+        />
+        <AuthModal />
+      </>
     );
   }
 
@@ -97,7 +129,7 @@ function AppContent() {
       case 'plan':
         return <CareerPlanView onNavigate={navigateTo} />;
       case 'roadmap':
-        return <RoadmapView />;
+        return <RoadmapView onNavigate={navigateTo} />;
       case 'skills':
         return <SkillsCenterView />;
       case 'learning':
@@ -130,9 +162,14 @@ function AppContent() {
   };
 
   return (
-    <AppShell currentView={currentView} onNavigate={navigateTo}>
-      {renderView()}
-    </AppShell>
+    <>
+      <AppShell currentView={currentView} onNavigate={navigateTo}>
+        {renderView()}
+      </AppShell>
+      {/* B.4 finding C-2: the AuthModal existed and was fully functional but
+          was never mounted, so there was no way to sign in or sign up. */}
+      <AuthModal />
+    </>
   );
 }
 

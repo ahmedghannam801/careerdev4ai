@@ -14,8 +14,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
 
   // Form states
   const [selectedPersona, setSelectedPersona] = useState<CareerState>(profile.careerState || 'working_professional');
-  const [currentTitle, setCurrentTitle] = useState(profile.currentTitle || 'Junior Developer');
-  const [location, setLocation] = useState(profile.location || 'San Francisco, CA');
+  const [currentTitle, setCurrentTitle] = useState(profile.currentTitle || '');
+  const [location, setLocation] = useState(profile.location || '');
   const [selectedGoal, setSelectedGoal] = useState<CareerGoal>(profile.careerGoal || 'get_promoted');
   const [customGoal, setCustomGoal] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState(targetRole.id || 'frontend-engineer');

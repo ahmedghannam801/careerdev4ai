@@ -24,27 +24,67 @@ import {
   Star
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { SecondaryCareerGoal, CareerMilestoneItem, MilestoneCategory } from '../../types/career';
+import { SecondaryCareerGoal, CareerMilestoneItem, MilestoneCategory, CareerGoal } from '../../types/career';
+
+/**
+ * Plain-language rendering of the career goals the user can pick. Used so the
+ * Primary Goal card can describe the user's own goal instead of a fixed
+ * sentence about somebody else's career.
+ */
+const CAREER_GOAL_LABELS: Record<CareerGoal, string> = {
+  get_first_job: 'Land a first full-time role',
+  get_internship: 'Secure an internship',
+  get_promoted: 'Get promoted',
+  switch_career: 'Switch careers',
+  become_specialist: 'Become a domain specialist',
+  become_manager: 'Move into management',
+  build_portfolio: 'Build a verifiable portfolio',
+  freelance: 'Go freelance',
+  explore_careers: 'Explore career options',
+  custom: 'Reach a custom goal'
+};
+
+/**
+ * Parses a date into a timestamp, treating a plain "YYYY-MM-DD" as a LOCAL
+ * day rather than UTC midnight. The deadline filter and the deadline
+ * formatter must agree, or a deadline set for today silently disappears for
+ * users behind UTC.
+ */
+const parseLocalDate = (value: string): number => {
+  const dayOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const parsed = dayOnly
+    ? new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10)))
+    : new Date(value);
+  return parsed.getTime();
+};
+
+/** Formats a "YYYY-MM-DD" (or ISO) date as a readable date. */
+const formatGoalDate = (value: string): string => {
+  const parsed = new Date(parseLocalDate(value));
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+};
 
 export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
-  const { 
-    profile, 
-    targetRole, 
-    analysis, 
-    skills, 
-    projects, 
-    evidenceItems, 
-    applications, 
-    interviewSessions, 
-    roadmapPhases, 
-    secondaryGoals, 
-    addSecondaryGoal, 
-    updateSecondaryGoal, 
+  const {
+    profile,
+    targetRole,
+    analysis,
+    skills,
+    projects,
+    evidenceItems,
+    applications,
+    interviewSessions,
+    roadmapPhases,
+    secondaryGoals,
+    cvVersions,
+    addSecondaryGoal,
+    updateSecondaryGoal,
     deleteSecondaryGoal,
-    milestones, 
-    addMilestone, 
-    careerBlockers, 
-    t 
+    milestones,
+    addMilestone,
+    careerBlockers,
+    t
   } = useCareer();
 
   const [addGoalModalOpen, setAddGoalModalOpen] = useState(false);
@@ -69,7 +109,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   const timelineEvents = [
     ...profile.education.map(e => ({
       id: `timeline-edu-${e.id}`,
-      year: e.startDate.slice(0, 4) || '2022',
+      year: e.startDate.slice(0, 4) || '',
       date: e.startDate,
       type: 'Education',
       title: `${e.degree} in ${e.field}`,
@@ -79,7 +119,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     })),
     ...profile.experiences.map(e => ({
       id: `timeline-exp-${e.id}`,
-      year: e.startDate.slice(0, 4) || '2024',
+      year: e.startDate.slice(0, 4) || '',
       date: e.startDate,
       type: 'Experience',
       title: `${e.role} at ${e.company}`,
@@ -89,7 +129,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     })),
     ...profile.certifications.map(c => ({
       id: `timeline-cert-${c.id}`,
-      year: c.issueDate.slice(0, 4) || '2024',
+      year: c.issueDate.slice(0, 4) || '',
       date: c.issueDate,
       type: 'Certification',
       title: c.name,
@@ -99,7 +139,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     })),
     ...projects.map(p => ({
       id: `timeline-proj-${p.id}`,
-      year: p.createdAt.slice(0, 4) || '2026',
+      year: p.createdAt.slice(0, 4) || '',
       date: p.createdAt,
       type: 'Project',
       title: p.title,
@@ -109,7 +149,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     })),
     ...applications.map(a => ({
       id: `timeline-app-${a.id}`,
-      year: a.appliedDate?.slice(0, 4) || '2026',
+      year: a.appliedDate?.slice(0, 4) || '',
       date: a.appliedDate || a.lastUpdated,
       type: 'Application',
       title: `${a.role} at ${a.company}`,
@@ -118,6 +158,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       icon: Calendar
     }))
   ].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  // The ATS score of the newest CV snapshot, if the user has one.
+  const latestCvAtsScore = cvVersions[0]?.atsAnalysis?.overallScore ?? null;
 
   // Asset Scorecard calculation
   const assetScorecard = [
@@ -147,8 +190,10 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     },
     {
       name: 'Target CV Alignment',
-      status: 'Complete',
-      desc: 'ATS Match Score: 84% tailored for Frontend Engineer',
+      status: latestCvAtsScore !== null ? 'Complete' : 'Needs Improvement',
+      desc: latestCvAtsScore !== null
+        ? `ATS Match Score: ${latestCvAtsScore}% tailored for ${targetRole.title}`
+        : 'No ATS score yet — run an ATS audit in CV Studio',
       view: 'cv-studio'
     },
     {
@@ -166,16 +211,50 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   ];
 
   // Journey Map stages
+  // The interview step shows the user's own in-flight interview, if any.
+  const nextInterview = applications.find(a => ['interview', 'technical', 'final'].includes(a.stage));
+  const nextInterviewLabel = nextInterview ? nextInterview.company : 'No interview yet';
+  const interviewCount = applications.filter(a => ['interview', 'technical', 'final'].includes(a.stage)).length;
+  const offerApplication = applications.find(a => a.stage === 'offer');
+
+  // The primary goal is described entirely from the user's own state: the
+  // role they selected, the goal they picked, and the work still open.
+  const goalLabel = CAREER_GOAL_LABELS[profile.careerGoal] ?? 'Advance your career';
+  const customGoal = profile.customGoalText?.trim() || '';
+  const primaryGoalTitle = customGoal || `Become a ${targetRole.title}`;
+  const primaryGoalDescription = customGoal
+    ? `Your stated goal: "${customGoal}" — working toward a ${targetRole.title} role.`
+    : `${goalLabel} — working toward a ${targetRole.title} role.`;
+
+  // The next action is the first roadmap task the user has not finished.
+  const openRoadmapTasks = roadmapPhases
+    .flatMap(p => p.milestones.flatMap(m => m.tasks))
+    .filter(t => t.status !== 'completed' && t.status !== 'skipped');
+  const nextRoadmapTask = openRoadmapTasks[0];
+
+  // The next real deadline the user has set, if any.
+  const candidateDeadlines = [
+    ...secondaryGoals
+      .filter(g => g.status === 'active' && !!g.deadline)
+      .map(g => g.deadline),
+    ...openRoadmapTasks.map(t => t.deadline).filter((d): d is string => !!d)
+  ];
+  const startOfToday = new Date(new Date().toDateString()).getTime();
+  const nextDeadline = candidateDeadlines
+    .filter(d => !Number.isNaN(parseLocalDate(d)))
+    .filter(d => parseLocalDate(d) >= startOfToday)
+    .sort()[0];
+
   const journeySteps = [
     { key: 'current', label: 'Current State', desc: profile.careerState.replace('_', ' '), active: false, done: true },
     { key: 'target', label: 'Target Role', desc: targetRole.title, active: false, done: true },
     { key: 'gaps', label: 'Skill Gaps', desc: `${analysis.criticalGaps.length} critical gaps`, active: false, done: true },
-    { key: 'plan', label: 'Strategic Plan', desc: '6 Phases Mapped', active: false, done: true },
+    { key: 'plan', label: 'Strategic Plan', desc: roadmapPhases.length > 0 ? `${roadmapPhases.length} Phases Mapped` : 'No roadmap yet', active: false, done: true },
     { key: 'build', label: 'Build & Learn', desc: 'Active Roadmap', active: true, done: false },
     { key: 'prove', label: 'Prove Skill', desc: `${evidenceItems.length} Artifacts`, active: false, done: false },
     { key: 'apply', label: 'Apply', desc: `${applications.length} Applications`, active: false, done: false },
-    { key: 'interview', label: 'Interview', desc: 'Vanguard Systems', active: false, done: false },
-    { key: 'outcome', label: 'Offer', desc: 'Targeting Q4 2026', active: false, done: false },
+    { key: 'interview', label: 'Interview', desc: nextInterviewLabel, active: false, done: false },
+    { key: 'outcome', label: 'Offer', desc: offerApplication ? offerApplication.company : 'No offer yet', active: false, done: false },
   ];
 
   const handleSaveGoal = () => {
@@ -184,7 +263,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       title: goalForm.title.trim(),
       description: goalForm.description.trim(),
       priority: goalForm.priority,
-      deadline: goalForm.deadline || '2026-12-31',
+      deadline: goalForm.deadline || '',
       status: 'active',
       progressPercent: 10
     });
@@ -219,7 +298,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               Where Am I in My Career Journey?
             </h1>
             <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-2xl">
-              You are currently transitioning from <strong className="text-[var(--text-primary)] capitalize">{profile.careerState.replace('_', ' ')}</strong> to a verified <strong className="text-[var(--accent-primary)]">{targetRole.title}</strong>. Your current market match is at <strong className="text-emerald-500">{analysis.matchPercentage}%</strong> with active interview pipelines.
+              You are currently transitioning from <strong className="text-[var(--text-primary)] capitalize">{profile.careerState.replace('_', ' ')}</strong> to a verified <strong className="text-[var(--accent-primary)]">{targetRole.title}</strong>. Your current market match is at <strong className="text-emerald-500">{analysis.matchPercentage}%</strong> with {interviewCount} active interview {interviewCount === 1 ? 'pipeline' : 'pipelines'}.
             </p>
           </div>
 
@@ -364,24 +443,31 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 Primary Goal
               </span>
               <h3 className="text-base font-bold text-[var(--text-primary)]">
-                Secure Mid-Level Frontend Engineer Role (Vanguard Systems / Top-Tier Product)
+                {primaryGoalTitle}
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1">
-                Achieve promotion / market transition with a 35% compensation step and ownership over design system architecture.
+                {primaryGoalDescription}
               </p>
             </div>
             <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 font-mono">
-              In Progress (75%)
+              Role Match ({analysis.matchPercentage}%)
             </span>
           </div>
 
           <div className="w-full h-2 rounded-full bg-[var(--surface-secondary)] overflow-hidden">
-            <div className="h-full bg-[var(--accent-primary)] rounded-full w-3/4" />
+            <div
+              className="h-full bg-[var(--accent-primary)] rounded-full"
+              style={{ width: `${analysis.matchPercentage}%` }}
+            />
           </div>
 
           <div className="flex flex-wrap items-center justify-between text-xs text-[var(--text-secondary)] pt-1">
-            <span>Deadline: Q4 2026 (Target: Nov 30)</span>
-            <span className="text-[var(--text-primary)] font-medium">Next Action: Technical Round with Vanguard Systems</span>
+            {nextDeadline && (
+              <span>Deadline: {formatGoalDate(nextDeadline)}</span>
+            )}
+            {nextRoadmapTask && (
+              <span className="text-[var(--text-primary)] font-medium">Next Action: {nextRoadmapTask.title}</span>
+            )}
           </div>
         </div>
 
@@ -428,9 +514,11 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 </div>
               </div>
 
-              <div className="text-[10px] text-[var(--text-muted)] font-mono">
-                Deadline: {goal.deadline}
-              </div>
+              {goal.deadline && (
+                <div className="text-[10px] text-[var(--text-muted)] font-mono">
+                  Deadline: {goal.deadline}
+                </div>
+              )}
             </div>
           ))}
         </div>
