@@ -78,6 +78,7 @@ export const SettingsView: React.FC = () => {
   // Change Email state
   const [changeEmailOpen, setChangeEmailOpen] = useState(false);
   const [newEmail, setNewEmail] = useState(profile.email);
+  const [emailPassword, setEmailPassword] = useState('');
   const [emailMsg, setEmailMsg] = useState<{ success?: boolean; text: string } | null>(null);
 
   // Delete Account modal state
@@ -147,6 +148,10 @@ export const SettingsView: React.FC = () => {
   const handleChangeEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmail || !newEmail.includes('@')) return;
+    if (!emailPassword) {
+      setEmailMsg({ success: false, text: 'Enter your current password to change your email' });
+      return;
+    }
     try {
       const token = await getAccessToken();
       const res = await fetch('/api/account/change-email', {
@@ -155,7 +160,7 @@ export const SettingsView: React.FC = () => {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ newEmail })
+        body: JSON.stringify({ newEmail, currentPassword: emailPassword })
       });
       const data = await res.json();
       if (res.ok) {
@@ -164,6 +169,7 @@ export const SettingsView: React.FC = () => {
         setTimeout(() => {
           setChangeEmailOpen(false);
           setEmailMsg(null);
+          setEmailPassword('');
         }, 1500);
       } else {
         setEmailMsg({ success: false, text: data.error || 'Failed to update email' });
@@ -721,6 +727,17 @@ export const SettingsView: React.FC = () => {
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">Current Password</label>
+                <input
+                  type="password"
+                  value={emailPassword}
+                  onChange={(e) => setEmailPassword(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
+                  autoComplete="current-password"
                   required
                 />
               </div>

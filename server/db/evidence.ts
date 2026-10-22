@@ -232,6 +232,18 @@ export async function updateEvidence(
   evidenceId: string,
   updates: UpdateEvidenceInput
 ): Promise<EvidenceDTO | null> {
+  // Ownership must be established before any child-table write. Without this
+  // a skillNames-only PATCH for another user's evidence id would delete that
+  // user's evidence_skills rows, because the parent row is not updated.
+  const { data: owned, error: ownedError } = await getSupabaseServer()
+    .from('evidence_items')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('id', evidenceId)
+    .maybeSingle();
+  if (ownedError) throw ownedError;
+  if (!owned) return null;
+
   if (updates.projectId) {
     const ok = await projectBelongsToProfile(profileId, updates.projectId);
     if (!ok) throw new Error('Project not found');

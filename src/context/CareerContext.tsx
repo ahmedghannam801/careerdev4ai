@@ -253,6 +253,15 @@ interface CareerContextType {
    * authenticated experience before this is true (B.4 finding C-1).
    */
   isAuthReady: boolean;
+  /** True when the authenticated data load failed; the UI must say so. */
+  hydrationError: boolean;
+  /**
+   * True once the authenticated data load has completed successfully. Routing
+   * decisions that depend on persisted profile fields (for example whether to
+   * show onboarding) must wait for this flag, otherwise they act on the empty
+   * pre-hydration profile.
+   */
+  isHydrated: boolean;
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -963,6 +972,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     let cancelled = false;
 
     const hydrate = async () => {
+      setHydrationError(false);
       try {
         const [
           roadmapRecord,
@@ -1199,7 +1209,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // written, and only then does the app trust the server's view.
         setIsHydrated(true);
       } catch (error) {
-        if (!cancelled) console.error('Failed to hydrate career data:', error);
+        if (!cancelled) {
+          console.error('Failed to hydrate career data:', error);
+          setHydrationError(true);
+        }
       }
     };
 
@@ -1339,6 +1352,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
   const [isLearningLoading, setIsLearningLoading] = useState(false);
   const [learningError, setLearningError] = useState<string | null>(null);
+  const [hydrationError, setHydrationError] = useState(false);
 
   // Projects & Evidence
   // Projects — PostgreSQL is the source of truth (B.3.7).
@@ -1708,16 +1722,19 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         })
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.error === 'string' ? data.error : 'Cover letter generation failed'
+        );
+      }
       return {
         coverLetter: data.coverLetter || '',
         keyHighlights: data.keyHighlights || []
       };
     } catch (e) {
+      // Never substitute an invented letter for a failed model call.
       console.error('Error generating cover letter:', e);
-      return {
-        coverLetter: `Dear Hiring Team at ${company},\n\nI am thrilled to apply for the ${jobTitle} opportunity. With proven experience engineering modern, scalable web applications and optimizing user experiences, I am confident in my ability to make an immediate positive contribution to your team.\n\nWarm regards,\n${profile.name}`,
-        keyHighlights: ['Direct role alignment', 'Authentic candidate grounding']
-      };
+      return { coverLetter: '', keyHighlights: [] };
     }
   };
 
@@ -1741,9 +1758,17 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         })
       });
       const data = await res.json();
-      return data.suggestedSummary || profile.professionalSummary;
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.error === 'string' ? data.error : 'Summary generation failed'
+        );
+      }
+      return data.suggestedSummary || '';
     } catch (e) {
-      return `Results-driven ${targetRole.title} with 2+ years of software engineering experience specializing in React, TypeScript, and accessible component architectures. Demonstrated track record of optimizing application performance and delivering high-impact product features.`;
+      // Returning a canned paragraph (or silently reusing the existing
+      // summary) would look like a generated suggestion. Return nothing.
+      console.error('Error generating summary suggestion:', e);
+      return '';
     }
   };
 
@@ -1755,12 +1780,21 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       const data = await res.json();
+      if (!res.ok) {
+        return {
+          available: false,
+          message:
+            typeof data?.error === 'string' ? data.error : 'Could not verify username availability',
+        };
+      }
       return {
         available: data.available,
         message: data.message
       };
     } catch (e) {
-      return { available: true, message: 'Username valid' };
+      // Never report a username as available without a successful server check.
+      console.error('Username validation failed:', e);
+      return { available: false, message: 'Could not verify username availability' };
     }
   };
 
@@ -2404,6 +2438,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setLearningItems([]);
     setLearningRecommendations([]);
     setLearningError(null);
+    setHydrationError(false);
     setLearningRecommendationMeta((prev) => ({
       ...prev,
       aiUsed: false,
@@ -2995,6 +3030,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (res.ok) {
         const data = await res.json();
         setAnalysis(data);
+      } else {
+        // Keep the previous analysis rather than replacing it with invented
+        // numbers; the server explains why no analysis was produced.
+        const data = await res.json().catch(() => ({}));
+        console.error(
+          'AI analysis unavailable:',
+          typeof data?.error === 'string' ? data.error : res.status
+        );
       }
     } catch (e) {
       console.error('Failed to run AI analysis:', e);
@@ -3429,6 +3472,13 @@ Skills: ${activeCV.skillsList.join(', ')}
           }
           return updated;
         });
+      } else {
+        // Never attach an invented ATS result to the user's CV version.
+        const data = await res.json().catch(() => ({}));
+        console.error(
+          'CV analysis unavailable:',
+          typeof data?.error === 'string' ? data.error : res.status
+        );
       }
     } catch (e) {
       console.error('Failed to optimize CV:', e);
@@ -3573,17 +3623,33 @@ Skills: ${activeCV.skillsList.join(', ')}
         if (data.proposedAction) {
           setPendingAiAction(data.proposedAction);
         }
+      } else {
+        // Never substitute canned career advice for a failed model call. The
+        // notice is explicitly a system message, not generated content.
+        let reason = 'The AI assistant is temporarily unavailable.';
+        try {
+          const body = await res.json();
+          if (body && typeof body.error === 'string') reason = body.error;
+        } catch {
+          // The response had no JSON body; the generic notice is enough.
+        }
+        const notice: CopilotMessage = {
+          id: `msg-${Date.now() + 1}`,
+          sender: 'assistant',
+          text: `${reason} Your message was not answered.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setCopilotMessages(prev => [...prev, notice]);
       }
     } catch (e) {
       console.error(e);
-      const fallbackMsg: CopilotMessage = {
+      const notice: CopilotMessage = {
         id: `msg-${Date.now() + 1}`,
         sender: 'assistant',
-        text: `Based on your profile targeting "${targetRole.title}", your top priority is addressing the ${analysis.criticalGaps[0]?.skill || 'core requirements'} gap. What specific questions do you have about this area?`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        suggestions: ['How to prepare for technical interview', 'Review my portfolio project idea', 'Optimize my CV']
+        text: 'The AI assistant could not be reached. Your message was not answered; please check your connection and try again.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
-      setCopilotMessages(prev => [...prev, fallbackMsg]);
+      setCopilotMessages(prev => [...prev, notice]);
     } finally {
       setIsCopilotTyping(false);
     }
@@ -3713,6 +3779,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         currentUser,
         authToken,
         isAuthReady,
+        hydrationError,
+        isHydrated,
         authModalOpen,
         setAuthModalOpen,
         login,

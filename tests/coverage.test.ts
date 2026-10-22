@@ -7,10 +7,10 @@
 //
 // The Gemini-backed routes (`/api/resumes/upload`, `/api/analyze-career`,
 // `/api/optimize-cv`, `/api/mock-interview`, `/api/suggest-summary`,
-// `/api/generate-cover-letter`) are only covered for their AUTH and
-// VALIDATION contract here: they call a paid external service, so the suite
-// asserts that they reject an unauthenticated or malformed request rather
-// than spending the application's key.
+// `/api/generate-cover-letter`) are covered for their AUTH contract and for
+// their behaviour when the model is not configured. Because the suite has no
+// Gemini key, it asserts that each route returns an explicit 503 and never
+// substitutes invented content for a real model response.
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -88,6 +88,15 @@ describe('the account lifecycle endpoints', () => {
       body: { newEmail: 'not-an-email' },
     });
     assert.equal(res.status, 400);
+  });
+
+  test('change-email requires the current password', async () => {
+    const res = await api('POST', '/api/account/change-email', {
+      token: user.token,
+      body: { newEmail: 'new-address@example.com' },
+    });
+    assert.equal(res.status, 400);
+    assert.match(String(res.body?.error ?? ''), /password/i);
   });
 
   test('the account endpoints require authentication', async () => {
@@ -277,11 +286,22 @@ describe('the AI routes reject an unauthenticated or malformed request', () => {
     }
   });
 
-  test('the AI routes answer without leaking an upstream error', async () => {
+  test('the AI routes fail honestly when no model is available', async (t) => {
     // These routes call Gemini with the application's key. In the test
-    // environment there is no key, so they take their documented fallback
-    // path. What matters is that they answer with a well-formed response and
-    // never leak an internal error message.
+    // environment there is no key, so every route must say that no result was
+    // produced. Substituting invented analysis, scores or prose would be
+    // indistinguishable from a real model response.
+    if (process.env.GEMINI_API_KEY) {
+      t.skip('GEMINI_API_KEY is configured; the no-model contract does not apply');
+      return;
+    }
+    const fabricatedKeys = [
+      'matchPercentage',
+      'overallScore',
+      'score',
+      'suggestedSummary',
+      'coverLetter',
+    ];
     for (const path of [
       '/api/analyze-career',
       '/api/optimize-cv',
@@ -290,17 +310,20 @@ describe('the AI routes reject an unauthenticated or malformed request', () => {
       '/api/generate-cover-letter',
     ]) {
       const res = await api('POST', path, { token: user.token, body: {} });
-      assert.ok(
-        res.status === 200 || res.status === 400,
-        `${path} must answer cleanly (got ${res.status})`
+      assert.equal(res.status, 503, `${path} must report the model as unavailable`);
+      assert.equal(
+        typeof res.body?.error,
+        'string',
+        `${path} must explain that no result was generated`
       );
-      if (res.status === 500) {
-        assert.equal(
-          res.body?.details,
-          undefined,
-          'an internal error message must never be returned to the client'
-        );
+      for (const key of fabricatedKeys) {
+        assert.equal(res.body?.[key], undefined, `${path} must not fabricate ${key}`);
       }
+      assert.equal(
+        res.body?.details,
+        undefined,
+        'an internal error message must never be returned to the client'
+      );
     }
   });
 });

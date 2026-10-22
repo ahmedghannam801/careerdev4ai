@@ -210,6 +210,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Do not advertise the framework.
+app.disable('x-powered-by');
+
+// Baseline security headers. A strict Content-Security-Policy is deliberately
+// not set here: the app loads Google Fonts and Vite injects inline styles, so a
+// policy has to be designed and tested with the production build first.
+app.use((_req: Request, res: Response, next: () => void) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
@@ -588,7 +602,7 @@ app.delete('/api/user-skills/:skillId', requireAuth, async (req: Request, res: R
 });
 
 // CV Upload Pipeline (POST /api/resumes/upload)
-app.post('/api/resumes/upload', upload.single('file'), requireAuth, async (req: Request, res: Response) => {
+app.post('/api/resumes/upload', requireAuth, upload.single('file'), async (req: Request, res: Response) => {
   try {
     let rawText = '';
 
@@ -675,40 +689,14 @@ Return only valid JSON.`;
       });
       parsedCV = JSON.parse(response.text || '{}');
     } catch (e) {
-      // Fallback parser if Gemini is temporarily unavailable
-      parsedCV = {
-        fullName: 'Extracted Applicant',
-        email: 'applicant@example.com',
-        phone: '+1 (555) 000-0000',
-        location: 'Remote',
-        title: targetRoleTitle,
-        summary: rawText.slice(0, 300),
-        experiences: [
-          {
-            id: 'exp-ext-1',
-            company: 'Previous Employer',
-            role: 'Software Developer',
-            period: '2023 - Present',
-            location: 'Remote',
-            bullets: [
-              'Contributed to core product features and maintenance.',
-              'Collaborated with agile engineering squad on sprint deliverables.'
-            ]
-          }
-        ],
-        education: [
-          {
-            id: 'edu-ext-1',
-            institution: 'University Program',
-            degree: 'Bachelor Degree',
-            field: 'Computer Science',
-            period: '2019 - 2023'
-          }
-        ],
-        projects: [],
-        skillsList: ['JavaScript', 'React', 'Git', 'HTML/CSS', 'SQL'],
-        certifications: []
-      };
+      // Never fabricate a parsed CV. Returning invented employers, degrees or
+      // contact details would persist false personal data as the user's own.
+      // Nothing has been written at this point, so the request fails cleanly.
+      console.error('CV parsing unavailable:', e);
+      return res.status(503).json({
+        error:
+          'CV parsing is temporarily unavailable. Your file was not saved; please try again shortly.',
+      });
     }
 
     // Run ATS diagnostic
@@ -737,7 +725,7 @@ Parsed CV:
 ${JSON.stringify(parsedCV)}
 Return only valid JSON.`;
 
-    let atsAnalysis: any;
+    let atsAnalysis: any = null;
     try {
       const atsRes = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
@@ -746,20 +734,10 @@ Return only valid JSON.`;
       });
       atsAnalysis = JSON.parse(atsRes.text || '{}');
     } catch (e) {
-      atsAnalysis = {
-        overallScore: 82,
-        breakdown: { keywordsMatch: 80, impactAndMetrics: 75, formattingStructure: 90, experienceRelevance: 82 },
-        matchedKeywords: ['React', 'JavaScript', 'Git', 'Agile'],
-        missingKeywords: ['TypeScript', 'Testing', 'CI/CD'],
-        actionableImprovements: [
-          {
-            section: 'Experience',
-            currentText: 'Contributed to core product features...',
-            suggestedText: 'Architected and shipped 10+ core product features, improving release reliability by 25%.',
-            reason: 'Uses X-Y-Z formula with quantifiable business metrics.'
-          }
-        ]
-      };
+      // The CV itself was parsed successfully. Store it without an ATS
+      // analysis rather than returning an invented score.
+      console.error('ATS analysis unavailable:', e);
+      atsAnalysis = null;
     }
 
     // Persist the original file, then the CV row and its first version.
@@ -805,11 +783,14 @@ Return only valid JSON.`;
       success: true,
       cv: parsedCV,
       atsAnalysis,
+      analysisAvailable: atsAnalysis !== null,
       cvId: cvRow.id,
       cvVersionId: version.id,
       fileStored: !!storedFile,
       fileName: storedFile?.fileName ?? null,
-      message: 'CV uploaded and analyzed successfully'
+      message: atsAnalysis
+        ? 'CV uploaded and analyzed successfully'
+        : 'CV uploaded successfully. ATS analysis is temporarily unavailable; you can retry it from CV Studio.',
     });
   } catch (error: any) {
     console.error('CV Upload Error:', error);
@@ -915,8 +896,16 @@ Rules:
         },
       });
 
-      const replyText = response.text || 'I analyzed your career graph. What specific milestone would you like to advance next?';
-      
+      const replyText = response.text?.trim();
+      if (!replyText) {
+        // An empty model response is still not an answer. Do not replace it
+        // with a sentence that reads as if the model had replied.
+        return res.status(503).json({
+          error:
+            'The AI assistant returned an empty response. Your message was not answered; please try again shortly.',
+        });
+      }
+
       // Intelligent proposed action if user asks to add or change something
       let proposedAction = undefined;
       const lower = userPrompt.toLowerCase();
@@ -942,18 +931,13 @@ Rules:
         proposedAction
       });
     } catch (aiErr: any) {
-      console.warn('Gemini temporary spike/fallback triggered:', aiErr?.message || aiErr);
-      const roleTitle = context?.targetRole?.title || 'your target role';
-      return res.json({
-        text: `Here is your targeted guidance for ${roleTitle}:
-1. Focus on closing your highest-priority gap (${context?.skillGaps?.[0] || 'core technical competencies'}).
-2. Ensure your active project "${context?.activeProjectTitle || 'portfolio deliverable'}" is deployed with public GitHub documentation.
-3. Complete STAR story preparation for upcoming interview rounds.`,
-        suggestions: [
-          'What should I prioritize today?',
-          'Audit my CV bullet points',
-          'Give me a technical interview question for my target role'
-        ],
+      // Honesty rule: if the model did not answer, do NOT return canned text
+      // that looks like an AI response. The caller is told the assistant is
+      // unavailable and can retry; no generated content is invented.
+      console.warn('Copilot AI request failed:', aiErr?.message || aiErr);
+      return res.status(503).json({
+        error:
+          'The AI assistant is temporarily unavailable. Your message was not answered by the model; please try again shortly.',
       });
     }
   } catch (error: any) {
@@ -997,25 +981,12 @@ Return valid JSON schema:
       });
       return res.json(JSON.parse(response.text || '{}'));
     } catch (e) {
-      return res.json({
-        matchPercentage: 82,
-        strengths: [
-          { skill: targetRole?.requiredSkills?.[0]?.name || 'Core Domain', note: 'Strong foundational execution aligned with role expectations.' },
-          { skill: targetRole?.requiredSkills?.[1]?.name || 'Architecture', note: 'Demonstrates modular problem solving and design clarity.' }
-        ],
-        criticalGaps: [
-          { skill: targetRole?.requiredSkills?.[4]?.name || 'Automated Testing', current: 2, target: 4, reason: 'Essential for production release velocity and regression avoidance.' }
-        ],
-        missingExperience: ['High-scale distributed systems ownership', 'Production on-call rotation'],
-        careerRisks: ['Evolving industry expectations require continuous hands-on framework updates'],
-        recommendedProjects: ['Accessible Design System component library', 'Real-time collaborative workspace'],
-        recommendedLearning: ['Official Documentation & Interactive Tutorials', 'CS50 Introduction to Databases with SQL'],
-        nextBestAction: {
-          title: 'Master Automated Testing Architecture',
-          description: 'Build comprehensive test coverage for core business reducers and critical user journeys.',
-          reason: 'This closes your largest detected gap for the target role.',
-          actionType: 'task'
-        }
+      // Never fabricate a career analysis. A made-up match percentage and
+      // invented skill gaps would be indistinguishable from a real result.
+      console.error('Career analysis unavailable:', e);
+      return res.status(503).json({
+        error:
+          'Career analysis is temporarily unavailable. No analysis was generated; please try again shortly.',
       });
     }
   } catch (error) {
@@ -1046,19 +1017,12 @@ Return JSON schema:
       });
       return res.json(JSON.parse(response.text || '{}'));
     } catch (e) {
-      return res.json({
-        overallScore: 86,
-        breakdown: { keywordsMatch: 88, impactAndMetrics: 82, formattingStructure: 94, experienceRelevance: 80 },
-        matchedKeywords: ['React', 'TypeScript', 'Tailwind CSS', 'Git & Version Control', 'REST APIs'],
-        missingKeywords: ['Playwright', 'Core Web Vitals', 'CI/CD Pipelines'],
-        actionableImprovements: [
-          {
-            section: 'Experience',
-            currentText: 'Collaborated closely with designers on web components...',
-            suggestedText: 'Spearheaded WCAG 2.1 AA compliant design system adoption across 3 product teams, reducing design debt by 35% and accelerating release cycles.',
-            reason: 'Employs Google X-Y-Z formula to demonstrate measurable business impact.'
-          }
-        ]
+      // An invented ATS score and invented "improvements" would be actively
+      // harmful: the user could rewrite a CV around a fabricated diagnosis.
+      console.error('CV optimization unavailable:', e);
+      return res.status(503).json({
+        error:
+          'CV analysis is temporarily unavailable. No ATS analysis was generated; please try again shortly.',
       });
     }
   } catch (error) {
@@ -1090,17 +1054,12 @@ Return JSON schema:
       });
       return res.json(JSON.parse(response.text || '{}'));
     } catch (e) {
-      return res.json({
-        score: 9,
-        strengths: ['Directly addresses technical constraints under pressure', 'Presents concrete debugging methodology'],
-        improvements: ['Explicitly mention team post-mortem and automated regression monitoring'],
-        starEvaluation: {
-          situation: 'High-visibility launch with performance regression close to deadline.',
-          task: 'Diagnose and resolve performance degradation within 4 days.',
-          action: 'Performed bundle flamechart analysis, implemented lazy loading and WebP compression.',
-          result: 'Recovered LCP to 1.2s and deployed on schedule.'
-        },
-        suggestedAnswer: 'During our release cycle, our LCP score degraded to 4.2s due to an unbundled module. I surfaced the risk in our daily standup, analyzed bundles using flamecharts, and dynamically code-split the dependencies. LCP recovered to 1.2s, we deployed on schedule, and I integrated bundle-size gating into our CI pipeline.'
+      // A fabricated score and a fabricated "model answer" would teach the
+      // candidate nothing and could be mistaken for feedback on their answer.
+      console.error('Interview evaluation unavailable:', e);
+      return res.status(503).json({
+        error:
+          'Interview evaluation is temporarily unavailable. No feedback was generated; please try again shortly.',
       });
     }
   } catch (error) {
@@ -1133,8 +1092,12 @@ Requirements:
       });
       return res.json(JSON.parse(response.text || '{}'));
     } catch (e) {
-      return res.json({
-        suggestedSummary: `Results-driven ${targetRoleTitle || 'Engineer'} with a demonstrated track record of architecting scalable applications and delivering measurable product improvements. Skilled across modern design systems, performance optimization, and cross-functional team delivery. Dedicated to engineering excellence and user-centric problem solving.`
+      // Do not return a generic paragraph as if the model had written it for
+      // this candidate. The caller must know that no suggestion was produced.
+      console.error('Summary suggestion unavailable:', e);
+      return res.status(503).json({
+        error:
+          'Summary generation is temporarily unavailable. No suggestion was generated; please try again shortly.',
       });
     }
   } catch (error) {
@@ -1171,13 +1134,12 @@ Rules:
       });
       return res.json(JSON.parse(response.text || '{}'));
     } catch (e) {
-      return res.json({
-        coverLetter: `Dear Hiring Team at ${company},\n\nI am writing to express my strong enthusiasm for the ${jobTitle} position. With my background in engineering modern, scalable applications and a dedicated focus on performance and accessibility, I am excited about the prospect of contributing directly to your team's mission.\n\nThroughout my work, I have consistently translated user needs into reliable, clean software architectures. My hands-on experience building design systems and optimizing web vitals has enabled me to drive significant improvements in release speed and UX consistency. What excites me most about ${company} is your commitment to high-impact products, and I am eager to bring my problem-solving mindset and technical discipline to your initiatives.\n\nThank you for considering my application. I look forward to the opportunity to discuss how my skill set aligns with your current priorities.\n\nWarm regards,\n${candidateName || 'Applicant'}`,
-        keyHighlights: [
-          `Targeted specifically to ${company}'s ${jobTitle} role`,
-          'Direct alignment with engineering architecture and performance',
-          'Professional, authentic closing call to action'
-        ]
+      // A cover letter full of claims the candidate never supplied is the most
+      // dangerous fallback in the product: it could be sent to an employer.
+      console.error('Cover letter generation unavailable:', e);
+      return res.status(503).json({
+        error:
+          'Cover letter generation is temporarily unavailable. No cover letter was generated; please try again shortly.',
       });
     }
   } catch (error) {
@@ -1346,12 +1308,15 @@ app.post('/api/account/change-email', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { newEmail } = req.body;
+    const { newEmail, currentPassword } = req.body;
     if (!newEmail || !newEmail.includes('@')) {
       return res.status(400).json({ error: 'Valid email is required' });
     }
+    if (!currentPassword) {
+      return res.status(400).json({ error: 'Current password is required to change email' });
+    }
 
-    const result = await changeEmail(auth.userId, newEmail.toLowerCase());
+    const result = await changeEmail(auth.userId, newEmail.toLowerCase(), currentPassword);
     if (!result.ok) {
       return res.status(409).json({ error: result.error || 'Failed to update email' });
     }
@@ -1393,8 +1358,6 @@ const str = (v: unknown, max = 500): string | null =>
 const isUuid = (v: unknown): v is string =>
   typeof v === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-
-/**
 
 /**
  * Validates and normalizes a roadmap tree sent by the client.
@@ -1904,10 +1867,14 @@ app.post('/api/cvs', requireAuth, async (req: Request, res: Response) => {
     const body = req.body ?? {};
     const name = str(body.name, 200);
     if (!name) return res.status(400).json({ error: 'Name is required' });
+    const storagePath = str(body.storagePath, 500) ?? undefined;
+    if (storagePath && !pathBelongsToUser(req.authUser!.id, storagePath)) {
+      return res.status(400).json({ error: 'Invalid storagePath' });
+    }
     const cv = await createCv(req.authUser!.id, {
       name,
       targetRoleTitle: str(body.targetRoleTitle, 200) ?? undefined,
-      storagePath: str(body.storagePath, 500) ?? undefined,
+      storagePath,
     });
     return res.status(201).json({ success: true, cv });
   } catch (error) {
@@ -1920,12 +1887,16 @@ app.patch('/api/cvs/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
     const body = req.body ?? {};
+    const storagePath =
+      body.storagePath === null ? undefined : (str(body.storagePath, 500) ?? undefined);
+    if (storagePath && !pathBelongsToUser(req.authUser!.id, storagePath)) {
+      return res.status(400).json({ error: 'Invalid storagePath' });
+    }
     const cv = await updateCv(req.authUser!.id, req.params.id, {
       name: str(body.name, 200) ?? undefined,
       targetRoleTitle:
         body.targetRoleTitle === null ? undefined : (str(body.targetRoleTitle, 200) ?? undefined),
-      storagePath:
-        body.storagePath === null ? undefined : (str(body.storagePath, 500) ?? undefined),
+      storagePath,
       isActive: typeof body.isActive === 'boolean' ? body.isActive : undefined,
     });
     if (!cv) return res.status(404).json({ error: 'CV not found' });

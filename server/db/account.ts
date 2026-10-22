@@ -41,11 +41,13 @@ export async function changePassword(
   newPassword: string
 ): Promise<{ ok: boolean; error?: string }> {
   // Verify the current password for this user by attempting a sign-in.
-  const { data: list } = await getSupabaseServer().auth.admin.listUsers({ page: 1, perPage: 1000 });
-  const target = list?.users?.find((u) => u.id === userId);
-  if (!target?.email) return { ok: false, error: 'Account not found' };
+  // getUserById is used instead of listUsers: a 1000-user page would silently
+  // fail for every account beyond the first page.
+  const { data: target, error: lookupError } = await getSupabaseServer().auth.admin.getUserById(userId);
+  if (lookupError || !target?.user?.email) return { ok: false, error: 'Account not found' };
+  const targetEmail = target.user.email;
 
-  const correct = await verifyPassword(target.email, currentPassword);
+  const correct = await verifyPassword(targetEmail, currentPassword);
   if (!correct) return { ok: false, error: 'Current password is incorrect' };
 
   const { error } = await getSupabaseServer().auth.admin.updateUserById(userId, {
@@ -56,13 +58,28 @@ export async function changePassword(
 }
 
 /**
- * Request an email change for the authenticated user.
- * Supabase Auth handles confirmation; the new address is not applied until confirmed.
+ * Change the authenticated user's email address.
+ *
+ * The current password is required, exactly as for a password change. The
+ * login identity must not be changeable by anyone who merely holds a stolen
+ * session token: without re-authentication an attacker could move the account
+ * to an address they control and then reset the password.
+ *
+ * The Admin API applies the new address immediately; Supabase's confirmation
+ * flow is not used here. The password check is therefore the authorization
+ * boundary for this operation.
  */
 export async function changeEmail(
   userId: string,
-  newEmail: string
+  newEmail: string,
+  currentPassword: string
 ): Promise<{ ok: boolean; error?: string }> {
+  const { data: target, error: lookupError } = await getSupabaseServer().auth.admin.getUserById(userId);
+  if (lookupError || !target?.user?.email) return { ok: false, error: 'Account not found' };
+
+  const correct = await verifyPassword(target.user.email, currentPassword);
+  if (!correct) return { ok: false, error: 'Current password is incorrect' };
+
   const { error } = await getSupabaseServer().auth.admin.updateUserById(userId, {
     email: newEmail,
   });

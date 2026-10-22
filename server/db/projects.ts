@@ -221,6 +221,18 @@ export async function updateProject(
   projectId: string,
   updates: UpdateProjectInput
 ): Promise<ProjectDTO | null> {
+  // Ownership must be established before any child-table write. Without this
+  // a skills-only PATCH for another user's project id would delete that user's
+  // project_skills rows, because the parent row itself is not updated.
+  const { data: owned, error: ownedError } = await getSupabaseServer()
+    .from('projects')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('id', projectId)
+    .maybeSingle();
+  if (ownedError) throw ownedError;
+  if (!owned) return null;
+
   const patch: Record<string, unknown> = {};
   if (updates.title !== undefined) patch.title = updates.title;
   if (updates.goal !== undefined) patch.goal = updates.goal ?? null;

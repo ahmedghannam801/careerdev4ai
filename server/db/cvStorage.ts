@@ -98,7 +98,15 @@ export async function deleteCvFile(userId: string, path: string): Promise<boolea
 /** True when the object path's first segment is the given user id. */
 export function pathBelongsToUser(userId: string, path: string): boolean {
   if (!userId || !path) return false;
-  return path.startsWith(`${userId}/`);
+  // Reject anything that a storage backend could normalise into a different
+  // object key: backslashes, empty segments, and '.'/'..' path traversal.
+  if (path.includes('\\')) return false;
+  const segments = path.split('/');
+  if (segments.length < 2) return false;
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    return false;
+  }
+  return segments[0] === userId;
 }
 
 /** Lists the caller's stored CV files (paths only). */

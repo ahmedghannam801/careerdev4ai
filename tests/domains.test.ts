@@ -64,6 +64,33 @@ describe('domain CRUD', () => {
     assert.equal(read.body.project.title, 'Design system');
   });
 
+  test('a skills-only update cannot touch another user\'s project links', async () => {
+    const userB = await createTestUser('projskill');
+    try {
+      const createdRes = await api('POST', '/api/projects', {
+        token: userA.token,
+        body: { title: 'Owned project', skills: ['React'] },
+      });
+      const project = createdRes.body.project;
+      track('projects', project.id);
+
+      const attack = await api('PATCH', `/api/projects/${project.id}`, {
+        token: userB.token,
+        body: { skills: [] },
+      });
+      assert.equal(attack.status, 404, "B must not update A's project");
+
+      const { data: links } = await admin
+        .from('project_skills')
+        .select('project_id, skill_name')
+        .eq('project_id', project.id);
+      assert.equal(links?.length, 1, "A's skill link must survive B's request");
+      assert.equal(links?.[0]?.skill_name, 'React');
+    } finally {
+      await deleteTestUser(userB);
+    }
+  });
+
   test('evidence + evidence skills round-trip', async () => {
     const createdRes = await api('POST', '/api/evidence', {
       token: userA.token,
@@ -225,6 +252,124 @@ describe('CV persistence and file storage', () => {
 
       const stolen = await api('GET', `/api/cvs/${cvId}/file`, { token: userB.token });
       assert.equal(stolen.status, 404, "B must not get A's file");
+    } finally {
+      await deleteTestUser(userB);
+    }
+  });
+
+  test('a CV version can be renamed and deleted by its owner', async () => {
+    const cv = await api('POST', '/api/cvs', {
+      token: userA.token,
+      body: { name: 'version owner cv' },
+    });
+    const cvId = cv.body.cv.id;
+    track('cvs', cvId);
+
+    const version = await api('POST', '/api/cv-versions', {
+      token: userA.token,
+      body: { cvId, name: 'v1', profileJson: { summary: 'before' } },
+    });
+    assert.equal(version.status, 201);
+    const versionId = version.body.version.id;
+
+    const renamed = await api('PATCH', `/api/cv-versions/${versionId}`, {
+      token: userA.token,
+      body: { name: 'renamed' },
+    });
+    assert.equal(renamed.status, 200, 'the owner must be able to rename a version');
+    assert.equal(renamed.body.version.name, 'renamed');
+
+    const deleted = await api('DELETE', `/api/cv-versions/${versionId}`, {
+      token: userA.token,
+    });
+    assert.equal(deleted.status, 200, 'the owner must be able to delete a version');
+
+    const { count } = await admin
+      .from('cv_versions')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', versionId);
+    assert.equal(count, 0, 'the version must be gone');
+  });
+
+  test("another user cannot rename or delete someone else's CV version", async () => {
+    const userB = await createTestUser('cvver');
+    try {
+      const cv = await api('POST', '/api/cvs', {
+        token: userA.token,
+        body: { name: 'protected version cv' },
+      });
+      const cvId = cv.body.cv.id;
+      track('cvs', cvId);
+
+      const version = await api('POST', '/api/cv-versions', {
+        token: userA.token,
+        body: { cvId, name: 'v1', profileJson: { summary: 'secret' } },
+      });
+      const versionId = version.body.version.id;
+
+      const renamed = await api('PATCH', `/api/cv-versions/${versionId}`, {
+        token: userB.token,
+        body: { name: 'stolen' },
+      });
+      assert.equal(renamed.status, 404, "B must not rename A's version");
+
+      const deleted = await api('DELETE', `/api/cv-versions/${versionId}`, {
+        token: userB.token,
+      });
+      assert.equal(deleted.status, 404, "B must not delete A's version");
+
+      const { data } = await admin
+        .from('cv_versions')
+        .select('name, profile_json')
+        .eq('id', versionId)
+        .single();
+      assert.equal(data?.name, 'v1', "A's version must be unchanged");
+    } finally {
+      await deleteTestUser(userB);
+    }
+  });
+
+  test('a skillNames-only update cannot touch another user\'s evidence links', async () => {
+    const userB = await createTestUser('evskill');
+    try {
+      const createdRes = await api('POST', '/api/evidence', {
+        token: userA.token,
+        body: { title: 'Owned evidence', type: 'github', skillNames: ['TypeScript'] },
+      });
+      const evidence = createdRes.body.evidence;
+      track('evidence_items', evidence.id);
+
+      const attack = await api('PATCH', `/api/evidence/${evidence.id}`, {
+        token: userB.token,
+        body: { skillNames: [] },
+      });
+      assert.equal(attack.status, 404, "B must not update A's evidence");
+
+      const { data: links } = await admin
+        .from('evidence_skills')
+        .select('evidence_id')
+        .eq('evidence_id', evidence.id);
+      assert.equal(links?.length, 1, "A's evidence skill link must survive B's request");
+    } finally {
+      await deleteTestUser(userB);
+    }
+  });
+
+  test('a storagePath outside the caller\'s folder is rejected', async () => {
+    const userB = await createTestUser('storagepath');
+    try {
+      for (const storagePath of [
+        `${userB.id}/stolen.txt`,
+        `${userA.id}/../${userB.id}/stolen.txt`,
+        `${userA.id}/nested/../../${userB.id}/stolen.txt`,
+        `${userA.id}\\..\\${userB.id}\\stolen.txt`,
+      ]) {
+        const res = await api('POST', '/api/cvs', {
+          token: userA.token,
+          body: { name: 'traversal attempt', storagePath },
+        });
+        assert.equal(res.status, 400, `storagePath must be rejected: ${storagePath}`);
+      }
     } finally {
       await deleteTestUser(userB);
     }

@@ -8,7 +8,7 @@
 import { getSupabaseServer } from './supabase';
 import { getProfile, upsertProfile } from './profiles';
 import { getPreferences, upsertPreferences } from './preferences';
-import { getUserSkills, upsertUserSkill } from './userSkills';
+import { getUserSkills, upsertUserSkill, DEFAULT_SKILL_CATEGORY } from './userSkills';
 
 export interface StatePayload {
   profile?: any;
@@ -154,7 +154,7 @@ export async function saveState(
       } else {
         const { data: created } = await getSupabaseServer()
           .from('skills')
-          .insert({ name: sk.name, category: sk.category ?? null })
+          .insert({ name: sk.name, category: sk.category ?? DEFAULT_SKILL_CATEGORY })
           .select('id')
           .single();
         skillId = created?.id ?? null;

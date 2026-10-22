@@ -123,6 +123,12 @@ export async function updateCvVersion(
   versionId: string,
   updates: UpdateCvVersionInput
 ): Promise<CvVersionDTO | null> {
+  // PostgREST does not support filtering an UPDATE by an embedded resource,
+  // so ownership is established with the same joined read used by getCvVersion
+  // before the row is touched.
+  const owned = await getCvVersion(profileId, versionId);
+  if (!owned) return null;
+
   const patch: Record<string, unknown> = {};
   if (updates.name !== undefined) patch.name = updates.name;
   if (updates.targetRoleTitle !== undefined) patch.target_role_title = updates.targetRoleTitle ?? null;
@@ -139,7 +145,6 @@ export async function updateCvVersion(
     .from('cv_versions')
     .update(patch)
     .eq('id', versionId)
-    .eq('cvs.profile_id', profileId)
     .select(SELECT_COLUMNS)
     .maybeSingle();
   if (error) throw error;
@@ -150,11 +155,15 @@ export async function deleteCvVersion(
   profileId: string,
   versionId: string
 ): Promise<boolean> {
+  // Verify ownership through the owning CV before deleting; a DELETE cannot be
+  // filtered by the embedded cvs.profile_id column.
+  const owned = await getCvVersion(profileId, versionId);
+  if (!owned) return false;
+
   const { data, error } = await getSupabaseServer()
     .from('cv_versions')
     .delete()
     .eq('id', versionId)
-    .eq('cvs.profile_id', profileId)
     .select('id');
   if (error) throw error;
   return (data ?? []).length > 0;

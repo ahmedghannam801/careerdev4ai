@@ -761,13 +761,25 @@ export const LearningCenterView: React.FC = () => {
 
       {tab === 'catalog' && (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {catalogFiltered.map((course) => (
-            <CourseCard
-              key={course.id}
-              {...cardProps(course, recommendationById.get(course.id))}
-              compact
-            />
-          ))}
+          {learningCatalog.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)] md:col-span-2 xl:col-span-3">
+              <BookOpen size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
+              The course catalogue could not be loaded. Refresh the page to try again.
+            </div>
+          ) : catalogFiltered.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)] md:col-span-2 xl:col-span-3">
+              <Search size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
+              No courses match these filters. Clear a filter or search term.
+            </div>
+          ) : (
+            catalogFiltered.map((course) => (
+              <CourseCard
+                key={course.id}
+                {...cardProps(course, recommendationById.get(course.id))}
+                compact
+              />
+            ))
+          )}
         </section>
       )}
 

@@ -30,7 +30,15 @@ import { DocumentsView } from './components/views/DocumentsView';
 import { ActivityView } from './components/views/ActivityView';
 
 function AppContent() {
-  const { profile, setActiveView, currentUser, isAuthReady, setAuthModalOpen } = useCareer();
+  const {
+    profile,
+    setActiveView,
+    currentUser,
+    isAuthReady,
+    hydrationError,
+    isHydrated,
+    setAuthModalOpen,
+  } = useCareer();
   const [currentView, setCurrentView] = useState<string>(() => {
     // Check hash for direct view or public profile
     const hash = window.location.hash.replace('#/', '');
@@ -63,6 +71,36 @@ function AppContent() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [currentView, setActiveView]);
+
+  // Once a session exists, `landing` is no longer a valid in-app view. Leaving
+  // it in place made the shell breadcrumb read "Landing" over the dashboard and
+  // stranded new users on the dashboard instead of the onboarding flow.
+  //
+  // The onboarding decision waits for hydration: the pre-hydration profile is
+  // empty, so acting on `onboardingCompleted` immediately would flash the
+  // onboarding wizard in front of an existing user.
+  useEffect(() => {
+    if (!currentUser || currentView === 'onboarding') return;
+
+    if (!isHydrated) {
+      if (currentView === 'landing') {
+        setCurrentView('dashboard');
+        setActiveView('dashboard');
+        window.location.hash = '#/dashboard';
+      }
+      return;
+    }
+
+    if (!profile.onboardingCompleted) {
+      setCurrentView('onboarding');
+      setActiveView('onboarding');
+      window.location.hash = '#/onboarding';
+    } else if (currentView === 'landing') {
+      setCurrentView('dashboard');
+      setActiveView('dashboard');
+      window.location.hash = '#/dashboard';
+    }
+  }, [currentUser, isHydrated, profile.onboardingCompleted, currentView, setActiveView]);
 
   // B.4 finding C-1 (session gate).
   //
@@ -164,6 +202,24 @@ function AppContent() {
   return (
     <>
       <AppShell currentView={currentView} onNavigate={navigateTo}>
+        {hydrationError && (
+          <div
+            role="alert"
+            className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300"
+          >
+            <span className="flex-1">
+              Some of your career data could not be loaded. Nothing was changed. Check your
+              connection and try again.
+            </span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg border border-amber-500/30 px-3 py-1.5 text-xs font-semibold hover:bg-amber-500/10"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         {renderView()}
       </AppShell>
       {/* B.4 finding C-2: the AuthModal existed and was fully functional but

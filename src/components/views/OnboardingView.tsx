@@ -20,7 +20,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   const [customGoal, setCustomGoal] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState(targetRole.id || 'frontend-engineer');
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1) {
       setCareerState(selectedPersona);
       setStep(2);
@@ -34,7 +34,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
       setPrimaryTargetRole(selectedRoleId);
       setStep(5);
     } else if (step === 5) {
-      updateProfile({ onboardingCompleted: true });
+      // Persist the completion flag BEFORE leaving the wizard. Navigating
+      // first let the route guard see the still-false flag and send the user
+      // back into a freshly mounted step 1.
+      await updateProfile({ onboardingCompleted: true });
       onComplete();
     }
   };
