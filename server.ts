@@ -284,8 +284,217 @@ const ai = new GoogleGenAI({
     headers: {
       'User-Agent': 'aistudio-build',
     },
+    // Without a deadline an upstream stall keeps the HTTP request open
+    // indefinitely. The SDK turns this into a normal rejection, which the
+    // routes convert into their honest 503 response.
+    timeout: 45_000,
   },
 });
+
+// The model is configurable so an operator can move to a newer or more
+// available Flash model without editing code. The default remains the model
+// the product was validated against.
+const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+
+// Structured-output validators.
+//
+// `responseMimeType: application/json` guarantees parseable JSON, not the
+// shape the application asked for. Returning `{}` or a half-filled object as
+// if it were a real analysis would be another form of fabricated output, so
+// every structured AI route validates the payload before responding.
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function isNumberInRange(value: unknown, min = 0, max = 100): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= min &&
+    value <= max
+  );
+}
+
+function validateParsedCvPayload(value: unknown): string[] {
+  if (!isJsonObject(value)) return ['response is not an object'];
+  const errors: string[] = [];
+  for (const key of ['fullName', 'email', 'phone', 'location', 'title', 'summary']) {
+    if (typeof value[key] !== 'string') errors.push(key);
+  }
+  for (const key of ['experiences', 'education', 'projects', 'skillsList', 'certifications']) {
+    if (!Array.isArray(value[key])) errors.push(key);
+  }
+  if (Array.isArray(value.experiences)) {
+    value.experiences.forEach((entry, index) => {
+      if (!isJsonObject(entry)) {
+        errors.push(`experiences[${index}]`);
+        return;
+      }
+      for (const key of ['id', 'company', 'role', 'period', 'location']) {
+        if (typeof entry[key] !== 'string') errors.push(`experiences[${index}].${key}`);
+      }
+      if (!isStringArray(entry.bullets)) errors.push(`experiences[${index}].bullets`);
+    });
+  }
+  if (Array.isArray(value.education)) {
+    value.education.forEach((entry, index) => {
+      if (!isJsonObject(entry)) {
+        errors.push(`education[${index}]`);
+        return;
+      }
+      for (const key of ['id', 'institution', 'degree', 'field', 'period', 'gpa']) {
+        if (typeof entry[key] !== 'string') errors.push(`education[${index}].${key}`);
+      }
+    });
+  }
+  if (Array.isArray(value.projects)) {
+    value.projects.forEach((entry, index) => {
+      if (!isJsonObject(entry)) {
+        errors.push(`projects[${index}]`);
+        return;
+      }
+      for (const key of ['id', 'title', 'role']) {
+        if (typeof entry[key] !== 'string') errors.push(`projects[${index}].${key}`);
+      }
+      for (const key of ['technologies', 'bullets']) {
+        if (!isStringArray(entry[key])) errors.push(`projects[${index}].${key}`);
+      }
+    });
+  }
+  return errors;
+}
+
+function validateAtsPayload(value: unknown): string[] {
+  if (!isJsonObject(value)) return ['response is not an object'];
+  const errors: string[] = [];
+  if (!isNumberInRange(value.overallScore)) errors.push('overallScore');
+  if (!isJsonObject(value.breakdown)) {
+    errors.push('breakdown');
+  } else {
+    for (const key of [
+      'keywordsMatch',
+      'impactAndMetrics',
+      'formattingStructure',
+      'experienceRelevance',
+    ]) {
+      if (!isNumberInRange(value.breakdown[key])) errors.push(`breakdown.${key}`);
+    }
+  }
+  for (const key of ['matchedKeywords', 'missingKeywords']) {
+    if (!isStringArray(value[key])) errors.push(key);
+  }
+  if (!Array.isArray(value.actionableImprovements)) {
+    errors.push('actionableImprovements');
+  } else {
+    value.actionableImprovements.forEach((entry, index) => {
+      if (!isJsonObject(entry)) {
+        errors.push(`actionableImprovements[${index}]`);
+        return;
+      }
+      for (const key of ['section', 'currentText', 'suggestedText', 'reason']) {
+        if (typeof entry[key] !== 'string') {
+          errors.push(`actionableImprovements[${index}].${key}`);
+        }
+      }
+    });
+  }
+  return errors;
+}
+
+function validateCareerAnalysisPayload(value: unknown): string[] {
+  if (!isJsonObject(value)) return ['response is not an object'];
+  const errors: string[] = [];
+  if (!isNumberInRange(value.matchPercentage)) errors.push('matchPercentage');
+  for (const key of [
+    'missingExperience',
+    'careerRisks',
+    'recommendedProjects',
+    'recommendedLearning',
+  ]) {
+    if (!isStringArray(value[key])) errors.push(key);
+  }
+  if (!Array.isArray(value.strengths)) {
+    errors.push('strengths');
+  } else {
+    value.strengths.forEach((entry, index) => {
+      if (!isJsonObject(entry) || typeof entry.skill !== 'string' || typeof entry.note !== 'string') {
+        errors.push(`strengths[${index}]`);
+      }
+    });
+  }
+  if (!Array.isArray(value.criticalGaps)) {
+    errors.push('criticalGaps');
+  } else {
+    value.criticalGaps.forEach((entry, index) => {
+      if (
+        !isJsonObject(entry) ||
+        typeof entry.skill !== 'string' ||
+        !isNumberInRange(entry.current) ||
+        !isNumberInRange(entry.target) ||
+        typeof entry.reason !== 'string'
+      ) {
+        errors.push(`criticalGaps[${index}]`);
+      }
+    });
+  }
+  if (!isJsonObject(value.nextBestAction)) {
+    errors.push('nextBestAction');
+  } else {
+    for (const key of ['title', 'description', 'reason']) {
+      if (typeof value.nextBestAction[key] !== 'string') {
+        errors.push(`nextBestAction.${key}`);
+      }
+    }
+    if (!['task', 'course', 'project', 'cv'].includes(String(value.nextBestAction.actionType))) {
+      errors.push('nextBestAction.actionType');
+    }
+  }
+  return errors;
+}
+
+function validateInterviewPayload(value: unknown): string[] {
+  if (!isJsonObject(value)) return ['response is not an object'];
+  const errors: string[] = [];
+  if (!isNumberInRange(value.score)) errors.push('score');
+  for (const key of ['strengths', 'improvements']) {
+    if (!isStringArray(value[key])) errors.push(key);
+  }
+  if (!isJsonObject(value.starEvaluation)) {
+    errors.push('starEvaluation');
+  } else {
+    for (const key of ['situation', 'task', 'action', 'result']) {
+      if (typeof value.starEvaluation[key] !== 'string') {
+        errors.push(`starEvaluation.${key}`);
+      }
+    }
+  }
+  if (typeof value.suggestedAnswer !== 'string') errors.push('suggestedAnswer');
+  return errors;
+}
+
+function validateSummaryPayload(value: unknown): string[] {
+  if (!isJsonObject(value)) return ['response is not an object'];
+  if (typeof value.suggestedSummary !== 'string' || value.suggestedSummary.trim().length < 50) {
+    return ['suggestedSummary'];
+  }
+  return [];
+}
+
+function validateCoverLetterPayload(value: unknown): string[] {
+  if (!isJsonObject(value)) return ['response is not an object'];
+  const errors: string[] = [];
+  if (typeof value.coverLetter !== 'string' || value.coverLetter.trim().length < 100) {
+    errors.push('coverLetter');
+  }
+  if (!isStringArray(value.keyHighlights)) errors.push('keyHighlights');
+  return errors;
+}
 
 // Health Check
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -683,11 +892,15 @@ Return only valid JSON.`;
     let parsedCV: any;
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: parsePrompt,
         config: { responseMimeType: 'application/json' },
       });
       parsedCV = JSON.parse(response.text || '{}');
+      const parsedCvErrors = validateParsedCvPayload(parsedCV);
+      if (parsedCvErrors.length > 0) {
+        throw new Error(`Invalid parsed CV payload: ${parsedCvErrors.join(', ')}`);
+      }
     } catch (e) {
       // Never fabricate a parsed CV. Returning invented employers, degrees or
       // contact details would persist false personal data as the user's own.
@@ -728,11 +941,15 @@ Return only valid JSON.`;
     let atsAnalysis: any = null;
     try {
       const atsRes = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: atsPrompt,
         config: { responseMimeType: 'application/json' },
       });
       atsAnalysis = JSON.parse(atsRes.text || '{}');
+      const atsErrors = validateAtsPayload(atsAnalysis);
+      if (atsErrors.length > 0) {
+        throw new Error(`Invalid ATS payload: ${atsErrors.join(', ')}`);
+      }
     } catch (e) {
       // The CV itself was parsed successfully. Store it without an ATS
       // analysis rather than returning an invented score.
@@ -888,7 +1105,7 @@ Rules:
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: userPrompt,
         config: {
           systemInstruction,
@@ -975,11 +1192,20 @@ Return valid JSON schema:
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
-      return res.json(JSON.parse(response.text || '{}'));
+      const payload = JSON.parse(response.text || '{}');
+      const payloadErrors = validateCareerAnalysisPayload(payload);
+      if (payloadErrors.length > 0) {
+        console.error('Career analysis returned an invalid payload:', payloadErrors);
+        return res.status(503).json({
+          error:
+            'Career analysis returned an invalid response. No analysis was accepted; please try again shortly.',
+        });
+      }
+      return res.json(payload);
     } catch (e) {
       // Never fabricate a career analysis. A made-up match percentage and
       // invented skill gaps would be indistinguishable from a real result.
@@ -1011,11 +1237,20 @@ Return JSON schema:
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
-      return res.json(JSON.parse(response.text || '{}'));
+      const payload = JSON.parse(response.text || '{}');
+      const payloadErrors = validateAtsPayload(payload);
+      if (payloadErrors.length > 0) {
+        console.error('CV optimization returned an invalid payload:', payloadErrors);
+        return res.status(503).json({
+          error:
+            'CV analysis returned an invalid response. No ATS analysis was accepted; please try again shortly.',
+        });
+      }
+      return res.json(payload);
     } catch (e) {
       // An invented ATS score and invented "improvements" would be actively
       // harmful: the user could rewrite a CV around a fabricated diagnosis.
@@ -1048,11 +1283,20 @@ Return JSON schema:
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
-      return res.json(JSON.parse(response.text || '{}'));
+      const payload = JSON.parse(response.text || '{}');
+      const payloadErrors = validateInterviewPayload(payload);
+      if (payloadErrors.length > 0) {
+        console.error('Interview evaluation returned an invalid payload:', payloadErrors);
+        return res.status(503).json({
+          error:
+            'Interview evaluation returned an invalid response. No feedback was accepted; please try again shortly.',
+        });
+      }
+      return res.json(payload);
     } catch (e) {
       // A fabricated score and a fabricated "model answer" would teach the
       // candidate nothing and could be mistaken for feedback on their answer.
@@ -1086,11 +1330,20 @@ Requirements:
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
-      return res.json(JSON.parse(response.text || '{}'));
+      const payload = JSON.parse(response.text || '{}');
+      const payloadErrors = validateSummaryPayload(payload);
+      if (payloadErrors.length > 0) {
+        console.error('Summary suggestion returned an invalid payload:', payloadErrors);
+        return res.status(503).json({
+          error:
+            'Summary generation returned an invalid response. No summary was accepted; please try again shortly.',
+        });
+      }
+      return res.json(payload);
     } catch (e) {
       // Do not return a generic paragraph as if the model had written it for
       // this candidate. The caller must know that no suggestion was produced.
@@ -1128,11 +1381,20 @@ Rules:
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
-      return res.json(JSON.parse(response.text || '{}'));
+      const payload = JSON.parse(response.text || '{}');
+      const payloadErrors = validateCoverLetterPayload(payload);
+      if (payloadErrors.length > 0) {
+        console.error('Cover letter returned an invalid payload:', payloadErrors);
+        return res.status(503).json({
+          error:
+            'Cover letter generation returned an invalid response. No cover letter was accepted; please try again shortly.',
+        });
+      }
+      return res.json(payload);
     } catch (e) {
       // A cover letter full of claims the candidate never supplied is the most
       // dangerous fallback in the product: it could be sent to an employer.
@@ -3260,6 +3522,7 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
     } else {
       result = await enrichRecommendationsWithAi(deterministic, built.context, {
         ai: process.env.GEMINI_API_KEY ? ai : null,
+        model: GEMINI_MODEL,
       });
     }
 
