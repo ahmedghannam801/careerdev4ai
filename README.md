@@ -12,9 +12,10 @@ Applications pipeline.
 ## Stack
 
 - React 19 + TypeScript + Vite 8 + Tailwind CSS 4
-- Express 4, executed with `tsx` (`server.ts`)
+- Express 4, executed with `tsx` for Node (`server.ts`) and bundled into a
+  Cloudflare Pages advanced-mode Worker (`dist/_worker.js`) for production
 - Supabase Auth, PostgreSQL, and Storage
-- Google Gemini (`@google/genai`) for the AI features
+- Google Gemini (`@google/genai`, web build) for the AI features
 
 ## Prerequisites
 
@@ -44,7 +45,6 @@ GEMINI_API_KEY=<key>            # AI routes return 503 without it
 GEMINI_MODEL=gemini-3.8-flash   # optional override
 PORT=3000
 ALLOWED_ORIGINS=                # comma-separated extra browser origins
-APP_URL=
 ```
 
 Rules:
@@ -93,13 +93,74 @@ so the API and the browser app share one origin.
 | --- | --- |
 | `npm run dev` | Start Express + Vite on port 3000 |
 | `npm start` | Start the server without Vite (use with a built `dist/`) |
-| `npm run build` | Build the browser bundle into `dist/` |
+| `npm run build` | Build the browser bundle and the Pages Worker into `dist/` |
 | `npm run lint` | Type-check the project with `tsc --noEmit` |
 | `npm test` | Run the integration test suite |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run preview` | Preview the Vite build |
 
-## Production
+## Deploy to Cloudflare Pages
+
+The production target is Cloudflare Pages, project `careerpilotai`:
+
+<https://careerpilotai.pages.dev>
+
+`npm run build` produces two things in `dist/`:
+
+- the static React bundle (`index.html`, `assets/`, `theme-init.js`, `_headers`)
+- `dist/_worker.js`, a single bundled Worker that serves the static assets and
+  forwards `/api/*` to the same Express application used locally
+
+`_worker.js` makes this a Pages **advanced mode** project. That is deliberate:
+the standard `functions/` bundler substitutes Node built-ins with `unenv`, whose
+`node:http` throws `http.createServer is not implemented yet!`, so Express
+cannot run there. Advanced mode is deployed as a normal Worker module, and a
+compatibility date of 2026-09-01 (the value in `wrangler.jsonc`) enables
+Node.js compatibility by default and gives it the runtime's real `node:http`
+implementation.
+
+```bash
+npm ci
+npm run build
+npx wrangler pages deploy dist --project-name careerpilotai
+```
+
+Configure these in the Pages project (Settings → Environment variables) for
+**both** Production and Preview:
+
+| Variable | Scope | Notes |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | build + client | inlined into the browser bundle |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | build + client | anon/publishable key only |
+| `SUPABASE_URL` | server | |
+| `SUPABASE_ANON_KEY` | server | verifies caller access tokens |
+| `SUPABASE_SERVICE_ROLE_KEY` | server | never expose or prefix with `VITE_` |
+| `GEMINI_API_KEY` | server | AI routes return `503` without it |
+| `GEMINI_MODEL` | server | optional |
+| `ALLOWED_ORIGINS` | server | optional, comma-separated |
+
+Supabase Auth must also be configured (Authentication → URL Configuration):
+
+- **Site URL**: `https://careerpilotai.pages.dev`
+- **Redirect URLs**: `https://careerpilotai.pages.dev/**`,
+  `https://*.careerpilotai.pages.dev/**` for previews, and
+  `http://localhost:3000/**` for local development
+- **Providers**: enable Google and LinkedIn (OIDC). GitHub is intentionally not
+  offered by the app and should stay disabled.
+
+Verify the production build locally before deploying:
+
+```bash
+npx wrangler pages dev dist          # loads .env, serves on http://localhost:8788
+curl http://localhost:8788/api/health
+```
+
+`GET /api/health` answers JSON, unknown `/api/*` paths answer JSON `404`, and
+`/api/profile` answers `401` without a session.
+
+### Node fallback
+
+The app can still be hosted as a plain Node process:
 
 ```bash
 npm install
@@ -107,20 +168,14 @@ npm run build
 NODE_ENV=production npm start
 ```
 
-In production the server serves `dist/` and falls back to `index.html` for
+`server.ts` loads `.env`, serves `dist/` and falls back to `index.html` for
 client-side routes. Unknown `/api/*` paths return JSON `404` instead of HTML.
-`tsx` is a runtime dependency because the server is executed from TypeScript
-source.
+`tsx` is a runtime dependency because the Node entry is executed from
+TypeScript source. Put the process behind HTTPS and provide every variable
+through the host's secret manager.
 
-Deployment notes:
-
-- Set `NODE_ENV=production` so Vite middleware is not loaded.
-- Provide all Supabase variables through the host's secret manager, not a
-  committed file.
-- Put the service behind HTTPS. The app sets baseline security headers but does
-  not define a Content-Security-Policy yet; add and test one before exposing
-  third-party embeds.
-- Health check: `GET /api/health`.
+The document-level Content-Security-Policy and HSTS live in
+`public/_headers`; the API adds its own baseline headers in `app.ts`.
 
 ## AI behaviour
 
@@ -140,9 +195,13 @@ data — never production credentials.
 ## Project layout
 
 ```text
-server.ts                 Express app, API routes, Vite/static serving
+app.ts                    Express application and every API route
+server.ts                 Node entry point (dotenv, Vite/static serving, listen)
+worker/index.ts           Cloudflare Pages advanced-mode entry point
+scripts/build-worker.mjs  Bundles worker/index.ts into dist/_worker.js
 server/auth/              Supabase token verification and route guard
 server/db/                One module per persisted domain
+server/shims/             Small Node-built-in replacements used by the Worker bundle
 src/context/              Application state, auth session, hydration
 src/components/views/     Authenticated product views
 src/lib/                  API clients and Supabase browser client

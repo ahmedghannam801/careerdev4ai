@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode, useMemo } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   CareerState,
@@ -263,6 +263,13 @@ interface CareerContextType {
   isHydrated: boolean;
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
+  /**
+   * A message from a failed OAuth / email-confirmation redirect (for example
+   * "Email link is invalid or has expired"). The provider opens the auth modal
+   * and the modal shows this until it is dismissed.
+   */
+  authRedirectError: string | null;
+  clearAuthRedirectError: () => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -601,6 +608,44 @@ function toUserAccount(
     token,
     createdAt: meta.created_at || new Date().toISOString(),
   };
+}
+
+// Reads an OAuth / email-confirmation error that Supabase appended to the
+// return URL, removes it from the address bar, and returns a human-readable
+// message. Query parameters are used by PKCE OAuth and email links; the hash is
+// also checked because some providers still return implicit-flow errors there.
+// The hash is only rewritten when it actually contains error parameters, so a
+// valid `#/route` or `type=recovery` fragment is never damaged.
+function consumeAuthRedirectError(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+  const read = (key: string) => search.get(key) ?? hash.get(key);
+  const raw = read('error_description') ?? read('error');
+  if (!raw) return null;
+
+  const code = read('error_code');
+  const message =
+    code === 'otp_expired'
+      ? 'That sign-in link has expired. Request a new one and try again.'
+      : raw.replace(/\+/g, ' ');
+
+  for (const key of ['error', 'error_code', 'error_description']) {
+    search.delete(key);
+    hash.delete(key);
+  }
+
+  const nextSearch = search.toString();
+  const nextUrl =
+    window.location.pathname +
+    (nextSearch ? `?${nextSearch}` : '') +
+    (window.location.hash.includes('error=') && hash.toString() ? `#${hash.toString()}` : window.location.hash);
+
+  // `replaceState` avoids adding an entry the Back button would return to.
+  window.history.replaceState({}, '', nextUrl);
+  return message;
 }
 
 // ---- DTO -> local domain type mappers (B.3.6) ----
@@ -1323,7 +1368,22 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [authToken]);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authRedirectError, setAuthRedirectError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('dashboard');
+
+  // Surface an OAuth / confirmation-link failure that Supabase appended to the
+  // return URL. Without this the visitor lands on the dashboard, silently
+  // signed out, with no explanation. Runs once on mount, before the user can
+  // interact with the app.
+  useEffect(() => {
+    const message = consumeAuthRedirectError();
+    if (message) {
+      setAuthRedirectError(message);
+      setAuthModalOpen(true);
+    }
+  }, []);
+
+  const clearAuthRedirectError = useCallback(() => setAuthRedirectError(null), []);
 
   // The Copilot drawer is part of the authenticated shell, but the dashboard
   // also opens it. The open flag therefore lives in the shared context rather
@@ -2467,6 +2527,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           // Display name is carried in user metadata; the authoritative id is
           // always auth.users.id (== public.profiles.id).
           data: { name },
+          // Send the confirmation link back to the deployed origin instead of
+          // relying on the project's dashboard default. This works for the
+          // Cloudflare Pages URL, preview deployments and localhost, provided
+          // each origin is allowlisted in Supabase Auth → URL Configuration.
+          emailRedirectTo: window.location.origin,
         },
       });
       if (error) {
@@ -3961,6 +4026,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         isHydrated,
         authModalOpen,
         setAuthModalOpen,
+        authRedirectError,
+        clearAuthRedirectError,
         login,
         register,
         logout,

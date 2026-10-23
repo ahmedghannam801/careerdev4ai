@@ -30,7 +30,9 @@
   "include": [
     "src",
     "server",
-    "server.ts"
+    "server.ts",
+    "app.ts",
+    "worker"
   ],
   "exclude": [
     "dist"

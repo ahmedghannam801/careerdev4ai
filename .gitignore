@@ -16,5 +16,9 @@ local_db/
 *.tmp
 *.upload
 
+# Local Cloudflare/Wrangler state and scratch QA artifacts (never shipped).
+.wrangler/
+.tmp-qa/
+
 # Local Supabase CLI state (project ref, pooler URL — machine specific)
 supabase/.temp/
