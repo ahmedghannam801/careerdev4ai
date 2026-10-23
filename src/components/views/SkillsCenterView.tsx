@@ -60,7 +60,7 @@ export const SkillsCenterView: React.FC = () => {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
           <Plus className="w-4 h-4" />
           <span>Add Custom Skill</span>
@@ -73,7 +73,7 @@ export const SkillsCenterView: React.FC = () => {
           onClick={() => setSelectedCategory('all')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
             selectedCategory === 'all'
-              ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
               : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -85,7 +85,7 @@ export const SkillsCenterView: React.FC = () => {
             onClick={() => setSelectedCategory(cat)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
               selectedCategory === cat
-                ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+                ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
                 : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -116,7 +116,7 @@ export const SkillsCenterView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-[var(--text-primary)]">{skill.name}</span>
                     {skill.evidenceIds.length > 0 && (
-                      <span className="text-[10px] text-[var(--color-success)] font-medium">· Verified</span>
+                      <span className="text-[10px] text-[var(--color-success-strong)] font-medium">· Verified</span>
                     )}
                   </div>
                   <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
@@ -157,7 +157,7 @@ export const SkillsCenterView: React.FC = () => {
                     </div>
                   ) : (
                     <div className="text-right">
-                      <div className="text-xs font-mono font-bold text-[var(--color-success)] flex items-center gap-1">
+                      <div className="text-xs font-mono font-bold text-[var(--color-success-strong)] flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Target Satisfied</span>
                       </div>
@@ -254,7 +254,7 @@ export const SkillsCenterView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold hover:bg-[var(--accent-secondary)]"
+                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)]"
                 >
                   Save Skill
                 </button>

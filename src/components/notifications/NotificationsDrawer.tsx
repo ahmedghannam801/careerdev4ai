@@ -17,10 +17,10 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
     <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[380px] bg-[var(--surface-main)] border-l border-[var(--border-subtle)] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
       <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Bell className="w-4 h-4 text-[var(--accent-primary)]" />
+          <Bell className="w-4 h-4 text-[var(--color-primary-text)]" />
           <span className="text-sm font-semibold text-[var(--text-primary)]">Notifications</span>
           {notifications.filter(n => !n.read).length > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--accent-surface)] text-[var(--accent-primary)] font-medium">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-medium">
               {notifications.filter(n => !n.read).length} new
             </span>
           )}
@@ -60,15 +60,15 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 font-medium text-xs">
-                  {n.type === 'interview' && <Calendar className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
+                  {n.type === 'interview' && <Calendar className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />}
                   {n.type === 'roadmap' && <AlertCircle className="w-3.5 h-3.5 text-[var(--color-warning)]" />}
-                  {n.type === 'skill' && <Award className="w-3.5 h-3.5 text-[var(--color-success)]" />}
+                  {n.type === 'skill' && <Award className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />}
                   <span>{n.title}</span>
                 </div>
                 {!n.read && (
                   <button
                     onClick={() => markNotificationRead(n.id)}
-                    className="p-0.5 text-[var(--text-muted)] hover:text-[var(--accent-primary)]"
+                    className="p-0.5 text-[var(--text-muted)] hover:text-[var(--color-primary-text)]"
                     title="Mark read"
                   >
                     <Check className="w-3.5 h-3.5" />
@@ -81,7 +81,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                 {n.linkAction && (
                   <button
                     onClick={() => { onNavigate(n.linkAction!); onClose(); }}
-                    className="text-[var(--accent-primary)] hover:underline font-medium"
+                    className="text-[var(--color-primary-text)] hover:underline font-medium"
                   >
                     Take Action →
                   </button>

@@ -99,7 +99,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             onClick={() => handleNavClick('dashboard')}
             className="flex items-center gap-2.5 text-left group"
           >
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-white flex items-center justify-center font-bold text-sm shadow-xs group-hover:bg-[var(--accent-secondary)] transition-colors">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-sm shadow-xs group-hover:bg-[var(--accent-secondary)] transition-colors">
               CP
             </div>
             <div>
@@ -130,11 +130,11 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                   onClick={() => handleNavClick(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                     isActive
-                      ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)] font-semibold shadow-2xs'
+                      ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold shadow-2xs'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--accent-primary)]' : 'text-[var(--text-muted)]'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--text-muted)]'}`} />
                   <span className="truncate">{item.label}</span>
                 </button>
               );
@@ -156,11 +156,11 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                   onClick={() => handleNavClick(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                     isActive
-                      ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)] font-semibold shadow-2xs'
+                      ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold shadow-2xs'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--accent-primary)]' : 'text-[var(--text-muted)]'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--text-muted)]'}`} />
                   <span className="truncate">{item.label}</span>
                 </button>
               );
@@ -172,7 +172,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-2">
           <button
             onClick={() => setCopilotOpen(true)}
-            className="w-full py-2.5 px-3 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
+            className="w-full py-2.5 px-3 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>{t('askCopilot')}</span>
@@ -198,7 +198,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 </div>
               </div>
             </div>
-            <span className="text-[10px] font-mono text-emerald-500 font-bold shrink-0">
+            <span className="text-[10px] font-mono text-[var(--color-success-strong)] font-bold shrink-0">
               ●
             </span>
           </button>
@@ -260,7 +260,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]"
               title="Toggle Theme"
             >
-              {settings.theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+              {settings.theme === 'dark' ? <Sun className="w-4 h-4 text-[var(--color-accent)]" /> : <Moon className="w-4 h-4" />}
             </button>
 
             {/* Notifications */}
@@ -289,7 +289,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <span className="w-7 h-7 rounded-full bg-[var(--accent-surface)] text-[var(--accent-primary)] flex items-center justify-center text-[10px] font-bold border border-[var(--border-subtle)]">
+                <span className="w-7 h-7 rounded-full bg-[var(--accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center text-[10px] font-bold border border-[var(--border-subtle)]">
                   {displayName.slice(0, 1).toUpperCase()}
                 </span>
               )}
@@ -341,7 +341,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                     </button>
                     <button
                       onClick={() => { setUserMenuOpen(false); logout(); }}
-                      className="w-full px-4 py-2.5 text-left text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center gap-2 border-t border-[var(--border-subtle)]"
+                      className="w-full px-4 py-2.5 text-left text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 flex items-center gap-2 border-t border-[var(--border-subtle)]"
                       data-testid="logout-button"
                     >
                       <LogOut className="w-3.5 h-3.5" />
@@ -367,7 +367,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <div className="space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-[var(--accent-primary)] text-white flex items-center justify-center font-bold text-xs">
+                  <div className="w-7 h-7 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-xs">
                     CP
                   </div>
                   <span className="font-bold text-sm text-[var(--text-primary)]">CareerPilot AI</span>
@@ -391,7 +391,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                       onClick={() => handleNavClick(item.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                         isActive
-                          ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)] font-semibold'
+                          ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
                       }`}
                     >
@@ -411,7 +411,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                       onClick={() => handleNavClick(item.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                         isActive
-                          ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)] font-semibold'
+                          ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
                       }`}
                     >
@@ -426,14 +426,14 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <div className="space-y-2">
               <button
                 onClick={() => { setCopilotOpen(true); setMobileMenuOpen(false); }}
-                className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] text-white text-xs font-semibold flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>{t('askCopilot')}</span>
               </button>
               <button
                 onClick={() => { setMobileMenuOpen(false); logout(); }}
-                className="w-full py-2.5 rounded-xl border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl border border-[var(--color-danger)]/30 text-[var(--color-danger)] text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sign out</span>
@@ -459,7 +459,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg ${
-                isActive ? 'text-[var(--accent-primary)] font-bold' : 'text-[var(--text-muted)]'
+                isActive ? 'text-[var(--color-primary-text)] font-bold' : 'text-[var(--text-muted)]'
               }`}
             >
               <Icon className="w-4 h-4" />

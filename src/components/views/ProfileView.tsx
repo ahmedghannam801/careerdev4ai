@@ -513,7 +513,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               />
               <button
                 onClick={() => setEditBasicOpen(true)}
-                className="absolute -bottom-2 -right-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] shadow-xs"
+                className="absolute -bottom-2 -right-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] shadow-xs"
                 title="Change Photo / Edit Profile"
               >
                 <Camera className="w-3.5 h-3.5" />
@@ -536,14 +536,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   </span>
                 )}
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                  profile.isPublic ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600'
+                  profile.isPublic ? 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
                 }`}>
                   {profile.isPublic ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                   {profile.isPublic ? 'Public Profile' : 'Private'}
                 </span>
               </div>
 
-              <p className="text-sm font-medium text-[var(--accent-primary)]">
+              <p className="text-sm font-medium text-[var(--color-primary-text)]">
                 {profile.headline || profile.currentTitle}
               </p>
 
@@ -581,7 +581,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 className="flex-1 md:flex-none px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
                 title="Copy shareable link"
               >
-                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Share2 className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-[var(--color-success-strong)]" /> : <Share2 className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
                 <span>{copiedLink ? 'Copied Link' : 'Share'}</span>
               </button>
             )}
@@ -611,7 +611,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 });
                 setEditBasicOpen(true);
               }}
-              className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+              className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
             >
               <Edit3 className="w-3.5 h-3.5" />
               <span>Edit Profile</span>
@@ -637,9 +637,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             </span>
           </div>
 
-          <div className="w-full h-2 rounded-full bg-[var(--surface-secondary)] overflow-hidden">
+          <div className="w-full h-2 rounded-full bg-[var(--color-progress-track)] overflow-hidden">
             <div 
-              className="h-full rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-emerald-500 transition-all duration-500"
+              className="h-full rounded-full bg-[var(--color-progress-strong)] transition-all duration-500"
               style={{ width: `${profileCompleteness.overallPercent}%` }}
             />
           </div>
@@ -661,11 +661,11 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                       onNavigate(item.targetView);
                     }
                   }}
-                  className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] border border-[var(--border-subtle)] transition-colors flex items-center gap-1.5"
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] border border-[var(--border-subtle)] transition-colors flex items-center gap-1.5"
                 >
-                  <Plus className="w-3 h-3 text-[var(--accent-primary)]" />
+                  <Plus className="w-3 h-3 text-[var(--color-primary-text)]" />
                   <span>{item.label}</span>
-                  <span className="text-[10px] text-emerald-600 font-mono">+{item.impactWeight}%</span>
+                  <span className="text-[10px] text-[var(--color-success-strong)] font-mono">+{item.impactWeight}%</span>
                 </button>
               ))}
             </div>
@@ -677,7 +677,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent-surface)] text-[var(--accent-primary)] flex items-center justify-center font-bold text-sm">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center font-bold text-sm">
               CI
             </div>
             <div>
@@ -691,7 +691,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
           <button 
             onClick={() => onNavigate('my-career')}
-            className="text-xs font-semibold text-[var(--accent-primary)] hover:underline flex items-center gap-1"
+            className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline flex items-center gap-1"
           >
             <span>Open My Career</span>
             <ExternalLink className="w-3 h-3" />
@@ -709,7 +709,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent-primary)]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
               Where You're Going
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
@@ -727,7 +727,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-warning)]">
               What You're Missing
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
@@ -736,7 +736,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-success-strong)]">
               What You're Building
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
@@ -745,7 +745,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-accent-strong)]">
               Where You're Applying
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
@@ -762,7 +762,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[var(--accent-primary)]" />
+            <FileText className="w-4 h-4 text-[var(--color-primary-text)]" />
             <h2 className="text-base font-bold text-[var(--text-primary)]">
               Professional Summary
             </h2>
@@ -774,7 +774,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             }}
             className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+            <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
             <span>Refine / Suggest with AI</span>
           </button>
         </div>
@@ -788,14 +788,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <Briefcase className="w-4 h-4 text-[var(--accent-primary)]" />
+            <Briefcase className="w-4 h-4 text-[var(--color-primary-text)]" />
             <h2 className="text-base font-bold text-[var(--text-primary)]">
               Work Experience ({profile.experiences.length})
             </h2>
           </div>
           <button
             onClick={handleOpenAddExp}
-            className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1 transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Experience</span>
@@ -823,7 +823,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                         {exp.employmentType}
                       </span>
                     </div>
-                    <p className="text-xs font-medium text-[var(--accent-primary)]">
+                    <p className="text-xs font-medium text-[var(--color-primary-text)]">
                       {exp.company} • {exp.location}
                     </p>
                   </div>
@@ -838,7 +838,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     </button>
                     <button
                       onClick={() => handleDeleteExp(exp.id)}
-                      className="p-1.5 rounded-md hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-red-500"
+                      className="p-1.5 rounded-md hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--color-danger)]"
                       title="Delete entry"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -860,7 +860,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   <ul className="space-y-1 text-xs text-[var(--text-secondary)]">
                     {exp.achievements.map((ach, idx) => (
                       <li key={idx} className="flex items-start gap-2">
-                        <span className="text-[var(--accent-primary)] font-bold">•</span>
+                        <span className="text-[var(--color-primary-text)] font-bold">•</span>
                         <span>{ach}</span>
                       </li>
                     ))}
@@ -891,14 +891,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <GraduationCap className="w-4 h-4 text-[var(--accent-primary)]" />
+              <GraduationCap className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 Education ({profile.education.length})
               </h2>
             </div>
             <button
               onClick={handleOpenAddEdu}
-              className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--accent-primary)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
+              className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--color-primary-text)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
             >
               <Plus className="w-3 h-3" />
               <span>Add</span>
@@ -916,7 +916,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     <h3 className="text-xs font-bold text-[var(--text-primary)]">
                       {edu.degree} in {edu.field}
                     </h3>
-                    <p className="text-xs text-[var(--accent-primary)] font-medium">
+                    <p className="text-xs text-[var(--color-primary-text)] font-medium">
                       {edu.institution}
                     </p>
                   </div>
@@ -924,7 +924,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     <button onClick={() => handleOpenEditEdu(edu)} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                       <Edit3 className="w-3 h-3" />
                     </button>
-                    <button onClick={() => handleDeleteEdu(edu.id)} className="p-1 text-[var(--text-muted)] hover:text-red-500">
+                    <button onClick={() => handleDeleteEdu(edu.id)} className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)]">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -946,7 +946,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <Award className="w-4 h-4 text-[var(--accent-primary)]" />
+              <Award className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 Certifications ({profile.certifications.length})
               </h2>
@@ -964,7 +964,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 });
                 setCertModalOpen(true);
               }}
-              className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--accent-primary)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
+              className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--color-primary-text)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
             >
               <Plus className="w-3 h-3" />
               <span>Add</span>
@@ -982,12 +982,12 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     <h3 className="text-xs font-bold text-[var(--text-primary)]">
                       {cert.name}
                     </h3>
-                    <p className="text-xs text-[var(--accent-primary)] font-medium">
+                    <p className="text-xs text-[var(--color-primary-text)] font-medium">
                       {cert.provider} • Issued {cert.issueDate}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => handleDeleteCert(cert.id)} className="p-1 text-[var(--text-muted)] hover:text-red-500">
+                    <button onClick={() => handleDeleteCert(cert.id)} className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)]">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -1002,7 +1002,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     href={cert.credentialUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] text-[var(--accent-primary)] hover:underline flex items-center gap-1"
+                    className="text-[11px] text-[var(--color-primary-text)] hover:underline flex items-center gap-1"
                   >
                     <span>Verify Credential</span>
                     <ExternalLink className="w-3 h-3" />
@@ -1020,14 +1020,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <Languages className="w-4 h-4 text-[var(--accent-primary)]" />
+              <Languages className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 Languages ({profile.languages.length})
               </h2>
             </div>
             <button
               onClick={() => setLangModalOpen(true)}
-              className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--accent-primary)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
+              className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--color-primary-text)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
             >
               <Plus className="w-3 h-3" />
               <span>Add</span>
@@ -1050,7 +1050,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 </div>
                 <button 
                   onClick={() => handleDeleteLang(l.id)}
-                  className="p-1 text-[var(--text-muted)] hover:text-red-500"
+                  className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)]"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -1063,14 +1063,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <LinkIcon className="w-4 h-4 text-[var(--accent-primary)]" />
+              <LinkIcon className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 Professional Links
               </h2>
             </div>
             <button
               onClick={() => setEditBasicOpen(true)}
-              className="text-xs font-semibold text-[var(--accent-primary)] hover:underline"
+              className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
             >
               Update Links
             </button>
@@ -1225,7 +1225,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono"
                   />
                   {usernameCheckMessage && (
-                    <p className={`text-[11px] mt-1 ${isUsernameValid ? 'text-emerald-500' : 'text-amber-500'}`}>
+                    <p className={`text-[11px] mt-1 ${isUsernameValid ? 'text-[var(--color-success-strong)]' : 'text-[var(--color-warning)]'}`}>
                       {usernameCheckMessage}
                     </p>
                   )}
@@ -1307,7 +1307,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleSaveBasic}
                 disabled={saving}
-                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
@@ -1322,7 +1322,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[var(--accent-primary)]" />
+                <Sparkles className="w-4 h-4 text-[var(--color-primary-text)]" />
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
                   AI Professional Summary Assistant
                 </h3>
@@ -1344,7 +1344,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 <button
                   onClick={handleGenerateSummary}
                   disabled={aiSummaryLoading}
-                  className="px-2.5 py-1 rounded-lg bg-[var(--accent-surface)] text-[var(--accent-primary)] text-xs font-semibold hover:bg-[var(--accent-primary)] hover:text-white transition-colors flex items-center gap-1 disabled:opacity-50"
+                  className="px-2.5 py-1 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold hover:bg-[var(--accent-primary)] hover:text-[var(--color-on-primary)] transition-colors flex items-center gap-1 disabled:opacity-50"
                 >
                   <Sparkles className="w-3 h-3" />
                   <span>{aiSummaryLoading ? 'Generating...' : 'Generate New Draft'}</span>
@@ -1372,7 +1372,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleConfirmSummary}
                 disabled={!aiSummaryDraft.trim() || saving}
-                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Approve & Save Summary'}
               </button>
@@ -1532,7 +1532,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleSaveExp}
                 disabled={!expForm.role || !expForm.company || saving}
-                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save Experience'}
               </button>
@@ -1547,7 +1547,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-[var(--accent-primary)]" />
+                <Eye className="w-4 h-4 text-[var(--color-primary-text)]" />
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
                   Executive Career Profile Preview
                 </h3>
@@ -1569,7 +1569,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   <h1 className="text-xl font-bold text-[var(--text-primary)]">
                     {profile.name}
                   </h1>
-                  <p className="text-xs font-semibold text-[var(--accent-primary)]">
+                  <p className="text-xs font-semibold text-[var(--color-primary-text)]">
                     {profile.headline || profile.currentTitle}
                   </p>
                   <p className="text-xs text-[var(--text-secondary)]">
@@ -1629,7 +1629,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="flex justify-end">
               <button
                 onClick={() => setPreviewModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold"
               >
                 Close Preview
               </button>
@@ -1716,7 +1716,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleSaveEdu}
                 disabled={saving}
-                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
@@ -1794,7 +1794,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleSaveCert}
                 disabled={saving}
-                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
@@ -1840,7 +1840,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleSaveLang}
                 disabled={saving}
-                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Add'}
               </button>

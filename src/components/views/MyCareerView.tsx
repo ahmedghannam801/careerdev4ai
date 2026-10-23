@@ -290,7 +290,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--accent-primary)] text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold">
               <Compass className="w-3.5 h-3.5" />
               <span>Career Journey Command</span>
             </div>
@@ -298,7 +298,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               Where Am I in My Career Journey?
             </h1>
             <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-2xl">
-              You are currently transitioning from <strong className="text-[var(--text-primary)] capitalize">{profile.careerState.replace('_', ' ')}</strong> to a verified <strong className="text-[var(--accent-primary)]">{targetRole.title}</strong>. Your current market match is at <strong className="text-emerald-500">{analysis.matchPercentage}%</strong> with {interviewCount} active interview {interviewCount === 1 ? 'pipeline' : 'pipelines'}.
+              You are currently transitioning from <strong className="text-[var(--text-primary)] capitalize">{profile.careerState.replace('_', ' ')}</strong> to a verified <strong className="text-[var(--color-primary-text)]">{targetRole.title}</strong>. Your current market match is at <strong className="text-[var(--color-success-strong)]">{analysis.matchPercentage}%</strong> with {interviewCount} active interview {interviewCount === 1 ? 'pipeline' : 'pipelines'}.
             </p>
           </div>
 
@@ -311,7 +311,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             </button>
             <button
               onClick={() => onNavigate('roadmap')}
-              className="px-4 py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+              className="px-4 py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
             >
               <span>View Active Roadmap</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -333,7 +333,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                   step.active 
                     ? 'bg-[var(--accent-surface)] border-[var(--accent-primary)] shadow-xs scale-102 ring-1 ring-[var(--accent-primary)]'
                     : step.done
-                    ? 'bg-[var(--surface-main)] border-emerald-500/40 text-[var(--text-primary)]'
+                    ? 'bg-[var(--surface-main)] border-[var(--color-success-strong)]/40 text-[var(--text-primary)]'
                     : 'bg-[var(--surface-secondary)]/40 border-[var(--border-subtle)] opacity-70'
                 }`}
               >
@@ -348,7 +348,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 </div>
                 <div className="mt-2 flex justify-center">
                   {step.done ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />
                   ) : step.active ? (
                     <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-primary)] animate-ping" />
                   ) : (
@@ -365,7 +365,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <AlertTriangle className="w-4 h-4 text-[var(--color-warning)]" />
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 What's Blocking You?
@@ -375,7 +375,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               </p>
             </div>
           </div>
-          <span className="text-xs font-mono text-amber-500 font-semibold px-2 py-0.5 rounded bg-amber-500/10">
+          <span className="text-xs font-mono text-[var(--color-warning)] font-semibold px-2 py-0.5 rounded bg-[var(--color-warning)]/10">
             {careerBlockers.length} Active Blockers
           </span>
         </div>
@@ -384,11 +384,11 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
           {careerBlockers.map(blocker => (
             <div 
               key={blocker.id}
-              className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 flex flex-col justify-between space-y-3"
+              className="p-4 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/5 flex flex-col justify-between space-y-3"
             >
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 font-mono">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--color-warning)]/20 text-[var(--color-warning)] font-mono">
                     {blocker.severity} Priority
                   </span>
                   <h3 className="text-xs font-bold text-[var(--text-primary)]">
@@ -402,7 +402,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
 
               <button
                 onClick={() => onNavigate(blocker.ctaView)}
-                className="self-start px-3 py-1.5 rounded-lg bg-[var(--surface-main)] hover:bg-[var(--accent-primary)] hover:text-white border border-[var(--border-subtle)] text-xs font-semibold text-[var(--accent-primary)] flex items-center gap-1.5 transition-colors shadow-2xs"
+                className="self-start px-3 py-1.5 rounded-lg bg-[var(--surface-main)] hover:bg-[var(--accent-primary)] hover:text-[var(--color-on-primary)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--color-primary-text)] flex items-center gap-1.5 transition-colors shadow-2xs"
               >
                 <span>{blocker.ctaText}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -416,7 +416,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-6">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <Target className="w-4 h-4 text-[var(--accent-primary)]" />
+            <Target className="w-4 h-4 text-[var(--color-primary-text)]" />
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 Career Goals Management
@@ -428,7 +428,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
           </div>
           <button
             onClick={() => setAddGoalModalOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1 transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Secondary Goal</span>
@@ -439,7 +439,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         <div className="p-5 rounded-xl border-2 border-[var(--accent-primary)]/40 bg-[var(--accent-surface)]/20 space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent-primary)] font-mono">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)] font-mono">
                 Primary Goal
               </span>
               <h3 className="text-base font-bold text-[var(--text-primary)]">
@@ -449,14 +449,14 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 {primaryGoalDescription}
               </p>
             </div>
-            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 font-mono">
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--color-success-surface)] text-[var(--color-success-strong)] font-mono">
               Role Match ({analysis.matchPercentage}%)
             </span>
           </div>
 
-          <div className="w-full h-2 rounded-full bg-[var(--surface-secondary)] overflow-hidden">
+          <div className="w-full h-2 rounded-full bg-[var(--color-progress-track)] overflow-hidden">
             <div
-              className="h-full bg-[var(--accent-primary)] rounded-full"
+              className="h-full bg-[var(--color-progress-strong)] rounded-full"
               style={{ width: `${analysis.matchPercentage}%` }}
             />
           </div>
@@ -494,7 +494,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 </div>
                 <button
                   onClick={() => deleteSecondaryGoal(goal.id)}
-                  className="p-1 text-[var(--text-muted)] hover:text-red-500"
+                  className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)]"
                   title="Remove goal"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -506,9 +506,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                   <span>Connected Progress</span>
                   <span className="font-mono font-bold text-[var(--text-primary)]">{goal.progressPercent}%</span>
                 </div>
-                <div className="w-full h-1.5 rounded-full bg-[var(--surface-secondary)] overflow-hidden">
+                <div className="w-full h-1.5 rounded-full bg-[var(--color-progress-track)] overflow-hidden">
                   <div 
-                    className="h-full rounded-full bg-[var(--accent-primary)]"
+                    className="h-full rounded-full bg-[var(--color-progress-strong)]"
                     style={{ width: `${goal.progressPercent}%` }}
                   />
                 </div>
@@ -528,7 +528,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <ShieldCheck className="w-4 h-4 text-[var(--color-success-strong)]" />
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 Career Asset Scorecard
@@ -551,8 +551,8 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 <h4 className="text-xs font-bold text-[var(--text-primary)]">{asset.name}</h4>
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                   asset.status === 'Complete' 
-                    ? 'bg-emerald-500/10 text-emerald-600'
-                    : 'bg-amber-500/10 text-amber-600'
+                    ? 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
+                    : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
                 }`}>
                   {asset.status}
                 </span>
@@ -569,14 +569,14 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         <div className="lg:col-span-1 p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-amber-400" />
+              <Star className="w-4 h-4 text-[var(--color-accent-strong)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 Milestones ({milestones.length})
               </h2>
             </div>
             <button
               onClick={() => setAddMilestoneModalOpen(true)}
-              className="p-1 rounded-md hover:bg-[var(--surface-secondary)] text-[var(--accent-primary)] font-bold text-xs"
+              className="p-1 rounded-md hover:bg-[var(--surface-secondary)] text-[var(--color-primary-text)] font-bold text-xs"
               title="Add Milestone"
             >
               <Plus className="w-4 h-4" />
@@ -591,7 +591,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[var(--text-primary)]">{m.title}</span>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
                   <span>{m.category.toUpperCase()}</span>
@@ -609,7 +609,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         <div className="lg:col-span-2 p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[var(--accent-primary)]" />
+              <Clock className="w-4 h-4 text-[var(--color-primary-text)]" />
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
                   Career Timeline
@@ -634,7 +634,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                   <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] group-hover:border-[var(--accent-primary)]/40 transition-colors space-y-1">
                     <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
                       <span>{ev.type} • {ev.date}</span>
-                      <span className="font-semibold text-[var(--accent-primary)] capitalize">{ev.status}</span>
+                      <span className="font-semibold text-[var(--color-primary-text)] capitalize">{ev.status}</span>
                     </div>
                     <div className="text-xs font-bold text-[var(--text-primary)]">
                       {ev.title}
@@ -702,7 +702,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setAddGoalModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveGoal} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold">Save Goal</button>
+              <button onClick={handleSaveGoal} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Save Goal</button>
             </div>
           </div>
         </div>
@@ -765,7 +765,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setAddMilestoneModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveMilestone} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold">Record</button>
+              <button onClick={handleSaveMilestone} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Record</button>
             </div>
           </div>
         </div>

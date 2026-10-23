@@ -62,7 +62,7 @@ export const EvidenceView: React.FC = () => {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
           <Plus className="w-4 h-4" />
           <span>Add Evidence Artifact</span>
@@ -75,7 +75,7 @@ export const EvidenceView: React.FC = () => {
           onClick={() => setSelectedType('all')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
             selectedType === 'all'
-              ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
               : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -87,7 +87,7 @@ export const EvidenceView: React.FC = () => {
             onClick={() => setSelectedType(t)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
               selectedType === t
-                ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+                ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
                 : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -115,7 +115,7 @@ export const EvidenceView: React.FC = () => {
                 </div>
 
                 {item.verified && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-success)] bg-[var(--color-success)]/10 px-2 py-0.5 rounded">
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-success-strong)] bg-[var(--color-success-surface)] px-2 py-0.5 rounded">
                     <ShieldCheck className="w-3.5 h-3.5" />
                     <span>Verified</span>
                   </span>
@@ -131,7 +131,7 @@ export const EvidenceView: React.FC = () => {
                 <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">Validated Competencies</div>
                 <div className="flex flex-wrap gap-1.5">
                   {item.skillNames.map((sk, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--accent-primary)] font-medium">
+                    <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--color-primary-text)] font-medium">
                       ✓ {sk}
                     </span>
                   ))}
@@ -146,7 +146,7 @@ export const EvidenceView: React.FC = () => {
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[var(--accent-primary)] hover:underline font-medium"
+                  className="flex items-center gap-1 text-[var(--color-primary-text)] hover:underline font-medium"
                 >
                   <span>Verify Link</span>
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -247,7 +247,7 @@ export const EvidenceView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold hover:bg-[var(--accent-secondary)]"
+                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)]"
                 >
                   Attach Evidence
                 </button>

@@ -47,7 +47,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   const statusColors: Record<RoadmapTaskStatus, string> = {
     not_started: 'text-[var(--text-muted)]',
     in_progress: 'text-[var(--color-warning)]',
-    completed: 'text-[var(--color-success)]',
+    completed: 'text-[var(--color-success-strong)]',
     skipped: 'text-[var(--text-muted)]',
     blocked: 'text-[var(--color-danger)]'
   };
@@ -66,14 +66,14 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
         <div className="flex items-center gap-4">
           <div className="text-right">
             <div className="text-xs text-[var(--text-muted)]">Roadmap Completion</div>
-            <div className="text-base font-bold font-mono tabular-nums text-[var(--accent-primary)]">
+            <div className="text-base font-bold font-mono tabular-nums text-[var(--color-primary-text)]">
               {completedTasks} / {totalTasks} Tasks ({progressPct}%)
             </div>
           </div>
           {!isEnrolledInRoadmap && (
             <button
               onClick={enrollInRoadmap}
-              className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold shadow-xs"
+              className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold shadow-xs"
             >
               Enroll in Roadmap
             </button>
@@ -89,7 +89,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
             onClick={() => setStatusFilter(st)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
               statusFilter === st
-                ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+                ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
                 : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -108,7 +108,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
             {/* Phase Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle)]">
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--accent-primary)] font-bold">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-primary-text)] font-bold">
                   PHASE {phase.phaseNumber}
                 </span>
                 <h2 className="text-lg font-bold text-[var(--text-primary)]">{phase.title}</h2>
@@ -146,7 +146,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                 {task.title}
                               </span>
                               {task.skillName && (
-                                <span className="text-[11px] text-[var(--accent-primary)]">· {task.skillName}</span>
+                                <span className="text-[11px] text-[var(--color-primary-text)]">· {task.skillName}</span>
                               )}
                             </div>
                             <div className="text-xs text-[var(--text-secondary)] leading-relaxed">
@@ -188,7 +188,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                                 {course.title}
                                               </span>
                                               {rec && (
-                                                <span className="rounded-full bg-[var(--accent-primary)]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--accent-primary)]">
+                                                <span className="rounded-full bg-[var(--accent-primary)]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--color-primary-text)]">
                                                   {Math.round(rec.score)}% match
                                                 </span>
                                               )}
@@ -219,7 +219,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                                   void startLearningCourse(course.id, rec?.reason);
                                                   updateTaskStatus(task.id, 'in_progress');
                                                 }}
-                                                className="rounded bg-[var(--accent-primary)] px-1.5 py-0.5 text-[10px] font-semibold text-white hover:opacity-90"
+                                                className="rounded bg-[var(--accent-primary)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-on-primary)] hover:opacity-90"
                                               >
                                                 Start
                                               </button>
@@ -228,7 +228,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                               href={course.url}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="text-[var(--text-muted)] hover:text-[var(--accent-primary)]"
+                                              className="text-[var(--text-muted)] hover:text-[var(--color-primary-text)]"
                                               aria-label={`Open ${course.title}`}
                                             >
                                               <ExternalLink className="h-3 w-3" />
@@ -242,7 +242,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                     <button
                                       type="button"
                                       onClick={() => onNavigate('learning')}
-                                      className="mt-2 text-[10px] font-medium text-[var(--accent-primary)] hover:underline"
+                                      className="mt-2 text-[10px] font-medium text-[var(--color-primary-text)] hover:underline"
                                     >
                                       Open the Learning Hub →
                                     </button>
@@ -260,7 +260,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                 onClick={() => updateTaskStatus(task.id, status)}
                                 className={`px-2 py-1 rounded text-[11px] font-medium capitalize transition-colors ${
                                   task.status === status
-                                    ? 'bg-[var(--accent-primary)] text-white font-semibold'
+                                    ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] font-semibold'
                                     : 'bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                 }`}
                               >

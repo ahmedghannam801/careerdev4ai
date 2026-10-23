@@ -99,7 +99,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             onClick={() => setShowBookmarksOnly(prev => !prev)}
             className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
               showBookmarksOnly
-                ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)] border-[var(--accent-primary)]'
+                ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] border-[var(--accent-primary)]'
                 : 'border-[var(--border-subtle)] bg-[var(--surface-main)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -109,7 +109,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
 
           <button
             onClick={() => onNavigate('applications')}
-            className="px-4 py-2 rounded-xl bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-xs font-semibold text-[var(--accent-primary)] border border-[var(--border-subtle)] flex items-center gap-1.5 transition-colors"
+            className="px-4 py-2 rounded-xl bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-xs font-semibold text-[var(--color-primary-text)] border border-[var(--border-subtle)] flex items-center gap-1.5 transition-colors"
           >
             <span>Applications Pipeline ({applications.length})</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -137,7 +137,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               onClick={() => setWorkModeFilter(mode)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
                 workModeFilter === mode
-                  ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+                  ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
                   : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -171,7 +171,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-base text-[var(--text-primary)]">{job.title}</span>
-                      <span className="text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded font-mono">
+                      <span className="text-xs font-semibold text-[var(--color-success-strong)] bg-[var(--color-success-surface)] px-2 py-0.5 rounded font-mono">
                         {matchPercentage}% Match
                       </span>
                     </div>
@@ -182,7 +182,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                       <span aria-hidden="true">·</span>
                       <span>{job.workMode}</span>
                       <span aria-hidden="true">·</span>
-                      <span className="font-mono text-emerald-600">{job.salaryRange.split(' ')[0]}</span>
+                      <span className="font-mono text-[var(--color-success-strong)]">{job.salaryRange.split(' ')[0]}</span>
                     </div>
                   </div>
 
@@ -191,7 +191,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                       onClick={() => toggleBookmarkJob(job.id)}
                       className={`p-2 rounded-lg border transition-colors ${
                         isBookmarked
-                          ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)] border-[var(--accent-primary)]'
+                          ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] border-[var(--accent-primary)]'
                           : 'border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                       }`}
                       title={isBookmarked ? 'Remove bookmark' : 'Bookmark job'}
@@ -209,7 +209,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                     ) : (
                       <button
                         onClick={() => handleTrackApplication(job)}
-                        className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold shadow-xs transition-colors"
+                        className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold shadow-xs transition-colors"
                       >
                         Track in Pipeline
                       </button>
@@ -234,7 +234,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                 {/* Skills Match Breakdown */}
                 <div className="pt-3 border-t border-[var(--border-subtle)] grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div className="space-y-1.5">
-                    <div className="font-semibold text-emerald-600 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                    <div className="font-semibold text-[var(--color-success-strong)] flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Matching Skills ({matched.length})</span>
                     </div>
@@ -248,13 +248,13 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <div className="font-semibold text-amber-500 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                    <div className="font-semibold text-[var(--color-warning)] flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
                       <AlertCircle className="w-3.5 h-3.5" />
                       <span>Missing / Gap Skills ({missing.length})</span>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {missing.map((m, i) => (
-                        <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-amber-500">
+                        <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--color-warning)]">
                           + {m}
                         </span>
                       ))}

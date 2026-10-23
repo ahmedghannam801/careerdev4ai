@@ -128,7 +128,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         className="flex items-center justify-between p-2.5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40 hover:bg-[var(--surface-secondary)] text-left transition-colors text-xs text-[var(--text-primary)]"
                       >
                         <div className="flex items-center gap-2.5">
-                          <div className="p-1.5 rounded-lg bg-[var(--accent-surface)] text-[var(--accent-primary)]">
+                          <div className="p-1.5 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]">
                             <Icon className="w-3.5 h-3.5" />
                           </div>
                           <span className="font-medium">{qa.label}</span>
@@ -147,7 +147,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       onClose();
                       onOpenCopilot();
                     }}
-                    className="w-full p-3 rounded-xl bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center justify-between shadow-xs"
+                    className="w-full p-3 rounded-xl bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-between shadow-xs"
                   >
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4" />
@@ -176,7 +176,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <Briefcase className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                          <Briefcase className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                           <span className="font-semibold text-[var(--text-primary)]">{r.title}</span>
                           <span className="text-[10px] text-[var(--text-muted)]">({r.category})</span>
                         </div>
@@ -198,11 +198,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <Award className="w-3.5 h-3.5 text-emerald-500" />
+                          <Award className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />
                           <span className="font-semibold text-[var(--text-primary)]">{s.name}</span>
                           <span className="text-[10px] text-[var(--text-muted)] font-mono">L{s.currentLevel} • {s.category}</span>
                         </div>
-                        <span className="text-[10px] font-mono text-[var(--accent-primary)]">Skills Center →</span>
+                        <span className="text-[10px] font-mono text-[var(--color-primary-text)]">Skills Center →</span>
                       </button>
                     ))}
                   </div>
@@ -220,7 +220,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <FolderGit2 className="w-3.5 h-3.5 text-blue-500" />
+                          <FolderGit2 className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />
                           <span className="font-semibold text-[var(--text-primary)]">{p.title}</span>
                         </div>
                         <ExternalLink className="w-3 h-3 text-[var(--text-muted)]" />
@@ -241,7 +241,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <Briefcase className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                          <Briefcase className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                           <span className="font-semibold text-[var(--text-primary)]">{j.title}</span>
                           <span className="text-[10px] text-[var(--text-muted)]">at {j.company}</span>
                         </div>
@@ -263,7 +263,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-purple-500" />
+                          <FileText className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />
                           <span className="font-semibold text-[var(--text-primary)]">{d.name}</span>
                           <span className="text-[10px] text-[var(--text-muted)]">({d.type})</span>
                         </div>

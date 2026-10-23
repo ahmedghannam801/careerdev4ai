@@ -69,7 +69,7 @@ export const AuthModal: React.FC = () => {
       >
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-white flex items-center justify-center font-bold text-sm">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-sm">
               CP
             </div>
             <div>
@@ -95,7 +95,7 @@ export const AuthModal: React.FC = () => {
         )}
 
         {successMsg && (
-          <div className="p-3 rounded-lg bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 text-xs text-[var(--color-success)] flex items-center gap-2">
+          <div className="p-3 rounded-lg bg-[var(--color-success-surface)] border border-[var(--color-success-strong)]/20 text-xs text-[var(--color-success-strong)] flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>{successMsg}</span>
           </div>
@@ -142,7 +142,7 @@ export const AuthModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => { setMode('forgot'); setError(null); }}
-                    className="text-[11px] text-[var(--accent-primary)] hover:underline"
+                    className="text-[11px] text-[var(--color-primary-text)] hover:underline"
                   >
                     Forgot password?
                   </button>
@@ -165,7 +165,7 @@ export const AuthModal: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white font-semibold flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
+            className="w-full py-2.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] font-semibold flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
           >
             <span>{loading ? 'Processing...' : mode === 'login' ? 'Sign In' : mode === 'register' ? 'Create Account' : 'Send Reset Link'}</span>
             <ArrowRight className="w-4 h-4" />
@@ -179,7 +179,7 @@ export const AuthModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => { setMode('register'); setError(null); }}
-                className="text-[var(--accent-primary)] font-semibold hover:underline"
+                className="text-[var(--color-primary-text)] font-semibold hover:underline"
               >
                 Sign up free
               </button>
@@ -190,7 +190,7 @@ export const AuthModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => { setMode('login'); setError(null); }}
-                className="text-[var(--accent-primary)] font-semibold hover:underline"
+                className="text-[var(--color-primary-text)] font-semibold hover:underline"
               >
                 Sign in
               </button>

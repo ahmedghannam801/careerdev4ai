@@ -38,11 +38,11 @@ const AVAILABILITY_LABELS: Record<CourseAvailability, string> = {
 };
 
 const AVAILABILITY_STYLES: Record<CourseAvailability, string> = {
-  free: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  youtube_free: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
-  audit: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20',
-  free_course_paid_certificate: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20',
-  free_with_limitations: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+  free: 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)] border-[var(--color-success-strong)]/20',
+  youtube_free: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)] border-[var(--color-danger)]/20',
+  audit: 'bg-[var(--color-accent)]/15 text-[var(--color-accent-strong)] border-[var(--color-accent)]/40',
+  free_course_paid_certificate: 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)] border-[var(--color-success-strong)]/25',
+  free_with_limitations: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)] border-[var(--color-warning)]/20',
   paid: 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-subtle)]',
 };
 
@@ -126,7 +126,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
           </h3>
         </div>
         {recommendation && (
-          <div className="shrink-0 rounded-full border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--color-accent)]">
+          <div className="shrink-0 rounded-full border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--color-accent-strong)]">
             {scoreLabel(recommendation.score)}
           </div>
         )}
@@ -147,7 +147,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
           </span>
         )}
         {isCompleted && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-success-strong)]">
             <CheckCircle2 size={11} /> Completed
           </span>
         )}
@@ -214,9 +214,9 @@ const CourseCard: React.FC<CourseCardProps> = ({
             <span>Progress</span>
             <span>{item?.progressPercent ?? 0}%</span>
           </div>
-          <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--bg-elevated)]">
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
             <div
-              className="h-full rounded-full bg-[var(--color-accent)] transition-all"
+              className="h-full rounded-full bg-[var(--color-progress-strong)] transition-all"
               style={{ width: `${item?.progressPercent ?? 0}%` }}
             />
           </div>
@@ -230,7 +230,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
                 step={5}
                 value={draft}
                 onChange={(event) => onProgressDraft(course.id, Number(event.target.value))}
-                className="h-2 flex-1 accent-[var(--color-accent)]"
+                className="h-2 flex-1 accent-[var(--color-progress-strong)]"
               />
               <button
                 type="button"
@@ -249,7 +249,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
           <button
             type="button"
             onClick={() => onStart(course.id, recommendation?.reason)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] hover:opacity-90"
           >
             <PlayCircle size={14} /> {isInProgress ? 'Continue' : 'Start'}
           </button>
@@ -258,7 +258,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
           <button
             type="button"
             onClick={() => onComplete(course.id)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-emerald-500/40 hover:text-emerald-600"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--color-success-strong)]/40 hover:text-[var(--color-success-strong)]"
           >
             <CheckCircle2 size={14} /> Complete
           </button>
@@ -299,7 +299,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
           href={course.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--color-accent)] hover:underline"
+          className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--color-accent-strong)] hover:underline"
         >
           Open resource <ExternalLink size={12} />
         </a>
@@ -459,7 +459,7 @@ export const LearningCenterView: React.FC = () => {
     <div className="space-y-7 animate-in fade-in duration-200">
       <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
             <Sparkles size={14} /> AI Learning Hub
           </div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
@@ -474,7 +474,7 @@ export const LearningCenterView: React.FC = () => {
           type="button"
           onClick={handleRefresh}
           disabled={isLearningLoading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90 disabled:opacity-50"
         >
           <RefreshCw size={15} className={isLearningLoading ? 'animate-spin' : ''} />
           {isLearningLoading ? 'Ranking…' : 'Refresh recommendations'}
@@ -482,7 +482,7 @@ export const LearningCenterView: React.FC = () => {
       </div>
 
       {learningError && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+        <div className="flex items-start gap-2 rounded-xl border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 p-3 text-sm text-[var(--color-danger)]">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <div>
             <div className="font-semibold">Learning Hub request failed</div>
@@ -494,7 +494,7 @@ export const LearningCenterView: React.FC = () => {
       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--text-secondary)]">
         {learningRecommendationMeta.aiUsed ? (
           <span className="inline-flex items-center gap-1.5">
-            <Sparkles size={13} className="text-[var(--color-accent)]" />
+            <Sparkles size={13} className="text-[var(--color-accent-strong)]" />
             AI explanations are active. Candidate courses and scores remain deterministic.
           </span>
         ) : (
@@ -516,7 +516,7 @@ export const LearningCenterView: React.FC = () => {
 
       {top && (
         <section className="rounded-2xl border border-[var(--color-accent)]/25 bg-gradient-to-br from-[var(--color-accent)]/10 via-[var(--bg-surface)] to-[var(--bg-surface)] p-5">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
             <Trophy size={14} /> Next best step
           </div>
           <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
@@ -537,7 +537,7 @@ export const LearningCenterView: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
-              <div className="text-3xl font-bold text-[var(--color-accent)]">{Math.round(top.score)}</div>
+              <div className="text-3xl font-bold text-[var(--color-accent-strong)]">{Math.round(top.score)}</div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                 deterministic
                 <br />
@@ -611,7 +611,7 @@ export const LearningCenterView: React.FC = () => {
             onClick={() => setTab(entry.id)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               tab === entry.id
-                ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+                ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -734,7 +734,7 @@ export const LearningCenterView: React.FC = () => {
                 key={course.id}
                 className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"
               >
-                <CheckCircle2 size={18} className="text-emerald-500" />
+                <CheckCircle2 size={18} className="text-[var(--color-success-strong)]" />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-[var(--text-primary)]">{course.title}</div>
                   <div className="text-xs text-[var(--text-secondary)]">
@@ -742,14 +742,14 @@ export const LearningCenterView: React.FC = () => {
                     {item.completedAt ? new Date(item.completedAt).toLocaleDateString() : ''}
                   </div>
                 </div>
-                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="rounded-full border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] px-2 py-1 text-[11px] font-medium text-[var(--color-success-strong)]">
                   Learning evidence recorded
                 </span>
                 <a
                   href={course.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-medium text-[var(--color-accent)] hover:underline"
+                  className="text-xs font-medium text-[var(--color-accent-strong)] hover:underline"
                 >
                   Open
                 </a>

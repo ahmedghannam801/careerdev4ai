@@ -33,7 +33,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       {/* Drawer Header */}
       <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent-surface)] flex items-center justify-center text-[var(--accent-primary)]">
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent-surface)] flex items-center justify-center text-[var(--color-primary-text)]">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
@@ -58,7 +58,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
         </div>
         <button 
           onClick={() => { onNavigate('analysis'); onClose(); }}
-          className="text-[var(--accent-primary)] hover:underline flex items-center gap-1 text-xs shrink-0"
+          className="text-[var(--color-primary-text)] hover:underline flex items-center gap-1 text-xs shrink-0"
         >
           View Analysis
           <ArrowRight className="w-3 h-3" />
@@ -73,14 +73,14 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
             className={`flex gap-3 text-sm ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {msg.sender === 'assistant' && (
-              <div className="w-7 h-7 rounded-md bg-[var(--accent-surface)] text-[var(--accent-primary)] flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-7 h-7 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center shrink-0 mt-0.5">
                 <Bot className="w-4 h-4" />
               </div>
             )}
             <div
               className={`max-w-[85%] rounded-xl p-3.5 leading-relaxed text-sm ${
                 msg.sender === 'user'
-                  ? 'bg-[var(--accent-primary)] text-white'
+                  ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
                   : 'bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]'
               }`}
             >
@@ -97,7 +97,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
                     <button
                       key={idx}
                       onClick={() => handleSend(sug)}
-                      className="block w-full text-left text-xs text-[var(--accent-primary)] hover:bg-[var(--accent-surface)] p-1.5 rounded transition-colors"
+                      className="block w-full text-left text-xs text-[var(--color-primary-text)] hover:bg-[var(--accent-surface)] p-1.5 rounded transition-colors"
                     >
                       → {sug}
                     </button>
@@ -115,7 +115,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
 
         {isCopilotTyping && (
           <div className="flex gap-3 items-center text-xs text-[var(--text-muted)]">
-            <div className="w-7 h-7 rounded-md bg-[var(--accent-surface)] text-[var(--accent-primary)] flex items-center justify-center">
+            <div className="w-7 h-7 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center">
               <Bot className="w-4 h-4 animate-spin" />
             </div>
             <span>CareerPilot is analyzing your graph...</span>
@@ -128,19 +128,19 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       <div className="px-4 py-2 border-t border-[var(--border-subtle)] bg-[var(--surface-main)] flex gap-2 overflow-x-auto text-xs">
         <button
           onClick={() => handleSend(t('copilotPrompt1'))}
-          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
+          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
         >
           Today's Next Step
         </button>
         <button
           onClick={() => handleSend(t('copilotPrompt3'))}
-          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
+          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
         >
           Recommend Project
         </button>
         <button
           onClick={() => handleSend(t('copilotPrompt4'))}
-          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
+          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
         >
           CV Audit
         </button>
@@ -166,7 +166,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           <button
             type="submit"
             disabled={!input.trim() || isCopilotTyping}
-            className="p-2 rounded-lg bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] disabled:opacity-50 transition-colors"
+            className="p-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] disabled:opacity-50 transition-colors"
           >
             <Send className="w-4 h-4" />
           </button>

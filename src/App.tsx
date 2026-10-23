@@ -118,7 +118,7 @@ function AppContent() {
     return (
       <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[var(--accent-primary)] text-white flex items-center justify-center font-bold text-sm">
+          <div className="w-9 h-9 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-sm">
             CP
           </div>
           <div className="text-xs text-[var(--text-muted)]">Restoring your session…</div>
@@ -205,7 +205,7 @@ function AppContent() {
         {hydrationError && (
           <div
             role="alert"
-            className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300"
+            className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 p-3 text-sm text-[var(--color-warning)]"
           >
             <span className="flex-1">
               Some of your career data could not be loaded. Nothing was changed. Check your
@@ -214,7 +214,7 @@ function AppContent() {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-lg border border-amber-500/30 px-3 py-1.5 text-xs font-semibold hover:bg-amber-500/10"
+              className="rounded-lg border border-[var(--color-warning)]/30 px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-warning)]/10"
             >
               Retry
             </button>

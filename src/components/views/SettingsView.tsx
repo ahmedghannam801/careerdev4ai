@@ -243,7 +243,7 @@ export const SettingsView: React.FC = () => {
           onClick={exportDataJson}
           className="self-start sm:self-auto px-3.5 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 transition-colors shadow-2xs"
         >
-          <Download className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+          <Download className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
           <span>Export All Career Data</span>
         </button>
       </div>
@@ -266,7 +266,7 @@ export const SettingsView: React.FC = () => {
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
                 isActive
-                  ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)] shadow-2xs'
+                  ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] shadow-2xs'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]'
               }`}
             >
@@ -298,7 +298,7 @@ export const SettingsView: React.FC = () => {
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Account Status</span>
-                <p className="font-semibold text-emerald-500 flex items-center gap-1">
+                <p className="font-semibold text-[var(--color-success-strong)] flex items-center gap-1">
                   <span>● Active Authenticated</span>
                 </p>
               </div>
@@ -324,7 +324,7 @@ export const SettingsView: React.FC = () => {
                 onClick={() => setChangeEmailOpen(true)}
                 className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5"
               >
-                <Mail className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                <Mail className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                 <span>Change Email</span>
               </button>
 
@@ -332,16 +332,16 @@ export const SettingsView: React.FC = () => {
                 onClick={() => setChangePasswordOpen(true)}
                 className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5"
               >
-                <Key className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                <Key className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                 <span>Change Password</span>
               </button>
             </div>
           </div>
 
           {/* Danger Zone: Account Deletion */}
-          <div className="p-6 rounded-2xl bg-red-500/5 border border-red-500/20 space-y-4">
+          <div className="p-6 rounded-2xl bg-[var(--color-danger)]/5 border border-[var(--color-danger)]/20 space-y-4">
             <div>
-              <h2 className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5">
+              <h2 className="text-sm font-bold text-[var(--color-danger)] flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4" />
                 <span>Danger Zone — Delete Account</span>
               </h2>
@@ -352,7 +352,7 @@ export const SettingsView: React.FC = () => {
 
             <button
               onClick={() => setDeleteAccountOpen(true)}
-              className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-4 py-2 rounded-xl bg-[var(--color-danger)] hover:bg-[var(--color-danger-hover)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete Account & Career Graph</span>
@@ -376,7 +376,7 @@ export const SettingsView: React.FC = () => {
           <div className="space-y-3">
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-lg bg-[var(--color-success-surface)] text-[var(--color-success-strong)] flex items-center justify-center">
                   <Laptop className="w-4 h-4" />
                 </div>
                 <div>
@@ -386,7 +386,7 @@ export const SettingsView: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-emerald-600 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold text-[var(--color-success-strong)] font-mono bg-[var(--color-success-surface)] px-2 py-0.5 rounded-full">
                 Online Now
               </span>
             </div>
@@ -442,7 +442,7 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
               {usernameStatus && (
-                <p className={`text-[11px] ${usernameStatus.available ? 'text-emerald-500' : 'text-amber-500'}`}>
+                <p className={`text-[11px] ${usernameStatus.available ? 'text-[var(--color-success-strong)]' : 'text-[var(--color-warning)]'}`}>
                   {usernameStatus.text}
                 </p>
               )}
@@ -528,7 +528,7 @@ export const SettingsView: React.FC = () => {
                     onClick={() => updateAiPreferences({ personalizationLevel: lvl })}
                     className={`py-2 rounded-lg capitalize font-semibold border transition-colors ${
                       aiPreferences.personalizationLevel === lvl
-                        ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)]'
+                        ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] border-[var(--accent-primary)]'
                         : 'bg-[var(--surface-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
                     }`}
                   >
@@ -611,7 +611,7 @@ export const SettingsView: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
             <div className="space-y-2">
               <label className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                <Globe className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                 <span>Language & Direction</span>
               </label>
               <div className="flex gap-2">
@@ -619,7 +619,7 @@ export const SettingsView: React.FC = () => {
                   onClick={() => updateSettings({ language: 'en' })}
                   className={`flex-1 py-2.5 rounded-xl font-semibold border transition-all ${
                     settings.language === 'en'
-                      ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)]'
+                      ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] border-[var(--accent-primary)]'
                       : 'bg-[var(--surface-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
                   }`}
                 >
@@ -629,7 +629,7 @@ export const SettingsView: React.FC = () => {
                   onClick={() => updateSettings({ language: 'ar' })}
                   className={`flex-1 py-2.5 rounded-xl font-semibold border transition-all ${
                     settings.language === 'ar'
-                      ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)]'
+                      ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] border-[var(--accent-primary)]'
                       : 'bg-[var(--surface-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
                   }`}
                 >
@@ -640,7 +640,7 @@ export const SettingsView: React.FC = () => {
 
             <div className="space-y-2">
               <label className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                {settings.theme === 'dark' ? <Moon className="w-3.5 h-3.5 text-[var(--accent-primary)]" /> : <Sun className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
+                {settings.theme === 'dark' ? <Moon className="w-3.5 h-3.5 text-[var(--color-primary-text)]" /> : <Sun className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />}
                 <span>Display Theme</span>
               </label>
               <div className="flex gap-2">
@@ -648,7 +648,7 @@ export const SettingsView: React.FC = () => {
                   onClick={() => updateSettings({ theme: 'light' })}
                   className={`flex-1 py-2.5 rounded-xl font-semibold border transition-all flex items-center justify-center gap-1.5 ${
                     settings.theme === 'light'
-                      ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)]'
+                      ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] border-[var(--accent-primary)]'
                       : 'bg-[var(--surface-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
                   }`}
                 >
@@ -659,7 +659,7 @@ export const SettingsView: React.FC = () => {
                   onClick={() => updateSettings({ theme: 'dark' })}
                   className={`flex-1 py-2.5 rounded-xl font-semibold border transition-all flex items-center justify-center gap-1.5 ${
                     settings.theme === 'dark'
-                      ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)]'
+                      ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] border-[var(--accent-primary)]'
                       : 'bg-[var(--surface-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
                   }`}
                 >
@@ -701,13 +701,13 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
               {passwordMsg && (
-                <p className={`text-[11px] font-medium ${passwordMsg.success ? 'text-emerald-500' : 'text-red-500'}`}>
+                <p className={`text-[11px] font-medium ${passwordMsg.success ? 'text-[var(--color-success-strong)]' : 'text-[var(--color-danger)]'}`}>
                   {passwordMsg.text}
                 </p>
               )}
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
                 <button type="button" onClick={() => setChangePasswordOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold">Update Password</button>
+                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Update Password</button>
               </div>
             </form>
           </div>
@@ -742,13 +742,13 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
               {emailMsg && (
-                <p className={`text-[11px] font-medium ${emailMsg.success ? 'text-emerald-500' : 'text-red-500'}`}>
+                <p className={`text-[11px] font-medium ${emailMsg.success ? 'text-[var(--color-success-strong)]' : 'text-[var(--color-danger)]'}`}>
                   {emailMsg.text}
                 </p>
               )}
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
                 <button type="button" onClick={() => setChangeEmailOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold">Update Email</button>
+                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Update Email</button>
               </div>
             </form>
           </div>
@@ -758,15 +758,15 @@ export const SettingsView: React.FC = () => {
       {/* MODAL: Delete Account Confirmation */}
       {deleteAccountOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[var(--surface-main)] rounded-2xl border border-red-500/30 shadow-2xl w-full max-w-md p-6 space-y-4">
-            <div className="flex items-center gap-2 text-red-600">
+          <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--color-danger)]/30 shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-2 text-[var(--color-danger)]">
               <AlertTriangle className="w-5 h-5" />
               <h3 className="text-base font-bold">Permanently Delete Account?</h3>
             </div>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
               This will irreversibly purge your profile, skills, roadmap milestones, project evidence, applications, and interview data from the persistent server database.
             </p>
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-600">
+            <div className="p-3 rounded-lg bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 text-xs text-[var(--color-danger)]">
               To confirm, type <strong className="font-mono">DELETE</strong> below:
             </div>
             <div>
@@ -783,7 +783,7 @@ export const SettingsView: React.FC = () => {
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleteConfirmText !== 'DELETE' || isDeleting}
-                className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold disabled:opacity-40 transition-colors"
+                className="px-4 py-1.5 bg-[var(--color-danger)] hover:bg-[var(--color-danger-hover)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-40 transition-colors"
               >
                 {isDeleting ? 'Deleting...' : 'Permanently Delete'}
               </button>

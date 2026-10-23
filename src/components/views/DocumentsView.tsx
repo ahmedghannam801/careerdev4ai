@@ -148,7 +148,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
       {/* Top Header */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--accent-primary)] text-xs font-semibold mb-2">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold mb-2">
             <FileText className="w-3.5 h-3.5" />
             <span>Document Hub</span>
           </div>
@@ -163,7 +163,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
         <div className="flex items-center gap-2">
           <button
             onClick={() => setAddDocModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+            className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Document</span>
@@ -177,7 +177,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           onClick={() => setActiveTab('documents')}
           className={`px-3.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
             activeTab === 'documents'
-              ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)]'
+              ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -189,7 +189,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           onClick={() => setActiveTab('cv-versions')}
           className={`px-3.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
             activeTab === 'cv-versions'
-              ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)]'
+              ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -201,11 +201,11 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           onClick={() => setActiveTab('cover-letters')}
           className={`px-3.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
             activeTab === 'cover-letters'
-              ? 'bg-[var(--accent-surface)] text-[var(--accent-primary)]'
+              ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          <Sparkles className="w-4 h-4 text-[var(--accent-primary)]" />
+          <Sparkles className="w-4 h-4 text-[var(--color-primary-text)]" />
           <span>Cover Letter Studio ({coverLetters.length})</span>
         </button>
       </div>
@@ -224,7 +224,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                   onClick={() => setDocTypeFilter(type)}
                   className={`px-2.5 py-1 rounded-md font-medium transition-colors capitalize ${
                     docTypeFilter === type
-                      ? 'bg-[var(--accent-primary)] text-white'
+                      ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
                       : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
@@ -248,7 +248,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-[var(--accent-surface)] text-[var(--accent-primary)]">
+                      <div className="p-2 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]">
                         <FileText className="w-4 h-4" />
                       </div>
                       <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)] font-mono">
@@ -258,14 +258,14 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
 
                     <div className="flex items-center gap-1">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                        doc.isPublic ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-500/10 text-slate-500'
+                        doc.isPublic ? 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)]' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'
                       }`}>
                         {doc.isPublic ? <Unlock className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
                         {doc.isPublic ? 'Public' : 'Private'}
                       </span>
                       <button
                         onClick={() => deleteDocument(doc.id)}
-                        className="p-1 text-[var(--text-muted)] hover:text-red-500 rounded"
+                        className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)] rounded"
                         title="Delete document"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -319,7 +319,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             </div>
             <button
               onClick={() => onNavigate('cv-studio')}
-              className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5"
             >
               <span>Open CV Studio</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -337,7 +337,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                     <h3 className="text-sm font-bold text-[var(--text-primary)]">
                       {version.name}
                     </h3>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 font-mono">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-[var(--color-success-surface)] text-[var(--color-success-strong)] font-mono">
                       ATS: {version.atsAnalysis ? `${version.atsAnalysis.overallScore}%` : '—'}
                     </span>
                   </div>
@@ -368,7 +368,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
 
                   <button
                     onClick={() => onNavigate('cv-studio')}
-                    className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-surface)] text-[var(--accent-primary)] font-semibold text-xs hover:bg-[var(--accent-primary)] hover:text-white transition-colors"
+                    className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold text-xs hover:bg-[var(--accent-primary)] hover:text-[var(--color-on-primary)] transition-colors"
                   >
                     Edit in CV Studio
                   </button>
@@ -376,7 +376,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                   {cvVersions.length > 1 && (
                     <button
                       onClick={() => deleteCVVersion(version.id)}
-                      className="p-1.5 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-red-500"
+                      className="p-1.5 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--color-danger)]"
                       title="Delete version"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -396,7 +396,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
             <div className="pb-3 border-b border-[var(--border-subtle)]">
               <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[var(--accent-primary)]" />
+                <Sparkles className="w-4 h-4 text-[var(--color-primary-text)]" />
                 <span>AI Cover Letter Generator</span>
               </h2>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
@@ -472,7 +472,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
               <button
                 onClick={handleGenerateCoverLetter}
                 disabled={isGeneratingCl || !clForm.company || !clForm.jobTitle}
-                className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-xs"
+                className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-xs"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>{isGeneratingCl ? 'Synthesizing with Gemini...' : 'Generate Tailored Cover Letter'}</span>
@@ -498,12 +498,12 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                     onClick={() => handleCopyText(activeClDraft, 'draft-cl')}
                     className="px-2.5 py-1 rounded-md border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs text-[var(--text-secondary)] flex items-center gap-1"
                   >
-                    {copiedId === 'draft-cl' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    {copiedId === 'draft-cl' ? <Check className="w-3 h-3 text-[var(--color-success-strong)]" /> : <Copy className="w-3 h-3" />}
                     <span>{copiedId === 'draft-cl' ? 'Copied' : 'Copy'}</span>
                   </button>
                   <button
                     onClick={handleSaveActiveCoverLetter}
-                    className="px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors"
+                    className="px-3 py-1 rounded-md bg-[var(--color-success-strong)] hover:bg-[var(--color-success-hover)] text-[var(--color-on-primary)] font-semibold text-xs transition-colors"
                   >
                     Approve & Save
                   </button>
@@ -515,13 +515,13 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
               <div className="space-y-4">
                 {clHighlights.length > 0 && (
                   <div className="p-3 rounded-xl bg-[var(--accent-surface)]/40 border border-[var(--accent-primary)]/20 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent-primary)]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
                       Strategic Highlights Grounded in Your Background
                     </span>
                     <ul className="text-xs text-[var(--text-secondary)] space-y-1">
                       {clHighlights.map((hl, idx) => (
                         <li key={idx} className="flex items-center gap-1.5">
-                          <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <Check className="w-3 h-3 text-[var(--color-success-strong)] shrink-0" />
                           <span>{hl}</span>
                         </li>
                       ))}
@@ -620,7 +620,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setAddDocModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveDocument} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold">Save Document</button>
+              <button onClick={handleSaveDocument} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Save Document</button>
             </div>
           </div>
         </div>
@@ -648,7 +648,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                   }
                   setRenameModalOpen(false);
                 }}
-                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-white rounded-lg text-xs font-semibold"
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold"
               >
                 Save
               </button>

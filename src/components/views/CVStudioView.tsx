@@ -69,7 +69,7 @@ export const CVStudioView: React.FC = () => {
           <button
             onClick={runAiCvOptimization}
             disabled={isOptimizingCV}
-            className="px-3.5 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--accent-primary)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            className="px-3.5 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--color-primary-text)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isOptimizingCV ? 'animate-spin' : ''}`} />
             <span>{isOptimizingCV ? 'Analyzing ATS Keywords...' : 'Run ATS Audit'}</span>
@@ -77,7 +77,7 @@ export const CVStudioView: React.FC = () => {
 
           <button
             onClick={handlePrint}
-            className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+            className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print / Export PDF</span>
@@ -91,7 +91,7 @@ export const CVStudioView: React.FC = () => {
           onClick={() => setActiveTab('editor')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
             activeTab === 'editor'
-              ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -101,7 +101,7 @@ export const CVStudioView: React.FC = () => {
           onClick={() => setActiveTab('ats')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
             activeTab === 'ats'
-              ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -111,7 +111,7 @@ export const CVStudioView: React.FC = () => {
           onClick={() => setActiveTab('versions')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
             activeTab === 'versions'
-              ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -195,7 +195,7 @@ export const CVStudioView: React.FC = () => {
               {/* Paper Header */}
               <div className="border-b border-slate-200 pb-4 text-center space-y-1">
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">{activeCV.fullName}</h2>
-                <div className="text-xs font-semibold text-[#6D5EF5] tracking-wide uppercase">{activeCV.title}</div>
+                <div className="text-xs font-semibold text-[var(--color-print-primary)] tracking-wide uppercase">{activeCV.title}</div>
                 <div className="text-xs text-slate-500 flex items-center justify-center gap-2 pt-1">
                   <span>{activeCV.email}</span>
                   <span>·</span>
@@ -274,13 +274,13 @@ export const CVStudioView: React.FC = () => {
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--accent-primary)]">ATS Match Diagnostic</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">ATS Match Diagnostic</span>
                 <h2 className="text-xl font-bold text-[var(--text-primary)] mt-0.5">
                   Alignment for {targetRole.title}
                 </h2>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--accent-primary)]">
+                <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--color-primary-text)]">
                   {latestAnalysis.overallScore} / 100
                 </div>
                 <div className="text-xs text-[var(--text-muted)]">Benchmark Passing Score: 75</div>
@@ -300,7 +300,7 @@ export const CVStudioView: React.FC = () => {
             {/* Matched vs Missing Keywords */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
               <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-2">
-                <div className="text-xs font-bold text-[var(--color-success)] flex items-center gap-1.5">
+                <div className="text-xs font-bold text-[var(--color-success-strong)] flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Matched Keywords ({latestAnalysis.matchedKeywords.length})</span>
                 </div>
@@ -341,10 +341,10 @@ export const CVStudioView: React.FC = () => {
                       </div>
                     )}
                     <div>
-                      <span className="font-semibold text-[var(--color-success)]">Suggested: </span>
+                      <span className="font-semibold text-[var(--color-success-strong)]">Suggested: </span>
                       <span className="font-medium text-[var(--text-primary)]">{imp.suggestedText}</span>
                     </div>
-                    <div className="text-[11px] text-[var(--accent-primary)] font-medium pt-1">
+                    <div className="text-[11px] text-[var(--color-primary-text)] font-medium pt-1">
                       Reason: {imp.reason}
                     </div>
                   </div>
@@ -369,7 +369,7 @@ export const CVStudioView: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     {v.atsAnalysis && (
-                      <span className="font-mono font-bold text-[var(--accent-primary)]">
+                      <span className="font-mono font-bold text-[var(--color-primary-text)]">
                         ATS {v.atsAnalysis.overallScore}%
                       </span>
                     )}
@@ -414,7 +414,7 @@ export const CVStudioView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+                  className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold"
                 >
                   Save Snapshot
                 </button>
@@ -447,7 +447,7 @@ export const CVStudioView: React.FC = () => {
               <button
                 type="button"
                 onClick={handleParsePastedCV}
-                className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+                className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold"
               >
                 Extract to Editor
               </button>

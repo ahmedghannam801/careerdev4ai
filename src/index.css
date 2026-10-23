@@ -1,44 +1,128 @@
 @import "tailwindcss";
 
+/*
+ * CareerPilot AI — Palette 2 ("Warm Cream + Terracotta + Dusty Rose + Sage + Charcoal")
+ *
+ * The application uses a single class-based dark-mode strategy (`.dark` on
+ * <html>). The semantic tokens below are the source of truth for every colour
+ * in the product. The legacy token names at the bottom are aliases kept for
+ * the existing components; they resolve to the same semantic values so there
+ * is no second competing theme system.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
-    --bg-main: #F8F9FC;
-    --surface-main: #FFFFFF;
-    --surface-secondary: #F1F3F8;
-    --surface-elevated: #FFFFFF;
-    --text-primary: #111827;
-    --text-secondary: #667085;
-    --text-muted: #98A2B3;
-    --border-subtle: #E5E7EB;
-    --border-strong: #D1D5DB;
-    --accent-primary: #6D5EF5;
-    --accent-secondary: #5B5BD6;
-    --accent-soft: #8B7CF6;
-    --accent-surface: #F0EEFF;
-    --color-success: #16A34A;
-    --color-warning: #D97706;
-    --color-danger: #DC2626;
-    --color-info: #2563EB;
+    color-scheme: light;
+
+    /* ---- Palette 2 semantic tokens (light) ---- */
+    --color-background: #F5F0E8;
+    --color-surface: #FFFFFF;
+    --color-surface-secondary: #F2EEE7;
+    --color-surface-elevated: #FFFFFF;
+    --color-surface-elevated-alt: #FAF7F1;
+
+    --color-primary: #B94736;
+    --color-primary-hover: #A33D2E;
+    --color-primary-text: #B94736;
+
+    --color-text: #282B29;
+    --color-text-secondary: #686D76;
+    --color-text-muted: #656A71;
+
+    --color-accent: #D9A49A;
+    --color-accent-strong: #95594E;
+    --color-accent-surface: #FBEFEC;
+
+    --color-success: #DDE6D5;
+    --color-success-strong: #4F6B49;
+    --color-success-hover: #415A3C;
+    --color-success-surface: #DDE6D5;
+    --color-progress: #DDE6D5;
+    --color-progress-strong: #5F7F58;
+    --color-progress-track: #DDE6D5;
+
+    --color-border: #E1DDD5;
+    --color-border-strong: #CBC5B9;
+    --color-divider: #E1DDD5;
+
+    --color-warning: #8A5A0F;
+    --color-danger: #B3261E;
+    --color-danger-hover: #8E1E18;
+    --color-info: #5F6B70;
+
+    /* Fixed colours for the printed-CV paper preview (it stays paper-white in both modes). */
+    --color-print-primary: #B94736;
+
+    /* Foreground colour for filled primary / accent / success / danger surfaces. */
+    --color-on-primary: #FFFFFF;
+
+    /* ---- Legacy-compatible aliases (same semantic values) ---- */
+    --bg-main: var(--color-background);
+    --surface-main: var(--color-surface);
+    --surface-secondary: var(--color-surface-secondary);
+    --surface-elevated: var(--color-surface-elevated);
+    --bg-surface: var(--color-surface);
+    --bg-elevated: var(--color-surface-elevated-alt);
+
+    --text-primary: var(--color-text);
+    --text-secondary: var(--color-text-secondary);
+    --text-muted: var(--color-text-muted);
+
+    --border-subtle: var(--color-border);
+    --border-strong: var(--color-border-strong);
+
+    --accent-primary: var(--color-primary);
+    --accent-secondary: var(--color-primary-hover);
+    --accent-soft: var(--color-accent);
+    --accent-surface: var(--color-accent-surface);
   }
 
   .dark {
-    --bg-main: #0B0D12;
-    --surface-main: #12151C;
-    --surface-secondary: #1E232D;
-    --surface-elevated: #181C24;
-    --text-primary: #F8FAFC;
-    --text-secondary: #A7AFBE;
-    --text-muted: #737C8C;
-    --border-subtle: #272D38;
-    --border-strong: #363E4D;
-    --accent-primary: #8B7CF6;
-    --accent-secondary: #9A8CFF;
-    --accent-soft: #A79BFF;
-    --accent-surface: #1E1B38;
-    --color-success: #22C55E;
-    --color-warning: #F59E0B;
-    --color-danger: #EF4444;
-    --color-info: #60A5FA;
+    color-scheme: dark;
+
+    /* ---- Palette 2 semantic tokens (dark) ---- */
+    --color-background: #1C201E;
+    --color-surface: #282B29;
+    --color-surface-secondary: #222623;
+    --color-surface-elevated: #303531;
+    --color-surface-elevated-alt: #303531;
+
+    --color-primary: #D66A58;
+    --color-primary-hover: #E07C6A;
+    --color-primary-text: #E58A7A;
+
+    --color-text: #F5F0E8;
+    --color-text-secondary: #B8BDB9;
+    --color-text-muted: #8E948F;
+
+    --color-accent: #D9A49A;
+    --color-accent-strong: #E3B4AA;
+    --color-accent-surface: #2C1F1C;
+
+    --color-success: #A8C5A0;
+    --color-success-strong: #A8C5A0;
+    --color-success-hover: #BBD6B3;
+    --color-success-surface: #2C3829;
+    --color-progress: #A8C5A0;
+    --color-progress-strong: #A8C5A0;
+    --color-progress-track: #3D433F;
+
+    --color-border: #3D433F;
+    --color-border-strong: #545B55;
+    --color-divider: #3D433F;
+
+    --color-warning: #F0B872;
+    --color-danger: #F08C82;
+    --color-danger-hover: #F6A69E;
+    --color-info: #A7B3B2;
+
+    --color-on-primary: #1C201E;
+
+    /* The CV preview is a print surface, so its brand colour stays fixed. */
+    --color-print-primary: #B94736;
+
+    /* Legacy aliases resolve automatically through the tokens above. */
   }
 
   body {
@@ -65,5 +149,10 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary-text);
   }
 }

@@ -97,7 +97,7 @@ export const InterviewsView: React.FC = () => {
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
                   selectedCategory === cat
-                    ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+                    ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
                     : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
@@ -125,7 +125,7 @@ export const InterviewsView: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-1">
-                    <span className="font-mono font-bold uppercase text-[var(--accent-primary)]">{q.category}</span>
+                    <span className="font-mono font-bold uppercase text-[var(--color-primary-text)]">{q.category}</span>
                     <span>{q.roleTarget === 'all' ? 'Universal' : targetRole.title}</span>
                   </div>
                   <h3 className="font-bold text-xs text-[var(--text-primary)] leading-snug">
@@ -141,7 +141,7 @@ export const InterviewsView: React.FC = () => {
         <div className="lg:col-span-7 space-y-6">
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--accent-primary)]">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
                 Active Prompt · {activeQuestion.category.toUpperCase()}
               </span>
               <h2 className="text-base font-bold text-[var(--text-primary)] leading-relaxed">
@@ -152,7 +152,7 @@ export const InterviewsView: React.FC = () => {
             {/* Recommended Framework Callout */}
             <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] text-xs space-y-1">
               <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                <HelpCircle className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                 <span>Recommended Framework & Strategy</span>
               </div>
               <p className="text-[var(--text-secondary)] leading-relaxed">
@@ -182,7 +182,7 @@ export const InterviewsView: React.FC = () => {
               <button
                 onClick={handleEvaluate}
                 disabled={!userAnswer.trim() || isEvaluating}
-                className="px-5 py-2.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-xs disabled:opacity-50"
+                className="px-5 py-2.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-2 transition-all shadow-xs disabled:opacity-50"
               >
                 <Sparkles className={`w-4 h-4 ${isEvaluating ? 'animate-spin' : ''}`} />
                 <span>{isEvaluating ? 'Evaluating with AI...' : 'Submit Response for AI Scoring'}</span>
@@ -195,11 +195,11 @@ export const InterviewsView: React.FC = () => {
             <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--accent-primary)]/40 space-y-5 shadow-xs animate-in fade-in duration-200">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--accent-primary)]">AI Mock Evaluation</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">AI Mock Evaluation</span>
                   <div className="text-sm font-bold text-[var(--text-primary)]">Response Score & Coaching Feedback</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-3xl font-extrabold font-mono text-[var(--accent-primary)]">
+                  <div className="text-3xl font-extrabold font-mono text-[var(--color-primary-text)]">
                     {evaluationResult.score} / 10
                   </div>
                 </div>
@@ -207,8 +207,8 @@ export const InterviewsView: React.FC = () => {
 
               {/* Strengths & Improvements */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-1.5 p-3 rounded-lg bg-[var(--color-success)]/5 border border-[var(--color-success)]/20">
-                  <div className="font-bold text-[var(--color-success)] flex items-center gap-1.5">
+                <div className="space-y-1.5 p-3 rounded-lg bg-[var(--color-success-surface)] border border-[var(--color-success-strong)]/20">
+                  <div className="font-bold text-[var(--color-success-strong)] flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>Strengths</span>
                   </div>
@@ -248,7 +248,7 @@ export const InterviewsView: React.FC = () => {
               {/* Suggested Answer */}
               {evaluationResult.suggestedAnswer && (
                 <div className="space-y-1 text-xs">
-                  <div className="font-bold text-[var(--accent-primary)]">Executive Suggested Answer Model:</div>
+                  <div className="font-bold text-[var(--color-primary-text)]">Executive Suggested Answer Model:</div>
                   <p className="text-[var(--text-secondary)] leading-relaxed italic bg-[var(--surface-secondary)]/40 p-3 rounded-lg border border-[var(--border-subtle)]">
                     "{evaluationResult.suggestedAnswer}"
                   </p>
@@ -261,7 +261,7 @@ export const InterviewsView: React.FC = () => {
           {interviewSessions.length > 0 && (
             <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
               <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                <History className="w-4 h-4 text-[var(--accent-primary)]" />
+                <History className="w-4 h-4 text-[var(--color-primary-text)]" />
                 <span>Recorded Mock Sessions ({interviewSessions.length})</span>
               </div>
               <div className="space-y-3">
@@ -269,7 +269,7 @@ export const InterviewsView: React.FC = () => {
                   <div key={session.id} className="p-3 rounded-lg bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[var(--text-primary)] line-clamp-1">{session.question}</span>
-                      <span className="font-mono font-bold text-[var(--accent-primary)] shrink-0 ml-2">
+                      <span className="font-mono font-bold text-[var(--color-primary-text)] shrink-0 ml-2">
                         Score: {session.aiFeedback?.score || 8}/10
                       </span>
                     </div>

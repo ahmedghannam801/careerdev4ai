@@ -59,7 +59,7 @@ export const ProjectsView: React.FC = () => {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
           <Plus className="w-4 h-4" />
           <span>New Project</span>
@@ -74,7 +74,7 @@ export const ProjectsView: React.FC = () => {
             onClick={() => setStatusFilter(st)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
               statusFilter === st
-                ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+                ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
                 : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -133,7 +133,7 @@ export const ProjectsView: React.FC = () => {
                 <ul className="text-xs text-[var(--text-secondary)] space-y-1">
                   {project.deliverables.map((deliv, i) => (
                     <li key={i} className="flex items-center gap-1.5">
-                      <span className="text-[var(--accent-primary)] font-bold">✓</span>
+                      <span className="text-[var(--color-primary-text)] font-bold">✓</span>
                       <span>{deliv}</span>
                     </li>
                   ))}
@@ -149,7 +149,7 @@ export const ProjectsView: React.FC = () => {
                     href={project.repositoryUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-[var(--text-primary)] hover:text-[var(--accent-primary)] font-medium"
+                    className="flex items-center gap-1 text-[var(--text-primary)] hover:text-[var(--color-primary-text)] font-medium"
                   >
                     <Github className="w-3.5 h-3.5" />
                     <span>Repository</span>
@@ -160,7 +160,7 @@ export const ProjectsView: React.FC = () => {
                     href={project.demoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-[var(--accent-primary)] hover:underline font-medium"
+                    className="flex items-center gap-1 text-[var(--color-primary-text)] hover:underline font-medium"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span>Live Demo</span>
@@ -275,7 +275,7 @@ export const ProjectsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold hover:bg-[var(--accent-secondary)]"
+                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)]"
                 >
                   Create Project
                 </button>

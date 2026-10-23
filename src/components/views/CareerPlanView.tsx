@@ -22,7 +22,7 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
 
         <button
           onClick={() => onNavigate('roadmap')}
-          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
           <span>Open Interactive Roadmap</span>
           <ArrowRight className="w-3.5 h-3.5" />
@@ -31,7 +31,7 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
 
       {/* Plan Strategy Summary */}
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3 shadow-xs">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--accent-primary)]">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">
           <Sparkles className="w-4 h-4" />
           <span>Strategic Trajectory Overview</span>
         </div>
@@ -63,9 +63,9 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
                     isFinished 
-                      ? 'bg-[var(--color-success)] text-white' 
-                      : phase.isUnlocked 
-                        ? 'bg-[var(--accent-primary)] text-white' 
+                      ? 'bg-[var(--color-success-strong)] text-[var(--color-on-primary)]'
+                      : phase.isUnlocked
+                        ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
                         : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'
                   }`}>
                     {idx + 1}
@@ -82,7 +82,7 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
                   </span>
                   <button
                     onClick={() => onNavigate('roadmap')}
-                    className="text-xs font-semibold text-[var(--accent-primary)] hover:underline"
+                    className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
                   >
                     View Tasks →
                   </button>

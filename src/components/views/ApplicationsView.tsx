@@ -147,7 +147,7 @@ export const ApplicationsView: React.FC = () => {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
+            className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Add Application</span>
@@ -195,7 +195,7 @@ export const ApplicationsView: React.FC = () => {
                         </div>
 
                         {app.nextAction && (
-                          <div className="text-[11px] text-[var(--accent-primary)] font-medium line-clamp-2">
+                          <div className="text-[11px] text-[var(--color-primary-text)] font-medium line-clamp-2">
                             → {app.nextAction}
                           </div>
                         )}
@@ -213,7 +213,7 @@ export const ApplicationsView: React.FC = () => {
 
                           <button
                             onClick={() => deleteApplication(app.id)}
-                            className="p-1 text-[var(--text-muted)] hover:text-red-500 rounded"
+                            className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)] rounded"
                             title="Delete application"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -262,13 +262,13 @@ export const ApplicationsView: React.FC = () => {
                     <td className="py-3 text-[var(--text-secondary)]">
                       {app.location} · {app.workMode}
                     </td>
-                    <td className="py-3 text-[var(--accent-primary)] font-medium">
+                    <td className="py-3 text-[var(--color-primary-text)] font-medium">
                       {app.nextAction || '—'}
                     </td>
                     <td className="py-3 text-right">
                       <button
                         onClick={() => deleteApplication(app.id)}
-                        className="text-xs text-[var(--text-muted)] hover:text-red-500 px-2 py-1"
+                        className="text-xs text-[var(--text-muted)] hover:text-[var(--color-danger)] px-2 py-1"
                       >
                         Delete
                       </button>
@@ -290,7 +290,7 @@ export const ApplicationsView: React.FC = () => {
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
                   {selectedApp.role}
                 </h3>
-                <p className="text-xs text-[var(--accent-primary)] font-semibold">
+                <p className="text-xs text-[var(--color-primary-text)] font-semibold">
                   {selectedApp.company} • {selectedApp.location}
                 </p>
               </div>
@@ -360,14 +360,14 @@ export const ApplicationsView: React.FC = () => {
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between text-xs p-1.5 bg-[var(--surface-main)] rounded border border-[var(--border-subtle)]">
                     <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
-                      <FileText className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+                      <FileText className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                       <span>{cvVersions[0]?.name || 'Frontend Engineer CV'}</span>
                     </span>
-                    <span className="text-[10px] font-mono text-emerald-600">84% ATS Match</span>
+                    <span className="text-[10px] font-mono text-[var(--color-success-strong)]">84% ATS Match</span>
                   </div>
                   <div className="flex items-center justify-between text-xs p-1.5 bg-[var(--surface-main)] rounded border border-[var(--border-subtle)]">
                     <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
-                      <FolderClosed className="w-3.5 h-3.5 text-blue-500" />
+                      <FolderClosed className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />
                       <span>{selectedApp.company} - Tailored Cover Letter.pdf</span>
                     </span>
                     <span className="text-[10px] font-mono text-[var(--text-muted)]">Verified</span>
@@ -385,7 +385,7 @@ export const ApplicationsView: React.FC = () => {
               </button>
               <button
                 onClick={handleSaveAppDetails}
-                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold"
               >
                 Save Notes & Reminder
               </button>
@@ -492,7 +492,7 @@ export const ApplicationsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-white font-semibold hover:bg-[var(--accent-secondary)]"
+                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] font-semibold hover:bg-[var(--accent-secondary)]"
                 >
                   Save to Pipeline
                 </button>

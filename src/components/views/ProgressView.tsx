@@ -43,7 +43,7 @@ export const ProgressView: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
-            <Award className="w-4 h-4 text-[var(--color-success)]" />
+            <Award className="w-4 h-4 text-[var(--color-success-strong)]" />
             <span>Mastered Skills</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
@@ -56,7 +56,7 @@ export const ProgressView: React.FC = () => {
 
         <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-[var(--accent-primary)]" />
+            <Layers className="w-4 h-4 text-[var(--color-primary-text)]" />
             <span>Roadmap Completion</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
@@ -99,7 +99,7 @@ export const ProgressView: React.FC = () => {
         {/* Closed Gaps Log */}
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
           <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[var(--color-success)]" />
+            <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
             <span>Mastered Skills for {targetRole.title}</span>
           </h3>
 
@@ -110,7 +110,7 @@ export const ProgressView: React.FC = () => {
                   <span className="font-semibold text-[var(--text-primary)]">{sk.name}</span>
                   <span className="text-[var(--text-muted)]"> · {sk.category}</span>
                 </div>
-                <span className="font-mono text-[var(--color-success)] font-medium">
+                <span className="font-mono text-[var(--color-success-strong)] font-medium">
                   Level {sk.currentLevel}/5 (Target Satisfied)
                 </span>
               </div>
@@ -121,7 +121,7 @@ export const ProgressView: React.FC = () => {
         {/* Shipped Evidence & Deliverables */}
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
           <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[var(--accent-primary)]" />
+            <ShieldCheck className="w-4 h-4 text-[var(--color-primary-text)]" />
             <span>Verifiable Evidence Artifacts</span>
           </h3>
 
@@ -132,7 +132,7 @@ export const ProgressView: React.FC = () => {
                   <span className="font-semibold text-[var(--text-primary)]">{ev.title}</span>
                   <span className="text-[var(--text-muted)]"> · {ev.type}</span>
                 </div>
-                <span className="text-[var(--accent-primary)] font-medium">
+                <span className="text-[var(--color-primary-text)] font-medium">
                   {ev.skillNames.length} Skills Linked
                 </span>
               </div>

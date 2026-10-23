@@ -17,7 +17,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 bg-[var(--surface-main)]/90 backdrop-blur-md border-b border-[var(--border-subtle)] px-6 py-4 flex items-center justify-between gap-8 max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-white flex items-center justify-center font-bold text-base shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-base shadow-sm">
             CP
           </div>
           <span className="font-semibold text-base tracking-tight text-[var(--text-primary)] whitespace-nowrap shrink-0">
@@ -36,14 +36,14 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
           {profile.onboardingCompleted ? (
             <button
               onClick={onOpenDashboard}
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] transition-all whitespace-nowrap shadow-xs"
+              className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] transition-all whitespace-nowrap shadow-xs"
             >
               Open Career Dashboard
             </button>
           ) : (
             <button
               onClick={onStartOnboarding}
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)] transition-all whitespace-nowrap shadow-xs"
+              className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] transition-all whitespace-nowrap shadow-xs"
             >
               Start Your Journey
             </button>
@@ -55,7 +55,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
       <section className="px-6 pt-16 pb-20 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--accent-primary)] text-xs font-medium">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-medium">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Personal Career Operating System</span>
             </div>
@@ -71,7 +71,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
             <div className="flex flex-wrap items-center gap-4 pt-2">
               <button
                 onClick={onStartOnboarding}
-                className="px-6 py-3 rounded-lg bg-[var(--accent-primary)] text-white font-medium text-sm hover:bg-[var(--accent-secondary)] transition-all flex items-center gap-2 shadow-sm"
+                className="px-6 py-3 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] font-medium text-sm hover:bg-[var(--accent-secondary)] transition-all flex items-center gap-2 shadow-sm"
               >
                 <span>Start Your Career Journey</span>
                 <ArrowRight className="w-4 h-4" />
@@ -87,15 +87,15 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
 
             <div className="pt-4 flex items-center gap-6 text-xs text-[var(--text-secondary)]">
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-[var(--color-success)]" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
                 <span>Zero fake metrics</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-[var(--color-success)]" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
                 <span>Bi-directional career graph</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-[var(--color-success)]" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
                 <span>Bilingual English & Arabic</span>
               </div>
             </div>
@@ -112,7 +112,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
               <div className="p-5 space-y-3">
                 <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
                   <span>LIVE CAREER GRAPH</span>
-                  <span className="font-mono text-[var(--color-success)]">ACTIVE</span>
+                  <span className="font-mono text-[var(--color-success-strong)]">ACTIVE</span>
                 </div>
                 <div className="text-sm font-semibold text-[var(--text-primary)]">
                   Next Best Action Engine
@@ -120,7 +120,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                   "Complete Playwright E2E testing drills to close the largest gap for your target Frontend Engineer role."
                 </p>
-                <div className="pt-2 flex items-center justify-between text-xs font-medium text-[var(--accent-primary)]">
+                <div className="pt-2 flex items-center justify-between text-xs font-medium text-[var(--color-primary-text)]">
                   <span>84% Target Readiness</span>
                   <span>14 Tasks in Roadmap →</span>
                 </div>
@@ -156,7 +156,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 key={idx}
                 className="p-4 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] flex flex-col justify-between"
               >
-                <div className="font-mono text-xs font-semibold text-[var(--accent-primary)] mb-2">{item.step}</div>
+                <div className="font-mono text-xs font-semibold text-[var(--color-primary-text)] mb-2">{item.step}</div>
                 <div className="font-semibold text-[var(--text-primary)] mb-1">{item.title}</div>
                 <div className="text-[11px] text-[var(--text-secondary)] leading-snug">{item.desc}</div>
               </div>
@@ -214,13 +214,13 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
               className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40 transition-all flex flex-col justify-between"
             >
               <div className="space-y-2">
-                <div className="text-xs font-semibold text-[var(--accent-primary)]">{persona.focus}</div>
+                <div className="text-xs font-semibold text-[var(--color-primary-text)]">{persona.focus}</div>
                 <h3 className="text-base font-bold text-[var(--text-primary)]">{persona.title}</h3>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{persona.desc}</p>
               </div>
               <button
                 onClick={onStartOnboarding}
-                className="mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-medium text-[var(--accent-primary)] flex items-center justify-between group"
+                className="mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-medium text-[var(--color-primary-text)] flex items-center justify-between group"
               >
                 <span>Select Persona</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -244,7 +244,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
             </div>
             <button
               onClick={onExploreRoles}
-              className="text-xs font-semibold text-[var(--accent-primary)] flex items-center gap-1 hover:underline"
+              className="text-xs font-semibold text-[var(--color-primary-text)] flex items-center gap-1 hover:underline"
             >
               <span>View All 8 Roles Catalog</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -262,7 +262,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                     <h3 className="text-base font-bold text-[var(--text-primary)]">{role.title}</h3>
                     <div className="text-xs text-[var(--text-muted)]">{role.category} · {role.level}</div>
                   </div>
-                  <span className="text-xs font-mono font-medium text-[var(--color-success)] bg-[var(--color-success)]/10 px-2 py-0.5 rounded">
+                  <span className="text-xs font-mono font-medium text-[var(--color-success-strong)] bg-[var(--color-success-surface)] px-2 py-0.5 rounded">
                     {role.salaryRange.split(' ')[0]}
                   </span>
                 </div>
@@ -284,7 +284,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
 
                 <button
                   onClick={onExploreRoles}
-                  className="w-full py-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-xs font-medium text-[var(--accent-primary)] transition-colors"
+                  className="w-full py-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-xs font-medium text-[var(--color-primary-text)] transition-colors"
                 >
                   View Role Breakdown →
                 </button>
@@ -305,7 +305,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
         <div className="pt-4">
           <button
             onClick={onStartOnboarding}
-            className="px-8 py-3.5 rounded-lg bg-[var(--accent-primary)] text-white font-semibold text-sm hover:bg-[var(--accent-secondary)] transition-all shadow-md inline-flex items-center gap-2"
+            className="px-8 py-3.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] font-semibold text-sm hover:bg-[var(--accent-secondary)] transition-all shadow-md inline-flex items-center gap-2"
           >
             <span>Start Your Career Journey</span>
             <ArrowRight className="w-4 h-4" />
