@@ -4,9 +4,9 @@
   // This file is the source of truth for the Pages project once it is deployed
   // with Wrangler (or once it is committed and the project is connected to
   // Git). The project name determines the free production URL:
-  //   https://careerpilotai.pages.dev
+  //   https://careerpilot4ai.pages.dev
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "careerpilotai",
+  "name": "careerpilot4ai",
   "pages_build_output_dir": "./dist",
 
   // A compatibility date of 2026-08-04 or later enables Node.js compatibility
@@ -14,8 +14,10 @@
   // real `node:http` server implementation used by the Express API in
   // `dist/_worker.js`, so no explicit compatibility flag is needed here;
   // adding one is redundant at this compatibility date.
-  "compatibility_date": "2026-09-01",
+  "compatibility_date": "2026-09-01"
 
-  // Keep preview deployments working against the same Worker build.
-  "preview_urls": true
+  // Preview URLs are a Pages dashboard setting, not a configuration-file key:
+  // current Wrangler rejects `preview_urls` when validating a Pages config, so
+  // it is deliberately absent here. Preview deployments still use the same
+  // Worker build produced by `npm run build`.
 }

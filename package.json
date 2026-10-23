@@ -14,7 +14,7 @@
     "test": "node tests/runner.mjs",
     "test:watch": "tsx --test --watch tests/*.test.ts",
     "cf:dev": "wrangler pages dev dist",
-    "cf:deploy": "npm run build && wrangler pages deploy dist --project-name careerpilotai"
+    "cf:deploy": "npm run build && wrangler pages deploy dist --project-name careerpilot4ai"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

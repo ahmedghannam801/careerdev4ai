@@ -101,9 +101,9 @@ so the API and the browser app share one origin.
 
 ## Deploy to Cloudflare Pages
 
-The production target is Cloudflare Pages, project `careerpilotai`:
+The production target is Cloudflare Pages, project `careerpilot4ai`:
 
-<https://careerpilotai.pages.dev>
+<https://careerpilot4ai.pages.dev>
 
 `npm run build` produces two things in `dist/`:
 
@@ -122,7 +122,7 @@ implementation.
 ```bash
 npm ci
 npm run build
-npx wrangler pages deploy dist --project-name careerpilotai
+npx wrangler pages deploy dist --project-name careerpilot4ai
 ```
 
 Configure these in the Pages project (Settings → Environment variables) for
@@ -141,9 +141,9 @@ Configure these in the Pages project (Settings → Environment variables) for
 
 Supabase Auth must also be configured (Authentication → URL Configuration):
 
-- **Site URL**: `https://careerpilotai.pages.dev`
-- **Redirect URLs**: `https://careerpilotai.pages.dev/**`,
-  `https://*.careerpilotai.pages.dev/**` for previews, and
+- **Site URL**: `https://careerpilot4ai.pages.dev`
+- **Redirect URLs**: `https://careerpilot4ai.pages.dev/**`,
+  `https://*.careerpilot4ai.pages.dev/**` for previews, and
   `http://localhost:3000/**` for local development
 - **Providers**: enable Google and LinkedIn (OIDC). GitHub is intentionally not
   offered by the app and should stay disabled.
