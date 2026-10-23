@@ -9,7 +9,8 @@ interface NotificationsDrawerProps {
 }
 
 export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
-  const { notifications, markNotificationRead, clearNotifications } = useCareer();
+  const { notifications, visibleNotifications, markNotificationRead, clearNotifications } =
+    useCareer();
 
   if (!isOpen) return null;
 
@@ -19,9 +20,9 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-[var(--color-primary-text)]" />
           <span className="text-sm font-semibold text-[var(--text-primary)]">Notifications</span>
-          {notifications.filter(n => !n.read).length > 0 && (
+          {visibleNotifications.filter(n => !n.read).length > 0 && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-medium">
-              {notifications.filter(n => !n.read).length} new
+              {visibleNotifications.filter(n => !n.read).length} new
             </span>
           )}
         </div>
@@ -44,12 +45,12 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-        {notifications.length === 0 ? (
+        {visibleNotifications.length === 0 ? (
           <div className="text-center py-12 text-xs text-[var(--text-muted)]">
             No notifications at this time.
           </div>
         ) : (
-          notifications.map(n => (
+          visibleNotifications.map(n => (
             <div
               key={n.id}
               className={`p-3 rounded-lg border text-sm transition-all ${
@@ -62,7 +63,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                 <div className="flex items-center gap-2 font-medium text-xs">
                   {n.type === 'interview' && <Calendar className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />}
                   {n.type === 'roadmap' && <AlertCircle className="w-3.5 h-3.5 text-[var(--color-warning)]" />}
-                  {n.type === 'skill' && <Award className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />}
+                  {n.type === 'achievement' && <Award className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />}
                   <span>{n.title}</span>
                 </div>
                 {!n.read && (

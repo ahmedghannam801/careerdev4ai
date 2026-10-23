@@ -539,7 +539,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               >
                 <div className="flex items-center gap-2">
                   <Briefcase className="w-4 h-4 text-[var(--color-success-strong)]" />
-                  <span className="font-medium">Matched Job Openings</span>
+                  <span className="font-medium">Job Search & Applications</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               </button>

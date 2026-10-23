@@ -1053,9 +1053,9 @@ rateSweep.unref?.();
  * Express middleware that limits a caller to a fixed number of requests per
  * window. Must run AFTER `requireAuth`, so the verified user id is available.
  */
-function rateLimit(limit: number, windowMs: number) {
+function rateLimit(limit: number, windowMs: number, namespace = 'global') {
   return (req: Request, res: Response, next: () => void) => {
-    const key = req.authUser?.id ?? req.ip ?? 'anonymous';
+    const key = `${namespace}:${req.authUser?.id ?? req.ip ?? 'anonymous'}`;
     const now = Date.now();
     let bucket = rateBuckets.get(key);
 
@@ -1077,7 +1077,14 @@ function rateLimit(limit: number, windowMs: number) {
 }
 
 /** The limiter applied to the Gemini-backed routes. */
-const aiRateLimit = rateLimit(AI_RATE_LIMIT, AI_RATE_WINDOW_MS);
+const aiRateLimit = rateLimit(AI_RATE_LIMIT, AI_RATE_WINDOW_MS, 'ai');
+
+/**
+ * Sensitive account operations (password, email, deletion) verify the current
+ * password or destroy the account. They are rate-limited per verified user so
+ * a stolen session cannot brute-force the password or hammer the endpoint.
+ */
+const accountRateLimit = rateLimit(10, 60_000, 'account');
 
 // AI Copilot with Contextual Page Understanding & Action Proposals
 app.post('/api/copilot', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
@@ -1414,7 +1421,8 @@ app.get('/api/profile/check-username', async (req: Request, res: Response) => {
   try {
     const raw = req.query.username as string;
     if (!raw) return res.status(400).json({ error: 'Username required' });
-    const username = raw.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '');
+    if (raw.length > 100) return res.status(400).json({ error: 'Username is too long' });
+    const username = raw.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
 
     // Group A: PostgreSQL is the only source. Uniqueness is enforced by the
     // existing profiles_username_key unique index.
@@ -1424,7 +1432,11 @@ app.get('/api/profile/check-username', async (req: Request, res: Response) => {
     return res.json({
       username,
       available: !isTaken && username.length >= 3,
-      message: isTaken ? 'Username is already taken' : 'Username is available'
+      message: isTaken
+        ? 'Username is already taken'
+        : username.length < 3
+          ? 'Username must be at least 3 characters'
+          : 'Username is available'
     });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to validate username' });
@@ -1482,7 +1494,9 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
     const linkMap: Record<string, string> = {};
     for (const link of publicLinks ?? []) {
       if (link && typeof link.kind === 'string' && typeof link.url === 'string') {
-        linkMap[link.kind] = link.url;
+        // Defense in depth for rows written before URL validation existed.
+        const safe = parseHttpUrl(link.url, 1000);
+        if (safe.valid && safe.value) linkMap[link.kind] = safe.value;
       }
     }
 
@@ -1491,7 +1505,7 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
       preferredName: profile.full_name,
       headline: profile.target_role,
       bio: profile.bio,
-      avatarUrl: profile.avatar_url,
+      avatarUrl: parseHttpUrl(profile.avatar_url, 1000).value,
       location: profile.location,
       targetRole: profile.target_role,
       careerState: profile.user_type,
@@ -1516,7 +1530,7 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
         issuer: c.issuer ?? undefined,
         issueDate: c.issue_date ?? undefined,
         expiryDate: c.expiry_date ?? undefined,
-        credentialUrl: c.url ?? undefined,
+        credentialUrl: parseHttpUrl(c.url, 1000).value,
       })),
       skills: (userSkills ?? []).map((us: any) => ({
         name: us.skill?.name,
@@ -1526,8 +1540,8 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
       projects: (projects ?? []).map((p: any) => ({
         title: p.title,
         description: p.description ?? undefined,
-        repositoryUrl: p.repository_url ?? undefined,
-        demoUrl: p.demo_url ?? undefined,
+        repositoryUrl: parseHttpUrl(p.repository_url, 1000).value,
+        demoUrl: parseHttpUrl(p.demo_url, 1000).value,
       })),
       links: linkMap,
     };
@@ -1538,20 +1552,14 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
 });
 
 // Account: Change Password
-app.post('/api/account/change-password', async (req: Request, res: Response) => {
+app.post('/api/account/change-password', requireAuth, accountRateLimit, async (req: Request, res: Response) => {
   try {
-    // Authoritative identity: verified Supabase Auth token only.
-    const auth = await verifySupabaseToken(req.headers.authorization);
-    if (auth.status !== 'valid') {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current and new password required' });
     }
 
-    const result = await changePassword(auth.userId, currentPassword, newPassword);
+    const result = await changePassword(req.authUser!.id, currentPassword, newPassword);
     if (!result.ok) {
       return res.status(400).json({ error: result.error || 'Failed to update password' });
     }
@@ -1563,13 +1571,8 @@ app.post('/api/account/change-password', async (req: Request, res: Response) => 
 });
 
 // Account: Change Email
-app.post('/api/account/change-email', async (req: Request, res: Response) => {
+app.post('/api/account/change-email', requireAuth, accountRateLimit, async (req: Request, res: Response) => {
   try {
-    const auth = await verifySupabaseToken(req.headers.authorization);
-    if (auth.status !== 'valid') {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     const { newEmail, currentPassword } = req.body;
     if (!newEmail || !newEmail.includes('@')) {
       return res.status(400).json({ error: 'Valid email is required' });
@@ -1578,7 +1581,7 @@ app.post('/api/account/change-email', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Current password is required to change email' });
     }
 
-    const result = await changeEmail(auth.userId, newEmail.toLowerCase(), currentPassword);
+    const result = await changeEmail(req.authUser!.id, newEmail.toLowerCase(), currentPassword);
     if (!result.ok) {
       return res.status(409).json({ error: result.error || 'Failed to update email' });
     }
@@ -1590,15 +1593,10 @@ app.post('/api/account/change-email', async (req: Request, res: Response) => {
 });
 
 // Account: Delete Account
-app.post('/api/account/delete', async (req: Request, res: Response) => {
+app.post('/api/account/delete', requireAuth, accountRateLimit, async (req: Request, res: Response) => {
   try {
-    const auth = await verifySupabaseToken(req.headers.authorization);
-    if (auth.status !== 'valid') {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     // Target is exclusively the verified Supabase Auth user id.
-    const result = await deleteAccount(auth.userId);
+    const result = await deleteAccount(req.authUser!.id);
     if (!result.ok) {
       return res.status(500).json({ error: result.error || 'Failed to delete account' });
     }
@@ -1620,6 +1618,39 @@ const str = (v: unknown, max = 500): string | null =>
 const isUuid = (v: unknown): v is string =>
   typeof v === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+/**
+ * Accepts only absolute http(s) URLs for fields that are rendered as links.
+ *
+ * Without this check a stored value such as `javascript:alert(1)` would be
+ * emitted as an href in the public profile and in the owner's views. An empty
+ * value is allowed (it clears the field); anything else that is not a valid
+ * http(s) URL is rejected by the caller.
+ */
+function parseHttpUrl(
+  value: unknown,
+  max = 1000
+): { valid: boolean; value?: string } {
+  if (value === undefined || value === null || value === '') {
+    return { valid: true, value: undefined };
+  }
+  if (typeof value !== 'string' || value.length > max) {
+    return { valid: false };
+  }
+  const trimmed = value.trim();
+  if (trimmed === '') {
+    return { valid: true, value: undefined };
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { valid: false };
+    }
+    return { valid: true, value: parsed.toString() };
+  } catch {
+    return { valid: false };
+  }
+}
 
 /**
  * Validates and normalizes a roadmap tree sent by the client.
@@ -2329,6 +2360,14 @@ app.post('/api/projects', requireAuth, async (req: Request, res: Response) => {
     if (status && !['idea', 'planned', 'in_progress', 'completed', 'published'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
+    const repositoryUrl = parseHttpUrl(body.repositoryUrl, 500);
+    const demoUrl = parseHttpUrl(body.demoUrl, 500);
+    if (!repositoryUrl.valid) {
+      return res.status(400).json({ error: 'repositoryUrl must be an http(s) URL' });
+    }
+    if (!demoUrl.valid) {
+      return res.status(400).json({ error: 'demoUrl must be an http(s) URL' });
+    }
     const project = await createProject(req.authUser!.id, {
       title,
       goal: str(body.goal, 4000) ?? undefined,
@@ -2341,8 +2380,8 @@ app.post('/api/projects', requireAuth, async (req: Request, res: Response) => {
         | 'completed'
         | 'published'
         | undefined,
-      repositoryUrl: str(body.repositoryUrl, 500) ?? undefined,
-      demoUrl: str(body.demoUrl, 500) ?? undefined,
+      repositoryUrl: repositoryUrl.value,
+      demoUrl: demoUrl.value,
       documentation: str(body.documentation, 500) ?? undefined,
       tasks: Array.isArray(body.tasks)
         ? body.tasks.filter((v: unknown): v is string => typeof v === 'string').slice(0, 100)
@@ -2365,6 +2404,20 @@ app.patch('/api/projects/:id', requireAuth, async (req: Request, res: Response) 
   try {
     if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
     const body = req.body ?? {};
+    const repositoryUrl =
+      body.repositoryUrl === undefined || body.repositoryUrl === null
+        ? { valid: true, value: undefined }
+        : parseHttpUrl(body.repositoryUrl, 500);
+    const demoUrl =
+      body.demoUrl === undefined || body.demoUrl === null
+        ? { valid: true, value: undefined }
+        : parseHttpUrl(body.demoUrl, 500);
+    if (!repositoryUrl.valid) {
+      return res.status(400).json({ error: 'repositoryUrl must be an http(s) URL' });
+    }
+    if (!demoUrl.valid) {
+      return res.status(400).json({ error: 'demoUrl must be an http(s) URL' });
+    }
     const project = await updateProject(req.authUser!.id, req.params.id, {
       title: str(body.title, 200) ?? undefined,
       goal: body.goal === null ? undefined : (str(body.goal, 4000) ?? undefined),
@@ -2372,9 +2425,8 @@ app.patch('/api/projects/:id', requireAuth, async (req: Request, res: Response) 
         body.description === null ? undefined : (str(body.description, 20000) ?? undefined),
       difficulty: str(body.difficulty, 30) as ProjectDifficulty | undefined,
       status: str(body.status, 30) as ProjectStatus | undefined,
-      repositoryUrl:
-        body.repositoryUrl === null ? undefined : (str(body.repositoryUrl, 500) ?? undefined),
-      demoUrl: body.demoUrl === null ? undefined : (str(body.demoUrl, 500) ?? undefined),
+      repositoryUrl: repositoryUrl.value,
+      demoUrl: demoUrl.value,
       documentation:
         body.documentation === null ? undefined : (str(body.documentation, 500) ?? undefined),
       tasks: Array.isArray(body.tasks)
@@ -2447,11 +2499,15 @@ app.post('/api/evidence', requireAuth, async (req: Request, res: Response) => {
     if (dateAdded && Number.isNaN(new Date(dateAdded).getTime())) {
       return res.status(400).json({ error: 'Invalid dateAdded' });
     }
+    const evidenceUrl = parseHttpUrl(body.url, 500);
+    if (!evidenceUrl.valid) {
+      return res.status(400).json({ error: 'url must be an http(s) URL' });
+    }
     const item = await createEvidence(req.authUser!.id, {
       title,
       type: (type ?? undefined) as (typeof EVIDENCE_TYPES)[number] | undefined,
       description: str(body.description, 20000) ?? undefined,
-      url: str(body.url, 500) ?? undefined,
+      url: evidenceUrl.value,
       verified: typeof body.verified === 'boolean' ? body.verified : undefined,
       dateAdded: dateAdded ?? undefined,
       projectId: projectId ?? undefined,
@@ -2478,12 +2534,19 @@ app.patch('/api/evidence/:id', requireAuth, async (req: Request, res: Response) 
     if (projectId && !isUuid(projectId)) {
       return res.status(400).json({ error: 'Invalid projectId' });
     }
+    const evidenceUrl =
+      body.url === undefined || body.url === null
+        ? { valid: true, value: undefined }
+        : parseHttpUrl(body.url, 500);
+    if (!evidenceUrl.valid) {
+      return res.status(400).json({ error: 'url must be an http(s) URL' });
+    }
     const item = await updateEvidence(req.authUser!.id, req.params.id, {
       title: str(body.title, 200) ?? undefined,
       type: (type ?? undefined) as (typeof EVIDENCE_TYPES)[number] | undefined,
       description:
         body.description === null ? undefined : (str(body.description, 20000) ?? undefined),
-      url: body.url === null ? undefined : (str(body.url, 500) ?? undefined),
+      url: evidenceUrl.value,
       verified: typeof body.verified === 'boolean' ? body.verified : undefined,
       dateAdded: str(body.dateAdded, 40) ?? undefined,
       projectId: projectId ?? undefined,
@@ -2535,12 +2598,16 @@ app.post('/api/certifications', requireAuth, async (req: Request, res: Response)
     if (expiryDate && Number.isNaN(new Date(expiryDate).getTime())) {
       return res.status(400).json({ error: 'Invalid expiryDate' });
     }
+    const certificationUrl = parseHttpUrl(body.url, 500);
+    if (!certificationUrl.valid) {
+      return res.status(400).json({ error: 'url must be an http(s) URL' });
+    }
     const certification = await createCertification(req.authUser!.id, {
       name,
       issuer: str(body.issuer, 200) ?? undefined,
       issueDate: issueDate ?? undefined,
       expiryDate: expiryDate ?? undefined,
-      url: str(body.url, 500) ?? undefined,
+      url: certificationUrl.value,
       credentialId: str(body.credentialId, 200) ?? undefined,
     });
     return res.status(201).json({ success: true, certification });
@@ -2554,12 +2621,19 @@ app.patch('/api/certifications/:id', requireAuth, async (req: Request, res: Resp
   try {
     if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
     const body = req.body ?? {};
+    const certificationUrl =
+      body.url === undefined || body.url === null
+        ? { valid: true, value: undefined }
+        : parseHttpUrl(body.url, 500);
+    if (!certificationUrl.valid) {
+      return res.status(400).json({ error: 'url must be an http(s) URL' });
+    }
     const certification = await updateCertification(req.authUser!.id, req.params.id, {
       name: str(body.name, 200) ?? undefined,
       issuer: body.issuer === null ? undefined : (str(body.issuer, 200) ?? undefined),
       issueDate: str(body.issueDate, 40) ?? undefined,
       expiryDate: str(body.expiryDate, 40) ?? undefined,
-      url: body.url === null ? undefined : (str(body.url, 500) ?? undefined),
+      url: certificationUrl.value,
       credentialId:
         body.credentialId === null ? undefined : (str(body.credentialId, 200) ?? undefined),
     });
@@ -2668,12 +2742,14 @@ app.post('/api/profile-links', requireAuth, async (req: Request, res: Response) 
     const body = req.body ?? {};
     const kind = str(body.kind, 60);
     if (!kind) return res.status(400).json({ error: 'Kind is required' });
-    const url = str(body.url, 500);
-    if (!url) return res.status(400).json({ error: 'URL is required' });
+    const parsedUrl = parseHttpUrl(body.url, 500);
+    if (!parsedUrl.valid || !parsedUrl.value) {
+      return res.status(400).json({ error: 'URL must be an http(s) URL' });
+    }
     const link = await createProfileLink(req.authUser!.id, {
       kind,
       label: str(body.label, 200) ?? undefined,
-      url,
+      url: parsedUrl.value,
     });
     return res.status(201).json({ success: true, link });
   } catch (error) {
@@ -2686,10 +2762,17 @@ app.patch('/api/profile-links/:id', requireAuth, async (req: Request, res: Respo
   try {
     if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
     const body = req.body ?? {};
+    const parsedUrl =
+      body.url === undefined || body.url === null
+        ? { valid: true, value: undefined }
+        : parseHttpUrl(body.url, 500);
+    if (!parsedUrl.valid) {
+      return res.status(400).json({ error: 'URL must be an http(s) URL' });
+    }
     const link = await updateProfileLink(req.authUser!.id, req.params.id, {
       kind: str(body.kind, 60) ?? undefined,
       label: body.label === null ? undefined : (str(body.label, 200) ?? undefined),
-      url: str(body.url, 500) ?? undefined,
+      url: parsedUrl.value,
     });
     if (!link) return res.status(404).json({ error: 'Profile link not found' });
     return res.json({ success: true, link });
@@ -3136,12 +3219,56 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
     ) {
       return res.status(400).json({ error: 'Invalid userType' });
     }
+
+    const avatarUrl =
+      body.avatarUrl === undefined || body.avatarUrl === null
+        ? { valid: true, value: undefined }
+        : parseHttpUrl(body.avatarUrl, 1000);
+    if (!avatarUrl.valid) {
+      return res.status(400).json({ error: 'avatarUrl must be an http(s) URL' });
+    }
+
+    // The public URL uses the username verbatim, so keep it to the documented
+    // vocabulary and length instead of trusting the client-side input filter.
+    let username: string | undefined;
+    if (body.username !== undefined && body.username !== null) {
+      const candidate = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
+      if (!/^[a-z0-9_-]{3,30}$/.test(candidate)) {
+        return res
+          .status(400)
+          .json({ error: 'Username must be 3-30 lowercase letters, numbers, hyphens or underscores' });
+      }
+      username = candidate;
+    }
+
+    // Professional links are rendered as clickable hrefs, including on the
+    // public profile, so every non-empty value must be an absolute http(s) URL.
+    // An empty string is meaningful: it removes that kind.
+    let sanitizedLinks: Record<string, string> | undefined;
+    if (body.links !== undefined) {
+      if (!body.links || typeof body.links !== 'object' || Array.isArray(body.links)) {
+        return res.status(400).json({ error: 'links must be an object' });
+      }
+      sanitizedLinks = {};
+      for (const [kind, raw] of Object.entries(body.links as Record<string, unknown>)) {
+        if (raw === undefined || raw === null || raw === '') {
+          sanitizedLinks[kind] = '';
+          continue;
+        }
+        const parsed = parseHttpUrl(raw, 1000);
+        if (!parsed.valid || !parsed.value) {
+          return res.status(400).json({ error: `links.${kind} must be an http(s) URL` });
+        }
+        sanitizedLinks[kind] = parsed.value;
+      }
+    }
+
     const profile = await updateProfileDto(req.authUser!.id, {
       fullName: str(body.fullName, 200) ?? undefined,
       preferredName:
         body.preferredName === null ? undefined : (str(body.preferredName, 200) ?? undefined),
-      username: body.username === null ? undefined : (str(body.username, 100) ?? undefined),
-      avatarUrl: body.avatarUrl === null ? undefined : (str(body.avatarUrl, 1000) ?? undefined),
+      username,
+      avatarUrl: avatarUrl.value,
       phone: body.phone === null ? undefined : (str(body.phone, 60) ?? undefined),
       location: body.location === null ? undefined : (str(body.location, 200) ?? undefined),
       city: body.city === null ? undefined : (str(body.city, 100) ?? undefined),
@@ -3174,16 +3301,7 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
       isPublic: typeof body.isPublic === 'boolean' ? body.isPublic : undefined,
       // The professional links are a keyed set (linkedin, github, ...); they
       // are replaced as a whole so a removed link is actually removed.
-      ...(body.links && typeof body.links === 'object'
-        ? {
-            links: Object.fromEntries(
-              Object.entries(body.links as Record<string, unknown>).map(([kind, url]) => [
-                kind,
-                typeof url === 'string' ? url : '',
-              ])
-            ),
-          }
-        : {}),
+      ...(sanitizedLinks ? { links: sanitizedLinks } : {}),
     });
     if (!profile) return res.status(404).json({ error: 'Profile not found' });
     return res.json({ success: true, profile });
@@ -3267,9 +3385,9 @@ app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) =
 
 // ---- Job bookmarks ----
 //
-// The job catalogue is static (src/data/jobsData.ts), so a bookmark stores
-// only the catalogue id: there is no duplicated job data that could drift
-// from the catalogue. The owner is always the verified user id.
+// A bookmark stores only an opaque external job id. The current release has
+// no live job feed, so a normal client has no bookmarks; the endpoint remains
+// for a future provider. The owner is always the verified user id.
 app.get('/api/bookmarks', requireAuth, async (req: Request, res: Response) => {
   try {
     const bookmarks = await listBookmarks(req.authUser!.id);

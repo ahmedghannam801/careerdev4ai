@@ -1,32 +1,22 @@
 import React, { useState } from 'react';
 import { 
   FileText, 
-  FolderPlus, 
-  Download, 
   ExternalLink, 
   Trash2, 
   Copy, 
   Check, 
   Sparkles, 
-  Plus, 
   Filter, 
   Layers, 
-  FileCheck, 
-  Briefcase, 
-  Eye, 
   Lock, 
   Unlock, 
-  X,
-  FileCode,
-  Send
+  FileCode
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { CareerDocument, CoverLetter } from '../../types/career';
 
 export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { 
     documents, 
-    addDocument, 
     deleteDocument, 
     cvVersions, 
     duplicateCVVersion, 
@@ -34,27 +24,20 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
     deleteCVVersion, 
     coverLetters, 
     saveCoverLetter, 
-    deleteCoverLetter, 
     generateAiCoverLetter, 
-    applications, 
-    targetRole 
+    applications,
+    aiPreferences,
+    privacyPreferences
   } = useCareer();
+
+  // AI requests are opt-in for writing and for sharing the career graph with
+  // the provider. Both Settings controls must be on before the button runs.
+  const aiWritingEnabled =
+    aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
 
   const [activeTab, setActiveTab] = useState<'documents' | 'cv-versions' | 'cover-letters'>('documents');
   const [docTypeFilter, setDocTypeFilter] = useState<string>('all');
-  const [addDocModalOpen, setAddDocModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  // New Document Form
-  const [docForm, setDocForm] = useState({
-    name: '',
-    type: 'cv' as CareerDocument['type'],
-    format: 'pdf' as CareerDocument['format'],
-    size: '',
-    isPublic: true,
-    contentPreview: '',
-    relatedApplicationId: ''
-  });
 
   // Rename CV Modal
   const [renameModalOpen, setRenameModalOpen] = useState(false);
@@ -72,44 +55,27 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
   const [activeClDraft, setActiveClDraft] = useState<string | null>(null);
   const [clHighlights, setClHighlights] = useState<string[]>([]);
   const [selectedAppForCl, setSelectedAppForCl] = useState<string>('');
+  const [clSaveMsg, setClSaveMsg] = useState<{ success: boolean; text: string } | null>(null);
 
   const filteredDocs = docTypeFilter === 'all' 
     ? documents 
     : documents.filter(d => d.type === docTypeFilter);
 
-  const handleCopyText = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2500);
-  };
-
-  const handleSaveDocument = () => {
-    if (!docForm.name.trim()) return;
-    addDocument({
-      name: docForm.name.trim(),
-      type: docForm.type,
-      format: docForm.format,
-      size: docForm.size,
-      isPublic: docForm.isPublic,
-      contentPreview: docForm.contentPreview,
-      relatedApplicationId: docForm.relatedApplicationId || undefined,
-      relatedRoleId: targetRole.id
-    });
-    setAddDocModalOpen(false);
-    setDocForm({
-      name: '',
-      type: 'cv',
-      format: 'pdf',
-      size: '',
-      isPublic: true,
-      contentPreview: '',
-      relatedApplicationId: ''
-    });
+  const handleCopyText = async (text: string, id: string) => {
+    if (!text.trim()) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2500);
+    } catch (error) {
+      console.error('Clipboard write failed:', error);
+    }
   };
 
   const handleGenerateCoverLetter = async () => {
     if (!clForm.company || !clForm.jobTitle) return;
     setIsGeneratingCl(true);
+    setClSaveMsg(null);
     try {
       const res = await generateAiCoverLetter(
         clForm.company,
@@ -117,30 +83,50 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
         clForm.jobDescription,
         clForm.tone
       );
+      if (!res.coverLetter.trim()) {
+        setClSaveMsg({
+          success: false,
+          text: 'The AI service did not return a cover letter. Check the AI configuration and try again.',
+        });
+        return;
+      }
       setActiveClDraft(res.coverLetter);
       setClHighlights(res.keyHighlights);
     } catch (e) {
       console.error(e);
+      setClSaveMsg({
+        success: false,
+        text: 'The cover letter could not be generated. Check the AI configuration and try again.',
+      });
     } finally {
       setIsGeneratingCl(false);
     }
   };
 
-  const handleSaveActiveCoverLetter = () => {
+  const handleSaveActiveCoverLetter = async () => {
     if (!activeClDraft) return;
-    saveCoverLetter({
-      title: `${clForm.company} — ${clForm.jobTitle}`,
-      company: clForm.company,
-      role: clForm.jobTitle,
-      jobDescription: clForm.jobDescription,
-      content: activeClDraft,
-      keyHighlights: clHighlights,
-      applicationId: selectedAppForCl || undefined
-    });
-    // The cover letter is stored once, in `cover_letters` (the canonical
-    // source). The "My Documents" entry is derived from it — no duplicate
-    // record is written.
-    alert('Cover letter saved!');
+    setClSaveMsg(null);
+    try {
+      await saveCoverLetter({
+        title: `${clForm.company} — ${clForm.jobTitle}`,
+        company: clForm.company,
+        role: clForm.jobTitle,
+        jobDescription: clForm.jobDescription,
+        content: activeClDraft,
+        keyHighlights: clHighlights,
+        applicationId: selectedAppForCl || undefined
+      });
+      // The cover letter is stored once, in `cover_letters` (the canonical
+      // source). The "My Documents" entry is derived from it — no duplicate
+      // record is written.
+      setClSaveMsg({ success: true, text: 'Cover letter saved.' });
+    } catch (error) {
+      console.error('Failed to save cover letter:', error);
+      setClSaveMsg({
+        success: false,
+        text: 'The cover letter could not be saved. Please try again.',
+      });
+    }
   };
 
   return (
@@ -162,11 +148,11 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setAddDocModalOpen(true)}
+            onClick={() => onNavigate('cv-studio')}
             className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Document</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Open CV Studio</span>
           </button>
         </div>
       </div>
@@ -291,11 +277,17 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => alert(`Downloading ${doc.name}...`)}
-                      className="px-2.5 py-1 rounded-md bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] font-semibold text-[11px] flex items-center gap-1 border border-[var(--border-subtle)]"
+                      onClick={() => void handleCopyText(doc.contentPreview || '', doc.id)}
+                      disabled={!doc.contentPreview?.trim()}
+                      title={doc.contentPreview?.trim() ? 'Copy document notes' : 'No notes to copy'}
+                      className="px-2.5 py-1 rounded-md bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] font-semibold text-[11px] flex items-center gap-1 border border-[var(--border-subtle)] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Download className="w-3 h-3" />
-                      <span>Download</span>
+                      {copiedId === doc.id ? (
+                        <Check className="w-3 h-3 text-[var(--color-success-strong)]" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                      <span>{copiedId === doc.id ? 'Copied' : 'Copy notes'}</span>
                     </button>
                   </div>
                 </div>
@@ -471,12 +463,25 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
 
               <button
                 onClick={handleGenerateCoverLetter}
-                disabled={isGeneratingCl || !clForm.company || !clForm.jobTitle}
+                disabled={
+                  isGeneratingCl || !clForm.company || !clForm.jobTitle || !aiWritingEnabled
+                }
+                title={
+                  aiWritingEnabled
+                    ? undefined
+                    : 'Enable AI Writing Assistance and Career Graph AI Grounding in Settings.'
+                }
                 className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-xs"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>{isGeneratingCl ? 'Synthesizing with Gemini...' : 'Generate Tailored Cover Letter'}</span>
               </button>
+              {!aiWritingEnabled && (
+                <p className="text-[11px] text-[var(--color-warning)]">
+                  AI writing is disabled in Settings. Enable AI Writing Assistance and Career
+                  Graph AI Grounding to generate a cover letter.
+                </p>
+              )}
             </div>
           </div>
 
@@ -510,6 +515,15 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                 </div>
               )}
             </div>
+
+            {clSaveMsg && (
+              <p
+                role={clSaveMsg.success ? 'status' : 'alert'}
+                className={`text-xs ${clSaveMsg.success ? 'text-[var(--color-success-strong)]' : 'text-[var(--color-danger)]'}`}
+              >
+                {clSaveMsg.text}
+              </p>
+            )}
 
             {activeClDraft ? (
               <div className="space-y-4">
@@ -549,82 +563,9 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
         </div>
       )}
 
-      {/* MODAL: Add Document */}
-      {addDocModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Add Career Document</h3>
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Document Name</label>
-                <input
-                  type="text"
-                  value={docForm.name}
-                  onChange={(e) => setDocForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Portfolio - Fullstack.pdf"
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Type</label>
-                  <select
-                    value={docForm.type}
-                    onChange={(e: any) => setDocForm(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
-                  >
-                    <option value="cv">CV / Resume</option>
-                    <option value="cover_letter">Cover Letter</option>
-                    <option value="certificate">Certificate</option>
-                    <option value="portfolio">Portfolio Asset</option>
-                    <option value="supporting">Supporting Doc</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Format</label>
-                  <select
-                    value={docForm.format}
-                    onChange={(e: any) => setDocForm(prev => ({ ...prev, format: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
-                  >
-                    <option value="pdf">PDF</option>
-                    <option value="docx">DOCX</option>
-                    <option value="txt">TXT</option>
-                    <option value="link">Web Link</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Link to Application (optional)</label>
-                <select
-                  value={docForm.relatedApplicationId}
-                  onChange={(e) => setDocForm(prev => ({ ...prev, relatedApplicationId: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
-                >
-                  <option value="">None</option>
-                  {applications.map(a => (
-                    <option key={a.id} value={a.id}>{a.company} — {a.role}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Brief Content / Notes</label>
-                <textarea
-                  rows={2}
-                  value={docForm.contentPreview}
-                  onChange={(e) => setDocForm(prev => ({ ...prev, contentPreview: e.target.value }))}
-                  placeholder="Summary or purpose of this document..."
-                  className="w-full p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
-              <button onClick={() => setAddDocModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveDocument} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Save Document</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Documents are derived from the canonical sources (CV versions,
+          cover letters, certifications and projects); there is no standalone
+          document record and therefore no separate "Add Document" form. */}
 
       {/* MODAL: Rename CV */}
       {renameModalOpen && (

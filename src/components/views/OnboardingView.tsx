@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, ArrowLeft, Check, Sparkles, User, Briefcase, Target, Award, Compass } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CareerState, CareerGoal } from '../../types/career';
 import { TARGET_ROLES } from '../../data/rolesData';
@@ -9,7 +9,7 @@ interface OnboardingViewProps {
 }
 
 export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) => {
-  const { profile, updateProfile, setCareerState, setCareerGoal, setPrimaryTargetRole, targetRole, skills, updateSkillLevel, t } = useCareer();
+  const { profile, updateProfile, setCareerState, setCareerGoal, setPrimaryTargetRole, targetRole, skills, updateSkillLevel } = useCareer();
   const [step, setStep] = useState<number>(1);
 
   // Form states
@@ -19,31 +19,55 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   const [selectedGoal, setSelectedGoal] = useState<CareerGoal>(profile.careerGoal || 'get_promoted');
   const [customGoal, setCustomGoal] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState(targetRole.id || 'frontend-engineer');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleNext = async () => {
-    if (step === 1) {
-      setCareerState(selectedPersona);
-      setStep(2);
-    } else if (step === 2) {
-      updateProfile({ currentTitle, location });
-      setStep(3);
-    } else if (step === 3) {
-      setCareerGoal(selectedGoal, customGoal);
-      setStep(4);
-    } else if (step === 4) {
-      setPrimaryTargetRole(selectedRoleId);
-      setStep(5);
-    } else if (step === 5) {
-      // Persist the completion flag BEFORE leaving the wizard. Navigating
-      // first let the route guard see the still-false flag and send the user
-      // back into a freshly mounted step 1.
-      await updateProfile({ onboardingCompleted: true });
-      onComplete();
+    if (isSaving) return;
+    if (step === 3 && selectedGoal === 'custom' && !customGoal.trim()) {
+      setSaveError('Please describe your custom goal before continuing.');
+      return;
+    }
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      if (step === 1) {
+        await setCareerState(selectedPersona);
+        setStep(2);
+      } else if (step === 2) {
+        await updateProfile({ currentTitle, location });
+        setStep(3);
+      } else if (step === 3) {
+        await setCareerGoal(
+          selectedGoal,
+          selectedGoal === 'custom' ? customGoal.trim() : ''
+        );
+        setStep(4);
+      } else if (step === 4) {
+        const persisted = await setPrimaryTargetRole(selectedRoleId);
+        if (!persisted) {
+          throw new Error('The target role and roadmap were not persisted');
+        }
+        setStep(5);
+      } else if (step === 5) {
+        // Persist the completion flag BEFORE leaving the wizard. Navigating
+        // first let the route guard see the still-false flag and send the user
+        // back into a freshly mounted step 1.
+        await updateProfile({ onboardingCompleted: true });
+        onComplete();
+      }
+    } catch (error) {
+      console.error('Onboarding step could not be saved:', error);
+      // Stay on the current step. Advancing with unsaved data would make the
+      // wizard report a success the database never received.
+      setSaveError('We could not save this step. Check your connection and try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleBack = () => {
-    if (step > 1) setStep(step - 1);
+    if (!isSaving && step > 1) setStep(step - 1);
   };
 
   return (
@@ -170,7 +194,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 { id: 'become_specialist', label: 'Become a Deep Domain Specialist' },
                 { id: 'become_manager', label: 'Move into Engineering / Product Management' },
                 { id: 'build_portfolio', label: 'Build a Verifiable Portfolio' },
+                { id: 'freelance', label: 'Build a Freelance Practice' },
                 { id: 'explore_careers', label: 'Explore & Compare Roles' },
+                { id: 'custom', label: 'Set a Custom Goal' },
               ].map((g) => (
                 <button
                   key={g.id}
@@ -186,6 +212,26 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 </button>
               ))}
             </div>
+
+            {selectedGoal === 'custom' && (
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="custom-goal"
+                  className="block text-xs font-semibold text-[var(--text-secondary)]"
+                >
+                  Describe your goal
+                </label>
+                <input
+                  id="custom-goal"
+                  type="text"
+                  value={customGoal}
+                  onChange={(event) => setCustomGoal(event.target.value)}
+                  maxLength={160}
+                  placeholder="e.g. Move into a staff-level platform engineering role"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -197,7 +243,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 What role are you targeting?
               </h2>
               <p className="text-sm text-[var(--text-secondary)] mt-1">
-                This choice dynamically defines your skill requirements, roadmap tasks, and job matches.
+                This choice dynamically defines your skill requirements and roadmap tasks.
               </p>
             </div>
 
@@ -276,24 +322,42 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         )}
 
         {/* Step Navigation Controls */}
-        <div className="pt-6 border-t border-[var(--border-subtle)] flex items-center justify-between">
-          {step > 1 ? (
-            <button
-              onClick={handleBack}
-              className="px-4 py-2 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] flex items-center gap-1.5 transition-colors"
+        <div className="pt-6 border-t border-[var(--border-subtle)] space-y-3">
+          {saveError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs text-[var(--color-danger)]"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
-            </button>
-          ) : <div />}
+              {saveError}
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            {step > 1 ? (
+              <button
+                onClick={handleBack}
+                disabled={isSaving}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back</span>
+              </button>
+            ) : <div />}
 
-          <button
-            onClick={handleNext}
-            className="px-6 py-2.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-all flex items-center gap-2 shadow-xs"
-          >
-            <span>{step === 5 ? 'Launch Career Command Center' : 'Continue'}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+            <button
+              onClick={handleNext}
+              disabled={isSaving}
+              className="px-6 py-2.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>
+                {isSaving
+                  ? 'Saving…'
+                  : step === 5
+                    ? 'Launch Career Command Center'
+                    : 'Continue'}
+              </span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

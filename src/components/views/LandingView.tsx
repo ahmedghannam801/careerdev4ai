@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight, CheckCircle2, Sparkles, Compass, Target, Layers, FileText, Briefcase, Award, ArrowUpRight } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { TARGET_ROLES } from '../../data/rolesData';
+import heroImage from '../../assets/images/career_command_hero_1792417630769.jpg';
 
 interface LandingViewProps {
   onStartOnboarding: () => void;
@@ -104,26 +105,30 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
           <div className="lg:col-span-5">
             <div className="relative rounded-2xl overflow-hidden border border-[var(--border-subtle)] shadow-xl bg-[var(--surface-main)]">
               <img
-                src="/src/assets/images/career_command_hero_1792417630769.jpg"
+                src={heroImage}
                 alt="Career Command Center Preview"
                 className="w-full h-80 object-cover"
                 referrerPolicy="no-referrer"
               />
               <div className="p-5 space-y-3">
                 <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
-                  <span>LIVE CAREER GRAPH</span>
-                  <span className="font-mono text-[var(--color-success-strong)]">ACTIVE</span>
+                  <span>PRODUCT PREVIEW</span>
+                  <span className="font-mono text-[var(--text-muted)]">ILLUSTRATIVE</span>
                 </div>
                 <div className="text-sm font-semibold text-[var(--text-primary)]">
                   Next Best Action Engine
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  "Complete Playwright E2E testing drills to close the largest gap for your target Frontend Engineer role."
+                  Your Next Best Action is derived from your own skills, roadmap and applications —
+                  never from sample data.
                 </p>
                 <div className="pt-2 flex items-center justify-between text-xs font-medium text-[var(--color-primary-text)]">
-                  <span>84% Target Readiness</span>
-                  <span>14 Tasks in Roadmap →</span>
+                  <span>Readiness scoring</span>
+                  <span>Roadmap tasks →</span>
                 </div>
+                <p className="text-[10px] text-[var(--text-muted)]">
+                  Illustrative preview. Your account data appears only after you sign in.
+                </p>
               </div>
             </div>
           </div>

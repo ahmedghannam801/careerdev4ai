@@ -45,8 +45,13 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     applications,
     suggestAiSummary,
     validateUsername,
+    aiPreferences,
+    privacyPreferences,
     t
   } = useCareer();
+
+  const aiWritingEnabled =
+    aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
 
   // Modals state
   const [editBasicOpen, setEditBasicOpen] = useState(false);
@@ -1343,13 +1348,25 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 </label>
                 <button
                   onClick={handleGenerateSummary}
-                  disabled={aiSummaryLoading}
+                  disabled={aiSummaryLoading || !aiWritingEnabled}
+                  title={
+                    aiWritingEnabled
+                      ? undefined
+                      : 'Enable AI Writing Assistance and Career Graph AI Grounding in Settings.'
+                  }
                   className="px-2.5 py-1 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold hover:bg-[var(--accent-primary)] hover:text-[var(--color-on-primary)] transition-colors flex items-center gap-1 disabled:opacity-50"
                 >
                   <Sparkles className="w-3 h-3" />
                   <span>{aiSummaryLoading ? 'Generating...' : 'Generate New Draft'}</span>
                 </button>
               </div>
+
+              {!aiWritingEnabled && (
+                <p className="text-[11px] text-[var(--color-warning)]">
+                  AI generation is disabled in Settings. You can still write and save the
+                  summary manually.
+                </p>
+              )}
 
               <textarea
                 rows={5}

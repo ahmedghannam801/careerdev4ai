@@ -1,8 +1,9 @@
 // Server persistence for public.job_applications.
 //
-// An application tracks the user's pipeline for one job. job_id references
-// the static JOBS_CATALOG (source code, not a table) and therefore stays a
-// string.
+// An application tracks the user's pipeline for one job. `job_id` is an
+// opaque external job reference (or a client-generated one for a manually
+// added application), so it stays a string. The current release has no live
+// job feed.
 //
 // Ownership: profile_id = auth.users.id; the id is always the verified
 // Supabase user id, never a client-supplied value.

@@ -4,9 +4,10 @@
 // so a saved job vanished on every reload and on every device change. The
 // feature could not be persisted without a table.
 //
-// The table stores ONLY the catalogue id (public.job_bookmarks.job_id): the
-// job listings themselves are the static catalogue in src/data/jobsData.ts,
-// so there is no duplicated job data that could drift from the catalogue.
+// The table stores ONLY an opaque external job id
+// (public.job_bookmarks.job_id). The current release has no live job feed, so
+// the client normally has no bookmarks; the endpoint stays available for a
+// future provider without duplicating job data in the database.
 //
 // Ownership: profile_id = auth.users.id; the id is always the verified
 // Supabase user id, never a client-supplied value.

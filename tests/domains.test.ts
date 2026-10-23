@@ -138,6 +138,34 @@ describe('domain CRUD', () => {
     assert.equal(link.status, 201);
     track('profile_links', link.body.link.id);
 
+    // Link fields are rendered as hrefs, including on the public profile, so
+    // a non-http(s) scheme must be rejected at the write boundary.
+    const unsafeLink = await api('POST', '/api/profile-links', {
+      token: userA.token,
+      body: { kind: 'portfolio', url: 'javascript:alert(1)' },
+    });
+    assert.equal(unsafeLink.status, 400, 'a javascript: profile link must be rejected');
+
+    const unsafeCertification = await api('POST', '/api/certifications', {
+      token: userA.token,
+      body: { name: 'Unsafe', url: 'javascript:alert(1)' },
+    });
+    assert.equal(
+      unsafeCertification.status,
+      400,
+      'a javascript: certification URL must be rejected'
+    );
+
+    const unsafeProfileLink = await api('PATCH', '/api/profile', {
+      token: userA.token,
+      body: { links: { linkedin: 'javascript:alert(1)' } },
+    });
+    assert.equal(
+      unsafeProfileLink.status,
+      400,
+      'a javascript: link in the profile patch must be rejected'
+    );
+
     const identity = await api('PUT', '/api/career-identity', {
       token: userA.token,
       body: { whoYouAre: 'builder', whereYoureGoing: 'staff engineer' },

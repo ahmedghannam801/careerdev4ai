@@ -305,7 +305,9 @@ export interface UserNotification {
   id: string;
   title: string;
   message: string;
-  type: 'roadmap' | 'interview' | 'application' | 'skill' | 'system';
+  // Mirrors server/db/notifications.ts NOTIFICATION_TYPES. The two lists must
+  // stay identical or persisted rows are cast to a type the UI cannot render.
+  type: 'roadmap' | 'interview' | 'application' | 'achievement' | 'system';
   read: boolean;
   timestamp: string;
   linkAction?: string;

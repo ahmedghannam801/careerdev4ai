@@ -50,7 +50,6 @@ const getClientLabel = (): string => {
 export const SettingsView: React.FC = () => {
   const { 
     currentUser, 
-    authToken, 
     profile, 
     updateProfile, 
     settings, 
@@ -85,10 +84,16 @@ export const SettingsView: React.FC = () => {
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Username validation state
+  // Username validation state. The username is saved only when the user
+  // presses Save — it must never be written on every keystroke.
   const [usernameInput, setUsernameInput] = useState(profile.username || '');
   const [usernameStatus, setUsernameStatus] = useState<{ available?: boolean; text: string } | null>(null);
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameSaved, setUsernameSaved] = useState(false);
+  const [publicSaving, setPublicSaving] = useState(false);
+  const [publicError, setPublicError] = useState<string | null>(null);
 
   // "Member Since" is the user's own account creation date, read from the
   // Supabase auth session. It was a hard-coded "October 2026" before.
@@ -182,6 +187,7 @@ export const SettingsView: React.FC = () => {
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') return;
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       const token = await getAccessToken();
       const res = await fetch('/api/account/delete', {
@@ -189,6 +195,12 @@ export const SettingsView: React.FC = () => {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (res.ok) {
+        // The auth user is already deleted. Clear the local Supabase session
+        // before reloading; otherwise the browser would restore a session for
+        // an identity that no longer exists and every API call would 401.
+        if (isSupabaseConfigured) {
+          await getBrowserSupabase().auth.signOut().catch(() => {});
+        }
         // B.4 finding L-1: `localStorage.clear()` also wiped the Supabase
         // auth session. The account is already deleted, so the session is
         // dead anyway; the cache keys are cleared explicitly instead.
@@ -197,32 +209,74 @@ export const SettingsView: React.FC = () => {
           'careerpilot_target_role',
           'careerpilot_skills',
           'careerpilot_settings',
+          'careerpilot_ai_preferences',
+          'careerpilot_notification_preferences',
+          'careerpilot_privacy_preferences',
         ]) {
           localStorage.removeItem(key);
         }
         window.location.reload();
       } else {
-        alert('Failed to delete account');
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(
+          typeof data?.error === 'string' ? data.error : 'Failed to delete account'
+        );
       }
     } catch (e) {
       console.error(e);
-      alert('Error deleting account');
+      setDeleteError('Network error while deleting the account. Please try again.');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleValidateUsername = async (val: string) => {
-    const clean = val.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  const handleUsernameChange = (value: string) => {
+    const clean = value.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
     setUsernameInput(clean);
-    if (clean.length < 3) {
+    setUsernameStatus(null);
+    setUsernameSaved(false);
+  };
+
+  const handleSaveUsername = async () => {
+    if (usernameSaving) return;
+    setUsernameStatus(null);
+    setUsernameSaved(false);
+    if (usernameInput.length < 3) {
       setUsernameStatus({ available: false, text: 'Username must be at least 3 characters' });
       return;
     }
-    const res = await validateUsername(clean);
-    setUsernameStatus({ available: res.available, text: res.message });
-    if (res.available) {
-      updateProfile({ username: clean });
+    if (usernameInput === profile.username) {
+      setUsernameStatus({ available: true, text: 'This is already your username' });
+      return;
+    }
+    setUsernameSaving(true);
+    try {
+      const res = await validateUsername(usernameInput);
+      setUsernameStatus({ available: res.available, text: res.message });
+      if (!res.available) return;
+      await updateProfile({ username: usernameInput });
+      setUsernameSaved(true);
+    } catch (error) {
+      console.error('Failed to save username:', error);
+      setUsernameStatus({
+        available: false,
+        text: 'Could not save the username. Please try again.',
+      });
+    } finally {
+      setUsernameSaving(false);
+    }
+  };
+
+  const handlePublicToggle = async (checked: boolean) => {
+    setPublicError(null);
+    setPublicSaving(true);
+    try {
+      await updateProfile({ isPublic: checked });
+    } catch (error) {
+      console.error('Failed to update public profile visibility:', error);
+      setPublicError('Could not update the public profile setting. Please try again.');
+    } finally {
+      setPublicSaving(false);
     }
   };
 
@@ -252,7 +306,7 @@ export const SettingsView: React.FC = () => {
       <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2 text-xs font-semibold">
         {[
           { id: 'account', label: 'Account', icon: User },
-          { id: 'security', label: 'Security & Sessions', icon: Shield },
+          { id: 'security', label: 'Security', icon: Shield },
           { id: 'privacy', label: 'Privacy Center', icon: Lock },
           { id: 'ai', label: 'AI Preferences', icon: Sparkles },
           { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -357,6 +411,11 @@ export const SettingsView: React.FC = () => {
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete Account & Career Graph</span>
             </button>
+            {deleteError && (
+              <p role="alert" className="text-xs text-[var(--color-danger)]">
+                {deleteError}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -366,10 +425,10 @@ export const SettingsView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Security & Active Sessions
+              Security & Active Session
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Monitor authentication tokens, connected devices, and active secure sessions.
+              Review the current authenticated session and how credentials are handled.
             </p>
           </div>
 
@@ -382,7 +441,7 @@ export const SettingsView: React.FC = () => {
                 <div>
                   <div className="text-xs font-bold text-[var(--text-primary)]">Current Active Session</div>
                   <div className="text-[11px] text-[var(--text-muted)] font-mono">
-                    Token: {authToken ? `${authToken.slice(0, 8)}...${authToken.slice(-6)}` : 'Supabase session'} • {getClientLabel()}
+                    Supabase session • {getClientLabel()}
                   </div>
                 </div>
               </div>
@@ -395,7 +454,9 @@ export const SettingsView: React.FC = () => {
           <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] space-y-2 text-xs">
             <span className="font-bold text-[var(--text-primary)] block">Authentication Protocols</span>
             <p className="text-[var(--text-secondary)] leading-relaxed">
-              Passwords are salted with cryptographic random bytes and hashed using Node.js scrypt with 64-byte key derivations. Server communication operates over TLS.
+              Credentials are handled by Supabase Auth; the application never stores a raw
+              password. Deployments must be served over HTTPS so session tokens are encrypted
+              in transit.
             </p>
           </div>
         </div>
@@ -415,18 +476,31 @@ export const SettingsView: React.FC = () => {
 
           <div className="space-y-4 text-xs">
             {/* Public profile toggle */}
-            <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
+            <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between gap-4">
               <div>
                 <span className="font-bold text-[var(--text-primary)] block">Public Career Profile</span>
                 <p className="text-[var(--text-secondary)] mt-0.5">
-                  Allows sharing a clean resume view at /#/profile/{profile.username || 'username'}. Private notes and applications are never exposed.
+                  Share a read-only resume view at /#/profile/{profile.username || 'username'}.
+                  Private notes, applications and interview sessions are never exposed.
                 </p>
+                {!profile.username && (
+                  <p className="text-[11px] text-[var(--color-warning)] mt-1">
+                    Save a username below before enabling the public profile.
+                  </p>
+                )}
+                {publicError && (
+                  <p role="alert" className="text-[11px] text-[var(--color-danger)] mt-1">
+                    {publicError}
+                  </p>
+                )}
               </div>
               <input
                 type="checkbox"
                 checked={profile.isPublic}
-                onChange={(e) => updateProfile({ isPublic: e.target.checked })}
-                className="w-4 h-4 accent-[var(--accent-primary)] rounded cursor-pointer"
+                onChange={(e) => void handlePublicToggle(e.target.checked)}
+                disabled={publicSaving || !profile.username}
+                aria-label="Enable public career profile"
+                className="w-4 h-4 accent-[var(--accent-primary)] rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -437,15 +511,42 @@ export const SettingsView: React.FC = () => {
                 <input
                   type="text"
                   value={usernameInput}
-                  onChange={(e) => handleValidateUsername(e.target.value)}
+                  onChange={(e) => handleUsernameChange(e.target.value)}
+                  maxLength={30}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleSaveUsername();
+                    }
+                  }}
+                  aria-label="Professional username handle"
                   className="flex-1 px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono"
                 />
+                <button
+                  type="button"
+                  onClick={() => void handleSaveUsername()}
+                  disabled={
+                    usernameSaving ||
+                    usernameInput.length < 3 ||
+                    usernameInput === profile.username
+                  }
+                  className="px-3 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {usernameSaving ? 'Saving…' : 'Save'}
+                </button>
               </div>
               {usernameStatus && (
                 <p className={`text-[11px] ${usernameStatus.available ? 'text-[var(--color-success-strong)]' : 'text-[var(--color-warning)]'}`}>
                   {usernameStatus.text}
                 </p>
               )}
+              {usernameSaved && (
+                <p className="text-[11px] text-[var(--color-success-strong)]">Username saved.</p>
+              )}
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Use 3–30 lowercase letters, numbers, hyphens or underscores. The public profile link is
+                /#/profile/{profile.username || 'username'}.
+              </p>
             </div>
 
             {/* AI Personalization */}
@@ -453,7 +554,8 @@ export const SettingsView: React.FC = () => {
               <div>
                 <span className="font-bold text-[var(--text-primary)] block">Career Graph AI Grounding</span>
                 <p className="text-[var(--text-secondary)] mt-0.5">
-                  Allows Gemini to analyze your roadmap gaps and project deliverables to provide tailored recommendations.
+                  Allows Gemini to analyze your roadmap gaps and project deliverables when you
+                  start an AI action. When off, AI buttons that need this context are disabled.
                 </p>
               </div>
               <input
@@ -475,7 +577,8 @@ export const SettingsView: React.FC = () => {
               AI Copilot & Writing Assistant Controls
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Customize how proactively CareerPilot AI assists with cover letters, mock evaluations, and roadmap planning.
+              These preferences are stored in this browser and control which AI actions you can
+              start. AI requests are never sent in the background.
             </p>
           </div>
 
@@ -549,15 +652,30 @@ export const SettingsView: React.FC = () => {
               Notification Preferences
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Control alert frequency for upcoming interviews, roadmap deadlines, and job match opportunities.
+              Choose which notification types appear in your Notifications drawer. These
+              preferences are stored in this browser; scheduled email delivery is not enabled in
+              this release.
             </p>
           </div>
 
           <div className="space-y-3 text-xs">
             <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)]">Interview Reminders</span>
-                <p className="text-[var(--text-secondary)]">Alerts 24 hours and 2 hours before scheduled technical or behavioral rounds.</p>
+                <span className="font-bold text-[var(--text-primary)]">In-app Notifications</span>
+                <p className="text-[var(--text-secondary)]">Master switch for the Notifications drawer.</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={notificationPreferences.inAppNotifications}
+                onChange={(e) => updateNotificationPreferences({ inAppNotifications: e.target.checked })}
+                className="w-4 h-4 accent-[var(--accent-primary)] rounded cursor-pointer"
+              />
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
+              <div>
+                <span className="font-bold text-[var(--text-primary)]">Interview Updates</span>
+                <p className="text-[var(--text-secondary)]">Show interview-related notifications in the drawer.</p>
               </div>
               <input
                 type="checkbox"
@@ -569,8 +687,8 @@ export const SettingsView: React.FC = () => {
 
             <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)]">Application Pipeline Follow-ups</span>
-                <p className="text-[var(--text-secondary)]">Reminders when recruiters have not responded past 7 business days.</p>
+                <span className="font-bold text-[var(--text-primary)]">Application Pipeline Updates</span>
+                <p className="text-[var(--text-secondary)]">Show application-stage notifications in the drawer.</p>
               </div>
               <input
                 type="checkbox"
@@ -582,8 +700,8 @@ export const SettingsView: React.FC = () => {
 
             <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)]">Roadmap Milestone Reminders</span>
-                <p className="text-[var(--text-secondary)]">Notifications when scheduled learning tasks are approaching due date.</p>
+                <span className="font-bold text-[var(--text-primary)]">Roadmap Updates</span>
+                <p className="text-[var(--text-secondary)]">Show roadmap and milestone notifications in the drawer.</p>
               </div>
               <input
                 type="checkbox"

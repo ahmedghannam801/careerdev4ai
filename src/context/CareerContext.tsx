@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useMemo } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import {
   CareerState,
   CareerGoal,
@@ -42,8 +43,6 @@ import {
   ProfileCompletenessBreakdown
 } from '../types/career';
 import { TARGET_ROLES } from '../data/rolesData';
-import { PROJECTS_CATALOG } from '../data/projectsCatalog';
-import { JOBS_CATALOG } from '../data/jobsData';
 import { translations, Language } from '../translations';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
 import {
@@ -267,13 +266,21 @@ interface CareerContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  /**
+   * True while the browser holds a Supabase recovery session created by the
+   * password-reset email link. The app must ask for a new password before the
+   * user continues, because the recovery session is not a normal sign-in.
+   */
+  passwordRecovery: boolean;
+  completePasswordReset: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  dismissPasswordRecovery: () => void;
 
   // Profile & Persona
   profile: UserProfile;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
-  setCareerState: (state: CareerState) => void;
-  setCareerGoal: (goal: CareerGoal, customText?: string) => void;
-  completeOnboarding: () => void;
+  setCareerState: (state: CareerState) => Promise<void>;
+  setCareerGoal: (goal: CareerGoal, customText?: string) => Promise<void>;
+  completeOnboarding: () => Promise<void>;
   suggestAiSummary: () => Promise<string>;
   validateUsername: (username: string) => Promise<{ available: boolean; message: string }>;
   profileCompleteness: ProfileCompletenessBreakdown;
@@ -282,10 +289,14 @@ interface CareerContextType {
   activeView: string;
   setActiveView: (view: string) => void;
 
+  // Copilot drawer (shared by the shell and the dashboard)
+  copilotOpen: boolean;
+  setCopilotOpen: (open: boolean) => void;
+
   // Target Roles & Comparison
   targetRole: TargetRole;
   savedRoles: TargetRole[];
-  setPrimaryTargetRole: (roleId: string) => void;
+  setPrimaryTargetRole: (roleId: string) => Promise<boolean>;
   saveRole: (role: TargetRole) => void;
   removeSavedRole: (roleId: string) => void;
 
@@ -306,11 +317,10 @@ interface CareerContextType {
 
   // Documents & Cover Letters
   documents: CareerDocument[];
-  addDocument: (doc: Omit<CareerDocument, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   deleteDocument: (id: string) => Promise<void>;
   coverLetters: CoverLetter[];
-  saveCoverLetter: (cl: Omit<CoverLetter, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
-  deleteCoverLetter: (id: string) => void;
+  saveCoverLetter: (cl: Omit<CoverLetter, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<void>;
+  deleteCoverLetter: (id: string) => Promise<void>;
   generateAiCoverLetter: (company: string, jobTitle: string, jobDesc: string, tone?: string) => Promise<{ coverLetter: string; keyHighlights: string[] }>;
 
   // Skills
@@ -407,6 +417,8 @@ interface CareerContextType {
 
   // Notifications
   notifications: UserNotification[];
+  /** Notifications allowed by the device-local notification preferences. */
+  visibleNotifications: UserNotification[];
   markNotificationRead: (id: string) => void;
   clearNotifications: () => void;
 
@@ -916,13 +928,76 @@ function toProfessionalLinks(links: ProfileLinkDTO[]): ProfessionalLinks {
   };
 }
 
+const DEFAULT_AI_PREFERENCES: AiPreferences = {
+  recommendationsEnabled: true,
+  writingAssistance: true,
+  proactiveSuggestions: true,
+  personalizationLevel: 'focused',
+  preferredLanguage: 'en',
+};
+
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  emailNotifications: true,
+  inAppNotifications: true,
+  applicationReminders: true,
+  interviewReminders: true,
+  roadmapReminders: true,
+  learningReminders: true,
+  aiRecommendations: true,
+};
+
+const DEFAULT_PRIVACY_PREFERENCES: PrivacyPreferences = {
+  profileVisibility: 'public',
+  allowSearchEngines: true,
+  shareAnalyticsWithAi: true,
+  showSkillsPublicly: true,
+  showProjectsPublicly: true,
+};
+
+/**
+ * Preferences are device-local UI settings. They are stored per browser
+ * rather than in PostgreSQL (theme and language are the account-owned
+ * exceptions, handled by the preferences API).
+ */
+function readPreferenceCache<T extends object>(key: string, defaults: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? { ...defaults, ...parsed } : defaults;
+  } catch {
+    return defaults;
+  }
+}
+
+function writePreferenceCache<T extends object>(key: string, value: T) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // A private-mode browser may refuse the write; the in-memory value still
+    // applies for this session.
+  }
+}
+
 export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Authentication State — Supabase Auth is the only identity source.
   // No demo fallback: an unauthenticated visitor has no session and no user.
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  // True when Supabase reports a recovery session created by the reset email.
+  // Until a new password is saved, the session must not be treated as a
+  // deliberate sign-in.
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+
+  // The identity the in-memory career state belongs to. When the Supabase
+  // session changes to a different user (or disappears) without going through
+  // the explicit logout button, the old user's data must be cleared before the
+  // new user's hydration starts. Otherwise the previous user's profile,
+  // roadmap, applications and notifications remain visible for the duration
+  // of the hydration request.
+  const authIdentityRef = useRef<string | null>(null);
 
   // Session restoration + automatic token refresh.
   // Supabase persists the session and refreshes it on expiry; this listener
@@ -932,10 +1007,23 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setIsAuthReady(true);
       return;
     }
+    // Read the recovery marker before Supabase initializes: with
+    // `detectSessionInUrl` the client consumes and removes the token fragment.
+    // The auth event below is the primary signal; this is the fallback for the
+    // case where initialization finishes before the listener is attached.
+    const looksLikeRecovery =
+      /(?:^|[#&?])type=recovery(?:[&=]|$)/.test(window.location.hash) ||
+      /(?:^|[?&])type=recovery(?:[&=]|$)/.test(window.location.search);
+
     const supabase = getBrowserSupabase();
 
-    supabase.auth.getSession().then(({ data }) => {
-      const session = data.session;
+    const applySession = (session: Session | null) => {
+      const nextUserId = session?.user?.id ?? null;
+      if (authIdentityRef.current !== null && authIdentityRef.current !== nextUserId) {
+        resetAuthenticatedState();
+      }
+      authIdentityRef.current = nextUserId;
+
       if (session) {
         setAuthToken(session.access_token);
         setCurrentUser(toUserAccount(session.user, session.access_token));
@@ -944,24 +1032,36 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setCurrentUser(null);
       }
       setIsAuthReady(true);
-    });
+    };
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (looksLikeRecovery && data.session) setPasswordRecovery(true);
+        applySession(data.session);
+      })
+      .catch(() => {
+        // A failed session restore must not leave the app on the boot loader
+        // forever. The visitor is treated as signed out.
+        setIsAuthReady(true);
+      });
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session) {
-          setAuthToken(session.access_token);
-          setCurrentUser(toUserAccount(session.user, session.access_token));
-        } else {
-          setAuthToken(null);
-          setCurrentUser(null);
-        }
-        setIsAuthReady(true);
+      (event, session) => {
+        // A reset link arrives as a real session with the PASSWORD_RECOVERY
+        // event. The user is authenticated, but the only safe next step is to
+        // choose a new password; the app shows that form before continuing.
+        if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+        applySession(session);
       }
     );
 
     return () => {
       subscription.subscription.unsubscribe();
     };
+    // `resetAuthenticatedState` is a hoisted function declaration and is called
+    // only from the session callback, never during render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // B.3.6 — Backend hydration for the persisted domains.
@@ -1225,6 +1325,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');
 
+  // The Copilot drawer is part of the authenticated shell, but the dashboard
+  // also opens it. The open flag therefore lives in the shared context rather
+  // than inside AppShell (where the dashboard's button could not reach it).
+  const [copilotOpen, setCopilotOpen] = useState(false);
+
   // Profile & Persona
   //
   // B.4 finding C-5: this used to be initialised with a hard-coded demo
@@ -1380,7 +1485,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // and the interviews with a fabricated mock-interview session. A brand-new
   // user saw other people's career activity. Both lists now start empty and
   // are filled from PostgreSQL.
-  const [jobs] = useState<JobListing[]>(JOBS_CATALOG);
+  // There is no live job feed integration in this release. The previous
+  // static catalogue contained fabricated employers and `.example.com`
+  // application links, so it has been removed rather than presented as live
+  // matches. The Jobs view now links to real job-board searches, and job
+  // applications are still tracked in PostgreSQL.
+  const jobs: JobListing[] = [];
   const [applications, setApplications] = useState<JobApplication[]>([]);
 
   // Interviews
@@ -1547,6 +1657,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     } catch (error) {
       console.error('Failed to save cover letter:', error);
+      throw error;
     }
   };
 
@@ -1628,57 +1739,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     setDocuments(derived);
   }, [cvVersions, coverLetters, profile.certifications, projects]);
-
-  // Adding a document routes it to the canonical source for its type
-  // (there is no standalone documents entity).
-  const addDocument = async (
-    doc: Omit<CareerDocument, 'id' | 'createdAt' | 'updatedAt'>
-  ) => {
-    try {
-      if (doc.type === 'cover_letter') {
-        await saveCoverLetter({
-          title: doc.name,
-          company: doc.relatedRoleId ?? 'Unknown',
-          role: doc.relatedRoleId ?? 'Unknown',
-          content: doc.contentPreview ?? '',
-          keyHighlights: [],
-          applicationId: doc.relatedApplicationId,
-        });
-        return;
-      }
-      if (doc.type === 'certificate') {
-        updateProfile({
-          certifications: [
-            ...profile.certifications,
-            {
-              id: `cert-${Date.now()}`,
-              name: doc.name,
-              provider: 'Unknown',
-              issueDate: new Date().toISOString().split('T')[0],
-            },
-          ],
-        });
-        return;
-      }
-      if (doc.type === 'portfolio') {
-        await addProject({
-          title: doc.name,
-          goal: doc.contentPreview ?? '',
-          description: doc.contentPreview ?? '',
-          difficulty: 'Intermediate',
-          skills: [],
-          tasks: [],
-          deliverables: [],
-          status: 'planned',
-        });
-        return;
-      }
-      // 'cv' and 'supporting' have no writable canonical source in this phase.
-      console.warn(`No canonical store for document type "${doc.type}" — ignored.`);
-    } catch (error) {
-      console.error('Failed to add document:', error);
-    }
-  };
 
   // Removing a derived document removes the underlying canonical record.
   const deleteDocument = async (id: string) => {
@@ -1872,44 +1932,75 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  // AI & Notification & Privacy Preferences
-  const [aiPreferences, setAiPreferences] = useState<AiPreferences>({
-    recommendationsEnabled: true,
-    writingAssistance: true,
-    proactiveSuggestions: true,
-    personalizationLevel: 'focused',
-    preferredLanguage: 'en'
-  });
+  // AI & Notification & Privacy Preferences. These are per-device UI
+  // preferences and survive a reload; account-owned theme and language live in
+  // the preferences API instead.
+  const [aiPreferences, setAiPreferences] = useState<AiPreferences>(() =>
+    readPreferenceCache('careerpilot_ai_preferences', DEFAULT_AI_PREFERENCES)
+  );
 
   const updateAiPreferences = (updates: Partial<AiPreferences>) => {
-    setAiPreferences(prev => ({ ...prev, ...updates }));
+    setAiPreferences(prev => {
+      const next = { ...prev, ...updates };
+      writePreferenceCache('careerpilot_ai_preferences', next);
+      return next;
+    });
   };
 
-  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
-    emailNotifications: true,
-    inAppNotifications: true,
-    applicationReminders: true,
-    interviewReminders: true,
-    roadmapReminders: true,
-    learningReminders: true,
-    aiRecommendations: true
-  });
+  const [notificationPreferences, setNotificationPreferences] =
+    useState<NotificationPreferences>(() =>
+      readPreferenceCache(
+        'careerpilot_notification_preferences',
+        DEFAULT_NOTIFICATION_PREFERENCES
+      )
+    );
 
   const updateNotificationPreferences = (updates: Partial<NotificationPreferences>) => {
-    setNotificationPreferences(prev => ({ ...prev, ...updates }));
+    setNotificationPreferences(prev => {
+      const next = { ...prev, ...updates };
+      writePreferenceCache('careerpilot_notification_preferences', next);
+      return next;
+    });
   };
 
-  const [privacyPreferences, setPrivacyPreferences] = useState<PrivacyPreferences>({
-    profileVisibility: 'public',
-    allowSearchEngines: true,
-    shareAnalyticsWithAi: true,
-    showSkillsPublicly: true,
-    showProjectsPublicly: true
-  });
+  const [privacyPreferences, setPrivacyPreferences] = useState<PrivacyPreferences>(() =>
+    readPreferenceCache('careerpilot_privacy_preferences', DEFAULT_PRIVACY_PREFERENCES)
+  );
 
   const updatePrivacyPreferences = (updates: Partial<PrivacyPreferences>) => {
-    setPrivacyPreferences(prev => ({ ...prev, ...updates }));
+    setPrivacyPreferences(prev => {
+      const next = { ...prev, ...updates };
+      writePreferenceCache('careerpilot_privacy_preferences', next);
+      return next;
+    });
   };
+
+  // The notification preferences are real display filters. A hidden category
+  // stays in the database; it is simply not shown in this browser.
+  const visibleNotifications = useMemo(() => {
+    if (!notificationPreferences.inAppNotifications) return [];
+    return notifications.filter((notification) => {
+      if (
+        notification.type === 'interview' &&
+        !notificationPreferences.interviewReminders
+      ) {
+        return false;
+      }
+      if (
+        notification.type === 'application' &&
+        !notificationPreferences.applicationReminders
+      ) {
+        return false;
+      }
+      if (
+        notification.type === 'roadmap' &&
+        !notificationPreferences.roadmapReminders
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [notifications, notificationPreferences]);
 
   // Real Calculated Profile Completeness
   const profileCompleteness = useMemo<ProfileCompletenessBreakdown>(() => {
@@ -2414,18 +2505,15 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const logout = () => {
-    if (isSupabaseConfigured) {
-      getBrowserSupabase().auth.signOut().catch(() => {});
-    }
-    setAuthToken(null);
-    setCurrentUser(null);
-    localStorage.removeItem('careerpilot_token');
-    localStorage.removeItem('careerpilot_user');
-    // B.4 finding M-3: the React state was NOT cleared on sign-out, so the
-    // next user to sign in on the same tab saw the previous user's profile,
-    // roadmap, applications and notifications until the hydration finished.
-    // Every domain is reset to its empty state here.
+  // Clears every domain that belongs to the signed-in user. It is called by
+  // the explicit logout button AND by the auth listener when the Supabase
+  // identity changes (session expiry, forced sign-out, or a different user
+  // signing in on the same tab).
+  //
+  // B.4 finding M-3: the React state was NOT cleared on sign-out, so the next
+  // user to sign in on the same tab saw the previous user's profile, roadmap,
+  // applications and notifications until hydration finished.
+  function resetAuthenticatedState() {
     setProfile({ ...emptyProfile });
     setTargetRole(TARGET_ROLES[0]);
     setSavedRoles([]);
@@ -2463,13 +2551,58 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setDocuments([]);
     setCopilotMessages([]);
     setPendingAiAction(null);
+    setCopilotOpen(false);
+    setActiveView('dashboard');
     setIsHydrated(false);
+    setPasswordRecovery(false);
+  }
+
+  const logout = () => {
+    if (isSupabaseConfigured) {
+      getBrowserSupabase().auth.signOut().catch(() => {});
+    }
+    setAuthToken(null);
+    setCurrentUser(null);
+    authIdentityRef.current = null;
+    localStorage.removeItem('careerpilot_token');
+    localStorage.removeItem('careerpilot_user');
+    resetAuthenticatedState();
+  };
+
+  // Completes the password-reset flow. Supabase treats the link as a recovery
+  // session, so `updateUser` is allowed without the old password. The modal
+  // stays open until the write succeeds, then the user continues normally.
+  const completePasswordReset = async (newPassword: string) => {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: 'Authentication is not configured' };
+    }
+    if (newPassword.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters' };
+    }
+    try {
+      const { error } = await getBrowserSupabase().auth.updateUser({ password: newPassword });
+      if (error) {
+        return { success: false, error: error.message || 'Could not update the password' };
+      }
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Connection failed' };
+    }
+  };
+
+  const dismissPasswordRecovery = () => {
+    setPasswordRecovery(false);
+    // Do not leave a recovery/token fragment in the address bar. replaceState
+    // avoids a navigation and keeps the app on the current SPA route.
+    if (/type=recovery|access_token=/.test(window.location.hash)) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
   };
 
   // Target Role Change Handler
-  const setPrimaryTargetRole = async (roleId: string) => {
+  const setPrimaryTargetRole = async (roleId: string): Promise<boolean> => {
     const role = TARGET_ROLES.find(r => r.id === roleId);
-    if (!role) return;
+    if (!role) return false;
     setTargetRole(role);
 
     // The skill target levels are derived from the role, so they follow the
@@ -2514,7 +2647,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (roadmap) {
         setRoadmapPhases(toRoadmapPhases(roadmap));
         setIsEnrolledInRoadmap(roadmap.isEnrolled);
-        return;
+        return true;
       }
     } catch (error) {
       console.error('Failed to persist roadmap:', error);
@@ -2522,8 +2655,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     // The server is unreachable: keep the generated tree locally so the UI
     // still responds. It will be replaced by the server's roadmap on the next
-    // successful load.
+    // successful load. `false` tells the caller (onboarding) that this choice
+    // is NOT persisted yet.
     setRoadmapPhases(generated);
+    return false;
   };
 
   const saveRole = async (role: TargetRole) => {
@@ -2564,6 +2699,15 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // the rest (educations, experiences, and the aggregated preferences) keep
   // flowing through the aggregate /api/state sync.
   const updateProfile = async (updates: Partial<UserProfile>) => {
+    // `email` is owned by Supabase Auth, not by the profile row. The account
+    // endpoint has already changed it when the UI calls this; mirroring it
+    // onto the session user keeps the displayed address in sync instead of
+    // silently ignoring the update.
+    if (updates.email !== undefined) {
+      setCurrentUser(prev => (prev ? { ...prev, email: updates.email! } : prev));
+      setProfile(prev => ({ ...prev, email: updates.email! }));
+    }
+
     const payload: Record<string, unknown> = {};
 
     if (updates.name !== undefined) payload.fullName = updates.name;
@@ -2910,30 +3054,37 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // goal chosen during onboarding were lost on reload. They are persisted
   // through PATCH /api/profile, which owns `user_type`, `career_goal` and
   // `custom_goal_text`.
+  //
+  // The local state is updated only after the server accepts the write, and
+  // the error is re-thrown so the onboarding wizard can keep the user on the
+  // current step instead of advancing with unsaved data.
   const setCareerState = async (state: CareerState) => {
-    setProfile(prev => ({ ...prev, careerState: state }));
     try {
       await patchProfile({ userType: state });
+      setProfile(prev => ({ ...prev, careerState: state }));
     } catch (error) {
       console.error('Failed to persist career state:', error);
+      throw error;
     }
   };
 
   const setCareerGoal = async (goal: CareerGoal, customText?: string) => {
-    setProfile(prev => ({ ...prev, careerGoal: goal, customGoalText: customText }));
     try {
       await patchProfile({ careerGoal: goal, customGoalText: customText ?? '' });
+      setProfile(prev => ({ ...prev, careerGoal: goal, customGoalText: customText }));
     } catch (error) {
       console.error('Failed to persist career goal:', error);
+      throw error;
     }
   };
 
   const completeOnboarding = async () => {
-    setProfile(prev => ({ ...prev, onboardingCompleted: true }));
     try {
       await patchProfile({ onboardingCompleted: true });
+      setProfile(prev => ({ ...prev, onboardingCompleted: true }));
     } catch (error) {
       console.error('Failed to persist onboarding completion:', error);
+      throw error;
     }
   };
 
@@ -3152,14 +3303,24 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const refreshLearningRecommendations = async (preferences: LearningPreferences = {}) => {
+    // The Privacy Center switch is the user's consent to send career-graph
+    // context to Gemini. Deterministic recommendations still run with AI off.
+    const aiBlockedByPrivacy =
+      preferences.ai === true && !privacyPreferences.shareAnalyticsWithAi;
+    const effectivePreferences = aiBlockedByPrivacy
+      ? { ...preferences, ai: false }
+      : preferences;
+
     setIsLearningLoading(true);
     try {
-      const result = await fetchLearningRecommendations(preferences);
+      const result = await fetchLearningRecommendations(effectivePreferences);
       setLearningRecommendations(result.recommendations ?? []);
       setLearningRecommendationMeta((prev) => ({
         ...prev,
         aiUsed: result.aiUsed,
-        aiFallbackReason: result.aiFallbackReason,
+        aiFallbackReason: aiBlockedByPrivacy
+          ? 'AI grounding is disabled in Settings.'
+          : result.aiFallbackReason,
         generatedAt: result.generatedAt,
         targetRoleTitle: result.context?.targetRoleTitle ?? prev.targetRoleTitle,
         weeklyHours: result.context?.weeklyHours ?? prev.weeklyHours,
@@ -3584,6 +3745,20 @@ Skills: ${activeCV.skillsList.join(', ')}
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setCopilotMessages(prev => [...prev, userMsg]);
+
+    if (!aiPreferences.recommendationsEnabled || !privacyPreferences.shareAnalyticsWithAi) {
+      setCopilotMessages(prev => [
+        ...prev,
+        {
+          id: `msg-${Date.now() + 1}`,
+          sender: 'assistant',
+          text: 'AI recommendations are turned off in Settings. Enable AI Recommendations and Career Graph AI Grounding to use Copilot.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+      return;
+    }
+
     setIsCopilotTyping(true);
 
     try {
@@ -3617,10 +3792,10 @@ Skills: ${activeCV.skillsList.join(', ')}
           text: data.text,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           suggestions: data.suggestions,
-          proposedAction: data.proposedAction
+          proposedAction: aiPreferences.proactiveSuggestions ? data.proposedAction : undefined
         };
         setCopilotMessages(prev => [...prev, assistantMsg]);
-        if (data.proposedAction) {
+        if (data.proposedAction && aiPreferences.proactiveSuggestions) {
           setPendingAiAction(data.proposedAction);
         }
       } else {
@@ -3675,7 +3850,7 @@ Skills: ${activeCV.skillsList.join(', ')}
             id: `notif-${Date.now()}`,
             title: 'AI Action Confirmed',
             message: `Added ${skillName} competency tracking to your career graph.`,
-            type: 'skill',
+            type: 'achievement',
             read: false,
             timestamp: 'Just now'
           },
@@ -3765,6 +3940,9 @@ Skills: ${activeCV.skillsList.join(', ')}
       'careerpilot_target_role',
       'careerpilot_skills',
       'careerpilot_settings',
+      'careerpilot_ai_preferences',
+      'careerpilot_notification_preferences',
+      'careerpilot_privacy_preferences',
       'careerpilot_token',
       'careerpilot_user',
     ]) {
@@ -3786,6 +3964,9 @@ Skills: ${activeCV.skillsList.join(', ')}
         login,
         register,
         logout,
+        passwordRecovery,
+        completePasswordReset,
+        dismissPasswordRecovery,
         profile,
         updateProfile,
         setCareerState,
@@ -3796,6 +3977,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         profileCompleteness,
         activeView,
         setActiveView,
+        copilotOpen,
+        setCopilotOpen,
         targetRole,
         savedRoles,
         setPrimaryTargetRole,
@@ -3811,7 +3994,6 @@ Skills: ${activeCV.skillsList.join(', ')}
         activities,
         logActivity,
         documents,
-        addDocument,
         deleteDocument,
         coverLetters,
         saveCoverLetter,
@@ -3882,6 +4064,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         pendingAiAction,
         confirmAiAction,
         notifications,
+        visibleNotifications,
         markNotificationRead,
         clearNotifications,
         settings,

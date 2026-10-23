@@ -38,16 +38,15 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, children }) => {
-  const { profile, targetRole, settings, updateSettings, notifications, currentUser, logout, t } = useCareer();
+  const { profile, targetRole, settings, updateSettings, visibleNotifications, currentUser, logout, t, copilotOpen, setCopilotOpen } = useCareer();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
-  const [copilotOpen, setCopilotOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   // B.4 finding C-3: `logout()` existed in the context but had no UI
   // trigger, so a signed-in user could never sign out.
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = visibleNotifications.filter(n => !n.read).length;
 
   const displayName = currentUser?.name || profile.name || 'Signed in';
 

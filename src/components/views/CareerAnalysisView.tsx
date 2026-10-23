@@ -18,7 +18,19 @@ interface CareerAnalysisViewProps {
 }
 
 export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNavigate }) => {
-  const { analysis, targetRole, profile, skills, refreshAiAnalysis, isAnalyzing, t } = useCareer();
+  const {
+    analysis,
+    targetRole,
+    profile,
+    skills,
+    refreshAiAnalysis,
+    isAnalyzing,
+    aiPreferences,
+    privacyPreferences,
+    t,
+  } = useCareer();
+  const aiAnalysisEnabled =
+    aiPreferences.recommendationsEnabled && privacyPreferences.shareAnalyticsWithAi;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
@@ -34,7 +46,12 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
         <div className="flex items-center gap-3">
           <button
             onClick={refreshAiAnalysis}
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || !aiAnalysisEnabled}
+            title={
+              aiAnalysisEnabled
+                ? undefined
+                : 'Enable AI Recommendations and Career Graph AI Grounding in Settings.'
+            }
             className="px-3.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-primary)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />

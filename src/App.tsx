@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { CareerProvider, useCareer } from './context/CareerContext';
 import { AppShell } from './components/layout/AppShell';
 import { AuthModal } from './components/auth/AuthModal';
+import { PasswordRecoveryModal } from './components/auth/PasswordRecoveryModal';
 import { LandingView } from './components/views/LandingView';
 import { OnboardingView } from './components/views/OnboardingView';
 import { DashboardView } from './components/views/DashboardView';
@@ -25,11 +26,27 @@ import { ApplicationsView } from './components/views/ApplicationsView';
 import { InterviewsView } from './components/views/InterviewsView';
 import { ProgressView } from './components/views/ProgressView';
 import { SettingsView } from './components/views/SettingsView';
+import { PublicProfileView } from './components/views/PublicProfileView';
 import { ProfileView } from './components/views/ProfileView';
 import { DocumentsView } from './components/views/DocumentsView';
 import { ActivityView } from './components/views/ActivityView';
 
-function AppContent() {
+/**
+ * Extracts the username from `#/profile/<username>`. A plain `#/profile` is
+ * the signed-in user's own profile and therefore not a public link.
+ */
+const readPublicProfileUsername = (): string | null => {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const match = hash.match(/^profile\/([^/?#]+)/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+};
+
+function AppRoutes() {
   const {
     profile,
     setActiveView,
@@ -38,6 +55,7 @@ function AppContent() {
     hydrationError,
     isHydrated,
     setAuthModalOpen,
+    setCopilotOpen,
   } = useCareer();
   const [currentView, setCurrentView] = useState<string>(() => {
     // Check hash for direct view or public profile
@@ -47,6 +65,9 @@ function AppContent() {
     if (hash === 'documents') return 'documents';
     return profile.onboardingCompleted ? 'dashboard' : 'landing';
   });
+  const [publicUsername, setPublicUsername] = useState<string | null>(
+    readPublicProfileUsername
+  );
 
   const navigateTo = (view: string) => {
     setCurrentView(view);
@@ -58,14 +79,18 @@ function AppContent() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#/', '');
+      const publicName = readPublicProfileUsername();
+      setPublicUsername(publicName);
+
+      if (publicName) {
+        setCurrentView('profile');
+        setActiveView('profile');
+        return;
+      }
+
       if (hash && hash !== currentView) {
-        if (hash.startsWith('profile/')) {
-          setCurrentView('profile');
-          setActiveView('profile');
-        } else {
-          setCurrentView(hash);
-          setActiveView(hash);
-        }
+        setCurrentView(hash);
+        setActiveView(hash);
       }
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -114,7 +139,7 @@ function AppContent() {
   //   * there is no session                -> the landing page only, with the
   //                                            sign-in dialog offered;
   //   * there is a session                 -> the authenticated experience.
-  if (!isAuthReady) {
+  if (!isAuthReady && !publicUsername) {
     return (
       <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -124,6 +149,23 @@ function AppContent() {
           <div className="text-xs text-[var(--text-muted)]">Restoring your session…</div>
         </div>
       </div>
+    );
+  }
+
+  // Public profile share link. It is intentionally checked before the auth
+  // gate because the link is meant for people without an account.
+  if (publicUsername) {
+    return (
+      <PublicProfileView
+        username={publicUsername}
+        onBack={() => {
+          window.location.hash = '';
+          setPublicUsername(null);
+          const nextView = currentUser ? 'dashboard' : 'landing';
+          setCurrentView(nextView);
+          setActiveView(nextView);
+        }}
+      />
     );
   }
 
@@ -157,7 +199,7 @@ function AppContent() {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <DashboardView onNavigate={navigateTo} onOpenCopilot={() => {}} />;
+        return <DashboardView onNavigate={navigateTo} onOpenCopilot={() => setCopilotOpen(true)} />;
       case 'my-career':
         return <MyCareerView onNavigate={navigateTo} />;
       case 'roles':
@@ -195,7 +237,7 @@ function AppContent() {
       case 'settings':
         return <SettingsView />;
       default:
-        return <DashboardView onNavigate={navigateTo} onOpenCopilot={() => {}} />;
+        return <DashboardView onNavigate={navigateTo} onOpenCopilot={() => setCopilotOpen(true)} />;
     }
   };
 
@@ -225,6 +267,17 @@ function AppContent() {
       {/* B.4 finding C-2: the AuthModal existed and was fully functional but
           was never mounted, so there was no way to sign in or sign up. */}
       <AuthModal />
+    </>
+  );
+}
+
+function AppContent() {
+  return (
+    <>
+      <AppRoutes />
+      {/* The recovery modal is outside the route tree so it can appear over
+          the landing page, onboarding, or the authenticated shell. */}
+      <PasswordRecoveryModal />
     </>
   );
 }

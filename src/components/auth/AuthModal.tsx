@@ -38,7 +38,16 @@ export const AuthModal: React.FC = () => {
       const res = await register(name, email, password);
       setLoading(false);
       if (res.success) {
-        setAuthModalOpen(false);
+        if (res.error) {
+          // Email confirmation is required: the account was created, but the
+          // user is not signed in yet. Keep the dialog open so the
+          // instruction is actually visible instead of closing silently.
+          setSuccessMsg(res.error);
+          setMode('login');
+          setPassword('');
+        } else {
+          setAuthModalOpen(false);
+        }
       } else {
         setError(res.error || 'Registration failed');
       }
@@ -141,7 +150,7 @@ export const AuthModal: React.FC = () => {
                 {mode === 'login' && (
                   <button
                     type="button"
-                    onClick={() => { setMode('forgot'); setError(null); }}
+                    onClick={() => { setMode('forgot'); setError(null); setSuccessMsg(null); }}
                     className="text-[11px] text-[var(--color-primary-text)] hover:underline"
                   >
                     Forgot password?
@@ -178,7 +187,7 @@ export const AuthModal: React.FC = () => {
               Don't have an account yet?{' '}
               <button
                 type="button"
-                onClick={() => { setMode('register'); setError(null); }}
+                onClick={() => { setMode('register'); setError(null); setSuccessMsg(null); }}
                 className="text-[var(--color-primary-text)] font-semibold hover:underline"
               >
                 Sign up free
@@ -189,7 +198,7 @@ export const AuthModal: React.FC = () => {
               Already registered?{' '}
               <button
                 type="button"
-                onClick={() => { setMode('login'); setError(null); }}
+                onClick={() => { setMode('login'); setError(null); setSuccessMsg(null); }}
                 className="text-[var(--color-primary-text)] font-semibold hover:underline"
               >
                 Sign in

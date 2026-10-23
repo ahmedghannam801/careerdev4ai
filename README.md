@@ -5,6 +5,10 @@ learning, projects, evidence, CVs, job applications, and interview practice in
 one workspace. State is stored in PostgreSQL (Supabase) and scoped to the
 signed-in Supabase Auth user.
 
+The Jobs view does not ship a live vacancy feed. It launches real searches on
+public job boards and keeps the roles you choose to pursue in the persisted
+Applications pipeline.
+
 ## Stack
 
 - React 19 + TypeScript + Vite 8 + Tailwind CSS 4
@@ -37,14 +41,10 @@ Optional:
 
 ```dotenv
 GEMINI_API_KEY=<key>            # AI routes return 503 without it
+GEMINI_MODEL=gemini-3.8-flash   # optional override
 PORT=3000
 ALLOWED_ORIGINS=                # comma-separated extra browser origins
 APP_URL=
-LINKEDIN_CLIENT_ID=
-LINKEDIN_CLIENT_SECRET=
-LINKEDIN_REDIRECT_URI=
-RAPIDAPI_KEY=
-JSEARCH_RAPIDAPI_KEY=
 ```
 
 Rules:
@@ -64,16 +64,14 @@ npx supabase db push
 
 or paste each file into the Supabase SQL editor in the same order.
 
-> **Important — fresh-project caveat.** The checked-in migrations create the
-> domain and learning tables (`roadmaps`, `projects`, `evidence_items`, `cvs`,
-> `job_applications`, `courses`, and so on). The legacy auth-linked tables
-> created before this migration series — `profiles`, `skills`, `experiences`,
-> `educations`, `user_skills`, and `user_preferences` — plus the
-> `auth.users` → `profiles` trigger are **not** fully recreated by these files.
-> The current production project already has them. A brand-new Supabase project
-> needs a verified baseline migration for those objects before it will work.
-> The archived files in `supabase/migrations/archive` are outdated (they use
-> `auth_uid` and singular `education`/`experience`) and are not a substitute.
+> **Fresh projects are supported.** `20251019000000_fresh_project_baseline.sql`
+> creates the auth-linked tables (`profiles`, `skills`, `experiences`,
+> `educations`, `user_skills`, `user_preferences`) and the
+> `auth.users` → `profiles` trigger that the later migrations build on. It sorts
+> before the original series, is additive, and is a no-op on the existing
+> hosted project. The archived files in `supabase/migrations/archive` are
+> outdated (they use `auth_uid` and singular `education`/`experience`) and are
+> not applied.
 
 The CV upload feature uses a private Storage bucket named `cv-files`
 (`202510200004_cv_file_storage.sql`). The bucket policies scope every object
@@ -152,6 +150,21 @@ supabase/migrations/      PostgreSQL schema, RLS policies, catalog seed
 tests/                    Integration tests
 ```
 
+## Release scope and external dependencies
+
+- **No live job feed.** The Jobs view builds searches on LinkedIn, Indeed,
+  Google Jobs and Wellfound. The application does not invent listings or
+  application links.
+- **Branding assets** (official logo mark, favicon set, web manifest and Open
+  Graph image) are not included in this repository. The app ships with a text
+  wordmark and a neutral favicon; add the official assets before launch.
+- **Gemini** is the only external AI provider. Without `GEMINI_API_KEY` the AI
+  routes return an explicit `503` and the UI reports that AI is unavailable;
+  no canned AI output is substituted.
+- **Supabase** is the only identity and persistence provider. Production
+  migrations must be applied to the target project before deploying.
+
 ## License
 
-No license file is included in this repository.
+No license file is included in this repository. All rights are reserved unless
+the repository owner states otherwise.

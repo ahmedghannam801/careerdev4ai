@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
 import { 
-  FileText, 
   Sparkles, 
-  Download, 
-  Plus, 
   CheckCircle2, 
   AlertCircle, 
-  Copy, 
-  Clock, 
   Upload, 
-  Printer,
-  Edit3
+  Printer
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 
 export const CVStudioView: React.FC = () => {
-  const { activeCV, updateCV, cvVersions, saveCVVersion, runAiCvOptimization, isOptimizingCV, targetRole } = useCareer();
+  const {
+    activeCV,
+    updateCV,
+    cvVersions,
+    saveCVVersion,
+    runAiCvOptimization,
+    isOptimizingCV,
+    targetRole,
+    aiPreferences,
+    privacyPreferences,
+  } = useCareer();
+  const aiWritingEnabled =
+    aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
   const [activeTab, setActiveTab] = useState<'editor' | 'ats' | 'versions'>('editor');
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionName, setVersionName] = useState('');
@@ -68,7 +74,12 @@ export const CVStudioView: React.FC = () => {
 
           <button
             onClick={runAiCvOptimization}
-            disabled={isOptimizingCV}
+            disabled={isOptimizingCV || !aiWritingEnabled}
+            title={
+              aiWritingEnabled
+                ? undefined
+                : 'Enable AI Writing Assistance and Career Graph AI Grounding in Settings.'
+            }
             className="px-3.5 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--color-primary-text)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isOptimizingCV ? 'animate-spin' : ''}`} />

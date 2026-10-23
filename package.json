@@ -1,14 +1,15 @@
 {
-  "name": "react-example",
+  "name": "careerpilot-ai",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "A personal career operating system for goals, skills, roadmaps, CVs, applications and interview practice.",
   "type": "module",
   "scripts": {
     "dev": "npx --yes tsx server.ts",
     "start": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "lint": "tsc --noEmit",
     "test": "node tests/runner.mjs",
     "test:watch": "tsx --test --watch tests/*.test.ts"

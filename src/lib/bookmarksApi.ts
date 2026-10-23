@@ -3,8 +3,8 @@
 // The bookmark toggle lived only in React state, so a saved job disappeared on
 // the next reload and on every other device. The bookmarks are now owned rows.
 //
-// The job listings themselves are the static catalogue in
-// src/data/jobsData.ts, so a bookmark stores only the catalogue id.
+// The job listings are supplied by an external feed (not bundled in this
+// release), so a bookmark stores only the opaque job id.
 
 import { getAccessToken } from './supabase';
 
