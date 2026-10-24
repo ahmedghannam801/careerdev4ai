@@ -226,6 +226,7 @@ async function main() {
     join(TESTS_DIR, 'restart.test.ts'),
     join(TESTS_DIR, 'b4.test.ts'),
     join(TESTS_DIR, 'b5.test.ts'),
+    join(TESTS_DIR, 'career-catalog.test.ts'),
   ].filter((file) => existsSync(file));
 
   if (testFiles.length === 0) {

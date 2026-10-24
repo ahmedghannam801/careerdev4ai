@@ -1,8 +1,23 @@
-import React, { useState } from 'react';
-import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, ArrowLeft, Check, Upload, FileText, Sparkles, Layers } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CareerState, CareerGoal } from '../../types/career';
-import { TARGET_ROLES } from '../../data/rolesData';
+import { TARGET_ROLES, CAREER_DOMAINS } from '../../data/rolesData';
+import { Reveal } from '../motion/Motion';
+import { CVImportModal } from '../cv/CVImportModal';
+import { AvatarSelector, DEFAULT_AVATAR_ID } from '../ui/CareerPilotAvatars';
+
+/**
+ * The roles grouped by career domain.
+ *
+ * The catalogue spans every major career domain, so a flat list of eighty
+ * roles is not browsable. Grouping by domain keeps the choice legible
+ * without hiding anything.
+ */
+const GROUPED_ROLES = CAREER_DOMAINS.map((domain) => ({
+  domain,
+  roles: TARGET_ROLES.filter((role) => role.domainId === domain.slug),
+})).filter((group) => group.roles.length > 0);
 
 interface OnboardingViewProps {
   onComplete: () => void;
@@ -19,8 +34,16 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   const [selectedGoal, setSelectedGoal] = useState<CareerGoal>(profile.careerGoal || 'get_promoted');
   const [customGoal, setCustomGoal] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState(targetRole.id || 'frontend-engineer');
+  const [showCvModal, setShowCvModal] = useState(false);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string>(profile.avatarUrl || DEFAULT_AVATAR_ID);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (profile.currentTitle && !currentTitle) setCurrentTitle(profile.currentTitle);
+    if (profile.location && !location) setLocation(profile.location);
+    if (profile.avatarUrl && profile.avatarUrl !== selectedAvatarId) setSelectedAvatarId(profile.avatarUrl);
+  }, [profile.currentTitle, profile.location, profile.avatarUrl]);
 
   const handleNext = async () => {
     if (isSaving) return;
@@ -44,23 +67,41 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         );
         setStep(4);
       } else if (step === 4) {
-        const persisted = await setPrimaryTargetRole(selectedRoleId);
+        const roleToSave = selectedRoleId || targetRole?.id || 'frontend-engineer';
+        const persisted = await setPrimaryTargetRole(roleToSave);
         if (!persisted) {
           throw new Error('The target role and roadmap were not persisted');
         }
         setStep(5);
       } else if (step === 5) {
-        // Persist the completion flag BEFORE leaving the wizard. Navigating
-        // first let the route guard see the still-false flag and send the user
-        // back into a freshly mounted step 1.
-        await updateProfile({ onboardingCompleted: true });
+        setStep(6);
+      } else if (step === 6) {
+        await updateProfile({
+          avatarUrl: selectedAvatarId || DEFAULT_AVATAR_ID,
+          onboardingCompleted: true,
+        });
         onComplete();
       }
     } catch (error) {
       console.error('Onboarding step could not be saved:', error);
-      // Stay on the current step. Advancing with unsaved data would make the
-      // wizard report a success the database never received.
       setSaveError('We could not save this step. Check your connection and try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSkipAvatar = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      await updateProfile({
+        avatarUrl: DEFAULT_AVATAR_ID,
+        onboardingCompleted: true,
+      });
+      onComplete();
+    } catch (error) {
+      console.error('Failed to complete onboarding:', error);
+      setSaveError('We could not save your profile. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -76,20 +117,20 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         {/* Step Progress Bar */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--color-primary-text)]">STEP {step} OF 5</span>
+            <span className="font-medium text-[var(--color-primary-text)]">STEP {step} OF 6</span>
             <span>Let's build your career path</span>
           </div>
           <div className="h-1.5 w-full bg-[var(--color-progress-track)] rounded-full overflow-hidden">
             <div 
               className="h-full bg-[var(--color-progress-strong)] transition-all duration-300"
-              style={{ width: `${(step / 5) * 100}%` }}
+              style={{ width: `${(step / 6) * 100}%` }}
             />
           </div>
         </div>
 
         {/* Step 1: Persona Selection */}
         {step === 1 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <Reveal onMount delay={0.04} className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 Who are you?
@@ -128,19 +169,68 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 </button>
               ))}
             </div>
-          </div>
+          </Reveal>
         )}
 
         {/* Step 2: Current Situation */}
         {step === 2 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <Reveal onMount delay={0.04} className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 Where are you now?
               </h2>
               <p className="text-sm text-[var(--text-secondary)] mt-1">
-                Provide basic details on your current role, study program, and location.
+                Provide basic details on your current role and location, or speed up onboarding with your CV.
               </p>
+            </div>
+
+            {/* 3 CV Options */}
+            <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
+                    CV Accelerated Setup (Optional)
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                    Your CV automatically populates your profile, experience, and baseline skills.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowCvModal(true)}
+                  className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)] text-left transition-all flex flex-col justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)] group-hover:text-[var(--color-primary-text)]">
+                    <Upload className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
+                    Upload My CV
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-1">PDF or Word (.docx)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCvModal(true)}
+                  className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)] text-left transition-all flex flex-col justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)] group-hover:text-[var(--color-primary-text)]">
+                    <FileText className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
+                    Paste My CV
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-1">Paste raw text</span>
+                </button>
+
+                <div className="p-3 rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--surface-main)] text-left flex flex-col justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-secondary)]">
+                    <Check className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
+                    Start From Scratch
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-1">Manual entry below</span>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -170,12 +260,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 />
               </div>
             </div>
-          </div>
+          </Reveal>
         )}
 
         {/* Step 3: Career Goal */}
         {step === 3 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <Reveal onMount delay={0.04} className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 Where do you want to go?
@@ -232,12 +322,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 />
               </div>
             )}
-          </div>
+          </Reveal>
         )}
 
         {/* Step 4: Target Role Selection */}
         {step === 4 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <Reveal onMount delay={0.04} className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 What role are you targeting?
@@ -248,40 +338,49 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             </div>
 
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-              {TARGET_ROLES.map((role) => (
-                <button
-                  key={role.id}
-                  onClick={() => setSelectedRoleId(role.id)}
-                  className={`w-full p-4 rounded-xl border text-left transition-all flex items-start justify-between ${
-                    selectedRoleId === role.id
-                      ? 'bg-[var(--accent-surface)]/60 border-[var(--accent-primary)] text-[var(--text-primary)]'
-                      : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
-                  }`}
-                >
-                  <div className="space-y-1 pr-4">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-[var(--text-primary)]">{role.title}</span>
-                      <span className="text-xs text-[var(--text-muted)]">· {role.category}</span>
-                    </div>
-                    <div className="text-xs text-[var(--text-secondary)] line-clamp-1">{role.overview}</div>
-                    <div className="text-[11px] text-[var(--text-muted)] pt-1">
-                      Expectation: {role.experienceExpectation}
-                    </div>
+              {GROUPED_ROLES.map((group) => (
+                <div key={group.domain.slug} className="space-y-2">
+                  <div className="sticky top-0 z-10 flex items-center gap-2 bg-[var(--surface-main)]/95 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] backdrop-blur">
+                    <Layers className="h-3 w-3" />
+                    <span>{group.domain.label}</span>
+                    <span className="font-mono text-[var(--text-muted)]/70">({group.roles.length})</span>
                   </div>
+                  {group.roles.map((role) => (
+                    <button
+                      key={role.id}
+                      onClick={() => setSelectedRoleId(role.id)}
+                      className={`w-full p-4 rounded-xl border text-left transition-all flex items-start justify-between ${
+                        selectedRoleId === role.id
+                          ? 'bg-[var(--accent-surface)]/60 border-[var(--accent-primary)] text-[var(--text-primary)]'
+                          : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
+                      }`}
+                    >
+                      <div className="space-y-1 pr-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-[var(--text-primary)]">{role.title}</span>
+                          <span className="text-xs text-[var(--text-muted)]">· {role.category}</span>
+                        </div>
+                        <div className="text-xs text-[var(--text-secondary)] line-clamp-1">{role.overview}</div>
+                        <div className="text-[11px] text-[var(--text-muted)] pt-1">
+                          Expectation: {role.experienceExpectation}
+                        </div>
+                      </div>
                   {selectedRoleId === role.id && (
                     <div className="w-5 h-5 rounded-full bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center shrink-0 mt-0.5">
                       <Check className="w-3 h-3" />
                     </div>
                   )}
-                </button>
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
-          </div>
+          </Reveal>
         )}
 
         {/* Step 5: Initial Skills Assessment */}
         {step === 5 && (
-          <div className="space-y-6 animate-in fade-in duration-200">
+          <Reveal onMount delay={0.04} className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 Rate your starting skills
@@ -318,7 +417,26 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 </div>
               ))}
             </div>
-          </div>
+          </Reveal>
+        )}
+
+        {/* Step 6: CareerPilot Avatar Selection */}
+        {step === 6 && (
+          <Reveal onMount delay={0.04} className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+                Choose Your CareerPilot Avatar
+              </h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">
+                Select a calm, professional avatar that represents you across the platform. You can change this anytime.
+              </p>
+            </div>
+
+            <AvatarSelector
+              selectedAvatarId={selectedAvatarId}
+              onSelect={(id) => setSelectedAvatarId(id)}
+            />
+          </Reveal>
         )}
 
         {/* Step Navigation Controls */}
@@ -343,23 +461,47 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
               </button>
             ) : <div />}
 
-            <button
-              onClick={handleNext}
-              disabled={isSaving}
-              className="px-6 py-2.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span>
-                {isSaving
-                  ? 'Saving…'
-                  : step === 5
-                    ? 'Launch Career Command Center'
-                    : 'Continue'}
-              </span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-3">
+              {step === 6 && (
+                <button
+                  type="button"
+                  onClick={handleSkipAvatar}
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors"
+                >
+                  Skip for now
+                </button>
+              )}
+
+              <button
+                onClick={handleNext}
+                disabled={isSaving}
+                className="px-6 py-2.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>
+                  {isSaving
+                    ? 'Saving…'
+                    : step === 6
+                      ? 'Launch Career Command Center'
+                      : 'Continue'}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      <CVImportModal
+        isOpen={showCvModal}
+        onClose={() => setShowCvModal(false)}
+        onImportComplete={() => {
+          if (profile.currentTitle) setCurrentTitle(profile.currentTitle);
+          if (profile.location) setLocation(profile.location);
+          setShowCvModal(false);
+        }}
+        onStartFromScratch={() => setShowCvModal(false)}
+      />
     </div>
   );
 };

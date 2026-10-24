@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  Sparkles, 
   ArrowRight, 
   CheckCircle2, 
   AlertTriangle, 
@@ -8,10 +7,10 @@ import {
   TrendingUp, 
   BookOpen, 
   FolderGit2, 
-  RefreshCw,
-  Award
+  RefreshCw
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { Reveal } from '../motion/Motion';
 
 interface CareerAnalysisViewProps {
   onNavigate: (view: string) => void;
@@ -27,13 +26,12 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
     isAnalyzing,
     aiPreferences,
     privacyPreferences,
-    t,
   } = useCareer();
   const aiAnalysisEnabled =
     aiPreferences.recommendationsEnabled && privacyPreferences.shareAnalyticsWithAi;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -237,6 +235,6 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
           </div>
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 };

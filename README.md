@@ -145,8 +145,35 @@ Supabase Auth must also be configured (Authentication → URL Configuration):
 - **Redirect URLs**: `https://careerpilot4ai.pages.dev/**`,
   `https://*.careerpilot4ai.pages.dev/**` for previews, and
   `http://localhost:3000/**` for local development
-- **Providers**: enable Google and LinkedIn (OIDC). GitHub is intentionally not
-  offered by the app and should stay disabled.
+- **Providers**: enable Google, LinkedIn (OIDC), and GitHub.
+
+### GitHub OAuth
+
+The app starts GitHub sign-in with the existing Supabase browser client and
+returns to the `origin` + `/auth/callback` path. The SPA fallback serves the app
+for that path, and the existing session listener completes the sign-in. No
+client secret or GitHub credential belongs in this repository or in any
+`VITE_` variable.
+
+1. Create a GitHub OAuth App (GitHub → Settings → Developer settings → OAuth
+   Apps) with the **Authorization callback URL** set to
+   `https://ciihprsfdojzvjnqgbxl.supabase.co/auth/v1/callback`.
+2. In Supabase → Authentication → Providers → GitHub, enable the provider and
+   paste the GitHub Client ID and Client Secret there. Keep those values in the
+   Supabase dashboard only.
+3. Add the production callback to Supabase → Authentication → URL
+   Configuration → Redirect URLs:
+   `https://careerpilot4ai.pages.dev/auth/callback`. Add
+   `http://localhost:3000/auth/callback` for local development. An existing
+   `<origin>/**` entry already covers the path.
+4. After the first GitHub sign-in, the existing `careerpilot_handle_new_user`
+   trigger creates the `profiles` and `user_preferences` rows; onboarding then
+   runs exactly as it does for email/password and the other providers.
+
+> `wrangler.jsonc` and the deployment commands above use the Pages project name
+> `careerpilot4ai`. If that is the live origin, use
+> `https://careerpilot4ai.pages.dev/auth/callback` instead and keep the Supabase
+> Site URL and Redirect URLs aligned with the origin actually deployed.
 
 Verify the production build locally before deploying:
 
@@ -199,9 +226,12 @@ app.ts                    Express application and every API route
 server.ts                 Node entry point (dotenv, Vite/static serving, listen)
 worker/index.ts           Cloudflare Pages advanced-mode entry point
 scripts/build-worker.mjs  Bundles worker/index.ts into dist/_worker.js
+scripts/generate-brand-assets.mjs  Rebuilds every logo derivative from the official files
 server/auth/              Supabase token verification and route guard
 server/db/                One module per persisted domain
 server/shims/             Small Node-built-in replacements used by the Worker bundle
+src/assets/brand/         Official logo files (official/) and their generated derivatives
+src/components/brand/     The shared <Logo> component (icon | full)
 src/context/              Application state, auth session, hydration
 src/components/views/     Authenticated product views
 src/lib/                  API clients and Supabase browser client
@@ -214,9 +244,15 @@ tests/                    Integration tests
 - **No live job feed.** The Jobs view builds searches on LinkedIn, Indeed,
   Google Jobs and Wellfound. The application does not invent listings or
   application links.
-- **Branding assets** (official logo mark, favicon set, web manifest and Open
-  Graph image) are not included in this repository. The app ships with a text
-  wordmark and a neutral favicon; add the official assets before launch.
+- **Branding assets** are integrated. The two approved logo files live in
+  `src/assets/brand/official/` and are the single source of truth: the icon-only
+  symbol and the full "CareerPilot AI" lockup. `npm run brand` regenerates every
+  derivative from them (`src/assets/brand/*.png` for the UI, `public/brand/*` for
+  the favicon, PWA and Open Graph set). The UI renders the logo through
+  `src/components/brand/Logo.tsx`; nothing else may reference an image file
+  directly. The artwork is never redrawn or recoloured — only the supplied outer
+  margin is trimmed and the white field is keyed out so the mark can sit on any
+  surface.
 - **Gemini** is the only external AI provider. Without `GEMINI_API_KEY` the AI
   routes return an explicit `503` and the UI reports that AI is unavailable;
   no canned AI output is substituted.

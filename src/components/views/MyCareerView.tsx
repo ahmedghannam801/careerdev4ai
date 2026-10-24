@@ -3,28 +3,22 @@ import {
   Compass, 
   ArrowRight, 
   Target, 
-  Layers, 
   CheckCircle2, 
   Clock, 
   AlertTriangle, 
-  ShieldAlert, 
-  TrendingUp, 
   Award, 
   FolderGit2, 
-  FileText, 
   Briefcase, 
   Calendar, 
   Plus, 
-  Check, 
   X, 
   ChevronRight,
-  Filter,
-  Flame,
   ShieldCheck,
   Star
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { SecondaryCareerGoal, CareerMilestoneItem, MilestoneCategory, CareerGoal } from '../../types/career';
+import { MilestoneCategory, CareerGoal } from '../../types/career';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 /**
  * Plain-language rendering of the career goals the user can pick. Used so the
@@ -79,12 +73,11 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     secondaryGoals,
     cvVersions,
     addSecondaryGoal,
-    updateSecondaryGoal,
     deleteSecondaryGoal,
     milestones,
     addMilestone,
     careerBlockers,
-    t
+    learningItems,
   } = useCareer();
 
   const [addGoalModalOpen, setAddGoalModalOpen] = useState(false);
@@ -102,8 +95,6 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     dateAchieved: '',
     notes: ''
   });
-
-  const [priorityFilter, setPriorityFilter] = useState<'all' | 'high' | 'recommended' | 'optional'>('all');
 
   // Unified Career Timeline Events
   const timelineEvents = [
@@ -245,16 +236,55 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     .filter(d => parseLocalDate(d) >= startOfToday)
     .sort()[0];
 
+  // Derive real dynamic journey stages:
+  // 1. Direction: completed if user selected target role and career goal
+  const isDirectionDone = Boolean(targetRole.title && profile.careerGoal);
+  
+  // 2. Skill Gaps: completed if Direction done AND skills recorded or gap analysis performed
+  const isSkillsDone = isDirectionDone && (skills.length > 0 || analysis.criticalGaps.length > 0 || analysis.strengths.length > 0);
+  
+  // 3. Roadmap: completed if Skill Gaps done AND user has a roadmap mapped
+  const isRoadmapDone = isSkillsDone && roadmapPhases.length > 0;
+  
+  // 4. Learning: completed if Roadmap done AND user has learning progress
+  const completedRoadmapTasksCount = roadmapPhases
+    .flatMap(p => p.milestones.flatMap(m => m.tasks))
+    .filter(t => t.status === 'completed').length;
+  const isLearningDone = isRoadmapDone && (learningItems.length > 0 || completedRoadmapTasksCount > 0);
+  
+  // 5. Projects: completed if Learning done AND user has projects
+  const isProjectsDone = isLearningDone && projects.length > 0;
+  
+  // 6. Evidence: completed if Projects done AND user has verified evidence items
+  const isEvidenceDone = isProjectsDone && evidenceItems.length > 0;
+  
+  // 7. CV: completed if Evidence done AND user has CV versions created or tailored
+  const isCvDone = isEvidenceDone && cvVersions.length > 0;
+  
+  // 8. Opportunity: completed if CV done AND user has an offer or active applications/interviews
+  const isOpportunityDone = isCvDone && (Boolean(offerApplication) || applications.length > 0);
+
+  // Determine active stage: first incomplete stage in sequence
+  let activeStageKey = 'direction';
+  if (!isDirectionDone) activeStageKey = 'direction';
+  else if (!isSkillsDone) activeStageKey = 'skills';
+  else if (!isRoadmapDone) activeStageKey = 'roadmap';
+  else if (!isLearningDone) activeStageKey = 'learning';
+  else if (!isProjectsDone) activeStageKey = 'projects';
+  else if (!isEvidenceDone) activeStageKey = 'evidence';
+  else if (!isCvDone) activeStageKey = 'cv';
+  else if (!isOpportunityDone) activeStageKey = 'opportunity';
+  else activeStageKey = 'opportunity';
+
   const journeySteps = [
-    { key: 'current', label: 'Current State', desc: profile.careerState.replace('_', ' '), active: false, done: true },
-    { key: 'target', label: 'Target Role', desc: targetRole.title, active: false, done: true },
-    { key: 'gaps', label: 'Skill Gaps', desc: `${analysis.criticalGaps.length} critical gaps`, active: false, done: true },
-    { key: 'plan', label: 'Strategic Plan', desc: roadmapPhases.length > 0 ? `${roadmapPhases.length} Phases Mapped` : 'No roadmap yet', active: false, done: true },
-    { key: 'build', label: 'Build & Learn', desc: 'Active Roadmap', active: true, done: false },
-    { key: 'prove', label: 'Prove Skill', desc: `${evidenceItems.length} Artifacts`, active: false, done: false },
-    { key: 'apply', label: 'Apply', desc: `${applications.length} Applications`, active: false, done: false },
-    { key: 'interview', label: 'Interview', desc: nextInterviewLabel, active: false, done: false },
-    { key: 'outcome', label: 'Offer', desc: offerApplication ? offerApplication.company : 'No offer yet', active: false, done: false },
+    { key: 'direction', label: 'Direction', desc: targetRole.title || 'Target role & goals', active: activeStageKey === 'direction', done: isDirectionDone },
+    { key: 'skills', label: 'Skill Gaps', desc: `${analysis.criticalGaps.length} critical gaps`, active: activeStageKey === 'skills', done: isSkillsDone },
+    { key: 'roadmap', label: 'Roadmap', desc: roadmapPhases.length > 0 ? `${roadmapPhases.length} Phases Active` : 'Generate roadmap', active: activeStageKey === 'roadmap', done: isRoadmapDone },
+    { key: 'learning', label: 'Learning', desc: learningItems.length > 0 ? `${learningItems.length} Courses Active` : completedRoadmapTasksCount > 0 ? `${completedRoadmapTasksCount} Tasks Done` : 'Course recommendations', active: activeStageKey === 'learning', done: isLearningDone },
+    { key: 'projects', label: 'Projects', desc: `${projects.length} Projects`, active: activeStageKey === 'projects', done: isProjectsDone },
+    { key: 'evidence', label: 'Evidence', desc: `${evidenceItems.length} Artifacts`, active: activeStageKey === 'evidence', done: isEvidenceDone },
+    { key: 'cv', label: 'CV', desc: cvVersions.length > 0 ? `${cvVersions.length} Versions` : 'Tailor CV', active: activeStageKey === 'cv', done: isCvDone },
+    { key: 'opportunity', label: 'Opportunity', desc: offerApplication ? 'Offer Received' : nextInterview ? `Interview: ${nextInterviewLabel}` : applications.length > 0 ? `${applications.length} Apps (${interviewCount} Int)` : 'Job pipeline', active: activeStageKey === 'opportunity', done: isOpportunityDone },
   ];
 
   const handleSaveGoal = () => {
@@ -285,7 +315,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <Reveal className="space-y-8">
       {/* Top Banner: Where Am I in My Journey? */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
@@ -319,13 +349,18 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
           </div>
         </div>
 
-        {/* 9-Step Visual Career Journey Map */}
+        {/* 8-Step Visual Career Journey Map */}
         <div className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4">
-            Visual Career Journey Map
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              Visual Career Journey Map
+            </h3>
+            <span className="text-xs font-mono font-bold text-[var(--color-primary-text)] bg-[var(--accent-surface)] px-2.5 py-0.5 rounded-full">
+              {Math.round((journeySteps.filter(s => s.done).length / journeySteps.length) * 100)}% Complete
+            </span>
+          </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
             {journeySteps.map((step, idx) => (
               <div 
                 key={step.key}
@@ -472,11 +507,11 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         </div>
 
         {/* Secondary Goals Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {secondaryGoals.map((goal) => (
-            <div 
+            <StaggerItem 
               key={goal.id}
-              className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)]/40 transition-colors space-y-3"
+              className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)]/40 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md space-y-3"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -519,9 +554,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                   Deadline: {goal.deadline}
                 </div>
               )}
-            </div>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </div>
 
       {/* Career Asset Scorecard */}
@@ -540,12 +575,12 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <Stagger inView gap={0.06} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {assetScorecard.map((asset, i) => (
-            <div 
+            <StaggerItem 
               key={i}
               onClick={() => onNavigate(asset.view)}
-              className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)] cursor-pointer transition-colors space-y-1.5"
+              className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)] cursor-pointer transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md space-y-1.5"
             >
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-[var(--text-primary)]">{asset.name}</h4>
@@ -558,9 +593,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 </span>
               </div>
               <p className="text-[11px] text-[var(--text-secondary)]">{asset.desc}</p>
-            </div>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </div>
 
       {/* Career Milestones & Career Timeline Dual Section */}
@@ -623,7 +658,6 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
 
           <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--border-subtle)]">
             {timelineEvents.map((ev) => {
-              const Icon = ev.icon;
               return (
                 <div key={ev.id} className="relative group">
                   {/* Dot */}
@@ -702,7 +736,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setAddGoalModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveGoal} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Save Goal</button>
+              <button onClick={handleSaveGoal} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">Save Goal</button>
             </div>
           </div>
         </div>
@@ -765,11 +799,11 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setAddMilestoneModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveMilestone} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Record</button>
+              <button onClick={handleSaveMilestone} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">Record</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

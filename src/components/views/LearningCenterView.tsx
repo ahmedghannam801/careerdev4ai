@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import {
   AlertCircle,
   BookOpen,
@@ -25,6 +26,8 @@ import type {
   LearningRecommendation,
   CourseLevel,
 } from '../../types/learning';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { EmptyState } from '../ui/EmptyState';
 
 type HubTab = 'recommended' | 'saved' | 'in_progress' | 'completed' | 'catalog';
 
@@ -273,9 +276,14 @@ const CourseCard: React.FC<CourseCardProps> = ({
           </button>
         )}
         {isSaved && (
-          <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
+          <motion.span
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-success-strong)]"
+          >
             <BookmarkCheck size={14} /> Saved
-          </span>
+          </motion.span>
         )}
         {!isCompleted && (
           <button
@@ -456,7 +464,7 @@ export const LearningCenterView: React.FC = () => {
   const top = filteredRecommendations[0];
 
   return (
-    <div className="space-y-7 animate-in fade-in duration-200">
+    <Reveal className="space-y-7">
       <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
@@ -688,14 +696,13 @@ export const LearningCenterView: React.FC = () => {
               No recommendations match these filters. Increase your budget or clear a filter.
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Stagger key="recommended" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filteredRecommendations.slice(0, 12).map((recommendation) => (
-                <CourseCard
-                  key={recommendation.course.id}
-                  {...cardProps(recommendation.course, recommendation)}
-                />
+                <StaggerItem key={recommendation.course.id} className="h-full">
+                  <CourseCard {...cardProps(recommendation.course, recommendation)} />
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           )}
         </section>
       )}
@@ -703,11 +710,20 @@ export const LearningCenterView: React.FC = () => {
       {tab === 'saved' && (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {savedItems.length === 0 ? (
-            <p className="text-sm text-[var(--text-secondary)]">Nothing saved yet.</p>
+            <EmptyState
+              compact
+              icon={BookmarkCheck}
+              title="Nothing saved yet"
+              description="Save a course from your recommendations and it will wait here until you are ready to start it."
+            />
           ) : (
-            savedItems.map(({ course }) => (
-              <CourseCard key={course.id} {...cardProps(course, recommendationById.get(course.id))} />
-            ))
+            <Stagger key="saved" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {savedItems.map(({ course }) => (
+                <StaggerItem key={course.id} className="h-full">
+                  <CourseCard {...cardProps(course, recommendationById.get(course.id))} />
+                </StaggerItem>
+              ))}
+            </Stagger>
           )}
         </section>
       )}
@@ -715,11 +731,20 @@ export const LearningCenterView: React.FC = () => {
       {tab === 'in_progress' && (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {inProgressItems.length === 0 ? (
-            <p className="text-sm text-[var(--text-secondary)]">No course in progress.</p>
+            <EmptyState
+              compact
+              icon={PlayCircle}
+              title="No course in progress"
+              description="Start a course and it will appear here, with the progress you have made so far."
+            />
           ) : (
-            inProgressItems.map(({ course }) => (
-              <CourseCard key={course.id} {...cardProps(course, recommendationById.get(course.id))} />
-            ))
+            <Stagger key="in_progress" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {inProgressItems.map(({ course }) => (
+                <StaggerItem key={course.id} className="h-full">
+                  <CourseCard {...cardProps(course, recommendationById.get(course.id))} />
+                </StaggerItem>
+              ))}
+            </Stagger>
           )}
         </section>
       )}
@@ -727,7 +752,12 @@ export const LearningCenterView: React.FC = () => {
       {tab === 'completed' && (
         <section className="space-y-3">
           {completedItems.length === 0 ? (
-            <p className="text-sm text-[var(--text-secondary)]">No completed learning yet.</p>
+            <EmptyState
+              compact
+              icon={CheckCircle2}
+              title="No completed learning yet"
+              description="Finish a course and it will be recorded here as learning evidence for your career."
+            />
           ) : (
             completedItems.map(({ item, course }) => (
               <div
@@ -772,13 +802,13 @@ export const LearningCenterView: React.FC = () => {
               No courses match these filters. Clear a filter or search term.
             </div>
           ) : (
-            catalogFiltered.map((course) => (
-              <CourseCard
-                key={course.id}
-                {...cardProps(course, recommendationById.get(course.id))}
-                compact
-              />
-            ))
+            <Stagger key="catalog" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {catalogFiltered.map((course) => (
+                <StaggerItem key={course.id} className="h-full">
+                  <CourseCard {...cardProps(course, recommendationById.get(course.id))} compact />
+                </StaggerItem>
+              ))}
+            </Stagger>
           )}
         </section>
       )}
@@ -787,6 +817,6 @@ export const LearningCenterView: React.FC = () => {
         Completing a course records learning progress; it does not automatically mark a skill as
         mastered. Update skill levels explicitly in the Skills Center.
       </footer>
-    </div>
+    </Reveal>
   );
 };

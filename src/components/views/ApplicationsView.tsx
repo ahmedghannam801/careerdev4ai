@@ -1,22 +1,14 @@
 import React, { useState } from 'react';
 import { 
   Plus, 
-  Calendar, 
-  Clock, 
-  Edit2, 
   Trash2, 
-  ArrowRight, 
   X, 
-  ExternalLink,
   FileText,
-  DollarSign,
-  User,
-  ShieldCheck,
-  CheckCircle2,
   FolderClosed
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { ApplicationStage, JobApplication } from '../../types/career';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const ApplicationsView: React.FC = () => {
   const { 
@@ -25,7 +17,6 @@ export const ApplicationsView: React.FC = () => {
     updateApplicationNotes, 
     deleteApplication, 
     addApplication,
-    documents,
     cvVersions,
     logActivity
   } = useCareer();
@@ -37,12 +28,12 @@ export const ApplicationsView: React.FC = () => {
   // Form state for new application
   const [company, setCompany] = useState('');
   const [role, setRole] = useState('');
-  const [location, setLocation] = useState('Remote');
+  const [location] = useState('Remote');
   const [workMode, setWorkMode] = useState('Remote');
   const [stage, setStage] = useState<ApplicationStage>('applied');
   const [nextAction, setNextAction] = useState('Awaiting recruiter response');
   const [nextActionDate, setNextActionDate] = useState('');
-  const [salaryDiscussed, setSalaryDiscussed] = useState('$145,000');
+  const [salaryDiscussed] = useState('$145,000');
   const [notes, setNotes] = useState('');
 
   // Edit details form inside modal
@@ -105,7 +96,7 @@ export const ApplicationsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -157,12 +148,12 @@ export const ApplicationsView: React.FC = () => {
 
       {/* KANBAN BOARD */}
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 overflow-x-auto pb-4">
+        <Stagger inView gap={0.06} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 overflow-x-auto pb-4">
           {stages.map((st) => {
             const stageApps = applications.filter((a) => a.stage === st);
 
             return (
-              <div
+              <StaggerItem
                 key={st}
                 className="bg-[var(--surface-main)] rounded-xl border border-[var(--border-subtle)] p-3 flex flex-col min-w-[200px] shadow-2xs"
               >
@@ -187,7 +178,7 @@ export const ApplicationsView: React.FC = () => {
                       <div
                         key={app.id}
                         onClick={() => handleOpenDetails(app)}
-                        className="p-3 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-2 text-xs hover:border-[var(--accent-primary)] cursor-pointer transition-all shadow-xs"
+                        className="p-3 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-2 text-xs hover:border-[var(--accent-primary)] cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md shadow-xs"
                       >
                         <div>
                           <div className="font-bold text-sm text-[var(--text-primary)] leading-tight">{app.role}</div>
@@ -223,10 +214,10 @@ export const ApplicationsView: React.FC = () => {
                     ))
                   )}
                 </div>
-              </div>
+              </StaggerItem>
             );
           })}
-        </div>
+        </Stagger>
       ) : (
         /* LIST VIEW */
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs">
@@ -501,6 +492,6 @@ export const ApplicationsView: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

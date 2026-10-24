@@ -1,16 +1,17 @@
 import React from 'react';
-import { ArrowRight, CheckCircle2, Circle, Clock, Sparkles, Layers, ShieldCheck, Target } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 interface CareerPlanViewProps {
   onNavigate: (view: string) => void;
 }
 
 export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) => {
-  const { roadmapPhases, targetRole, profile, analysis } = useCareer();
+  const { roadmapPhases, targetRole, profile } = useCareer();
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -39,19 +40,19 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
           From {profile.careerState.replace('_', ' ')} to Mid-Level {targetRole.title}
         </h2>
         <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-3xl">
-          This 6-phase dynamic career architecture addresses your assessed gaps in priority order. Advancing through each phase unlocks the next tier of proof and prepares you for competitive market applications.
+          This 5-phase dynamic career architecture addresses your assessed gaps in priority order. Advancing through each phase unlocks the next tier of proof and prepares you for competitive market applications.
         </p>
       </div>
 
       {/* 6 Phases Timeline Cards */}
-      <div className="space-y-4">
+      <Stagger inView gap={0.06} className="space-y-4">
         {roadmapPhases.map((phase, idx) => {
           const totalTasks = phase.milestones.flatMap(m => m.tasks).length;
           const completedTasks = phase.milestones.flatMap(m => m.tasks.filter(t => t.status === 'completed')).length;
           const isFinished = totalTasks > 0 && completedTasks === totalTasks;
 
           return (
-            <div
+            <StaggerItem
               key={phase.id}
               className={`p-6 rounded-xl border transition-all ${
                 phase.isUnlocked || idx <= 1
@@ -105,10 +106,10 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
                   </div>
                 ))}
               </div>
-            </div>
+            </StaggerItem>
           );
         })}
-      </div>
-    </div>
+      </Stagger>
+    </Reveal>
   );
 };

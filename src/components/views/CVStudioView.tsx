@@ -7,6 +7,8 @@ import {
   Printer
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { Reveal } from '../motion/Motion';
+import { CVImportModal } from '../cv/CVImportModal';
 
 export const CVStudioView: React.FC = () => {
   const {
@@ -25,7 +27,6 @@ export const CVStudioView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'editor' | 'ats' | 'versions'>('editor');
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionName, setVersionName] = useState('');
-  const [uploadText, setUploadText] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   const latestAnalysis = cvVersions[0]?.atsAnalysis;
@@ -42,18 +43,8 @@ export const CVStudioView: React.FC = () => {
     setShowVersionModal(false);
   };
 
-  const handleParsePastedCV = () => {
-    if (!uploadText.trim()) return;
-    // Extract basic summary and update activeCV
-    updateCV({
-      summary: uploadText.slice(0, 400),
-    });
-    setShowUploadModal(false);
-    setUploadText('');
-  };
-
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -425,7 +416,7 @@ export const CVStudioView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold"
+                  className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]"
                 >
                   Save Snapshot
                 </button>
@@ -436,36 +427,10 @@ export const CVStudioView: React.FC = () => {
       )}
 
       {/* Import / Paste Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-[var(--surface-main)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl p-6 space-y-4">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Import / Paste CV Text</h3>
-            <textarea
-              rows={6}
-              value={uploadText}
-              onChange={(e) => setUploadText(e.target.value)}
-              placeholder="Paste raw text from your existing CV here..."
-              className="w-full p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowUploadModal(false)}
-                className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-secondary)]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleParsePastedCV}
-                className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold"
-              >
-                Extract to Editor
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <CVImportModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+      />
+    </Reveal>
   );
 };

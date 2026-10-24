@@ -8,9 +8,11 @@
 // The Gemini-backed routes (`/api/resumes/upload`, `/api/analyze-career`,
 // `/api/optimize-cv`, `/api/mock-interview`, `/api/suggest-summary`,
 // `/api/generate-cover-letter`) are covered for their AUTH contract and for
-// their behaviour when the model is not configured. Because the suite has no
-// Gemini key, it asserts that each route returns an explicit 503 and never
-// substitutes invented content for a real model response.
+// their behaviour when the model is not configured. Whether a model is
+// configured is a property of the SERVER (it loads `.env`), so the suite asks
+// the server through `/api/health` rather than guessing from its own
+// environment — and it asserts that each route returns an explicit failure
+// and never substitutes invented content for a real model response.
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -20,6 +22,72 @@ import {
   api,
   type TestUser,
 } from './helpers.ts';
+
+/**
+ * The Gemini-backed routes, with a body that is valid enough to reach the
+ * model call and the payload key a real answer must contain.
+ */
+const AI_ROUTE_CASES = [
+  {
+    path: '/api/analyze-career',
+    body: {
+      targetRole: { title: 'Financial Analyst', requiredSkills: ['Excel', 'Financial Modelling'] },
+      careerState: 'Analyst',
+      userSkills: ['Excel'],
+    },
+    successKey: 'matchPercentage',
+  },
+  {
+    path: '/api/optimize-cv',
+    body: {
+      cvText: 'Financial Analyst with three years of monthly reporting and variance analysis.',
+      targetRoleTitle: 'Financial Analyst',
+      targetRoleSkills: ['Excel', 'Financial Modelling'],
+    },
+    successKey: 'overallScore',
+  },
+  {
+    path: '/api/mock-interview',
+    body: {
+      roleTitle: 'Financial Analyst',
+      interviewType: 'behavioral',
+      question: 'Tell me about a report you owned end to end.',
+      userAnswer: 'I owned the monthly reporting pack, from source data to the board deck.',
+    },
+    successKey: 'score',
+  },
+  {
+    path: '/api/suggest-summary',
+    body: {
+      name: 'Test Analyst',
+      targetRoleTitle: 'Financial Analyst',
+      careerState: 'Analyst',
+      yearsExperience: '3',
+      skills: ['Excel', 'Reporting'],
+    },
+    successKey: 'suggestedSummary',
+  },
+  {
+    path: '/api/generate-cover-letter',
+    body: {
+      company: 'Example Corp',
+      jobTitle: 'Financial Analyst',
+      jobDescription: 'Monthly reporting and variance analysis.',
+      candidateName: 'Test Analyst',
+      experiences: ['Financial Analyst at Example Corp (2022-2025)'],
+    },
+    successKey: 'coverLetter',
+  },
+];
+
+/** Payload keys that must never appear in an error response. */
+const FABRICATED_KEYS = [
+  'matchPercentage',
+  'overallScore',
+  'score',
+  'suggestedSummary',
+  'coverLetter',
+];
 
 let user: TestUser;
 
@@ -287,37 +355,69 @@ describe('the AI routes reject an unauthenticated or malformed request', () => {
   });
 
   test('the AI routes fail honestly when no model is available', async (t) => {
-    // These routes call Gemini with the application's key. In the test
-    // environment there is no key, so every route must say that no result was
-    // produced. Substituting invented analysis, scores or prose would be
+    // Whether a model is configured is a property of the SERVER, not of the
+    // test process: the server loads `.env`, so the suite asks the server
+    // itself instead of guessing from its own environment. When no model is
+    // configured every route must say that no result was produced.
+    // Substituting invented analysis, scores or prose would be
     // indistinguishable from a real model response.
-    if (process.env.GEMINI_API_KEY) {
-      t.skip('GEMINI_API_KEY is configured; the no-model contract does not apply');
+    const health = await api('GET', '/api/health');
+    if (health.body?.modelConfigured === true) {
+      t.skip('the server has a model configured, so the no-model contract does not apply');
       return;
     }
-    const fabricatedKeys = [
-      'matchPercentage',
-      'overallScore',
-      'score',
-      'suggestedSummary',
-      'coverLetter',
-    ];
-    for (const path of [
-      '/api/analyze-career',
-      '/api/optimize-cv',
-      '/api/mock-interview',
-      '/api/suggest-summary',
-      '/api/generate-cover-letter',
-    ]) {
-      const res = await api('POST', path, { token: user.token, body: {} });
-      assert.equal(res.status, 503, `${path} must report the model as unavailable`);
+
+    for (const route of AI_ROUTE_CASES) {
+      const res = await api('POST', route.path, { token: user.token, body: route.body });
+      assert.equal(res.status, 503, `${route.path} must report the model as unavailable`);
       assert.equal(
         typeof res.body?.error,
         'string',
-        `${path} must explain that no result was generated`
+        `${route.path} must explain that no result was generated`
       );
-      for (const key of fabricatedKeys) {
-        assert.equal(res.body?.[key], undefined, `${path} must not fabricate ${key}`);
+      assert.equal(
+        res.body?.code,
+        'model_unavailable',
+        `${route.path} must say that the model itself is missing`
+      );
+      for (const key of FABRICATED_KEYS) {
+        assert.equal(res.body?.[key], undefined, `${route.path} must not fabricate ${key}`);
+      }
+      assert.equal(
+        res.body?.details,
+        undefined,
+        'an internal error message must never be returned to the client'
+      );
+    }
+  });
+
+  test('an AI route never invents a result when it fails', async () => {
+    // Whether the model answers, its quota is exhausted, or no model is
+    // configured at all, the route must either return a real model answer or
+    // an explicit failure. It must NEVER return invented content.
+    for (const route of AI_ROUTE_CASES) {
+      const res = await api('POST', route.path, { token: user.token, body: route.body });
+
+      if (res.status === 200) {
+        // A real model answer: it carries the documented payload.
+        assert.ok(
+          res.body?.[route.successKey] !== undefined,
+          `${route.path} returned 200 without a ${route.successKey}`
+        );
+        continue;
+      }
+
+      assert.ok(
+        res.status === 429 || res.status === 503,
+        `${route.path} must answer 429 (quota) or 503 (unavailable), not ${res.status}`
+      );
+      assert.equal(
+        typeof res.body?.error,
+        'string',
+        `${route.path} must explain that no result was generated`
+      );
+      for (const key of FABRICATED_KEYS) {
+        assert.equal(res.body?.[key], undefined, `${route.path} must not fabricate ${key}`);
       }
       assert.equal(
         res.body?.details,

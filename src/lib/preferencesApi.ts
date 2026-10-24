@@ -8,37 +8,14 @@
 // personalisation controls) are per-device UI preferences and deliberately
 // stay in local state.
 
-import { getAccessToken } from './supabase';
+// The shared client: the same Bearer header, JSON parsing and non-OK
+// handling every API module uses.
+import { apiRequest as request } from './apiClient';
 
 export interface PreferencesDTO {
   theme: string | null;
   language: string | null;
   notificationsEnabled: boolean | null;
-}
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = await getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...((init?.headers as Record<string, string>) ?? {}),
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(path, { ...init, headers });
-  let payload: unknown = null;
-  try {
-    payload = await res.json();
-  } catch {
-    payload = null;
-  }
-  if (!res.ok) {
-    const message =
-      payload && typeof payload === 'object' && payload !== null && 'error' in payload
-        ? String((payload as { error: unknown }).error)
-        : `Request failed with status ${res.status}`;
-    throw new Error(message);
-  }
-  return payload as T;
 }
 
 export async function fetchPreferences(): Promise<PreferencesDTO | null> {

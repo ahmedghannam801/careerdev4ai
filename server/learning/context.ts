@@ -14,7 +14,7 @@ import {
   listLearningItems,
   listUserSkillsWithNames,
 } from '../db/learning.ts';
-import { TARGET_ROLES } from '../../src/data/rolesData.ts';
+import { resolveRole } from '../../shared/careerRoles.ts';
 import type {
   BudgetPreference,
   ExperienceLevel,
@@ -55,18 +55,17 @@ function experienceFromProfile(
 
 function findRole(preferences: RecommendationPreferences, persistedTitle: string | null): RoleContext | null {
   const byId = preferences.targetRoleId
-    ? TARGET_ROLES.find((role) => role.id === preferences.targetRoleId)
+    ? resolveRole(preferences.targetRoleId)
     : undefined;
   const persisted = preferences.targetRoleTitle ?? persistedTitle ?? '';
-  const byTitle = TARGET_ROLES.find(
-    (role) => role.title === persisted || role.id === persisted
-  );
+  const byTitle = resolveRole(persisted);
   const role = byId ?? byTitle;
   if (!role) return null;
   return {
     slug: role.id,
     title: role.title,
     level: role.level,
+    domainId: role.domainId,
     requiredSkills: role.requiredSkills.map((skill) => ({
       name: skill.name,
       category: skill.category,

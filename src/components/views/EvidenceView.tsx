@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, ShieldCheck, ExternalLink, Github, Award, CheckCircle2, FileCheck, X } from 'lucide-react';
+import { Plus, ShieldCheck, ExternalLink, X } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { EvidenceType, EvidenceItem } from '../../types/career';
+import { EvidenceType } from '../../types/career';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const EvidenceView: React.FC = () => {
-  const { evidenceItems, addEvidence, deleteEvidence, targetRole, skills } = useCareer();
+  const { evidenceItems, addEvidence, deleteEvidence } = useCareer();
   const [selectedType, setSelectedType] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -50,7 +51,7 @@ export const EvidenceView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -97,11 +98,11 @@ export const EvidenceView: React.FC = () => {
       </div>
 
       {/* Evidence Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filtered.map((item) => (
-          <div
+          <StaggerItem
             key={item.id}
-            className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 flex flex-col justify-between shadow-xs hover:border-[var(--border-strong)] transition-all"
+            className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 flex flex-col justify-between shadow-xs hover:border-[var(--border-strong)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
           >
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -160,9 +161,9 @@ export const EvidenceView: React.FC = () => {
                 Delete
               </button>
             </div>
-          </div>
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       {/* Add Evidence Modal */}
       {showAddModal && (
@@ -256,6 +257,6 @@ export const EvidenceView: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

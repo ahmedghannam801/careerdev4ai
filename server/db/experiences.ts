@@ -98,16 +98,6 @@ function experienceDescription(
 
 // ---- experiences ----
 
-/** Reads every experience row owned by the given user. */
-export async function getExperiences(userId: string) {
-  const { data, error } = await getSupabaseServer()
-    .from('experiences')
-    .select('*')
-    .eq('user_id', userId);
-  if (error) throw error;
-  return data;
-}
-
 export async function listExperiences(userId: string): Promise<ExperienceDTO[]> {
   const { data, error } = await getSupabaseServer()
     .from('experiences')

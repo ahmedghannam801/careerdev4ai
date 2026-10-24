@@ -38,6 +38,7 @@ interface AssetBinding {
 
 interface Env {
   ASSETS: AssetBinding;
+  [key: string]: unknown;
 }
 
 function isApiPath(pathname: string): boolean {
@@ -71,6 +72,14 @@ function isAssetShapedPath(pathname: string): boolean {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    if (env && typeof env === 'object') {
+      for (const [key, value] of Object.entries(env)) {
+        if (typeof value === 'string' && process.env[key] !== value) {
+          process.env[key] = value;
+        }
+      }
+    }
+
     const url = new URL(request.url);
 
     if (isApiPath(url.pathname)) {

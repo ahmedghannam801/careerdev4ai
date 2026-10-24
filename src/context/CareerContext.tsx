@@ -8,6 +8,7 @@ import {
   SkillCategory,
   CareerAnalysis,
   RoadmapPhase,
+  RoadmapMilestone,
   RoadmapTask,
   RoadmapTaskStatus,
   CareerProject,
@@ -40,10 +41,11 @@ import {
   NotificationPreferences,
   PrivacyPreferences,
   CareerBlocker,
-  ProfileCompletenessBreakdown
+  ProfileCompletenessBreakdown,
+  CareerContextSummary,
 } from '../types/career';
-import { TARGET_ROLES } from '../data/rolesData';
-import { translations, Language } from '../translations';
+import { TARGET_ROLES, resolveRole } from '../data/rolesData';
+import { translations } from '../translations';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
 import {
   fetchActivities,
@@ -54,7 +56,6 @@ import {
   deleteSecondaryGoal as deleteSecondaryGoalApi,
   fetchCareerMilestones,
   postCareerMilestone,
-  patchCareerMilestone,
   deleteCareerMilestone,
   fetchCoverLetters,
   postCoverLetter,
@@ -68,8 +69,6 @@ import {
 import {
   fetchCvs,
   postCv,
-  patchCv,
-  deleteCv,
   fetchCvVersions,
   postCvVersion,
   patchCvVersion,
@@ -80,7 +79,6 @@ import {
   deleteProject as deleteProjectApi,
   fetchEvidence,
   postEvidence,
-  patchEvidence,
   deleteEvidence as deleteEvidenceApi,
   fetchCertifications,
   postCertification,
@@ -91,11 +89,7 @@ import {
   patchLanguage,
   deleteLanguage,
   fetchProfileLinks,
-  postProfileLink,
-  patchProfileLink,
-  deleteProfileLink,
   fetchCareerIdentity,
-  putCareerIdentity,
   fetchSavedRoles,
   postSavedRole,
   deleteSavedRole,
@@ -105,16 +99,12 @@ import {
   deleteJobApplication,
   fetchInterviewSessions,
   postInterviewSession,
-  patchInterviewSession,
-  deleteInterviewSession,
-  type CvDTO,
   type CvVersionDTO,
   type ProjectDTO,
   type EvidenceDTO,
   type CertificationDTO,
   type LanguageDTO,
   type ProfileLinkDTO,
-  type CareerIdentityDTO,
   type SavedRoleDTO,
   type JobApplicationDTO,
   type InterviewSessionDTO,
@@ -122,7 +112,6 @@ import {
 import {
   fetchRoadmap,
   createRoadmap as createRoadmapApi,
-  deleteRoadmap as deleteRoadmapApi,
   patchRoadmapTaskStatus,
   enrollInRoadmap as enrollInRoadmapApi,
   addRoadmapTask,
@@ -171,7 +160,6 @@ import type {
   LearningCourse,
   LearningItem,
   LearningRecommendation,
-  RecommendationResult,
   LearningPreferences,
   LearningStatus,
   CourseFormat,
@@ -228,7 +216,7 @@ export interface UserProfile {
 const emptyProfile: UserProfile = {
   name: '',
   email: '',
-  avatarUrl: '',
+  avatarUrl: 'avatar-01',
   currentTitle: '',
   location: '',
   bio: '',
@@ -398,7 +386,11 @@ interface CareerContextType {
   deleteCVVersion: (versionId: string) => void;
   runAiCvOptimization: () => Promise<void>;
   isOptimizingCV: boolean;
-  uploadCvFile: (file: File) => Promise<{ success: boolean; error?: string }>;
+  uploadCvFile: (file: File) => Promise<{ success: boolean; cv?: CVProfile; atsAnalysis?: any; error?: string }>;
+  pasteCvText: (text: string) => Promise<{ success: boolean; cv?: CVProfile; atsAnalysis?: any; error?: string }>;
+  importExtractedCvData: (cv: CVProfile, selectedSections: Record<string, boolean>) => Promise<void>;
+  regeneratePersonalizedRoadmap: () => Promise<boolean>;
+  careerContext: CareerContextSummary;
   isUploadingCv: boolean;
 
   // Jobs & Applications
@@ -445,151 +437,451 @@ interface CareerContextType {
 
 const CareerContext = createContext<CareerContextType | undefined>(undefined);
 
-const DEFAULT_INITIAL_SKILLS: UserSkill[] = [
-  { id: 'sk-1', name: 'React', category: 'technical', currentLevel: 3, targetLevel: 4, gap: 1, source: 'self_reported', evidenceIds: ['ev-1'], lastUpdated: '2026-10-18' },
-  { id: 'sk-2', name: 'TypeScript', category: 'technical', currentLevel: 3, targetLevel: 4, gap: 1, source: 'self_reported', evidenceIds: [], lastUpdated: '2026-10-18' },
-  { id: 'sk-3', name: 'JavaScript (ES6+)', category: 'technical', currentLevel: 4, targetLevel: 4, gap: 0, source: 'experience', evidenceIds: [], lastUpdated: '2026-10-18' },
-  { id: 'sk-4', name: 'HTML5 & Modern CSS', category: 'technical', currentLevel: 4, targetLevel: 4, gap: 0, source: 'experience', evidenceIds: [], lastUpdated: '2026-10-18' },
-  { id: 'sk-5', name: 'State Management', category: 'technical', currentLevel: 2, targetLevel: 3, gap: 1, source: 'ai_estimated', evidenceIds: [], lastUpdated: '2026-10-18' },
-  { id: 'sk-6', name: 'Web Performance Optimization', category: 'analytical', currentLevel: 2, targetLevel: 3, gap: 1, source: 'ai_estimated', evidenceIds: [], lastUpdated: '2026-10-18' },
-  { id: 'sk-7', name: 'Git & Version Control', category: 'tools', currentLevel: 4, targetLevel: 4, gap: 0, source: 'project_evidence', evidenceIds: ['ev-1'], lastUpdated: '2026-10-18' },
-  { id: 'sk-8', name: 'REST & GraphQL APIs', category: 'technical', currentLevel: 3, targetLevel: 3, gap: 0, source: 'self_reported', evidenceIds: [], lastUpdated: '2026-10-18' },
-  { id: 'sk-9', name: 'Accessibility (a11y)', category: 'domain', currentLevel: 2, targetLevel: 3, gap: 1, source: 'self_reported', evidenceIds: [], lastUpdated: '2026-10-18' },
-  { id: 'sk-10', name: 'Testing (Jest/Playwright)', category: 'tools', currentLevel: 1, targetLevel: 3, gap: 2, source: 'self_reported', evidenceIds: [], lastUpdated: '2026-10-18' },
-];
+export function normalizeSkillName(name: string): string {
+  if (!name) return '';
+  const clean = name.toLowerCase().trim();
+  // Aliases bridge the way a skill is written in a CV against the way the
+  // role catalogue names it. The table spans every career domain, so a
+  // "Financial Statement Analysis" in a CV matches the catalogue, and so does
+  // a "Financial Modelling" one.
+  const aliases: Record<string, string> = {
+    'microsoft excel': 'excel',
+    'ms excel': 'excel',
+    'excel / spreadsheets modeling': 'excel',
+    'excel / spreadsheets modelling': 'excel',
+    'spreadsheets': 'excel',
+    'power bi': 'power bi',
+    'powerbi': 'power bi',
+    'ms power bi': 'power bi',
+    'microsoft power bi': 'power bi',
+    'data visualization (tableau/power bi)': 'data visualization',
+    'data visualisation': 'data visualization',
+    'tableau desktop': 'tableau',
+    'react.js': 'react',
+    'reactjs': 'react',
+    'node.js': 'node.js',
+    'nodejs': 'node.js',
+    'ts': 'typescript',
+    'js': 'javascript',
+    'python3': 'python',
+    'py': 'python',
+    'postgres': 'postgresql',
+    'postgresql': 'postgresql',
+    'git & version control': 'git',
+    'git / version control': 'git',
+    'statistical analysis': 'statistics',
+    'statistics': 'statistics',
+    // Finance and accounting
+    'financial statement analysis': 'financial statements',
+    'financial statements analysis': 'financial statements',
+    'financial reporting': 'financial statements',
+    'fin modeling': 'financial modelling',
+    'financial model': 'financial modelling',
+    'management reporting': 'budgeting',
+    'budgeting & forecasting': 'budgeting',
+    // People and HR
+    'human resources': 'employee relations',
+    'hr generalist': 'employee relations',
+    'recruitment': 'sourcing & boolean search',
+    'recruiting': 'sourcing & boolean search',
+    'talent acquisition': 'sourcing & boolean search',
+    'payroll administration': 'payroll & people process administration',
+    'total rewards': 'compensation benchmarking & market pricing',
+    'comp & ben': 'compensation benchmarking & market pricing',
+    // Marketing, sales and design
+    'search engine optimisation': 'seo content writing',
+    'search engine optimization': 'seo content writing',
+    'social media marketing': 'social media strategy',
+    'customer acquisition': 'sourcing & boolean search',
+    'brand & graphic design': 'visual identity systems',
+    'ux / ui': 'interaction & ux design',
+    // Operations and supply chain
+    'supply chain management': 'demand forecasting & supply planning',
+    'procurement': 'sourcing & competitive tendering',
+    'warehouse management': 'inventory & warehouse management',
+    'logistics coordination': 'logistics coordination & routing',
+    // Education, healthcare and legal
+    'classroom management': 'classroom management',
+    'lesson planning': 'curriculum & lesson planning',
+    'patient care': 'clinical assessment & nursing care',
+    'clinical nursing': 'clinical assessment & nursing care',
+    'legal research': 'legal research & case analysis',
+    'contract management': 'contract lifecycle management',
+  };
+  return aliases[clean] || clean.replace(/[^a-z0-9+#]/g, '');
+}
 
-function generateInitialRoadmap(role: TargetRole): RoadmapPhase[] {
+/**
+ * A roadmap deadline, expressed as a date relative to today.
+ *
+ * Deadlines used to be hard-coded strings, which meant every generated
+ * roadmap carried the same dates no matter when it was created.
+ */
+function roadmapDeadline(weeksFromNow: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + weeksFromNow * 7);
+  return date.toISOString().slice(0, 10);
+}
+
+interface RoadmapGenerationContext {
+  userSkills?: UserSkill[];
+  skillLevels?: Record<string, number>;
+  experiences?: UserExperienceEntry[];
+  projects?: CareerProject[];
+  cv?: CVProfile | null;
+  careerGoal?: CareerGoal;
+  /** Completed or in-progress learning items, used to raise skill baselines. */
+  learningItems?: { courseId: string; status: string; title?: string }[];
+  /** Skills the learner has already completed in a previous roadmap. */
+  completedSkillNames?: string[];
+}
+
+export function generateInitialRoadmap(
+  role: TargetRole,
+  context?: RoadmapGenerationContext
+): RoadmapPhase[] {
+  const reqSkills = role.requiredSkills || [];
+  const prefSkills = role.preferredSkills || [];
+  const allRoleSkills = [...reqSkills, ...prefSkills];
+
+  // Map user skill proficiencies
+  const userSkillMap = new Map<string, number>();
+  if (context?.userSkills) {
+    for (const sk of context.userSkills) {
+      userSkillMap.set(normalizeSkillName(sk.name), sk.currentLevel);
+    }
+  }
+  if (context?.skillLevels) {
+    for (const [k, v] of Object.entries(context.skillLevels)) {
+      userSkillMap.set(normalizeSkillName(k), v);
+    }
+  }
+
+  // Detect skills mentioned in CV or experiences or projects
+  const demonstratedSkillNames = new Set<string>();
+  if (context?.cv?.skillsList) {
+    for (const s of context.cv.skillsList) demonstratedSkillNames.add(normalizeSkillName(s));
+  }
+  if (context?.experiences) {
+    for (const e of context.experiences) {
+      for (const s of e.skillsUsed || []) demonstratedSkillNames.add(normalizeSkillName(s));
+      const descLower = (e.description || '').toLowerCase();
+      for (const rsk of allRoleSkills) {
+        if (descLower.includes(rsk.name.toLowerCase())) demonstratedSkillNames.add(normalizeSkillName(rsk.name));
+      }
+    }
+  }
+  if (context?.projects) {
+    for (const p of context.projects) {
+      for (const s of p.skills || []) demonstratedSkillNames.add(normalizeSkillName(s));
+    }
+  }
+  // Learning progress counts as evidence: a skill the learner has already
+  // studied through the Learning Hub is not a cold gap.
+  if (context?.learningItems) {
+    for (const item of context.learningItems) {
+      if (item.status !== 'completed' && item.status !== 'in_progress') continue;
+      for (const sk of allRoleSkills) {
+        const title = (item.title || '').toLowerCase();
+        if (title && title.includes(sk.name.toLowerCase())) {
+          demonstratedSkillNames.add(normalizeSkillName(sk.name));
+        }
+      }
+    }
+  }
+  // Skills already completed in an earlier roadmap stay completed.
+  if (context?.completedSkillNames) {
+    for (const name of context.completedSkillNames) {
+      demonstratedSkillNames.add(normalizeSkillName(name));
+    }
+  }
+
+  // Evaluate skills into: gaps (high priority), strengthen (medium priority), and covered (low/complete)
+  const criticalGaps: { name: string; current: number; target: number; gap: number }[] = [];
+  const strengthenSkills: { name: string; current: number; target: number; gap: number }[] = [];
+  const coveredSkills: { name: string; current: number; target: number }[] = [];
+
+  for (const sk of reqSkills) {
+    const norm = normalizeSkillName(sk.name);
+    let current = userSkillMap.get(norm);
+    if (current === undefined) {
+      // If demonstrated in CV/experience, give baseline level 3; otherwise 1
+      current = demonstratedSkillNames.has(norm) ? 3 : 1;
+    }
+    const target = sk.minLevel;
+    const gap = Math.max(0, target - current);
+
+    if (gap >= 2 || current <= 1) {
+      criticalGaps.push({ name: sk.name, current, target, gap });
+    } else if (gap === 1) {
+      strengthenSkills.push({ name: sk.name, current, target, gap });
+    } else {
+      coveredSkills.push({ name: sk.name, current, target });
+    }
+  }
+
+  // If no critical gaps, pick top required skills
+  if (criticalGaps.length === 0 && strengthenSkills.length === 0) {
+    for (const sk of reqSkills.slice(0, 2)) {
+      strengthenSkills.push({ name: sk.name, current: 3, target: sk.minLevel, gap: 1 });
+    }
+  }
+
+  const primaryGapSkill = criticalGaps[0] || strengthenSkills[0] || { name: reqSkills[0]?.name || 'Core Foundations', current: 1, target: 4, gap: 3 };
+  const secondaryGapSkill = criticalGaps[1] || strengthenSkills[1] || {
+    name: reqSkills[1]?.name || 'Domain Architecture',
+    current: 2,
+    target: reqSkills[1]?.minLevel || 4,
+    gap: 2,
+  };
+
+  let taskCounter = 1;
+
+  // Phase 1: Critical Skill Gaps & Foundations
+  const phase1Milestones: RoadmapMilestone[] = [
+    {
+      id: 'ms-1-1',
+      title: `${primaryGapSkill.name} Mastery & Targeted Gap Closure`,
+      description: `Bridge your highest-priority gap in ${primaryGapSkill.name} from baseline to target level ${primaryGapSkill.target}/5.`,
+      completedTasksCount: 0,
+      tasks: [
+        {
+          id: `t-${taskCounter++}`,
+          title: `Complete comprehensive drills on core ${primaryGapSkill.name} principles`,
+          description: `Study the fundamental practices, methods and workflows required for ${role.title}.`,
+          status: 'in_progress',
+          skillName: primaryGapSkill.name,
+          deadline: roadmapDeadline(1),
+          estimatedHours: 8,
+        },
+        {
+          id: `t-${taskCounter++}`,
+          title: `Complete applied practice exercises using ${primaryGapSkill.name}`,
+          description: `Work through realistic exercises that simulate ${role.title} day-to-day requirements.`,
+          status: 'not_started',
+          skillName: primaryGapSkill.name,
+          deadline: roadmapDeadline(2),
+          estimatedHours: 10,
+        },
+      ],
+    },
+    {
+      id: 'ms-1-2',
+      title: `${secondaryGapSkill.name} Competency & Workflow Integration`,
+      description: `Level up in ${secondaryGapSkill.name} to satisfy ${role.title} baseline requirements.`,
+      completedTasksCount: 0,
+      tasks: [
+        {
+          id: `t-${taskCounter++}`,
+          title: `Synthesize best practices and reference approaches for ${secondaryGapSkill.name}`,
+          description: `Analyse the standards, guidance and worked examples that define good practice.`,
+          status: 'not_started',
+          skillName: secondaryGapSkill.name,
+          deadline: roadmapDeadline(3),
+          estimatedHours: 6,
+        },
+      ],
+    },
+  ];
+
+  // If user has covered skills, add a milestone celebrating and validating them
+  if (coveredSkills.length > 0) {
+    phase1Milestones.push({
+      id: 'ms-1-3',
+      title: `Verified Competencies (${coveredSkills.map(s => s.name).slice(0, 2).join(', ')})`,
+      description: `Recognize your demonstrated strength and maintain readiness.`,
+      completedTasksCount: 1,
+      tasks: [
+        {
+          id: `t-${taskCounter++}`,
+          title: `Baseline validated: ${coveredSkills[0].name} proficiency verified`,
+          description: `Your existing experience and confidence in ${coveredSkills[0].name} are accounted for in this roadmap.`,
+          status: 'completed',
+          skillName: coveredSkills[0].name,
+          estimatedHours: 4,
+        },
+      ],
+    });
+  }
+
+  // Phase 2: Applied Projects & Proof of Skill
+  const project1Title = role.typicalProjects?.[0] || `${role.title} Showcase Project`;
+  const project2Title = role.typicalProjects?.[1] || `${role.title} Advanced Application`;
+  const primaryTool = role.tools?.[0] || 'the tools used in the role';
+
+  const phase2Milestones: RoadmapMilestone[] = [
+    {
+      id: 'ms-2-1',
+      title: `Project 1: ${project1Title}`,
+      description: `Plan and deliver a tangible piece of work that reflects professional ${role.title} standards.`,
+      completedTasksCount: 0,
+      tasks: [
+        {
+          id: `t-${taskCounter++}`,
+          title: `Define the scope, requirements and deliverables for ${project1Title}`,
+          description: `Document what good looks like, the steps involved and the measures of success.`,
+          status: 'in_progress',
+          skillName: primaryGapSkill.name,
+          deadline: roadmapDeadline(5),
+          estimatedHours: 12,
+        },
+        {
+          id: `t-${taskCounter++}`,
+          title: `Produce and present a working deliverable using ${primaryTool}`,
+          description: `Deliver a verifiable work sample with documented results and a walkthrough.`,
+          status: 'not_started',
+          skillName: role.tools?.[1] || primaryGapSkill.name,
+          deadline: roadmapDeadline(7),
+          estimatedHours: 16,
+        },
+      ],
+    },
+    {
+      id: 'ms-2-2',
+      title: `Project 2: ${project2Title}`,
+      description: `Demonstrate end-to-end execution on complex real-world problems.`,
+      completedTasksCount: 0,
+      tasks: [
+        {
+          id: `t-${taskCounter++}`,
+          title: `Deliver a complete case study for ${project2Title}`,
+          description: `Showcase the outcomes you achieved and the decisions you made along the way.`,
+          status: 'not_started',
+          deadline: roadmapDeadline(9),
+          estimatedHours: 14,
+        },
+      ],
+    },
+  ];
+
+  // Phase 3: Portfolio Evidence & Certification
+  const certName = role.certifications?.[0] || `${role.title} Professional Credential`;
+  const evidenceSuggestion = role.evidenceSuggestions?.[0];
+  const phase3Milestones: RoadmapMilestone[] = [
+    {
+      id: 'ms-3-1',
+      title: `Credential & Verifiable Evidence: ${certName}`,
+      description: `Earn recognized certification and anchor proof items to your public profile.`,
+      completedTasksCount: 0,
+      tasks: [
+        {
+          id: `t-${taskCounter++}`,
+          title: `Prepare and pass ${certName} curriculum`,
+          description: `Review the official exam topics and complete practice assessments.`,
+          status: 'not_started',
+          estimatedHours: 20,
+        },
+        {
+          id: `t-${taskCounter++}`,
+          title: `Attach project evidence to CareerPilot Evidence Hub`,
+          description: evidenceSuggestion
+            ? `Link your supporting artefacts and links to your profile — for example: ${evidenceSuggestion}.`
+            : `Link your supporting artefacts, links and measurable outcomes to your profile.`,
+          status: 'not_started',
+          estimatedHours: 3,
+        },
+      ],
+    },
+  ];
+
+  // Phase 4: Market Preparation & CV Alignment
+  const phase4Milestones: RoadmapMilestone[] = [
+    {
+      id: 'ms-4-1',
+      title: `CV & Keyword Calibration for ${role.title}`,
+      description: `Align your CV narrative, keywords and role expectations in CV Studio.`,
+      completedTasksCount: 0,
+      tasks: [
+        {
+          id: `t-${taskCounter++}`,
+          title: `Tailor CV summary and achievements to ${role.title}`,
+          description: `Run the keyword and evidence diagnostic, then target a strong alignment score.`,
+          status: 'not_started',
+          estimatedHours: 4,
+        },
+      ],
+    },
+  ];
+
+  // Phase 5: Interview Readiness & Targeted Applications
+  const interviewTopic = role.interviewTopics?.[0] || 'Core Role Principles';
+  // Not every goal is "apply for a job": someone building a portfolio or
+  // specialising needs a different final step than an active applicant.
+  const isJobSearchGoal =
+    !context?.careerGoal ||
+    ['get_first_job', 'get_internship', 'switch_career', 'freelance', 'explore_careers'].includes(
+      context.careerGoal,
+    );
+  const phase5Milestones: RoadmapMilestone[] = [
+    {
+      id: 'ms-5-1',
+      title: `Interview Simulation & ${isJobSearchGoal ? 'Targeted Applications' : 'Targeted Outreach'}`,
+      description: `Rehearse the key topics (${interviewTopic}) and put yourself forward for relevant opportunities.`,
+      completedTasksCount: 0,
+      tasks: [
+        {
+          id: `t-${taskCounter++}`,
+          title: `Complete a mock interview on ${interviewTopic}`,
+          description: `Practice STAR framework responses in the Interview Prep simulator.`,
+          status: 'not_started',
+          estimatedHours: 4,
+        },
+        {
+          id: `t-${taskCounter++}`,
+          title: isJobSearchGoal
+            ? `Submit 5 targeted applications with tailored profiles`
+            : `Prepare 5 targeted approaches to relevant roles or clients`,
+          description: isJobSearchGoal
+            ? `Track application stages and follow-up milestones in Applications view.`
+            : `Track each approach and follow-up in the Applications view so nothing is missed.`,
+          status: 'not_started',
+          estimatedHours: 5,
+        },
+      ],
+    },
+  ];
+
   return [
     {
       id: 'phase-1',
       phaseNumber: 1,
-      title: 'Phase 1: Foundations & Architecture Mastery',
-      description: 'Strengthen fundamental syntax, typing patterns, and core component lifecycle principles.',
+      title: `Phase 1: Priority Skill Gaps & Foundations`,
+      description: `Close critical skill gaps between your current proficiency and ${role.title} standards.`,
       isUnlocked: true,
-      milestones: [
-        {
-          id: 'ms-1-1',
-          title: 'Advanced Type Safety & Generics',
-          description: 'Achieve strict TypeScript confidence across complex interfaces and utility types.',
-          completedTasksCount: 1,
-          tasks: [
-            { id: 't-1', title: 'Complete TypeScript Handbook section on Generics and Discriminated Unions', description: 'Review official Microsoft documentation and complete interactive playground drills.', status: 'completed', skillName: 'TypeScript', estimatedHours: 8 },
-            { id: 't-2', title: 'Refactor component props to strict Readonly and generic payload types', description: 'Eliminate any remaining any types and implement strict narrowing.', status: 'in_progress', skillName: 'TypeScript', deadline: '2026-10-25', estimatedHours: 6 },
-          ]
-        },
-        {
-          id: 'ms-1-2',
-          title: 'Core Rendering Lifecycle & Purity',
-          description: 'Master React 19 reconciliation, hook dependency arrays, and server components.',
-          completedTasksCount: 0,
-          tasks: [
-            { id: 't-3', title: 'Benchmark virtual DOM re-renders using Chrome DevTools Flamechart', description: 'Identify unnecessary re-render triggers across nested child trees.', status: 'not_started', skillName: 'Web Performance Optimization', deadline: '2026-10-30', estimatedHours: 5 }
-          ]
-        }
-      ]
+      milestones: phase1Milestones,
     },
     {
       id: 'phase-2',
       phaseNumber: 2,
-      title: 'Phase 2: Target Skill Development & Gaps',
-      description: 'Systematically close the critical gaps identified between your current proficiency and role requirements.',
+      title: `Phase 2: Applied Projects & Practical Mastery`,
+      description: `Deliver proof-of-work projects matching professional expectations for ${role.title}.`,
       isUnlocked: true,
-      milestones: [
-        {
-          id: 'ms-2-1',
-          title: 'Automated Testing Infrastructure',
-          description: 'Close your testing gap (Current: 1/5 -> Target: 3/5) with unit, integration, and E2E suites.',
-          completedTasksCount: 0,
-          tasks: [
-            { id: 't-4', title: 'Write comprehensive Jest unit tests for core state reducers', description: 'Ensure 90%+ branch coverage for mission-critical logic.', status: 'in_progress', skillName: 'Testing (Jest/Playwright)', deadline: '2026-11-05', estimatedHours: 12 },
-            { id: 't-5', title: 'Build Playwright E2E test workflow simulating user onboarding', description: 'Run cross-browser tests on Chromium, Firefox, and WebKit.', status: 'not_started', skillName: 'Testing (Jest/Playwright)', estimatedHours: 10 }
-          ]
-        },
-        {
-          id: 'ms-2-2',
-          title: 'Accessibility & Keyboard Governance',
-          description: 'Bring accessibility up to WCAG 2.1 AA production standards.',
-          completedTasksCount: 0,
-          tasks: [
-            { id: 't-6', title: 'Audit navigation with NVDA / VoiceOver screen reader', description: 'Verify ARIA live regions, focus trapping on modals, and semantic landmarks.', status: 'not_started', skillName: 'Accessibility (a11y)', estimatedHours: 6 }
-          ]
-        }
-      ]
+      milestones: phase2Milestones,
     },
     {
       id: 'phase-3',
       phaseNumber: 3,
-      title: 'Phase 3: Proof of Skill & Portfolio Evidence',
-      description: 'Ship tangible, verifiable artifacts that showcase your capabilities directly to engineering managers.',
+      title: `Phase 3: Portfolio Evidence & Professional Credentials`,
+      description: `Solidify your market standing with industry certifications and verified evidence.`,
       isUnlocked: false,
-      milestones: [
-        {
-          id: 'ms-3-1',
-          title: 'Flagship Portfolio Production Release',
-          description: 'Deploy an accessible Design System or Full-Stack solution with automated CI/CD.',
-          completedTasksCount: 0,
-          tasks: [
-            { id: 't-7', title: 'Publish documentation site and storybook for Accessible UI System', description: 'Host live on custom domain with public GitHub repository.', status: 'not_started', deadline: '2026-11-20', estimatedHours: 20 },
-            { id: 't-8', title: 'Attach live project URL as verifiable evidence in CareerPilot Evidence Hub', description: 'Connect Project -> Skill -> Evidence -> CV.', status: 'not_started', estimatedHours: 2 }
-          ]
-        }
-      ]
+      milestones: phase3Milestones,
     },
     {
       id: 'phase-4',
       phaseNumber: 4,
-      title: 'Phase 4: Market Preparation & CV Optimization',
-      description: 'Reposition your CV, optimize for ATS keyword parsing, and curate evidence bullets.',
+      title: `Phase 4: Market Preparation & CV Optimization`,
+      description: `Tune your CV bullet points and keyword alignment specifically for ${role.title} openings.`,
       isUnlocked: false,
-      milestones: [
-        {
-          id: 'ms-4-1',
-          title: 'ATS-Aligned CV Studio Polish',
-          description: 'Tune CV bullet points using Google X-Y-Z formula and achieve 85%+ ATS match score.',
-          completedTasksCount: 0,
-          tasks: [
-            { id: 't-9', title: 'Run CV ATS optimization analysis against primary target role', description: 'Incorporate missing keywords and impact metrics.', status: 'not_started', estimatedHours: 4 },
-            { id: 't-10', title: 'Export clean PDF and align LinkedIn profile headline and experience', description: 'Ensure consistency across all public applicant profiles.', status: 'not_started', estimatedHours: 3 }
-          ]
-        }
-      ]
+      milestones: phase4Milestones,
     },
     {
       id: 'phase-5',
       phaseNumber: 5,
-      title: 'Phase 5: Targeted Job Applications',
-      description: 'Target high-fit opportunities with customized applications and disciplined pipeline tracking.',
+      title: `Phase 5: Interview Simulation & Targeted Applications`,
+      description: `Execute your search pipeline with interview readiness and high-match applications.`,
       isUnlocked: false,
-      milestones: [
-        {
-          id: 'ms-5-1',
-          title: 'Application Pipeline Execution',
-          description: 'Submit 5-10 targeted high-match applications with tracked interview stages.',
-          completedTasksCount: 0,
-          tasks: [
-            { id: 't-11', title: 'Filter jobs for >75% skill match and save top 5 positions', description: 'Review job requirements and customize cover letter notes.', status: 'not_started', estimatedHours: 4 }
-          ]
-        }
-      ]
+      milestones: phase5Milestones,
     },
-    {
-      id: 'phase-6',
-      phaseNumber: 6,
-      title: 'Phase 6: Interview Mastery & Negotiation',
-      description: 'Simulate technical deep dives, master the STAR behavioral framework, and secure top-tier offers.',
-      isUnlocked: false,
-      milestones: [
-        {
-          id: 'ms-6-1',
-          title: 'Mock Interview Simulator Drills',
-          description: 'Complete 3 AI mock interview drills covering behavioral and technical questions.',
-          completedTasksCount: 0,
-          tasks: [
-            { id: 't-12', title: 'Practice STAR story for unexpected technical roadblock', description: 'Receive AI scoring and refine response.', status: 'not_started', estimatedHours: 3 }
-          ]
-        }
-      ]
-    }
   ];
 }
 
@@ -600,10 +892,20 @@ function toUserAccount(
   token?: string
 ): UserAccount {
   const meta = user.user_metadata || {};
+  // Google and LinkedIn supply `name`; GitHub may supply only its username
+  // (`user_name`/`preferred_username`). None of these fields is required: the
+  // onboarding flow collects the details the profile needs, so a provider that
+  // omits them must not prevent the session from being established.
+  const email = user.email || meta.email || '';
   return {
     id: user.id,
-    email: user.email || '',
-    name: meta.name || meta.full_name || (user.email ? user.email.split('@')[0] : 'User'),
+    email,
+    name:
+      meta.name ||
+      meta.full_name ||
+      meta.user_name ||
+      meta.preferred_username ||
+      (email ? email.split('@')[0] : 'User'),
     avatarUrl: meta.avatar_url || undefined,
     token,
     createdAt: meta.created_at || new Date().toISOString(),
@@ -904,6 +1206,14 @@ function toTargetRole(dto: SavedRoleDTO): TargetRole {
       interviewTopics: [],
       careerProgression: [],
       relatedRoles: [],
+      domainId: 'business',
+      aliases: [],
+      entryPath: [],
+      intermediatePath: [],
+      advancedPath: [],
+      proficiencyExpectations: [],
+      evidenceSuggestions: [],
+      learningTopics: [],
     }
   );
 }
@@ -1343,10 +1653,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           roadmapSkillCount: learningRecommendationResult.context?.roadmapSkillCount ?? 0,
         }));
 
-        // The target role is persisted as its title; the catalogue entry
+        // The target role is persisted as its canonical title; the catalogue entry
         // supplies the skill requirements and the roadmap the UI derives.
         const persistedRole = profileRecord?.targetRole
-          ? TARGET_ROLES.find((role) => role.title === profileRecord.targetRole)
+          ? resolveRole(profileRecord.targetRole)
           : undefined;
         if (persistedRole) setTargetRole(persistedRole);
 
@@ -2277,7 +2587,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       let totalPoints = 0;
 
       reqSkills.forEach(req => {
-        const found = skills.find(s => s.name.toLowerCase() === req.name.toLowerCase());
+        // Match on the normalised name so the analysis and the roadmap
+        // generator always agree about the same skill.
+        const normalized = normalizeSkillName(req.name);
+        const found = skills.find(s => normalizeSkillName(s.name) === normalized);
         const current = found ? found.currentLevel : 1;
         totalPoints += req.minLevel;
         earnedPoints += Math.min(current, req.minLevel);
@@ -2292,7 +2605,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             skill: req.name,
             current,
             target: req.minLevel,
-            reason: `Role requires level ${req.minLevel}/5 for production independence; currently assessed at ${current}/5.`
+            reason: `Role requires level ${req.minLevel}/5 for independent delivery; currently assessed at ${current}/5.`
           });
         }
       });
@@ -2305,21 +2618,23 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       strengths: strengths.slice(0, 4),
       criticalGaps: criticalGaps.slice(0, 5),
       missingExperience: [
-        'Production CI/CD deployment pipeline maintenance',
-        'Direct architectural responsibility for distributed client state'
+        `Demonstrable ${targetRole.title} delivery against ${targetRole.experienceExpectation || 'the role expectation'}`,
+        `Evidence in your portfolio that shows the skills below at working level`,
       ],
       careerRisks: [
-        'Candidate pool contains applicants with dedicated unit testing experience',
-        'Rapid evolution of server components requires continuous hands-on practice'
+        `Candidates with verified ${targetRole.title} experience are competing for the same openings`,
+        `Skills in this role are expected to keep developing, so continuous practice matters`,
       ],
-      recommendedProjects: [
-        'Accessible Design System component library with automated tests',
-        'Real-time collaborative dashboard with WebSockets'
-      ],
-      recommendedLearning: [
-        'CS50 Introduction to Databases with SQL',
-        'Official React Documentation & Interactive Tutorials'
-      ],
+      recommendedProjects: (targetRole.typicalProjects?.length
+        ? targetRole.typicalProjects
+        : [`A ${targetRole.title} showcase project`]
+      ).slice(0, 2),
+      recommendedLearning: (targetRole.learningTopics?.length
+        ? targetRole.learningTopics.map(
+            (topic) => `Focused study on ${topic} for ${targetRole.title}`,
+          )
+        : [`Targeted study on ${criticalGaps[0]?.skill || targetRole.title} fundamentals`]
+      ).slice(0, 2),
       nextBestAction: criticalGaps.length > 0 ? {
         title: `Close ${criticalGaps[0].skill} gap`,
         description: `Advance from level ${criticalGaps[0].current} to ${criticalGaps[0].target} with hands-on practice.`,
@@ -2327,7 +2642,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         actionType: 'task'
       } : {
         title: 'Prepare for Upcoming Interviews',
-        description: 'Simulate behavioral and architectural STAR questions to solidify your interview presence.',
+        description: 'Simulate behavioural and role-specific STAR questions to solidify your interview presence.',
         reason: 'Your core technical skill requirements are aligned with market expectations.',
         actionType: 'cv'
       }
@@ -2665,8 +2980,40 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Target Role Change Handler
+  /**
+   * Learning items joined with their course title.
+   *
+   * The roadmap generator uses this to recognise a skill the learner has
+   * already studied through the Learning Hub, so it is not treated as a cold
+   * gap.
+   */
+  const learningItemsForRoadmap = () =>
+    learningItems.map((item) => ({
+      courseId: item.courseId,
+      status: item.status,
+      title: learningCatalog.find((course) => course.id === item.courseId)?.title,
+    }));
+
+  /**
+   * Skills the learner has already completed in the current roadmap.
+   *
+   * Regenerating a roadmap must not throw away completed work, so the
+   * generator is told which skills are already done.
+   */
+  const completedRoadmapSkillNames = (): string[] => {
+    const names: string[] = [];
+    for (const phase of roadmapPhases) {
+      for (const milestone of phase.milestones ?? []) {
+        for (const task of milestone.tasks ?? []) {
+          if (task.status === 'completed' && task.skillName) names.push(task.skillName);
+        }
+      }
+    }
+    return names;
+  };
+
   const setPrimaryTargetRole = async (roleId: string): Promise<boolean> => {
-    const role = TARGET_ROLES.find(r => r.id === roleId);
+    const role = resolveRole(roleId) ?? TARGET_ROLES.find(r => r.id === roleId);
     if (!role) return false;
     setTargetRole(role);
 
@@ -2682,14 +3029,80 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // The tree is sent to POST /api/roadmap, which writes the phases,
     // milestones and tasks and returns the roadmap with the REAL database ids.
     // The local state is then replaced by the server's roadmap.
-    const generated = generateInitialRoadmap(role);
+    const generated = generateInitialRoadmap(role, {
+      userSkills: skills,
+      skillLevels,
+      experiences: profile.experiences,
+      projects,
+      cv: activeCV,
+      careerGoal: profile.careerGoal,
+      learningItems: learningItemsForRoadmap(),
+      completedSkillNames: completedRoadmapSkillNames(),
+    });
     try {
       // The target role is persisted alongside the roadmap so the server's
       // view of the user's target matches the UI's (B.4 finding M-2).
       await patchProfile({ targetRole: role.title, targetIndustry: role.category });
+
+      let roadmapPersisted = false;
+      try {
+        const roadmap = await createRoadmapApi({
+          title: `${role.title} Roadmap`,
+          targetRoleTitle: role.title,
+          phases: generated.map((phase, phaseIndex) => ({
+            phaseNumber: phase.phaseNumber ?? phaseIndex + 1,
+            title: phase.title,
+            description: phase.description,
+            isUnlocked: phase.isUnlocked,
+            milestones: phase.milestones.map(milestone => ({
+              title: milestone.title,
+              description: milestone.description,
+              tasks: milestone.tasks.map(task => ({
+                title: task.title,
+                description: task.description,
+                status: task.status,
+                skillName: task.skillName,
+                deadline: task.deadline,
+                estimatedHours: task.estimatedHours,
+              })),
+            })),
+          })),
+        });
+        if (roadmap) {
+          setRoadmapPhases(toRoadmapPhases(roadmap));
+          setIsEnrolledInRoadmap(roadmap.isEnrolled);
+          roadmapPersisted = true;
+        }
+      } catch (roadmapError) {
+        console.warn('Roadmap tree sync note:', roadmapError);
+      }
+
+      if (!roadmapPersisted) {
+        setRoadmapPhases(generated);
+      }
+      return true;
+    } catch (error) {
+      console.error('Failed to persist target role:', error);
+      setRoadmapPhases(generated);
+      return false;
+    }
+  };
+
+  const regeneratePersonalizedRoadmap = async (): Promise<boolean> => {
+    const generated = generateInitialRoadmap(targetRole, {
+      userSkills: skills,
+      skillLevels,
+      experiences: profile.experiences,
+      projects,
+      cv: activeCV,
+      careerGoal: profile.careerGoal,
+      learningItems: learningItemsForRoadmap(),
+      completedSkillNames: completedRoadmapSkillNames(),
+    });
+    try {
       const roadmap = await createRoadmapApi({
-        title: `${role.title} Roadmap`,
-        targetRoleTitle: role.title,
+        title: `${targetRole.title} Roadmap`,
+        targetRoleTitle: targetRole.title,
         phases: generated.map((phase, phaseIndex) => ({
           phaseNumber: phase.phaseNumber ?? phaseIndex + 1,
           title: phase.title,
@@ -2715,13 +3128,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return true;
       }
     } catch (error) {
-      console.error('Failed to persist roadmap:', error);
+      console.error('Failed to regenerate roadmap:', error);
     }
-
-    // The server is unreachable: keep the generated tree locally so the UI
-    // still responds. It will be replaced by the server's roadmap on the next
-    // successful load. `false` tells the caller (onboarding) that this choice
-    // is NOT persisted yet.
     setRoadmapPhases(generated);
     return false;
   };
@@ -3557,29 +3965,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const updateEvidence = async (
-    evidenceId: string,
-    updates: Partial<EvidenceItem>
-  ) => {
-    try {
-      const dto = await patchEvidence(evidenceId, {
-        title: updates.title,
-        type: updates.type,
-        description: updates.description,
-        url: updates.url,
-        verified: updates.verified,
-        dateAdded: updates.dateAdded,
-        projectId: updates.projectId,
-        skillNames: updates.skillNames,
-      });
-      setEvidenceItems(prev =>
-        prev.map(e => (e.id === evidenceId ? toEvidenceItem(dto) : e))
-      );
-    } catch (error) {
-      console.error('Failed to update evidence:', error);
-    }
-  };
-
   const deleteEvidence = async (evidenceId: string) => {
     try {
       await deleteEvidenceApi(evidenceId);
@@ -3619,7 +4004,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Real CV Upload Pipeline implementation
-  const uploadCvFile = async (file: File): Promise<{ success: boolean; error?: string }> => {
+  const uploadCvFile = async (file: File): Promise<{ success: boolean; cv?: CVProfile; atsAnalysis?: any; error?: string }> => {
     setIsUploadingCv(true);
     try {
       const formData = new FormData();
@@ -3640,9 +4025,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       if (data.cv) {
         setActiveCV(data.cv);
-        // The route creates the CV row and its first version and returns
-        // their real ids. Without them the version list would hold a fake
-        // id, and the next snapshot would have no CV to attach to.
         if (data.cvId) setActiveCvId(data.cvId);
         const newVer: CVVersion = {
           id: data.cvVersionId ?? `cv-v-${Date.now()}`,
@@ -3656,13 +4038,200 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setCvVersions(prev => [newVer, ...prev]);
       }
 
-      return { success: true };
+      return { success: true, cv: data.cv, atsAnalysis: data.atsAnalysis };
     } catch (e: any) {
       console.error('Upload CV error:', e);
       return { success: false, error: e.message || 'File extraction failed' };
     } finally {
       setIsUploadingCv(false);
     }
+  };
+
+  const pasteCvText = async (text: string): Promise<{ success: boolean; cv?: CVProfile; atsAnalysis?: any; error?: string }> => {
+    setIsUploadingCv(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch('/api/resumes/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          text,
+          targetRoleTitle: targetRole.title
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to parse CV');
+      }
+
+      if (data.cv) {
+        setActiveCV(data.cv);
+        if (data.cvId) setActiveCvId(data.cvId);
+        const newVer: CVVersion = {
+          id: data.cvVersionId ?? `cv-v-${Date.now()}`,
+          cvId: data.cvId,
+          name: 'Pasted CV',
+          targetRoleTitle: targetRole.title,
+          createdAt: new Date().toISOString().split('T')[0],
+          profile: data.cv,
+          atsAnalysis: data.atsAnalysis
+        };
+        setCvVersions(prev => [newVer, ...prev]);
+      }
+
+      return { success: true, cv: data.cv, atsAnalysis: data.atsAnalysis };
+    } catch (e: any) {
+      console.error('Paste CV error:', e);
+      return { success: false, error: e.message || 'Text extraction failed' };
+    } finally {
+      setIsUploadingCv(false);
+    }
+  };
+
+  const importExtractedCvData = async (
+    cv: CVProfile,
+    selectedSections: Record<string, boolean>
+  ): Promise<void> => {
+    // 1. Personal Information -> Profile
+    if (selectedSections.personal) {
+      const updates: Partial<UserProfile> = {};
+      if (cv.fullName && cv.fullName.trim() && (!profile.name || profile.name.trim() === '')) {
+        updates.name = cv.fullName.trim();
+      }
+      if (cv.title && cv.title.trim()) {
+        updates.currentTitle = cv.title.trim();
+        updates.headline = cv.title.trim();
+      }
+      if (cv.location && cv.location.trim()) {
+        updates.location = cv.location.trim();
+      }
+      if (cv.summary && cv.summary.trim()) {
+        updates.professionalSummary = cv.summary.trim();
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateProfile(updates);
+      }
+    }
+
+    // 2. Work Experience -> Experiences (with duplicate prevention)
+    if (selectedSections.experience && cv.experiences && cv.experiences.length > 0) {
+      const existing = profile.experiences || [];
+      const toAdd: UserExperienceEntry[] = [];
+      for (const exp of cv.experiences) {
+        const normCompany = exp.company.toLowerCase().trim();
+        const normRole = exp.role.toLowerCase().trim();
+        const isDupe = existing.some(e => e.company.toLowerCase().trim() === normCompany && e.role.toLowerCase().trim() === normRole);
+        if (!isDupe && (exp.company.trim() || exp.role.trim())) {
+          const periodParts = exp.period ? exp.period.split(/[-–|]|\bto\b/i).map(s => s.trim()) : [];
+          const isCurr = exp.period ? /present|current|now/i.test(exp.period) : false;
+          toAdd.push({
+            id: `exp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            company: exp.company.trim(),
+            role: exp.role.trim(),
+            employmentType: 'Full-time',
+            location: exp.location || '',
+            startDate: periodParts[0] || '',
+            endDate: periodParts[1] || (isCurr ? 'Present' : ''),
+            isCurrent: isCurr,
+            description: exp.bullets?.join('. ') || '',
+            achievements: exp.bullets || [],
+            skillsUsed: []
+          });
+        }
+      }
+      if (toAdd.length > 0) {
+        await updateProfile({ experiences: [...existing, ...toAdd] });
+      }
+    }
+
+    // 3. Education -> Education records (with duplicate prevention)
+    if (selectedSections.education && cv.education && cv.education.length > 0) {
+      const existing = profile.education || [];
+      const toAdd: UserEducationEntry[] = [];
+      for (const edu of cv.education) {
+        const normInst = edu.institution.toLowerCase().trim();
+        const normDegree = edu.degree.toLowerCase().trim();
+        const isDupe = existing.some(e => e.institution.toLowerCase().trim() === normInst && e.degree.toLowerCase().trim() === normDegree);
+        if (!isDupe && (edu.institution.trim() || edu.degree.trim())) {
+          const periodParts = edu.period ? edu.period.split(/[-–|]|\bto\b/i).map(s => s.trim()) : [];
+          toAdd.push({
+            id: `edu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            institution: edu.institution.trim(),
+            degree: edu.degree.trim(),
+            field: edu.field?.trim() || '',
+            startDate: periodParts[0] || '',
+            endDate: periodParts[1] || (periodParts[0] && !periodParts[1] ? periodParts[0] : ''),
+            current: false,
+            gpa: edu.gpa || ''
+          });
+        }
+      }
+      if (toAdd.length > 0) {
+        await updateProfile({ education: [...existing, ...toAdd] });
+      }
+    }
+
+    // 4. Skills -> User Skills (with normalization and duplicate prevention)
+    if (selectedSections.skills && cv.skillsList && cv.skillsList.length > 0) {
+      for (const s of cv.skillsList) {
+        const norm = normalizeSkillName(s);
+        const existingSkill = skills.find(existing => normalizeSkillName(existing.name) === norm);
+        if (!existingSkill && s.trim()) {
+          await updateSkillLevel(s.trim(), 3);
+        }
+      }
+    }
+
+    // 5. Projects -> Projects (with duplicate prevention)
+    if (selectedSections.projects && cv.projects && cv.projects.length > 0) {
+      for (const p of cv.projects) {
+        const normTitle = p.title.toLowerCase().trim();
+        const isDupe = projects.some(proj => proj.title.toLowerCase().trim() === normTitle);
+        if (!isDupe && p.title.trim()) {
+          await addProject({
+            title: p.title.trim(),
+            goal: p.role || '',
+            description: p.bullets?.join('. ') || p.title,
+            difficulty: 'Intermediate',
+            skills: p.technologies || [],
+            tasks: p.bullets || [],
+            deliverables: ['Project Implementation'],
+            status: 'completed'
+          });
+        }
+      }
+    }
+
+    // 6. Certifications -> Certifications (with duplicate prevention)
+    if (selectedSections.certifications && cv.certifications && cv.certifications.length > 0) {
+      const existing = profile.certifications || [];
+      const toAdd = [];
+      for (const c of cv.certifications) {
+        const norm = c.toLowerCase().trim();
+        const isDupe = existing.some(cert => cert.name.toLowerCase().trim() === norm);
+        if (!isDupe) {
+          toAdd.push({
+            id: `cert-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name: c.trim(),
+            provider: 'Verified Credential',
+            issueDate: new Date().getFullYear().toString()
+          });
+        }
+      }
+      if (toAdd.length > 0) {
+        await updateProfile({ certifications: [...existing, ...toAdd] });
+      }
+    }
+
+    // Save active CV in context
+    setActiveCV(cv);
+
+    // Refresh personalized roadmap with the newly imported context
+    await regeneratePersonalizedRoadmap();
   };
 
   const runAiCvOptimization = async () => {
@@ -3827,18 +4396,10 @@ Skills: ${activeCV.skillsList.join(', ')}
     setIsCopilotTyping(true);
 
     try {
-      const topGaps = analysis.criticalGaps.map(g => `${g.skill} (${g.current}->${g.target})`);
-      const context = {
-        activeView,
-        careerState: profile.careerState,
-        careerGoal: profile.careerGoal,
-        targetRole,
-        skillGaps: topGaps,
-        applicationsCount: applications.length,
-        interviewsCount: interviewSessions.length,
-        activeProjectTitle: projects.find(p => p.status === 'in_progress')?.title
-      };
-
+      // The server reads the user's career graph from the database for the
+      // verified user id, so only the prompt and the active view travel from
+      // the browser. Sending the whole context used to mean the assistant was
+      // reasoning about unverified client data.
       const token = await getAccessToken();
       const res = await fetch('/api/copilot', {
         method: 'POST',
@@ -3846,7 +4407,7 @@ Skills: ${activeCV.skillsList.join(', ')}
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ userPrompt: text, context })
+        body: JSON.stringify({ userPrompt: text, context: { activeView } })
       });
 
       if (res.ok) {
@@ -3895,32 +4456,64 @@ Skills: ${activeCV.skillsList.join(', ')}
     }
   };
 
-  const confirmAiAction = (actionId: string, accept: boolean) => {
+  const confirmAiAction = async (actionId: string, accept: boolean) => {
     if (!pendingAiAction || pendingAiAction.id !== actionId) return;
 
     if (accept) {
       // Execute the proposed action safely
       if (pendingAiAction.type === 'update_task' || pendingAiAction.type === 'add_skill') {
-        const skillName = pendingAiAction.payload?.skill || 'Automated Testing';
-        addCustomSkill({
-          name: skillName,
-          category: 'tools',
-          currentLevel: 1,
-          targetLevel: 3,
-          source: 'ai_estimated',
-          evidenceIds: []
-        });
-        setNotifications(prev => [
-          {
-            id: `notif-${Date.now()}`,
-            title: 'AI Action Confirmed',
-            message: `Added ${skillName} competency tracking to your career graph.`,
-            type: 'achievement',
-            read: false,
-            timestamp: 'Just now'
-          },
-          ...prev
-        ]);
+        // The server proposes a real skill name from the user's actual gap
+        // list. If it did not supply one, nothing is created: writing a
+        // placeholder skill would pollute the user's skill graph.
+        const proposedSkill = pendingAiAction.payload?.skill;
+        if (!proposedSkill || !proposedSkill.trim()) {
+          setCopilotMessages(prev => [
+            ...prev,
+            {
+              id: `msg-${Date.now() + 1}`,
+              sender: 'assistant',
+              text: 'That action did not name a specific skill, so nothing was added. Ask the assistant to name the skill you should work on.',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ]);
+          setPendingAiAction(null);
+          return;
+        }
+        const skillName = proposedSkill.trim();
+        try {
+          await addCustomSkill({
+            name: skillName,
+            category: 'tools',
+            currentLevel: 1,
+            targetLevel: 3,
+            source: 'ai_estimated',
+            evidenceIds: []
+          });
+          setNotifications(prev => [
+            {
+              id: `notif-${Date.now()}`,
+              title: 'AI Action Confirmed',
+              message: `Added ${skillName} competency tracking to your career graph.`,
+              type: 'achievement',
+              read: false,
+              timestamp: 'Just now'
+            },
+            ...prev
+          ]);
+        } catch (error) {
+          // The write failed: report it instead of showing a success toast
+          // for work that did not happen.
+          console.error('Failed to add the AI-proposed skill:', error);
+          setCopilotMessages(prev => [
+            ...prev,
+            {
+              id: `msg-${Date.now() + 1}`,
+              sender: 'assistant',
+              text: `Could not add "${skillName}" to your skills. Nothing was changed; please try again.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ]);
+        }
       }
     }
 
@@ -4016,9 +4609,46 @@ Skills: ${activeCV.skillsList.join(', ')}
     window.location.reload();
   };
 
+  const careerContext: CareerContextSummary = useMemo(() => ({
+    profile,
+    careerGoal: profile.careerGoal,
+    targetRole,
+    skills,
+    skillGaps: analysis.criticalGaps.map(g => g.skill),
+    experience: profile.experiences,
+    education: profile.education,
+    projects,
+    evidence: evidenceItems,
+    roadmap: roadmapPhases,
+    learningProgress: learningItems,
+    preferences: {
+      aiPreferences,
+      notificationPreferences,
+      privacyPreferences,
+    },
+    cv: activeCV,
+    applications,
+  }), [
+    profile,
+    targetRole,
+    skills,
+    analysis,
+    projects,
+    evidenceItems,
+    roadmapPhases,
+    learningItems,
+    aiPreferences,
+    notificationPreferences,
+    privacyPreferences,
+    activeCV,
+    applications,
+  ]);
+
   return (
     <CareerContext.Provider
       value={{
+        careerContext,
+        regeneratePersonalizedRoadmap,
         currentUser,
         authToken,
         isAuthReady,
@@ -4114,6 +4744,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         runAiCvOptimization,
         isOptimizingCV,
         uploadCvFile,
+        pasteCvText,
+        importExtractedCvData,
         isUploadingCv,
         jobs,
         bookmarkedJobIds,

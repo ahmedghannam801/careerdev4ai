@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Award, Filter, ArrowUpDown, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Plus, CheckCircle2, X } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { SkillCategory, SkillSource } from '../../types/career';
+import { Reveal } from '../motion/Motion';
 
 export const SkillsCenterView: React.FC = () => {
   const { skills, updateSkillLevel, addCustomSkill, removeSkill, targetRole } = useCareer();
@@ -13,7 +14,7 @@ export const SkillsCenterView: React.FC = () => {
   const [newSkillCategory, setNewSkillCategory] = useState<SkillCategory>('technical');
   const [newSkillLevel, setNewSkillLevel] = useState(3);
   const [newSkillTarget, setNewSkillTarget] = useState(4);
-  const [newSkillSource, setNewSkillSource] = useState<SkillSource>('self_reported');
+  const [newSkillSource] = useState<SkillSource>('self_reported');
 
   const categories: SkillCategory[] = [
     'technical',
@@ -48,7 +49,7 @@ export const SkillsCenterView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -263,6 +264,6 @@ export const SkillsCenterView: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

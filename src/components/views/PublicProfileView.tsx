@@ -9,6 +9,9 @@ import {
   ExternalLink,
   AlertCircle,
 } from 'lucide-react';
+import { Logo } from '../brand/Logo';
+import { SkeletonCard } from '../ui/Skeleton';
+import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
 
 interface PublicExperience {
   company: string;
@@ -123,7 +126,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)]">
       <header className="border-b border-[var(--border-subtle)] bg-[var(--surface-main)]">
         <div className="max-w-4xl mx-auto px-5 py-3 flex items-center justify-between">
-          <span className="font-bold tracking-tight">CareerPilot AI</span>
+          <Logo variant="full" className="h-8 sm:h-9 w-auto" />
           <button
             onClick={onBack}
             className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline flex items-center gap-1.5"
@@ -136,8 +139,14 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
 
       <main className="max-w-4xl mx-auto px-5 py-10 space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-8 text-sm text-[var(--text-secondary)]">
-            Loading public profile…
+          <div
+            className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-8"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="sr-only">Loading public profile…</span>
+            <SkeletonCard />
+            <SkeletonCard />
           </div>
         )}
 
@@ -169,18 +178,10 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
           <>
             <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 sm:p-8 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                {profile.avatarUrl ? (
-                  <img
-                    src={profile.avatarUrl}
-                    alt={`${profile.name ?? username} avatar`}
-                    className="w-16 h-16 rounded-2xl object-cover border border-[var(--border-subtle)]"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-16 h-16 rounded-2xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center text-xl font-bold">
-                    {(profile.name ?? username).slice(0, 1).toUpperCase()}
-                  </div>
-                )}
+                <CareerPilotAvatar
+                  avatarId={profile.avatarUrl}
+                  className="w-16 h-16 rounded-2xl border border-[var(--border-subtle)]"
+                />
                 <div className="space-y-1">
                   <h1 className="text-2xl font-bold tracking-tight">
                     {profile.name ?? username}

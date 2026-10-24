@@ -83,12 +83,6 @@ export function unmappedStateFields(payload: StatePayload): string[] {
   return out;
 }
 
-function toDate(value: any): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
-}
-
 export async function saveState(
   userId: string,
   payload: StatePayload

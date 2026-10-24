@@ -1,24 +1,40 @@
-import React, { useState } from 'react';
-import { Target, Sparkles, CheckCircle2, AlertCircle, Play, History, ArrowRight, HelpCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Sparkles, CheckCircle2, AlertCircle, History, HelpCircle } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { getAccessToken } from '../../lib/supabase';
-import { INTERVIEW_QUESTIONS_BANK, QuestionItem } from '../../data/interviewBank';
+import { questionsForRole, QuestionItem } from '../../data/interviewBank';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const InterviewsView: React.FC = () => {
   const { targetRole, interviewSessions, saveInterviewSession } = useCareer();
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'star' | 'technical' | 'behavioral'>('all');
-  const [activeQuestion, setActiveQuestion] = useState<QuestionItem>(INTERVIEW_QUESTIONS_BANK[0]);
+
+  // The practice material follows the user's actual target role: the
+  // universal questions plus the role's own interview topics from the
+  // catalogue.
+  const questionBank = useMemo(() => questionsForRole(targetRole), [targetRole]);
+  const [activeQuestion, setActiveQuestion] = useState<QuestionItem | null>(null);
   const [userAnswer, setUserAnswer] = useState('');
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState<any>(null);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
 
-  const filteredQuestions = INTERVIEW_QUESTIONS_BANK.filter(q => 
+  const filteredQuestions = questionBank.filter(q =>
     selectedCategory === 'all' ? true : q.category === selectedCategory
   );
 
+  // Keep a question selected as the bank changes.
+  useEffect(() => {
+    if (!activeQuestion && filteredQuestions.length > 0) {
+      setActiveQuestion(filteredQuestions[0]);
+    }
+  }, [filteredQuestions, activeQuestion]);
+
   const handleEvaluate = async () => {
-    if (!userAnswer.trim() || isEvaluating) return;
+    if (!userAnswer.trim() || isEvaluating || !activeQuestion) return;
     setIsEvaluating(true);
+    setEvaluationError(null);
+    setEvaluationResult(null);
 
     try {
       const token = await getAccessToken();
@@ -48,30 +64,30 @@ export const InterviewsView: React.FC = () => {
           userAnswer: userAnswer.trim(),
           aiFeedback: feedback
         });
+      } else {
+        // The server refused or could not answer. The candidate is told
+        // plainly that no feedback was produced — no score is invented.
+        const body = await res.json().catch(() => null);
+        setEvaluationError(
+          body?.error ??
+            'The interviewer is unavailable right now. No feedback was generated — please try again shortly.'
+        );
       }
     } catch (e) {
       console.error(e);
-      // Fallback evaluation
-      const fallbackFeedback = {
-        score: 8,
-        strengths: ['Directly addresses the question', 'Concrete technical context supplied'],
-        improvements: ['Deepen the quantified metrics in the Result segment'],
-        starEvaluation: {
-          situation: 'High-pressure technical impediment near release.',
-          task: 'Diagnose and remediate.',
-          action: 'Implemented modular code splitting and optimizations.',
-          result: 'Achieved sub-second latency and shipped on time.'
-        },
-        suggestedAnswer: 'Refined model answer using strong action verbs and quantified impact metrics.'
-      };
-      setEvaluationResult(fallbackFeedback);
+      // Honesty rule: a fabricated score and a fabricated model answer would
+      // be indistinguishable from real feedback. The candidate is told that
+      // nothing was evaluated, and their answer is kept.
+      setEvaluationError(
+        'The interviewer is unreachable right now, so your answer was not evaluated. Your answer is still saved below — please try again shortly.'
+      );
     } finally {
       setIsEvaluating(false);
     }
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -106,19 +122,20 @@ export const InterviewsView: React.FC = () => {
             ))}
           </div>
 
-          <div className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
+          <Stagger inView gap={0.06} className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
             {filteredQuestions.map((q) => {
-              const isSelected = activeQuestion.id === q.id;
+              const isSelected = activeQuestion?.id === q.id;
 
               return (
-                <div
+                <StaggerItem
                   key={q.id}
                   onClick={() => {
                     setActiveQuestion(q);
                     setUserAnswer('');
                     setEvaluationResult(null);
+                    setEvaluationError(null);
                   }}
-                  className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${
+                  className={`p-4 rounded-xl border text-left cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                     isSelected
                       ? 'bg-[var(--accent-surface)]/50 border-[var(--accent-primary)] shadow-xs'
                       : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
@@ -131,14 +148,19 @@ export const InterviewsView: React.FC = () => {
                   <h3 className="font-bold text-xs text-[var(--text-primary)] leading-snug">
                     {q.question}
                   </h3>
-                </div>
+                </StaggerItem>
               );
             })}
-          </div>
+          </Stagger>
         </div>
 
         {/* Right Column (7 cols): Active Mock Drill & AI Evaluation */}
         <div className="lg:col-span-7 space-y-6">
+          {!activeQuestion ? (
+            <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+              Choose a question from the bank to begin a practice drill.
+            </div>
+          ) : (
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
             <div className="space-y-1">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
@@ -189,10 +211,23 @@ export const InterviewsView: React.FC = () => {
               </button>
             </div>
           </div>
+          )}
+
+          {/* Honest failure notice: the answer was NOT evaluated, and no
+              score or model answer was invented for it. */}
+          {evaluationError && (
+            <div className="p-4 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-strong)] space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+                <AlertCircle className="w-4 h-4 text-[var(--color-primary-text)]" />
+                No feedback was generated
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{evaluationError}</p>
+            </div>
+          )}
 
           {/* AI Evaluation Result Card */}
           {evaluationResult && (
-            <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--accent-primary)]/40 space-y-5 shadow-xs animate-in fade-in duration-200">
+            <Reveal delay={0.06} className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--accent-primary)]/40 space-y-5 shadow-xs">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">AI Mock Evaluation</span>
@@ -254,7 +289,7 @@ export const InterviewsView: React.FC = () => {
                   </p>
                 </div>
               )}
-            </div>
+            </Reveal>
           )}
 
           {/* Past Sessions History */}
@@ -283,6 +318,6 @@ export const InterviewsView: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 };

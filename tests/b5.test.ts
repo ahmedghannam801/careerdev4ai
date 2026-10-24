@@ -29,6 +29,7 @@ import {
   validateAiRecommendations,
   type AiClientLike,
 } from '../server/learning/ai.ts';
+import { CAREER_ROLES } from '../shared/careerRoles.ts';
 
 const COURSE_ID = 'dc-python-intro';
 const AVALID_AVAILABILITY = new Set([
@@ -47,16 +48,22 @@ const VALID_FORMATS = new Set([
   'video',
   'playlist',
 ]);
-const VALID_ROLES = new Set([
-  'frontend-engineer',
-  'fullstack-engineer',
-  'data-analyst',
-  'ai-ml-engineer',
-  'cloud-devops-engineer',
-  'product-manager',
-  'ui-ux-designer',
-  'cybersecurity-analyst',
-]);
+/**
+ * The roles a catalogue course may be linked to.
+ *
+ * Derived from the shared role catalogue rather than a hard-coded list, so
+ * the catalogue and the test cannot drift apart when a career domain is
+ * added.
+ */
+const VALID_ROLES = new Set(CAREER_ROLES.map((role) => role.id));
+
+/** The skill names the role catalogue uses. */
+const CATALOG_SKILL_NAMES = new Set(
+  CAREER_ROLES.flatMap((role) => [
+    ...role.requiredSkills.map((skill) => skill.name),
+    ...role.preferredSkills.map((skill) => skill.name),
+  ]),
+);
 
 let user: TestUser;
 let otherUser: TestUser;
@@ -155,10 +162,12 @@ const paidCourse = makeCourse('paid-course', {
 });
 
 describe('B.5 catalogue integrity', () => {
-  test('77 unique, verified resources with complete, real metadata', () => {
-    assert.equal(catalog.length, 77);
-    assert.equal(new Set(catalog.map((course) => course.id)).size, 77);
-    assert.equal(new Set(catalog.map((course) => course.url)).size, 77);
+  test('unique, verified resources with complete, real metadata', () => {
+    // The catalogue spans every career domain and grows as domains are added,
+    // so the count is a floor rather than a fixed number.
+    assert.ok(catalog.length >= 77, `catalogue shrank: ${catalog.length}`);
+    assert.equal(new Set(catalog.map((course) => course.id)).size, catalog.length, 'duplicate course ids');
+    assert.equal(new Set(catalog.map((course) => course.url)).size, catalog.length, 'duplicate course urls');
 
     for (const course of catalog) {
       assert.ok(course.title.trim().length > 3, `${course.id} has no title`);
@@ -180,6 +189,13 @@ describe('B.5 catalogue integrity', () => {
       for (const skill of course.skills) {
         assert.ok(skill.name.trim().length > 0);
         assert.ok(skill.importance >= 1 && skill.importance <= 5);
+        // Every catalogue skill must be a skill the role catalogue actually
+        // uses, otherwise the recommender can never match the course to the
+        // learner's gap for that skill.
+        assert.ok(
+          CATALOG_SKILL_NAMES.has(skill.name),
+          `${course.id} skill "${skill.name}" is not a catalogue skill`
+        );
       }
       for (const role of course.roles) {
         assert.ok(VALID_ROLES.has(role.roleSlug), `${course.id} role ${role.roleSlug}`);
@@ -187,8 +203,12 @@ describe('B.5 catalogue integrity', () => {
       }
     }
 
-    assert.equal(catalog.reduce((sum, course) => sum + course.skills.length, 0), 195);
-    assert.equal(catalog.reduce((sum, course) => sum + course.roles.length, 0), 183);
+    // The catalogue grows as career domains are added, so the totals are
+    // floors rather than fixed numbers: the catalogue must never shrink.
+    const totalSkills = catalog.reduce((sum, course) => sum + course.skills.length, 0);
+    const totalRoles = catalog.reduce((sum, course) => sum + course.roles.length, 0);
+    assert.ok(totalSkills >= 195, `catalogue skill links shrank: ${totalSkills}`);
+    assert.ok(totalRoles >= 183, `catalogue role links shrank: ${totalRoles}`);
   });
 
   test('availability claims match the provider, not a universal "free" label', () => {

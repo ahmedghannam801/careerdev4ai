@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Clock, SkipForward, AlertCircle, Circle, Calendar, Sparkles, Filter, Plus, BookOpen, ExternalLink } from 'lucide-react';
+import { Calendar, BookOpen, ExternalLink, RefreshCw } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { RoadmapTaskStatus, RoadmapTask } from '../../types/career';
+import { RoadmapTaskStatus } from '../../types/career';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { AnimatedProgress } from '../motion/AnimatedProgress';
 
 interface RoadmapViewProps {
   onNavigate?: (view: string) => void;
@@ -13,15 +15,15 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
     updateTaskStatus,
     isEnrolledInRoadmap,
     enrollInRoadmap,
-    targetRole,
-    t,
     learningCatalog,
     learningRecommendations,
     getLearningItem,
     saveLearningCourse,
     startLearningCourse,
+    regeneratePersonalizedRoadmap,
   } = useCareer();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const coursesForSkill = (skillName: string | null) => {
     if (!skillName) return [];
@@ -44,16 +46,8 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   const completedTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks.filter(t => t.status === 'completed'))).length;
   const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const statusColors: Record<RoadmapTaskStatus, string> = {
-    not_started: 'text-[var(--text-muted)]',
-    in_progress: 'text-[var(--color-warning)]',
-    completed: 'text-[var(--color-success-strong)]',
-    skipped: 'text-[var(--text-muted)]',
-    blocked: 'text-[var(--color-danger)]'
-  };
-
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -70,16 +64,42 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
               {completedTasks} / {totalTasks} Tasks ({progressPct}%)
             </div>
           </div>
-          {!isEnrolledInRoadmap && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={enrollInRoadmap}
-              className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold shadow-xs"
+              onClick={async () => {
+                setIsUpdating(true);
+                try {
+                  await regeneratePersonalizedRoadmap();
+                } finally {
+                  setIsUpdating(false);
+                }
+              }}
+              disabled={isUpdating}
+              className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              title="Recalculate priorities based on your latest skills, CV and experience"
             >
-              Enroll in Roadmap
+              <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
+              <span>{isUpdating ? 'Updating…' : 'Sync With Profile'}</span>
             </button>
-          )}
+            {!isEnrolledInRoadmap && (
+              <button
+                onClick={enrollInRoadmap}
+                className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold shadow-xs"
+              >
+                Enroll in Roadmap
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* The roadmap bar fills toward its target as tasks are completed. */}
+      <AnimatedProgress
+        value={progressPct}
+        label="Roadmap completion"
+        className="h-2 w-full overflow-hidden rounded-full bg-[var(--surface-secondary)]"
+        fillClassName="bg-[var(--color-primary)]"
+      />
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -99,40 +119,50 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
       </div>
 
       {/* Phases and Milestones List */}
-      <div className="space-y-6">
+      <Stagger inView gap={0.09} className="space-y-6">
         {roadmapPhases.map((phase) => (
-          <div
-            key={phase.id}
-            className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs"
-          >
-            {/* Phase Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle)]">
-              <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-primary-text)] font-bold">
-                  PHASE {phase.phaseNumber}
-                </span>
-                <h2 className="text-lg font-bold text-[var(--text-primary)]">{phase.title}</h2>
-                <p className="text-xs text-[var(--text-secondary)]">{phase.description}</p>
+          <StaggerItem key={phase.id}>
+            <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
+              {/* Phase Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle)]">
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-primary-text)] font-bold">
+                    PHASE {phase.phaseNumber}
+                  </span>
+                  <h2 className="text-lg font-bold text-[var(--text-primary)]">{phase.title}</h2>
+                  <p className="text-xs text-[var(--text-secondary)]">{phase.description}</p>
+                </div>
               </div>
-            </div>
 
-            {/* Milestones inside Phase */}
-            <div className="space-y-6">
-              {phase.milestones.map((milestone) => {
-                const visibleTasks = milestone.tasks.filter(t => 
-                  statusFilter === 'all' ? true : t.status === statusFilter
-                );
+              {/* Milestones inside Phase */}
+              <div className="space-y-6">
+                {phase.milestones.map((milestone) => {
+                  const visibleTasks = milestone.tasks.filter(t =>
+                    statusFilter === 'all' ? true : t.status === statusFilter
+                  );
 
-                if (visibleTasks.length === 0 && statusFilter !== 'all') return null;
+                  if (visibleTasks.length === 0 && statusFilter !== 'all') return null;
 
-                return (
-                  <div key={milestone.id} className="space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-[var(--text-primary)]">
-                      <span>{milestone.title}</span>
-                      <span className="font-mono text-[var(--text-muted)] text-[11px]">
-                        {milestone.completedTasksCount}/{milestone.tasks.length} Completed
-                      </span>
-                    </div>
+                  const milestonePct =
+                    milestone.tasks.length > 0
+                      ? (milestone.completedTasksCount / milestone.tasks.length) * 100
+                      : 0;
+
+                  return (
+                    <div key={milestone.id} className="space-y-3">
+                      <div className="flex items-center justify-between text-xs font-bold text-[var(--text-primary)]">
+                        <span>{milestone.title}</span>
+                        <span className="font-mono text-[var(--text-muted)] text-[11px]">
+                          {milestone.completedTasksCount}/{milestone.tasks.length} Completed
+                        </span>
+                      </div>
+
+                      <AnimatedProgress
+                        value={milestonePct}
+                        label={`${milestone.title} progress`}
+                        className="h-1 w-full overflow-hidden rounded-full bg-[var(--surface-secondary)]"
+                        fillClassName="bg-[var(--color-accent)]"
+                      />
 
                     <div className="space-y-2.5">
                       {visibleTasks.map((task) => (
@@ -242,7 +272,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                     <button
                                       type="button"
                                       onClick={() => onNavigate('learning')}
-                                      className="mt-2 text-[10px] font-medium text-[var(--color-primary-text)] hover:underline"
+                                      className="mt-2 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-primary-text)] transition-[background-color,box-shadow] hover:bg-[var(--color-accent-surface)] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary)_10%,transparent)]"
                                     >
                                       Open the Learning Hub →
                                     </button>
@@ -276,8 +306,9 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
               })}
             </div>
           </div>
+            </StaggerItem>
         ))}
-      </div>
-    </div>
+      </Stagger>
+    </Reveal>
   );
 };

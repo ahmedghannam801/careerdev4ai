@@ -5,6 +5,11 @@
 // ranked candidates with an explicit score breakdown. It never calls an LLM.
 // The AI layer receives only these already-ranked candidates.
 
+import {
+  GOAL_LEARNING_CATEGORIES,
+  categoryServesDomain,
+} from '../../shared/learningCategories.ts';
+
 export type Availability =
   | 'free'
   | 'free_with_limitations'
@@ -80,6 +85,8 @@ export interface RoleContext {
   slug: string;
   title: string;
   level: string;
+  /** The career domain the role belongs to, used to match catalogue categories. */
+  domainId?: string;
   requiredSkills: RoleSkill[];
   preferredSkills: RoleSkill[];
 }
@@ -165,18 +172,12 @@ const WEIGHTS = {
   focus: 10,
 } as const;
 
-const GOAL_CATEGORIES: Record<string, string[]> = {
-  get_first_job: ['Programming', 'Data', 'Frontend', 'Cloud', 'Cybersecurity'],
-  get_internship: ['Programming', 'Data', 'Frontend', 'Cybersecurity'],
-  switch_career: ['Programming', 'Data', 'Frontend', 'Cloud', 'Cybersecurity'],
-  get_promoted: ['Product', 'Data', 'Cloud', 'AI'],
-  become_specialist: ['AI', 'Data', 'Cloud', 'Cybersecurity'],
-  become_manager: ['Product', 'Data'],
-  build_portfolio: ['Frontend', 'Backend', 'Data', 'Design'],
-  freelance: ['Frontend', 'Backend', 'Design'],
-  explore_careers: ['Programming', 'Data', 'AI', 'Design', 'Product'],
-  custom: [],
-};
+/**
+ * The catalogue categories that suit a career goal.
+ *
+ * The list lives in the shared module so the catalogue seed and the
+ * recommender cannot drift apart.
+ */
 
 function round(value: number, digits = 1): number {
   const factor = 10 ** digits;
@@ -246,17 +247,39 @@ function levelFit(courseLevel: LearningCourse['level'], experience: ExperienceLe
   return matrix[experience][courseLevel];
 }
 
-function goalFit(course: LearningCourse, careerGoal: string): number {
-  const categories = GOAL_CATEGORIES[careerGoal] ?? [];
-  let score = categories.includes(course.category) ? 0.8 : 0.25;
+/**
+ * How well a course serves the user's career goal.
+ *
+ * A course in the user's target-role domain is directly relevant whatever
+ * their goal is, so it scores well. Otherwise the goal's category list is
+ * consulted. A category that neither list knows about is treated as NEUTRAL
+ * rather than penalised: the old hard-coded technical list meant every
+ * course in a new discipline scored 0.25 for every goal.
+ */
+function goalFit(
+  course: LearningCourse,
+  careerGoal: string,
+  targetRole?: RoleContext | null
+): number {
+  const goalCategories = GOAL_LEARNING_CATEGORIES[careerGoal] ?? [];
+  const servesDomain = categoryServesDomain(course.category, targetRole?.domainId);
+  const suitsGoal = goalCategories.includes(course.category);
+
+  let score: number;
+  if (servesDomain && suitsGoal) score = 0.9;
+  else if (servesDomain) score = 0.75;
+  else if (suitsGoal) score = 0.7;
+  else if (goalCategories.length === 0) score = 0.5;
+  else score = 0.45;
+
   if (careerGoal === 'get_first_job' || careerGoal === 'get_internship') {
-    if (course.level === 'Beginner') score += 0.2;
+    if (course.level === 'Beginner') score += 0.1;
   }
   if (careerGoal === 'become_specialist' || careerGoal === 'get_promoted') {
-    if (course.level !== 'Beginner') score += 0.15;
+    if (course.level !== 'Beginner') score += 0.1;
   }
   if (careerGoal === 'build_portfolio') {
-    if (course.format === 'professional_certificate' || course.format === 'tutorial') score += 0.15;
+    if (course.format === 'professional_certificate' || course.format === 'tutorial') score += 0.1;
   }
   return clamp01(score);
 }
@@ -396,7 +419,7 @@ export function scoreCourse(
     gap: round(WEIGHTS.gap * gapScore),
     role: round(WEIGHTS.role * roleRelevance),
     roadmap: round(WEIGHTS.roadmap * roadmapScore),
-    goal: round(WEIGHTS.goal * goalFit(course, context.careerGoal)),
+    goal: round(WEIGHTS.goal * goalFit(course, context.careerGoal, context.targetRole)),
     level: round(WEIGHTS.level * levelFit(course.level, context.experienceLevel)),
     language: round(WEIGHTS.language * languageScore),
     format: round(WEIGHTS.format * formatScore),

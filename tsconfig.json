@@ -25,11 +25,13 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    "noUnusedLocals": true
   },
   "include": [
     "src",
     "server",
+    "shared",
     "server.ts",
     "app.ts",
     "worker"

@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Sparkles, X, Send, Bot, User, ArrowRight, Lightbulb } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 
 interface CopilotDrawerProps {
   isOpen: boolean;
@@ -9,9 +11,10 @@ interface CopilotDrawerProps {
 }
 
 export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
-  const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, profile, t, settings } = useCareer();
+  const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, profile, t } = useCareer();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion() ?? false;
 
   useEffect(() => {
     if (isOpen) {
@@ -26,10 +29,18 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
     await sendCopilotMessage(q);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[440px] bg-[var(--surface-main)] border-l border-[var(--border-subtle)] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          role="dialog"
+          aria-label="CareerPilot Copilot"
+          className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[440px]"
+          variants={drawerVariants(reduced)}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
       {/* Drawer Header */}
       <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -66,10 +77,17 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4">
+        <motion.div
+          variants={staggerContainer(reduced, 0.06)}
+          initial="hidden"
+          animate="visible"
+          className="space-y-4"
+        >
         {copilotMessages.map((msg) => (
-          <div
+          <motion.div
             key={msg.id}
+            variants={staggerItemVariants(reduced)}
             className={`flex gap-3 text-sm ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {msg.sender === 'assistant' && (
@@ -110,18 +128,36 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
                 <User className="w-4 h-4" />
               </div>
             )}
-          </div>
+          </motion.div>
         ))}
 
         {isCopilotTyping && (
           <div className="flex gap-3 items-center text-xs text-[var(--text-muted)]">
-            <div className="w-7 h-7 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center">
-              <Bot className="w-4 h-4 animate-spin" />
+            <div className="w-7 h-7 rounded-md bg-[var(--color-accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center">
+              <Bot className="w-4 h-4" />
             </div>
-            <span>CareerPilot is analyzing your graph...</span>
+            <span className="flex items-center gap-2">
+              <span aria-live="polite">CareerPilot is analyzing your graph</span>
+              <span className="flex items-center gap-0.5" aria-hidden="true">
+                {[0, 1, 2].map((dot) => (
+                  <motion.span
+                    key={dot}
+                    className="h-1 w-1 rounded-full bg-[var(--color-primary-text)]"
+                    animate={reduced ? { opacity: 0.6 } : { opacity: [0.25, 1, 0.25] }}
+                    transition={{
+                      duration: 1.1,
+                      repeat: reduced ? 0 : Infinity,
+                      delay: dot * 0.16,
+                      ease: 'easeInOut',
+                    }}
+                  />
+                ))}
+              </span>
+            </span>
           </div>
         )}
         <div ref={messagesEndRef} />
+        </motion.div>
       </div>
 
       {/* Quick Prompts Bar */}
@@ -172,6 +208,8 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           </button>
         </form>
       </div>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

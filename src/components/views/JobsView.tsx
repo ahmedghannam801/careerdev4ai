@@ -9,6 +9,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { Reveal } from '../motion/Motion';
 
 interface JobsViewProps {
   onNavigate: (view: string) => void;
@@ -77,7 +78,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -159,7 +160,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               href={board.buildUrl()}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 hover:border-[var(--accent-primary)]/50 hover:bg-[var(--surface-secondary)] transition-colors flex items-start justify-between gap-3 group"
+              className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 hover:border-[var(--accent-primary)]/50 hover:bg-[var(--surface-secondary)] transition-[border-color,background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md flex items-start justify-between gap-3 group"
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
@@ -213,6 +214,6 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
-    </div>
+    </Reveal>
   );
 };

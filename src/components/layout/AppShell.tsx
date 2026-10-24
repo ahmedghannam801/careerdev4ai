@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { 
   Home, 
   Compass, 
@@ -18,7 +19,6 @@ import {
   X, 
   Sun, 
   Moon, 
-  ShieldCheck, 
   Target,
   User,
   Activity,
@@ -30,6 +30,9 @@ import { useCareer } from '../../context/CareerContext';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { CopilotDrawer } from '../copilot/CopilotDrawer';
 import { NotificationsDrawer } from '../notifications/NotificationsDrawer';
+import { Logo } from '../brand/Logo';
+import { backdropVariants, drawerLeftVariants } from '../../lib/motion';
+import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
 
 interface AppShellProps {
   currentView: string;
@@ -45,6 +48,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
   // B.4 finding C-3: `logout()` existed in the context but had no UI
   // trigger, so a signed-in user could never sign out.
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const reduced = useReducedMotion() ?? false;
 
   const unreadCount = visibleNotifications.filter(n => !n.read).length;
 
@@ -98,9 +102,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             onClick={() => handleNavClick('dashboard')}
             className="flex items-center gap-2.5 text-left group"
           >
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-sm shadow-xs group-hover:bg-[var(--accent-secondary)] transition-colors">
-              CP
-            </div>
+            <Logo variant="icon" className="h-8 w-8" alt="" />
             <div>
               <div className="font-bold text-sm tracking-tight text-[var(--text-primary)]">
                 CareerPilot AI
@@ -183,10 +185,9 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             className="w-full p-2 rounded-xl hover:bg-[var(--surface-secondary)] flex items-center justify-between text-left transition-colors group"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <img
-                src={profile.avatarUrl}
-                alt={profile.name}
-                className="w-7 h-7 rounded-lg object-cover border border-[var(--border-subtle)]"
+              <CareerPilotAvatar
+                avatarId={profile.avatarUrl}
+                className="w-7 h-7 rounded-lg border border-[var(--border-subtle)]"
               />
               <div className="min-w-0">
                 <div className="text-xs font-bold text-[var(--text-primary)] truncate">
@@ -280,18 +281,10 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               className="flex items-center gap-2 pl-2 border-l border-[var(--border-subtle)] group"
               title="View My Profile"
             >
-              {profile.avatarUrl ? (
-                <img
-                  src={profile.avatarUrl}
-                  alt={displayName}
-                  className="w-7 h-7 rounded-full object-cover border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)] transition-colors"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span className="w-7 h-7 rounded-full bg-[var(--accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center text-[10px] font-bold border border-[var(--border-subtle)]">
-                  {displayName.slice(0, 1).toUpperCase()}
-                </span>
-              )}
+              <CareerPilotAvatar
+                avatarId={profile.avatarUrl}
+                className="w-7 h-7 rounded-full border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)] transition-colors"
+              />
               <span className="hidden lg:inline text-xs font-medium text-[var(--text-primary)]">
                 {displayName.split(' ')[0]}
               </span>
@@ -360,15 +353,31 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       </div>
 
       {/* Mobile Drawer Menu */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden bg-black/50 backdrop-blur-xs flex">
-          <div className="w-72 bg-[var(--surface-main)] h-full p-4 flex flex-col justify-between border-r border-[var(--border-subtle)] animate-in slide-in-from-left duration-200">
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 flex md:hidden">
+            <motion.div
+              aria-hidden="true"
+              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+              variants={backdropVariants(reduced)}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <motion.div
+              role="dialog"
+              aria-label="Navigation"
+              className="relative flex h-full w-72 flex-col justify-between border-r border-[var(--border-subtle)] bg-[var(--surface-main)] p-4"
+              variants={drawerLeftVariants(reduced)}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
             <div className="space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-xs">
-                    CP
-                  </div>
+                  <Logo variant="icon" className="h-7 w-7" alt="" />
                   <span className="font-bold text-sm text-[var(--text-primary)]">CareerPilot AI</span>
                 </div>
                 <button 
@@ -438,9 +447,10 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 <span>Sign out</span>
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
+    </AnimatePresence>
 
       {/* Mobile Bottom Navigation Bar */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--surface-main)]/95 backdrop-blur-md border-t border-[var(--border-subtle)] px-2 py-1.5 flex items-center justify-around text-[10px]">

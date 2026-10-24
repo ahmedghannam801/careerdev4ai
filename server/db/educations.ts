@@ -90,16 +90,6 @@ function educationDescription(
   return parts.length > 0 ? parts.join('\n') : null;
 }
 
-/** Reads every education row owned by the given user. */
-export async function getEducations(userId: string) {
-  const { data, error } = await getSupabaseServer()
-    .from('educations')
-    .select('*')
-    .eq('user_id', userId);
-  if (error) throw error;
-  return data;
-}
-
 export async function listEducations(userId: string): Promise<EducationDTO[]> {
   const { data, error } = await getSupabaseServer()
     .from('educations')

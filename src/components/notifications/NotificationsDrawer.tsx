@@ -1,6 +1,8 @@
 import React from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Bell, X, Check, Calendar, AlertCircle, Award } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 
 interface NotificationsDrawerProps {
   isOpen: boolean;
@@ -11,11 +13,20 @@ interface NotificationsDrawerProps {
 export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
   const { notifications, visibleNotifications, markNotificationRead, clearNotifications } =
     useCareer();
-
-  if (!isOpen) return null;
+  const reduced = useReducedMotion() ?? false;
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[380px] bg-[var(--surface-main)] border-l border-[var(--border-subtle)] shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          role="dialog"
+          aria-label="Notifications"
+          className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[380px]"
+          variants={drawerVariants(reduced)}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
       <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-[var(--color-primary-text)]" />
@@ -44,21 +55,37 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+      <div className="flex-1 overflow-y-auto p-4">
         {visibleNotifications.length === 0 ? (
-          <div className="text-center py-12 text-xs text-[var(--text-muted)]">
-            No notifications at this time.
+          <div className="flex flex-col items-center gap-2 py-12 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-surface-secondary)] text-[var(--color-text-muted)]">
+              <Bell className="h-5 w-5" />
+            </span>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              You are all caught up
+            </p>
+            <p className="max-w-[15rem] text-xs leading-relaxed text-[var(--text-muted)]">
+              Roadmap deadlines, interview stages and milestones will appear here as
+              they happen.
+            </p>
           </div>
         ) : (
-          visibleNotifications.map(n => (
-            <div
-              key={n.id}
-              className={`p-3 rounded-lg border text-sm transition-all ${
-                n.read 
-                  ? 'bg-[var(--surface-main)] border-[var(--border-subtle)] text-[var(--text-secondary)]' 
-                  : 'bg-[var(--surface-secondary)]/80 border-[var(--border-strong)] text-[var(--text-primary)]'
-              }`}
-            >
+          <motion.div
+            variants={staggerContainer(reduced, 0.05)}
+            initial="hidden"
+            animate="visible"
+            className="space-y-2.5"
+          >
+            {visibleNotifications.map(n => (
+              <motion.div
+                key={n.id}
+                variants={staggerItemVariants(reduced)}
+                className={`p-3 rounded-lg border text-sm transition-colors ${
+                  n.read
+                    ? 'bg-[var(--surface-main)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
+                    : 'bg-[var(--surface-secondary)]/80 border-[var(--color-border-strong)] text-[var(--text-primary)]'
+                }`}
+              >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 font-medium text-xs">
                   {n.type === 'interview' && <Calendar className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />}
@@ -88,10 +115,13 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                   </button>
                 )}
               </div>
-            </div>
-          ))
+              </motion.div>
+            ))}
+          </motion.div>
         )}
       </div>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

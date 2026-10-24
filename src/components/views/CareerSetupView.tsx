@@ -1,38 +1,47 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Search, 
   Check, 
-  Briefcase, 
   Bookmark, 
   BookmarkCheck, 
   ArrowRight, 
-  Layers, 
-  DollarSign, 
-  Award, 
-  BookOpen, 
   ArrowLeftRight,
   GitBranch,
-  TrendingUp
+  Layers
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { TARGET_ROLES } from '../../data/rolesData';
+import { CAREER_DOMAINS, TARGET_ROLES, searchCareerCatalog } from '../../data/rolesData';
 import { TargetRole } from '../../types/career';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 interface CareerSetupViewProps {
   onNavigate: (view: string) => void;
 }
 
 export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) => {
-  const { targetRole, savedRoles, setPrimaryTargetRole, saveRole, removeSavedRole, skills, profile, t } = useCareer();
+  const { targetRole, savedRoles, setPrimaryTargetRole, saveRole, removeSavedRole, skills } = useCareer();
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeDomain, setActiveDomain] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<TargetRole>(targetRole);
   const [compareRole, setCompareRole] = useState<TargetRole | null>(null);
 
-  const filteredRoles = TARGET_ROLES.filter(r => 
-    r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.tools.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  /**
+   * Role filtering.
+   *
+   * A query runs through the shared fuzzy matcher, so "fin analyst",
+   * "supply chain" or "teach" find the right role even though the catalogue
+   * is now multi-domain. Without a query the whole catalogue is listed,
+   * optionally narrowed to one domain.
+   */
+  const filteredRoles = useMemo(() => {
+    if (searchQuery.trim()) {
+      return searchCareerCatalog(searchQuery, { limit: 60 }).roles.map((match) => match.role);
+    }
+    if (activeDomain) {
+      return TARGET_ROLES.filter((role) => role.domainId === activeDomain);
+    }
+    return TARGET_ROLES;
+  }, [searchQuery, activeDomain]);
 
   const isSaved = (roleId: string) => savedRoles.some(r => r.id === roleId);
 
@@ -50,7 +59,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -91,7 +100,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
 
       {/* SIDE-BY-SIDE COMPARISON VIEW (Section 55) */}
       {compareRole && (
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--accent-primary)]/40 space-y-6 shadow-xs animate-in fade-in duration-200">
+        <Reveal delay={0.06} className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--accent-primary)]/40 space-y-6 shadow-xs">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
               <ArrowLeftRight className="w-4 h-4 text-[var(--color-primary-text)]" />
@@ -203,7 +212,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
               )}
             </div>
           </div>
-        </div>
+        </Reveal>
       )}
 
       {/* Role Selection & Details Split Grid */}
@@ -216,21 +225,62 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by role title, tool, or discipline..."
+              placeholder={'Search a role or domain — e.g. "financial analyst", "supply chain", "teacher"'}
               className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
 
-          <div className="space-y-2.5 max-h-[700px] overflow-y-auto pr-1">
+          {/* Domain filter — shown when the user is browsing rather than searching. */}
+          {!searchQuery.trim() && (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setActiveDomain(null)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                  activeDomain === null
+                    ? 'bg-[var(--accent-surface)] border-[var(--accent-primary)] text-[var(--color-primary-text)]'
+                    : 'bg-[var(--surface-main)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                All domains ({TARGET_ROLES.length})
+              </button>
+              {CAREER_DOMAINS.map((domain) => {
+                const count = TARGET_ROLES.filter((role) => role.domainId === domain.slug).length;
+                if (count === 0) return null;
+                const isActive = activeDomain === domain.slug;
+                return (
+                  <button
+                    key={domain.slug}
+                    onClick={() => setActiveDomain(isActive ? null : domain.slug)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                      isActive
+                        ? 'bg-[var(--accent-surface)] border-[var(--accent-primary)] text-[var(--color-primary-text)]'
+                        : 'bg-[var(--surface-main)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {domain.label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {searchQuery.trim() && (
+            <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
+              <Layers className="w-3 h-3" />
+              <span>{filteredRoles.length} role{filteredRoles.length === 1 ? '' : 's'} matched &ldquo;{searchQuery}&rdquo;</span>
+            </div>
+          )}
+
+          <Stagger inView gap={0.06} className="space-y-2.5 max-h-[700px] overflow-y-auto pr-1">
             {filteredRoles.map((role) => {
               const isCurrentTarget = targetRole.id === role.id;
               const isSelected = selectedRole.id === role.id;
 
               return (
-                <div
+                <StaggerItem
                   key={role.id}
                   onClick={() => setSelectedRole(role)}
-                  className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${
+                  className={`p-4 rounded-xl border text-left cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                     isSelected
                       ? 'bg-[var(--accent-surface)]/40 border-[var(--accent-primary)] shadow-xs'
                       : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
@@ -277,10 +327,10 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                     <span className="font-mono text-[var(--color-success-strong)]">{role.salaryRange.split(' ')[0]}</span>
                     <span className="hover:text-[var(--color-primary-text)] font-medium">Inspect Specification →</span>
                   </div>
-                </div>
+                </StaggerItem>
               );
             })}
-          </div>
+          </Stagger>
         </div>
 
         {/* Right Column (7 cols): Detailed Role Blueprint & Career Path Explorer */}
@@ -386,6 +436,6 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
           </div>
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 };

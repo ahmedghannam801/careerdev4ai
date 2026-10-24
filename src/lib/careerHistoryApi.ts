@@ -7,7 +7,9 @@
 // Every call is authenticated with the current Supabase access token; the
 // server derives the owner from the verified token, never from the request.
 
-import { getAccessToken } from './supabase';
+// The shared client: the same Bearer header, JSON parsing and non-OK
+// handling every API module uses.
+import { apiRequest as request } from './apiClient';
 
 export interface ExperienceDTO {
   id: string;
@@ -41,40 +43,7 @@ export interface UserSkillDTO {
   skill?: { id: string; name: string; category: string | null } | null;
 }
 
-export class ApiRequestError extends Error {
-  readonly status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = 'ApiRequestError';
-    this.status = status;
-  }
-}
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = await getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...((init?.headers as Record<string, string>) ?? {}),
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(path, { ...init, headers });
-  let payload: unknown = null;
-  try {
-    payload = await res.json();
-  } catch {
-    payload = null;
-  }
-
-  if (!res.ok) {
-    const message =
-      payload && typeof payload === 'object' && payload !== null && 'error' in payload
-        ? String((payload as { error: unknown }).error)
-        : `Request failed with status ${res.status}`;
-    throw new ApiRequestError(res.status, message);
-  }
-  return payload as T;
-}
+export { ApiRequestError } from './apiClient';
 
 // ---- Experiences ----
 

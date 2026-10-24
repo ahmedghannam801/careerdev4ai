@@ -3,33 +3,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { CareerProvider, useCareer } from './context/CareerContext';
 import { AppShell } from './components/layout/AppShell';
 import { AuthModal } from './components/auth/AuthModal';
 import { PasswordRecoveryModal } from './components/auth/PasswordRecoveryModal';
 import { LandingView } from './components/views/LandingView';
-import { OnboardingView } from './components/views/OnboardingView';
-import { DashboardView } from './components/views/DashboardView';
-import { MyCareerView } from './components/views/MyCareerView';
-import { CareerSetupView } from './components/views/CareerSetupView';
-import { CareerAnalysisView } from './components/views/CareerAnalysisView';
-import { CareerPlanView } from './components/views/CareerPlanView';
-import { SkillsCenterView } from './components/views/SkillsCenterView';
-import { RoadmapView } from './components/views/RoadmapView';
-import { LearningCenterView } from './components/views/LearningCenterView';
-import { ProjectsView } from './components/views/ProjectsView';
-import { EvidenceView } from './components/views/EvidenceView';
-import { CVStudioView } from './components/views/CVStudioView';
-import { JobsView } from './components/views/JobsView';
-import { ApplicationsView } from './components/views/ApplicationsView';
-import { InterviewsView } from './components/views/InterviewsView';
-import { ProgressView } from './components/views/ProgressView';
-import { SettingsView } from './components/views/SettingsView';
-import { PublicProfileView } from './components/views/PublicProfileView';
-import { ProfileView } from './components/views/ProfileView';
-import { DocumentsView } from './components/views/DocumentsView';
-import { ActivityView } from './components/views/ActivityView';
+import { Logo } from './components/brand/Logo';
+import { Skeleton } from './components/ui/Skeleton';
+
+/**
+ * The authenticated experience is loaded on demand.
+ *
+ * A visitor who only sees the landing page should not download the CV studio,
+ * the interview trainer and the settings screens to look at a headline. Each
+ * view is a separate chunk that is fetched the first time it is opened, and
+ * the hashed chunks are served with a one-year immutable cache header.
+ */
+const OnboardingView = lazy(() => import('./components/views/OnboardingView').then((m) => ({ default: m.OnboardingView })));
+const DashboardView = lazy(() => import('./components/views/DashboardView').then((m) => ({ default: m.DashboardView })));
+const MyCareerView = lazy(() => import('./components/views/MyCareerView').then((m) => ({ default: m.MyCareerView })));
+const CareerSetupView = lazy(() => import('./components/views/CareerSetupView').then((m) => ({ default: m.CareerSetupView })));
+const CareerAnalysisView = lazy(() => import('./components/views/CareerAnalysisView').then((m) => ({ default: m.CareerAnalysisView })));
+const CareerPlanView = lazy(() => import('./components/views/CareerPlanView').then((m) => ({ default: m.CareerPlanView })));
+const SkillsCenterView = lazy(() => import('./components/views/SkillsCenterView').then((m) => ({ default: m.SkillsCenterView })));
+const RoadmapView = lazy(() => import('./components/views/RoadmapView').then((m) => ({ default: m.RoadmapView })));
+const LearningCenterView = lazy(() => import('./components/views/LearningCenterView').then((m) => ({ default: m.LearningCenterView })));
+const ProjectsView = lazy(() => import('./components/views/ProjectsView').then((m) => ({ default: m.ProjectsView })));
+const EvidenceView = lazy(() => import('./components/views/EvidenceView').then((m) => ({ default: m.EvidenceView })));
+const CVStudioView = lazy(() => import('./components/views/CVStudioView').then((m) => ({ default: m.CVStudioView })));
+const JobsView = lazy(() => import('./components/views/JobsView').then((m) => ({ default: m.JobsView })));
+const ApplicationsView = lazy(() => import('./components/views/ApplicationsView').then((m) => ({ default: m.ApplicationsView })));
+const InterviewsView = lazy(() => import('./components/views/InterviewsView').then((m) => ({ default: m.InterviewsView })));
+const ProgressView = lazy(() => import('./components/views/ProgressView').then((m) => ({ default: m.ProgressView })));
+const SettingsView = lazy(() => import('./components/views/SettingsView').then((m) => ({ default: m.SettingsView })));
+const PublicProfileView = lazy(() => import('./components/views/PublicProfileView').then((m) => ({ default: m.PublicProfileView })));
+const ProfileView = lazy(() => import('./components/views/ProfileView').then((m) => ({ default: m.ProfileView })));
+const DocumentsView = lazy(() => import('./components/views/DocumentsView').then((m) => ({ default: m.DocumentsView })));
+const ActivityView = lazy(() => import('./components/views/ActivityView').then((m) => ({ default: m.ActivityView })));
 
 /**
  * Extracts the username from `#/profile/<username>`. A plain `#/profile` is
@@ -45,6 +56,28 @@ const readPublicProfileUsername = (): string | null => {
     return match[1];
   }
 };
+
+/**
+ * The placeholder shown while a view chunk is being fetched.
+ *
+ * It reserves the shape of the panel that is about to arrive, so the layout
+ * settles into place instead of jumping, and it uses a calm branded shimmer
+ * rather than a spinner.
+ */
+function ViewFallback() {
+  return (
+    <div className="space-y-4" role="status" aria-live="polite">
+      <span className="sr-only">Loading…</span>
+      <Skeleton className="h-8 w-64" widthClassName="w-64" />
+      <Skeleton className="h-40 w-full" widthClassName="w-full" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-24 w-full" widthClassName="w-full" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function AppRoutes() {
   const {
@@ -143,9 +176,7 @@ function AppRoutes() {
     return (
       <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-sm">
-            CP
-          </div>
+          <Logo variant="icon" className="h-9 w-9" alt="" />
           <div className="text-xs text-[var(--text-muted)]">Restoring your session…</div>
         </div>
       </div>
@@ -156,16 +187,18 @@ function AppRoutes() {
   // gate because the link is meant for people without an account.
   if (publicUsername) {
     return (
-      <PublicProfileView
-        username={publicUsername}
-        onBack={() => {
-          window.location.hash = '';
-          setPublicUsername(null);
-          const nextView = currentUser ? 'dashboard' : 'landing';
-          setCurrentView(nextView);
-          setActiveView(nextView);
-        }}
-      />
+      <Suspense fallback={<ViewFallback />}>
+        <PublicProfileView
+          username={publicUsername}
+          onBack={() => {
+            window.location.hash = '';
+            setPublicUsername(null);
+            const nextView = currentUser ? 'dashboard' : 'landing';
+            setCurrentView(nextView);
+            setActiveView(nextView);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -187,9 +220,11 @@ function AppRoutes() {
   if (currentView === 'onboarding') {
     return (
       <>
-        <OnboardingView
-          onComplete={() => navigateTo('dashboard')}
-        />
+        <Suspense fallback={<ViewFallback />}>
+          <OnboardingView
+            onComplete={() => navigateTo('dashboard')}
+          />
+        </Suspense>
         <AuthModal />
       </>
     );
@@ -262,9 +297,10 @@ function AppRoutes() {
             </button>
           </div>
         )}
-        {renderView()}
-      </AppShell>
-      {/* B.4 finding C-2: the AuthModal existed and was fully functional but
+        <Suspense fallback={<ViewFallback />}>
+          {renderView()}
+        </Suspense>
+      </AppShell>      {/* B.4 finding C-2: the AuthModal existed and was fully functional but
           was never mounted, so there was no way to sign in or sign up. */}
       <AuthModal />
     </>

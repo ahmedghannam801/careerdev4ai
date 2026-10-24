@@ -1,24 +1,26 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Search, 
-  X, 
-  Briefcase, 
-  Award, 
-  FolderGit2, 
-  BookOpen, 
-  ExternalLink, 
-  Plus, 
-  Sparkles, 
-  FileText, 
-  Layers, 
-  Target, 
-  User, 
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import {
+  Search,
+  X,
+  Briefcase,
+  Award,
+  FolderGit2,
+  ExternalLink,
+  Plus,
+  Sparkles,
+  FileText,
+  Target,
   ArrowRight,
   ShieldCheck,
-  Calendar
+  Calendar,
+  Layers,
+  Compass
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { TARGET_ROLES } from '../../data/rolesData';
+import { searchCareerCatalog } from '../../data/rolesData';
+import { backdropVariants, dialogVariants } from '../../lib/motion';
+import { useScrollLock } from '../../lib/overlay';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -34,7 +36,10 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   onOpenCopilot 
 }) => {
   const [query, setQuery] = useState('');
-  const { skills, projects, jobs, learningCatalog, documents, secondaryGoals, targetRole } = useCareer();
+  const { skills, projects, jobs, learningCatalog, documents, setPrimaryTargetRole } = useCareer();
+  const reduced = useReducedMotion() ?? false;
+
+  useScrollLock(isOpen);
 
   // Close on Escape, open on Cmd+K
   useEffect(() => {
@@ -48,11 +53,19 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   }, [isOpen, onClose]);
 
   const results = useMemo(() => {
-    if (!query.trim()) return { roles: [], skills: [], projects: [], jobs: [], learning: [], docs: [] };
+    if (!query.trim()) {
+      return { roles: [], domains: [], skills: [], projects: [], jobs: [], learning: [], docs: [] };
+    }
     const q = query.toLowerCase();
 
+    // Career roles and domains come from the shared catalogue and use the
+    // fuzzy matcher, so "fin analyst", "supply chain" and "teach" all land on
+    // the right role.
+    const career = searchCareerCatalog(query, { limit: 6 });
+
     return {
-      roles: TARGET_ROLES.filter(r => r.title.toLowerCase().includes(q) || r.category.toLowerCase().includes(q)).slice(0, 3),
+      roles: career.roles,
+      domains: career.domains,
       skills: skills.filter(s => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q)).slice(0, 3),
       projects: projects.filter(p => p.title.toLowerCase().includes(q) || p.skills.some(s => s.toLowerCase().includes(q))).slice(0, 3),
       jobs: jobs.filter(j => j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)).slice(0, 3),
@@ -61,10 +74,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     };
   }, [query, skills, projects, jobs, learningCatalog, documents]);
 
-  if (!isOpen) return null;
-
-  const totalResults = results.roles.length + results.skills.length + results.projects.length + results.jobs.length + results.learning.length + results.docs.length;
-
+  const totalResults = results.roles.length + results.domains.length + results.skills.length + results.projects.length + results.jobs.length + results.learning.length + results.docs.length;
   const quickActions = [
     { label: 'Add New Skill', icon: Award, view: 'skills' },
     { label: 'Add Proof-of-Skill Project', icon: FolderGit2, view: 'projects' },
@@ -75,15 +85,37 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     { label: 'Open CV Studio', icon: FileText, view: 'cv-studio' },
   ];
 
+  /** Selecting a role makes it the user's target: it re-scopes the roadmap,
+   *  the skill gaps and the learning recommendations. */
+  const chooseRole = async (roleId: string) => {
+    onClose();
+    await setPrimaryTargetRole(roleId);
+    onNavigate('my-career');
+  };
+
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/50 backdrop-blur-xs"
-      onClick={onClose}
-    >
-      <div 
-        className="w-full max-w-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
-        onClick={e => e.stopPropagation()}
-      >
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-16 sm:pt-24">
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            variants={backdropVariants(reduced)}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            onClick={onClose}
+          />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search and commands"
+            className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl"
+            variants={dialogVariants(reduced)}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
         {/* Search Input Bar */}
         <div className="flex items-center px-4 py-3.5 border-b border-[var(--border-subtle)] gap-3">
           <Search className="w-5 h-5 text-[var(--text-muted)] shrink-0" />
@@ -161,26 +193,49 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           ) : totalResults === 0 ? (
             <div className="text-center py-10 text-xs text-[var(--text-secondary)] space-y-1">
               <p className="font-bold text-[var(--text-primary)]">No matching records found for "{query}".</p>
-              <p className="text-[var(--text-muted)]">Try searching for a skill, company, job title, or project name.</p>
+              <p className="text-[var(--text-muted)]">Try a role ("financial analyst"), a domain ("marketing"), a skill, company, job title, or project name.</p>
             </div>
           ) : (
             <div className="space-y-4 text-xs">
-              {results.roles.length > 0 && (
+              {results.domains.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Roles</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Career Domains</div>
                   <div className="space-y-1">
-                    {results.roles.map(r => (
+                    {results.domains.map(({ domain }) => (
                       <button
-                        key={r.id}
-                        onClick={() => { onNavigate('my-career'); onClose(); }}
+                        key={domain.slug}
+                        onClick={() => { onNavigate('roles'); onClose(); }}
                         className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
                       >
-                        <div className="flex items-center gap-2">
-                          <Briefcase className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-                          <span className="font-semibold text-[var(--text-primary)]">{r.title}</span>
-                          <span className="text-[10px] text-[var(--text-muted)]">({r.category})</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Layers className="w-3.5 h-3.5 text-[var(--color-primary-text)] shrink-0" />
+                          <span className="font-semibold text-[var(--text-primary)] truncate">{domain.label}</span>
+                          <span className="text-[10px] text-[var(--text-muted)] truncate hidden sm:inline">{domain.summary}</span>
                         </div>
-                        <ExternalLink className="w-3 h-3 text-[var(--text-muted)]" />
+                        <ExternalLink className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {results.roles.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Career Roles</div>
+                  <div className="space-y-1">
+                    {results.roles.map(({ role: r, matchedOn }) => (
+                      <button
+                        key={r.id}
+                        onClick={() => { void chooseRole(r.id); }}
+                        title={matchedOn === 'skill' ? `Matched on skill: ${r.requiredSkills.find(s => s.name.toLowerCase().includes(query.toLowerCase()))?.name ?? ''}` : undefined}
+                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Briefcase className="w-3.5 h-3.5 text-[var(--color-primary-text)] shrink-0" />
+                          <span className="font-semibold text-[var(--text-primary)] truncate">{r.title}</span>
+                          <span className="text-[10px] text-[var(--text-muted)] truncate">({r.category})</span>
+                        </div>
+                        <Compass className="w-3 h-3 text-[var(--text-muted)] shrink-0" />
                       </button>
                     ))}
                   </div>
@@ -276,7 +331,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 };

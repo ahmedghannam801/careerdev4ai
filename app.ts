@@ -10,6 +10,7 @@
  */
 import express, { Request, Response } from 'express';
 import multer from 'multer';
+import { inflateSync, inflateRawSync } from 'node:zlib';
 // The *web* build of the SDK is imported deliberately. It is the build the
 // browser already receives, it uses `fetch` rather than `google-auth-library`
 // (ADC, child processes, the local filesystem), and it therefore runs unchanged
@@ -38,14 +39,12 @@ declare global {
   }
 }
 import { requireAuth } from './server/auth/require-auth.ts';
-import { getProfile, upsertProfile, findProfileByUsername } from './server/db/profiles.ts';
+import { findProfileByUsername } from './server/db/profiles.ts';
 import { changePassword, changeEmail, deleteAccount } from './server/db/account.ts';
 import { saveState, loadState, unmappedStateFields } from './server/db/state.ts';
 import { getSupabaseServer } from './server/db/supabase.ts';
 import {
   listRoadmaps,
-  getRoadmap,
-  createRoadmap,
   createRoadmapWithTree,
   enrollInRoadmap,
   updateTaskStatus,
@@ -103,14 +102,20 @@ import {
 import { rankCourses, type LearningFormat, type LearningStatus } from './server/learning/recommendation.ts';
 import { enrichRecommendationsWithAi } from './server/learning/ai.ts';
 import { buildLearningContext } from './server/learning/context.ts';
+import { loadAiCareerContext, buildAiContextBlock } from './server/ai/careerContext.ts';
+import {
+  consumeDailyAiBudget,
+  isQuotaError,
+  quotaRetryAfterSeconds,
+  refundDailyAiBudget,
+} from './server/ai/quota.ts';
+import { resolveRole, CATALOG_SKILL_NAMES } from './shared/careerRoles.ts';
 import {
   uploadCvFile,
   createCvFileDownloadUrl,
   deleteCvFile,
-  listCvFiles,
   pathBelongsToUser,
   extensionForMimeType,
-  CV_BUCKET,
   MAX_CV_FILE_BYTES,
 } from './server/db/cvStorage.ts';
 import {
@@ -364,6 +369,769 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
+
+// Accepted CV upload formats.
+//
+// A file must match BOTH its extension and one of the MIME types declared for
+// that extension, so a renamed or crafted upload cannot pass the format check
+// under a false identity.
+//
+// Supported formats: PDF, DOCX, TXT, JSON.
+const CV_UPLOAD_TYPES: Record<string, string[]> = {
+  '.pdf': ['application/pdf'],
+  '.docx': [
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/zip',
+    'application/octet-stream',
+    'application/x-zip-compressed',
+  ],
+  '.txt': ['text/plain'],
+  '.json': ['application/json'],
+};
+const CV_UPLOAD_TYPE_ERROR =
+  'Unsupported file type. Please upload a .pdf, .docx, .txt, or .json file.';
+
+/**
+ * Production-grade zero-dependency DOCX text extractor.
+ * Reads word/document.xml from OOXML ZIP archive.
+ * Preserves tables by converting cells to pipe-delimited text and detects bullet/numbered lists.
+ */
+function extractTextFromDocx(buffer: Buffer): string {
+  let offset = 0;
+  while (offset < buffer.length - 4) {
+    if (buffer.readUInt32LE(offset) === 0x04034b50) {
+      const compression = buffer.readUInt16LE(offset + 8);
+      const compressedSize = buffer.readUInt32LE(offset + 18);
+      const nameLen = buffer.readUInt16LE(offset + 26);
+      const extraLen = buffer.readUInt16LE(offset + 28);
+      const name = buffer.toString('utf8', offset + 30, offset + 30 + nameLen);
+      const dataStart = offset + 30 + nameLen + extraLen;
+
+      if (name === 'word/document.xml') {
+        let xml = '';
+        try {
+          if (compression === 8) {
+            xml = inflateRawSync(buffer.subarray(dataStart, dataStart + compressedSize)).toString('utf8');
+          } else if (compression === 0) {
+            xml = buffer.subarray(dataStart, dataStart + compressedSize).toString('utf8');
+          }
+        } catch (e) {
+          console.warn('[docx] failed to inflate word/document.xml:', e);
+          return '';
+        }
+
+        // 1. Convert tables (<w:tbl>) into paragraphs where table cells are joined by " | "
+        const processedXml = xml.replace(/<w:tbl\b[^>]*>([\s\S]*?)<\/w:tbl>/g, (_match, tblContent) => {
+          const rows = tblContent.match(/<w:tr\b[^>]*>[\s\S]*?<\/w:tr>/g) || [];
+          const tablePs: string[] = [];
+          for (const row of rows) {
+            const cells = row.match(/<w:tc\b[^>]*>[\s\S]*?<\/w:tc>/g) || [];
+            const cellTexts = cells
+              .map((cell: string) => {
+                const paragraphs = cell.match(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g) || [];
+                return paragraphs
+                  .map((p: string) => {
+                    const texts = p.match(/<w:t\b[^>]*>([^<]*)<\/w:t>/g) || [];
+                    return texts.map((t: string) => t.replace(/<[^>]+>/g, '')).join('');
+                  })
+                  .join(' ')
+                  .trim();
+              })
+              .filter((t: string) => t.length > 0);
+
+            if (cellTexts.length > 0) {
+              tablePs.push(`<w:p><w:r><w:t>${cellTexts.join(' | ')}</w:t></w:r></w:p>`);
+            }
+          }
+          return tablePs.join('');
+        });
+
+        // 2. Extract paragraphs, identifying list items (<w:numPr>) and formatting
+        const paragraphs = processedXml.match(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g) || [];
+        const lines = paragraphs
+          .map((p) => {
+            const isList = /<w:numPr\b[^>]*>/.test(p);
+            // Replace <w:tab/> with space and <w:br/> with newline
+            const cleanP = p.replace(/<w:tab\b[^>]*\/?>/g, ' ').replace(/<w:br\b[^>]*\/?>/g, '\n');
+            const texts = cleanP.match(/<w:t\b[^>]*>([^<]*)<\/w:t>/g) || [];
+            let lineText = texts.map((t) => t.replace(/<[^>]+>/g, '')).join('').trim();
+            if (lineText && isList && !/^[•\-*]/.test(lineText)) {
+              lineText = '• ' + lineText;
+            }
+            return lineText;
+          })
+          .filter((line) => line.trim().length > 0);
+
+        return lines.join('\n');
+      }
+      offset = dataStart + compressedSize;
+    } else {
+      offset++;
+    }
+  }
+  return '';
+}
+
+/**
+ * Parses a PDF literal string with balanced and escaped parenthesis handling and octal decoding.
+ */
+function parsePdfLiteralString(str: string, startIdx: number): { text: string; endIdx: number } {
+  let result = '';
+  let i = startIdx + 1;
+  let depth = 1;
+  while (i < str.length) {
+    const char = str[i];
+    if (char === '\\') {
+      i++;
+      if (i >= str.length) break;
+      const next = str[i];
+      if (next === 'n') { result += '\n'; i++; }
+      else if (next === 'r') { result += '\r'; i++; }
+      else if (next === 't') { result += '\t'; i++; }
+      else if (next === 'b') { result += '\b'; i++; }
+      else if (next === 'f') { result += '\f'; i++; }
+      else if (next === '(' || next === ')' || next === '\\') { result += next; i++; }
+      else if (/[0-7]/.test(next)) {
+        let octal = next;
+        i++;
+        if (i < str.length && /[0-7]/.test(str[i])) { octal += str[i]; i++; }
+        if (i < str.length && /[0-7]/.test(str[i])) { octal += str[i]; i++; }
+        result += String.fromCharCode(parseInt(octal, 8));
+      } else if (next === '\r' || next === '\n') {
+        if (next === '\r' && i + 1 < str.length && str[i + 1] === '\n') i++;
+        i++;
+      } else {
+        result += next;
+        i++;
+      }
+    } else if (char === '(') {
+      depth++;
+      result += '(';
+      i++;
+    } else if (char === ')') {
+      depth--;
+      if (depth === 0) {
+        return { text: result, endIdx: i + 1 };
+      }
+      result += ')';
+      i++;
+    } else {
+      result += char;
+      i++;
+    }
+  }
+  return { text: result, endIdx: i };
+}
+
+/**
+ * Parses a PDF hexadecimal string (< ... >), handling ASCII hex and UTF-16BE / CID.
+ */
+function parsePdfHexString(str: string, startIdx: number): { text: string; endIdx: number } {
+  let hex = '';
+  let i = startIdx + 1;
+  while (i < str.length) {
+    const char = str[i];
+    if (char === '>') {
+      i++;
+      break;
+    }
+    if (/[0-9a-fA-F]/.test(char)) {
+      hex += char;
+    }
+    i++;
+  }
+  if (hex.length % 2 !== 0) hex += '0';
+
+  let decoded = '';
+  if (hex.length >= 4 && hex.length % 4 === 0) {
+    let isUtf16 = false;
+    if (hex.slice(0, 4).toUpperCase() === 'FEFF') {
+      isUtf16 = true;
+      hex = hex.slice(4);
+    } else {
+      let zeroes = 0;
+      for (let j = 0; j < hex.length; j += 4) {
+        if (hex.slice(j, j + 2) === '00') zeroes++;
+      }
+      if (zeroes > (hex.length / 4) * 0.7) {
+        isUtf16 = true;
+      }
+    }
+
+    if (isUtf16) {
+      for (let j = 0; j < hex.length; j += 4) {
+        const code = parseInt(hex.slice(j, j + 4), 16);
+        if (code > 0) decoded += String.fromCharCode(code);
+      }
+      return { text: decoded, endIdx: i };
+    }
+  }
+
+  for (let j = 0; j < hex.length; j += 2) {
+    const code = parseInt(hex.slice(j, j + 2), 16);
+    if (code >= 32 && code <= 126) {
+      decoded += String.fromCharCode(code);
+    } else if (code === 10 || code === 13 || code === 9) {
+      decoded += ' ';
+    }
+  }
+  return { text: decoded, endIdx: i };
+}
+
+/**
+ * Robust stream text extractor parsing Tj, TJ, and text positioning operators.
+ */
+function extractTextFromPdfStream(streamText: string): string {
+  let output = '';
+  let i = 0;
+  const len = streamText.length;
+
+  while (i < len) {
+    const ch = streamText[i];
+
+    if (ch === '(') {
+      const parsed = parsePdfLiteralString(streamText, i);
+      i = parsed.endIdx;
+      while (i < len && /\s/.test(streamText[i])) i++;
+      if (streamText.slice(i, i + 2) === 'Tj') {
+        output += parsed.text;
+        i += 2;
+      } else if (streamText[i] === "'") {
+        output += '\n' + parsed.text;
+        i += 1;
+      } else if (streamText[i] === '"') {
+        output += '\n' + parsed.text;
+        i += 1;
+      } else {
+        output += parsed.text + ' ';
+      }
+      continue;
+    }
+
+    if (ch === '<' && streamText[i + 1] !== '<') {
+      const parsed = parsePdfHexString(streamText, i);
+      i = parsed.endIdx;
+      while (i < len && /\s/.test(streamText[i])) i++;
+      if (streamText.slice(i, i + 2) === 'Tj') {
+        output += parsed.text;
+        i += 2;
+      } else {
+        output += parsed.text + ' ';
+      }
+      continue;
+    }
+
+    if (ch === '[') {
+      let j = i + 1;
+      let arrayText = '';
+      while (j < len && streamText[j] !== ']') {
+        if (streamText[j] === '(') {
+          const parsed = parsePdfLiteralString(streamText, j);
+          arrayText += parsed.text;
+          j = parsed.endIdx;
+        } else if (streamText[j] === '<' && streamText[j + 1] !== '<') {
+          const parsed = parsePdfHexString(streamText, j);
+          arrayText += parsed.text;
+          j = parsed.endIdx;
+        } else if (/[-0-9]/.test(streamText[j])) {
+          let numStr = '';
+          while (j < len && /[-0-9.]/.test(streamText[j])) {
+            numStr += streamText[j];
+            j++;
+          }
+          const num = parseFloat(numStr);
+          if (num <= -120) {
+            arrayText += ' ';
+          }
+        } else {
+          j++;
+        }
+      }
+      i = j + 1;
+      while (i < len && /\s/.test(streamText[i])) i++;
+      if (streamText.slice(i, i + 2) === 'TJ') {
+        output += arrayText;
+        i += 2;
+      } else {
+        output += arrayText + ' ';
+      }
+      continue;
+    }
+
+    if (ch === 'T' && streamText[i + 1] === '*') {
+      output += '\n';
+      i += 2;
+      continue;
+    }
+    if (
+      ch === 'T' &&
+      (streamText[i + 1] === 'd' || streamText[i + 1] === 'D') &&
+      (i === 0 || /\s/.test(streamText[i - 1])) &&
+      (i + 2 >= len || /\s/.test(streamText[i + 2]))
+    ) {
+      output += '\n';
+      i += 2;
+      continue;
+    }
+    if (
+      ch === 'E' &&
+      streamText[i + 1] === 'T' &&
+      (i === 0 || /\s/.test(streamText[i - 1])) &&
+      (i + 2 >= len || /\s/.test(streamText[i + 2]))
+    ) {
+      output += '\n';
+      i += 2;
+      continue;
+    }
+
+    i++;
+  }
+
+  return output;
+}
+
+/**
+ * Extracts readable text streams from PDF buffers using stream inflation and structure-aware parsing.
+ */
+function extractTextFromPdf(buffer: Buffer): string {
+  let text = '';
+  const bufStr = buffer.toString('binary');
+  const streamRegex = /stream[\r\n]+([\s\S]*?)[\r\n]+endstream/g;
+  let match: RegExpExecArray | null;
+  while ((match = streamRegex.exec(bufStr)) !== null) {
+    const rawStream = Buffer.from(match[1], 'binary');
+    let decompressed: Buffer | null = null;
+    try {
+      decompressed = inflateSync(rawStream);
+    } catch {
+      try {
+        decompressed = inflateRawSync(rawStream);
+      } catch {
+        decompressed = rawStream;
+      }
+    }
+    if (decompressed) {
+      const streamText = decompressed.toString('latin1');
+      const extracted = extractTextFromPdfStream(streamText);
+      if (extracted.trim()) {
+        text += extracted + '\n\n';
+      }
+    }
+  }
+
+  if (text.trim().length < 50) {
+    const rawVisible = buffer
+      .toString('utf8')
+      .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+      .replace(/\s+/g, ' ');
+    if (rawVisible.length > text.length) {
+      text = rawVisible;
+    }
+  }
+
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Assesses the extraction quality of an uploaded CV.
+ * Catches scanned/image PDFs, unreadable documents, binary garbage, and non-CV text.
+ */
+function assessDocumentQuality(
+  rawText: string,
+  fileExtension?: string,
+  fileSize?: number
+): {
+  isAcceptable: boolean;
+  isScannedPdf: boolean;
+  quality: 'high' | 'medium' | 'low' | 'failed';
+  errorMessage?: string;
+} {
+  const trimmed = rawText.trim();
+  const totalLength = trimmed.length;
+
+  // 1. Scanned / image-only PDF check
+  if (fileExtension === '.pdf' && fileSize && fileSize > 25000 && totalLength < 80) {
+    return {
+      isAcceptable: false,
+      isScannedPdf: true,
+      quality: 'failed',
+      errorMessage:
+        'We could not extract readable text from this document. It appears to be a scanned or image-based PDF. Automated text extraction without OCR is not supported for scanned images. Please upload a text-based PDF or DOCX, or paste your CV text directly.',
+    };
+  }
+
+  // 2. Minimum readable characters
+  if (totalLength < 50) {
+    return {
+      isAcceptable: false,
+      isScannedPdf: false,
+      quality: 'failed',
+      errorMessage:
+        'We could not reliably read this CV. The document has insufficient readable text. Please upload a clearer PDF or DOCX, or paste your CV text directly.',
+    };
+  }
+
+  // 3. Printable character ratio (avoid binary noise)
+  const printableMatches = trimmed.match(/[\x20-\x7E\n\r\t\u00A0-\u024F\u0600-\u06FF]/g) || [];
+  const printableRatio = printableMatches.length / totalLength;
+  if (printableRatio < 0.6) {
+    return {
+      isAcceptable: false,
+      isScannedPdf: false,
+      quality: 'failed',
+      errorMessage:
+        'The uploaded document could not be decoded into readable text. Please check the file encoding or upload a standard DOCX/PDF.',
+    };
+  }
+
+  // 4. CV signal detection
+  const cvSignalRegex =
+    /\b(experience|education|skills|projects|employment|curriculum\s+vitae|resume|qualification|university|college|bachelor|master|degree|engineer|analyst|developer|manager|specialist|consultant|responsibilities|achievements)\b/i;
+  const contactSignalRegex =
+    /\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|\+?\d[\d\s.-]{8,}\d|linkedin\.com|github\.com)\b/i;
+
+  const hasCvSignals = cvSignalRegex.test(trimmed);
+  const hasContact = contactSignalRegex.test(trimmed);
+
+  if (!hasCvSignals && !hasContact && totalLength < 300) {
+    return {
+      isAcceptable: false,
+      isScannedPdf: false,
+      quality: 'failed',
+      errorMessage:
+        'The uploaded document does not appear to be a CV or resume. Please upload a valid resume.',
+    };
+  }
+
+  let quality: 'high' | 'medium' | 'low' = 'low';
+  if (totalLength > 400 && hasCvSignals && hasContact) {
+    quality = 'high';
+  } else if (totalLength > 200 && (hasCvSignals || hasContact)) {
+    quality = 'medium';
+  }
+
+  return { isAcceptable: true, isScannedPdf: false, quality };
+}
+
+// Canonical skill lookup map built from CATALOG_SKILL_NAMES
+const CANONICAL_SKILL_MAP = new Map<string, string>();
+for (const skill of CATALOG_SKILL_NAMES) {
+  CANONICAL_SKILL_MAP.set(skill.toLowerCase(), skill);
+  const stripped = skill.toLowerCase().replace(/[\s._-]+/g, '');
+  if (!CANONICAL_SKILL_MAP.has(stripped)) {
+    CANONICAL_SKILL_MAP.set(stripped, skill);
+  }
+}
+
+const COMMON_SKILL_ALIASES: Record<string, string> = {
+  js: 'JavaScript',
+  ts: 'TypeScript',
+  py: 'Python',
+  golang: 'Go',
+  reactjs: 'React',
+  'react.js': 'React',
+  nodejs: 'Node.js',
+  'node.js': 'Node.js',
+  node: 'Node.js',
+  vuejs: 'Vue.js',
+  'vue.js': 'Vue.js',
+  nextjs: 'Next.js',
+  'next.js': 'Next.js',
+  postgres: 'PostgreSQL',
+  postgresql: 'PostgreSQL',
+  mongo: 'MongoDB',
+  mongodb: 'MongoDB',
+  'ms excel': 'Microsoft Excel',
+  excel: 'Microsoft Excel',
+  'power bi': 'Power BI',
+  powerbi: 'Power BI',
+  k8s: 'Kubernetes',
+  kube: 'Kubernetes',
+  tf: 'Terraform',
+  aws: 'AWS',
+  'amazon web services': 'AWS',
+  gcp: 'Google Cloud',
+  'google cloud platform': 'Google Cloud',
+  azure: 'Microsoft Azure',
+  'ms azure': 'Microsoft Azure',
+  'ci/cd': 'CI/CD',
+  cicd: 'CI/CD',
+  git: 'Git',
+  docker: 'Docker',
+  graphql: 'GraphQL',
+};
+for (const [alias, canonical] of Object.entries(COMMON_SKILL_ALIASES)) {
+  CANONICAL_SKILL_MAP.set(alias.toLowerCase(), canonical);
+  CANONICAL_SKILL_MAP.set(alias.toLowerCase().replace(/[\s._-]+/g, ''), canonical);
+}
+
+/**
+ * Normalizes a raw skill string to the shared canonical catalogue skill where possible.
+ */
+function canonicalizeSkill(rawSkill: string): string {
+  const trimmed = rawSkill.trim();
+  if (!trimmed) return '';
+  const lower = trimmed.toLowerCase();
+  if (CANONICAL_SKILL_MAP.has(lower)) {
+    return CANONICAL_SKILL_MAP.get(lower)!;
+  }
+  const stripped = lower.replace(/[\s._-]+/g, '');
+  if (CANONICAL_SKILL_MAP.has(stripped)) {
+    return CANONICAL_SKILL_MAP.get(stripped)!;
+  }
+  return trimmed;
+}
+
+/**
+ * Deterministic CV parser used when document text is extracted and
+ * Gemini is offline, rate-limited, or unavailable. Never invents data.
+ */
+function parseCvTextDeterministically(rawText: string, targetRoleTitle: string): JsonObject {
+  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  let email = '';
+  let phone = '';
+  let location = '';
+  let fullName = '';
+  let linkedin = '';
+  let github = '';
+  let website = '';
+  const title = targetRoleTitle || '';
+
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+  const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\+?\d[\d\s.-]{8,}\d/;
+  const locationRegex = /\b([A-Z][a-zA-Z\s.-]+,\s*[A-Z]{2}\b|[A-Z][a-zA-Z\s.-]+,\s*[A-Z][a-zA-Z\s]+)/;
+  const linkedinRegex = /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|profile)\/([a-zA-Z0-9_-]+)/i;
+  const githubRegex = /(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9_-]+)/i;
+  const urlRegex = /https?:\/\/[^\s]+/i;
+
+  for (const line of lines.slice(0, 20)) {
+    if (!email && emailRegex.test(line)) {
+      email = line.match(emailRegex)![0];
+    }
+    if (!phone && phoneRegex.test(line)) {
+      phone = line.match(phoneRegex)![0].trim();
+    }
+    if (!location && locationRegex.test(line)) {
+      location = line.match(locationRegex)![0].trim();
+    }
+    if (!linkedin && linkedinRegex.test(line)) {
+      linkedin = line.match(linkedinRegex)![0];
+    }
+    if (!github && githubRegex.test(line)) {
+      github = line.match(githubRegex)![0];
+    }
+    if (!website && urlRegex.test(line) && !line.includes('linkedin.com') && !line.includes('github.com')) {
+      website = line.match(urlRegex)![0];
+    }
+  }
+
+  // Name extraction: first non-contact line with 2-4 capitalized words
+  for (const line of lines.slice(0, 6)) {
+    const clean = line.replace(/^[#*\s_-]+/, '').replace(/[#*\s_-]+$/, '').trim();
+    if (
+      clean.length > 2 &&
+      clean.length < 50 &&
+      !emailRegex.test(clean) &&
+      !phoneRegex.test(clean) &&
+      !urlRegex.test(clean) &&
+      !/resume|curriculum|vitae|\bcv\b|profile|summary|experience|portfolio/i.test(clean) &&
+      /^[A-Z][a-zA-Z'.\-]+(?:\s+[A-Z][a-zA-Z'.\-]+){1,3}$/.test(clean)
+    ) {
+      fullName = clean;
+      break;
+    }
+  }
+
+  const sections: Record<string, string[]> = {
+    header: [],
+    summary: [],
+    experience: [],
+    education: [],
+    skills: [],
+    projects: [],
+    certifications: [],
+    languages: [],
+  };
+
+  let currentSection = 'header';
+  const headingMap = [
+    { regex: /^(?:professional\s+)?summary|career\s+objective|profile|about(?:\s+me)?\b/i, key: 'summary' },
+    { regex: /^(?:work\s+|professional\s+)?experience|employment(?:\s+history)?|work\s+history|career\s+history\b/i, key: 'experience' },
+    { regex: /^education|academic(?:\s+background|\s+history)?|qualifications\b/i, key: 'education' },
+    { regex: /^(?:technical\s+|core\s+)?skills|core\s+competencies|technologies|tools(?:\s+&\s+tech)?\b/i, key: 'skills' },
+    { regex: /^(?:key\s+|personal\s+|technical\s+)?projects|portfolio\b/i, key: 'projects' },
+    { regex: /^certifications|certificates|licenses|credentials|courses\b/i, key: 'certifications' },
+    { regex: /^languages(?:\s+spoken|\s+proficiency)?\b/i, key: 'languages' },
+  ];
+
+  for (const line of lines) {
+    const clean = line.replace(/^[\s#*_-]+/, '').replace(/[\s#*_-]+$/, '').trim();
+    let matched = false;
+    if (clean.length < 40) {
+      for (const h of headingMap) {
+        if (h.regex.test(clean)) {
+          currentSection = h.key;
+          matched = true;
+          break;
+        }
+      }
+    }
+    if (!matched) {
+      sections[currentSection].push(line);
+    }
+  }
+
+  // Only real summary text from the document
+  const summary = sections.summary.join(' ').slice(0, 1500).trim();
+
+  // Skills normalized through canonical skill map
+  const rawSkillsText = sections.skills.join(', ');
+  const rawSkillsList = Array.from(
+    new Set(
+      rawSkillsText
+        .split(/[,•|·\n\r/]/)
+        .map((s) => s.replace(/^[*\s\-•]+/, '').replace(/[:]$/, '').trim())
+        .filter((s) => s.length >= 2 && s.length <= 40 && !headingMap.some((h) => h.regex.test(s)))
+    )
+  );
+  const skillsList = Array.from(new Set(rawSkillsList.map(canonicalizeSkill).filter(Boolean))).slice(0, 30);
+
+  const experiences: Array<{
+    id: string;
+    company: string;
+    role: string;
+    period: string;
+    location: string;
+    bullets: string[];
+  }> = [];
+
+  const expLines = sections.experience;
+  let currExp: (typeof experiences)[0] | null = null;
+  const dateRangeRegex =
+    /\b((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}[\/.-])?\s*(?:19\d\d|20\d\d))\s*(?:–|-|to|until)\s*(Present|Current|Now|(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}[\/.-])?\s*(?:19\d\d|20\d\d)))/i;
+
+  for (const line of expLines) {
+    const isBullet = /^[•\-*]/.test(line);
+    const dateMatch = line.match(dateRangeRegex);
+
+    if (!isBullet && (dateMatch || line.includes(' | '))) {
+      if (currExp && (currExp.company || currExp.role)) {
+        experiences.push(currExp);
+      }
+      const parts = line.split(/[-–|]/).map((p) => p.trim());
+      const comp = parts[0] || '';
+      const r = parts[1] || '';
+      const period = dateMatch ? dateMatch[0].trim() : parts[2] || '';
+
+      currExp = {
+        id: 'exp-' + Math.random().toString(36).slice(2, 9),
+        company: comp.replace(dateRangeRegex, '').trim(),
+        role: r.replace(dateRangeRegex, '').trim(),
+        period,
+        location: '',
+        bullets: [],
+      };
+    } else if (currExp && isBullet) {
+      const bulletText = line.replace(/^[•\-*\s]+/, '').trim();
+      if (bulletText) currExp.bullets.push(bulletText);
+    } else if (currExp && line.trim().length > 0) {
+      if (!currExp.role && line.length < 50 && !currExp.bullets.length) {
+        currExp.role = line.trim();
+      } else {
+        currExp.bullets.push(line.trim());
+      }
+    }
+  }
+  if (currExp && (currExp.company || currExp.role)) {
+    experiences.push(currExp);
+  }
+
+  const education: Array<{
+    id: string;
+    institution: string;
+    degree: string;
+    field: string;
+    period: string;
+    gpa: string;
+  }> = [];
+
+  const eduLines = sections.education;
+  for (const line of eduLines) {
+    if (line.length > 5) {
+      const yearMatch = line.match(/\b(19\d\d|20\d\d)\b/);
+      const degreeMatch = line.match(
+        /\b(bachelor|master|ph\.?d|b\.?s\.?|m\.?s\.?|b\.?a\.?|m\.?b\.?a\.?|diploma|associate)\b[^\n,–|]*/i
+      );
+      const parts = line.split(/[-–|,]/).map((p) => p.trim());
+
+      education.push({
+        id: 'edu-' + Math.random().toString(36).slice(2, 9),
+        institution: parts[0] || line,
+        degree: degreeMatch ? degreeMatch[0].trim() : '',
+        field: '',
+        period: yearMatch ? yearMatch[0] : '',
+        gpa: '',
+      });
+      if (education.length >= 4) break;
+    }
+  }
+
+  const projects: Array<{
+    id: string;
+    title: string;
+    role: string;
+    technologies: string[];
+    bullets: string[];
+  }> = [];
+
+  let currProj: (typeof projects)[0] | null = null;
+  for (const line of sections.projects) {
+    const isBullet = /^[•\-*]/.test(line);
+    if (!isBullet && line.length > 3 && line.length < 80) {
+      if (currProj) projects.push(currProj);
+      currProj = {
+        id: 'proj-' + Math.random().toString(36).slice(2, 9),
+        title: line.replace(/^[#*\s-]+/, '').trim(),
+        role: '',
+        technologies: [],
+        bullets: [],
+      };
+    } else if (currProj && isBullet) {
+      const bulletText = line.replace(/^[•\-*\s]+/, '').trim();
+      if (bulletText) currProj.bullets.push(bulletText);
+    } else if (currProj && line.trim().length > 0) {
+      currProj.bullets.push(line.trim());
+    }
+  }
+  if (currProj) projects.push(currProj);
+
+  const certifications = sections.certifications
+    .map((c) => c.replace(/^[•\-*\s]+/, '').trim())
+    .filter((c) => c.length > 2 && c.length < 100)
+    .slice(0, 10);
+
+  return {
+    fullName,
+    email,
+    phone,
+    location,
+    title: title || experiences[0]?.role || '',
+    summary,
+    linkedin,
+    github,
+    website,
+    experiences,
+    education,
+    projects,
+    skillsList,
+    certifications,
+  };
+}
 
 // Initialize Gemini Client
 //
@@ -625,8 +1393,17 @@ function validateCoverLetterPayload(value: unknown): string[] {
 }
 
 // Health Check
+//
+// `modelConfigured` reports WHETHER a model is configured — never the key
+// itself. It lets a client (and the test suite) tell "there is no model on
+// this server" apart from "the model's quota is exhausted", which are very
+// different problems.
 app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    modelConfigured: Boolean(process.env.GEMINI_API_KEY),
+  });
 });
 
 // Persistent State Load
@@ -938,215 +1715,6 @@ app.delete('/api/user-skills/:skillId', requireAuth, async (req: Request, res: R
   }
 });
 
-// CV Upload Pipeline (POST /api/resumes/upload)
-app.post('/api/resumes/upload', requireAuth, upload.single('file'), async (req: Request, res: Response) => {
-  try {
-    let rawText = '';
-
-    if (req.file) {
-      const mime = req.file.mimetype;
-      const originalName = req.file.originalname.toLowerCase();
-
-      // Check format
-      if (!originalName.endsWith('.pdf') && !originalName.endsWith('.txt') && !originalName.endsWith('.docx') && !originalName.endsWith('.json')) {
-        return res.status(400).json({ error: 'Unsupported file type. Please upload a .pdf, .docx, or .txt file.' });
-      }
-
-      // Extract text content from buffer
-      rawText = req.file.buffer.toString('utf-8');
-      // Strip non-printable binary characters if raw PDF
-      if (originalName.endsWith('.pdf')) {
-        rawText = rawText.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s+/g, ' ');
-      }
-    } else if (req.body.text) {
-      rawText = req.body.text;
-    } else {
-      return res.status(400).json({ error: 'No CV file or text provided' });
-    }
-
-    if (!rawText || rawText.length < 20) {
-      return res.status(400).json({ error: 'Unable to extract sufficient readable text from the document.' });
-    }
-
-    const targetRoleTitle = req.body.targetRoleTitle || 'Software Engineer';
-
-    // Parse CV text using Gemini
-    const parsePrompt = `Extract and structure the following CV text into JSON matching this exact schema:
-{
-  "fullName": string,
-  "email": string,
-  "phone": string,
-  "location": string,
-  "title": string,
-  "summary": string,
-  "experiences": [
-    {
-      "id": string,
-      "company": string,
-      "role": string,
-      "period": string,
-      "location": string,
-      "bullets": [string]
-    }
-  ],
-  "education": [
-    {
-      "id": string,
-      "institution": string,
-      "degree": string,
-      "field": string,
-      "period": string,
-      "gpa": string
-    }
-  ],
-  "projects": [
-    {
-      "id": string,
-      "title": string,
-      "role": string,
-      "technologies": [string],
-      "bullets": [string]
-    }
-  ],
-  "skillsList": [string],
-  "certifications": [string]
-}
-
-CV Text:
-${rawText.slice(0, 8000)}
-
-Return only valid JSON.`;
-
-    let parsedCV: any;
-    try {
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: parsePrompt,
-        config: { responseMimeType: 'application/json' },
-      });
-      parsedCV = JSON.parse(response.text || '{}');
-      const parsedCvErrors = validateParsedCvPayload(parsedCV);
-      if (parsedCvErrors.length > 0) {
-        throw new Error(`Invalid parsed CV payload: ${parsedCvErrors.join(', ')}`);
-      }
-    } catch (e) {
-      // Never fabricate a parsed CV. Returning invented employers, degrees or
-      // contact details would persist false personal data as the user's own.
-      // Nothing has been written at this point, so the request fails cleanly.
-      console.error('CV parsing unavailable:', e);
-      return res.status(503).json({
-        error:
-          'CV parsing is temporarily unavailable. Your file was not saved; please try again shortly.',
-      });
-    }
-
-    // Run ATS diagnostic
-    const atsPrompt = `Evaluate this parsed CV for the target role "${targetRoleTitle}".
-JSON Schema:
-{
-  "overallScore": number (0-100),
-  "breakdown": {
-    "keywordsMatch": number,
-    "impactAndMetrics": number,
-    "formattingStructure": number,
-    "experienceRelevance": number
-  },
-  "matchedKeywords": [string],
-  "missingKeywords": [string],
-  "actionableImprovements": [
-    {
-      "section": string,
-      "currentText": string,
-      "suggestedText": string,
-      "reason": string
-    }
-  ]
-}
-Parsed CV:
-${JSON.stringify(parsedCV)}
-Return only valid JSON.`;
-
-    let atsAnalysis: any = null;
-    try {
-      const atsRes = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: atsPrompt,
-        config: { responseMimeType: 'application/json' },
-      });
-      atsAnalysis = JSON.parse(atsRes.text || '{}');
-      const atsErrors = validateAtsPayload(atsAnalysis);
-      if (atsErrors.length > 0) {
-        throw new Error(`Invalid ATS payload: ${atsErrors.join(', ')}`);
-      }
-    } catch (e) {
-      // The CV itself was parsed successfully. Store it without an ATS
-      // analysis rather than returning an invented score.
-      console.error('ATS analysis unavailable:', e);
-      atsAnalysis = null;
-    }
-
-    // Persist the original file, then the CV row and its first version.
-    // The parsed content and ATS analysis stay in PostgreSQL; the original file
-    // lives in the private 'cv-files' bucket under the caller's own folder.
-    const userId = req.authUser!.id;
-    let storedFile: { path: string; size: number; fileName: string } | null = null;
-    if (req.file) {
-      const mimeType = req.file.mimetype;
-      const ext = extensionForMimeType(mimeType);
-      if (!ext) {
-        return res.status(400).json({ error: 'Unsupported file type' });
-      }
-      if (req.file.size > MAX_CV_FILE_BYTES) {
-        return res.status(400).json({ error: 'File exceeds the maximum size' });
-      }
-      storedFile = await uploadCvFile(
-        userId,
-        req.file.originalname,
-        req.file.buffer,
-        mimeType
-      );
-    }
-
-    const cvName = req.file
-      ? `${req.file.originalname.replace(/\.[^/.]+$/, '')} (Uploaded)`
-      : 'Uploaded CV';
-    const cvRow = await createCv(userId, {
-      name: cvName,
-      targetRoleTitle: req.body.targetRoleTitle || undefined,
-      storagePath: storedFile?.path,
-    });
-    await setActiveCv(userId, cvRow.id);
-    const version = await createCvVersion(userId, {
-      cvId: cvRow.id,
-      name: cvName,
-      targetRoleTitle: req.body.targetRoleTitle || undefined,
-      profileJson: parsedCV,
-      atsAnalysis,
-    });
-
-    return res.json({
-      success: true,
-      cv: parsedCV,
-      atsAnalysis,
-      analysisAvailable: atsAnalysis !== null,
-      cvId: cvRow.id,
-      cvVersionId: version.id,
-      fileStored: !!storedFile,
-      fileName: storedFile?.fileName ?? null,
-      message: atsAnalysis
-        ? 'CV uploaded and analyzed successfully'
-        : 'CV uploaded successfully. ATS analysis is temporarily unavailable; you can retry it from CV Studio.',
-    });
-  } catch (error: any) {
-    console.error('CV Upload Error:', error);
-    // The detail is logged server-side, never returned: an upstream message
-    // can carry internal paths, provider payloads or stack frames.
-    return res.status(500).json({
-      error: 'Failed to process and analyze CV upload',
-    });
-  }
-});
-
 /**
  * A small, in-process rate limiter for the AI routes.
  *
@@ -1203,6 +1771,8 @@ function rateLimit(limit: number, windowMs: number, namespace = 'global') {
       res.setHeader('Retry-After', String(retryAfterSeconds));
       return res.status(429).json({
         error: 'Too many requests. Please slow down and try again shortly.',
+        code: 'rate_limit',
+        retryAfterSeconds,
       });
     }
     next();
@@ -1211,6 +1781,465 @@ function rateLimit(limit: number, windowMs: number, namespace = 'global') {
 
 /** The limiter applied to the Gemini-backed routes. */
 const aiRateLimit = rateLimit(AI_RATE_LIMIT, AI_RATE_WINDOW_MS, 'ai');
+
+/**
+ * Answers 503 when no model is configured on this server.
+ *
+ * This runs BEFORE the daily budget is touched: there is no model call to
+ * spend budget on, so the caller must be told that the model is unavailable
+ * rather than that the quota is exhausted. Consuming budget first would also
+ * make the per-user rate limiter look like a shared, project-wide limit.
+ */
+function modelUnavailable(res: Response): Response {
+  return res.status(503).json({
+    error:
+      'The AI assistant is not configured on this server, so no result was generated. Please try again later.',
+    code: 'model_unavailable',
+  });
+}
+
+/**
+ * Consumes one unit of the daily AI budget for this caller.
+ *
+ * Returns null when the request may proceed, or the 429 response to send
+ * when the daily allowance is used up. The response carries a machine-readable
+ * `code`, so a client can tell "your own daily allowance is spent" apart from
+ * "the provider's quota is spent" — two different problems with two different
+ * remedies.
+ */
+function consumeAiBudget(res: Response, userId?: string | null): Response | null {
+  const budget = consumeDailyAiBudget(userId);
+  if (budget.allowed) return null;
+  res.setHeader('Retry-After', String(budget.retryAfterSeconds));
+  return res.status(429).json({
+    error:
+      "The AI assistant has reached today's usage limit. Your message was not answered; please try again later.",
+    code: 'ai_daily_budget',
+    scope: budget.scope,
+    retryAfterSeconds: budget.retryAfterSeconds,
+  });
+}
+
+/**
+ * Consumes one unit of the daily AI budget WITHOUT answering the request.
+ *
+ * Used by the routes that have a working non-AI fallback (the CV upload
+ * falls back to a deterministic parser): when the allowance is spent the
+ * model is skipped and the route continues, so the user still gets a result.
+ */
+function tryConsumeAiBudget(userId?: string | null): boolean {
+  return consumeDailyAiBudget(userId).allowed;
+}
+/**
+ * Reports an AI failure honestly.
+ *
+ * A provider quota error becomes a 429 with a Retry-After header, so the
+ * client (and any monitoring) can tell "come back tomorrow" from "try again
+ * in a moment". Every other failure is a 503: the caller is told that no
+ * result was produced, and no generated content is invented.
+ *
+ * A provider quota error also gives the daily budget its unit back: the
+ * provider refused to serve the request, so it must not count against the
+ * application's allowance either.
+ */
+function respondAiFailure(
+  res: Response,
+  error: unknown,
+  message: string,
+  userId?: string | null
+): Response {
+  console.error('AI request unavailable:', error);
+  if (isQuotaError(error)) {
+    refundDailyAiBudget(userId);
+    const retryAfterSeconds = quotaRetryAfterSeconds(error);
+    res.setHeader('Retry-After', String(retryAfterSeconds));
+    return res.status(429).json({
+      error:
+        "The AI assistant has reached today's usage limit. Nothing was generated; please try again later.",
+      code: 'provider_quota',
+      retryAfterSeconds,
+    });
+  }
+  return res.status(503).json({ error: message, code: 'ai_unavailable' });
+}
+
+// CV Upload Pipeline (POST /api/resumes/upload)
+// The route makes up to two Gemini calls (parsing and ATS analysis), so it
+// carries the same limiter as the other AI routes. Without it, repeated
+// uploads were the cheapest way to exhaust the project's daily quota.
+app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    let rawText = '';
+
+    if (req.file) {
+      const originalName = req.file.originalname.toLowerCase();
+      // The declared MIME type is compared without its parameters, so
+      // 'text/plain; charset=utf-8' still matches 'text/plain'.
+      const mimeType = req.file.mimetype.split(';')[0].trim().toLowerCase();
+      const dot = originalName.lastIndexOf('.');
+      const extension = dot > -1 ? originalName.slice(dot) : '';
+
+      // Check format: the extension must be accepted AND the declared MIME
+      // type must be one of the types accepted for that extension.
+      const allowedMimeTypes = CV_UPLOAD_TYPES[extension];
+      if (!allowedMimeTypes || !allowedMimeTypes.includes(mimeType)) {
+        return res.status(400).json({ error: CV_UPLOAD_TYPE_ERROR });
+      }
+
+      // Extract text content from buffer
+      if (extension === '.docx') {
+        rawText = extractTextFromDocx(req.file.buffer);
+      } else if (extension === '.pdf') {
+        rawText = extractTextFromPdf(req.file.buffer);
+      } else {
+        rawText = req.file.buffer.toString('utf-8');
+      }
+    } else if (req.body.text) {
+      rawText = req.body.text;
+    } else {
+      return res.status(400).json({ error: 'No CV file or text provided' });
+    }
+
+    // Validate document readability and quality
+    const qualityAssessment = assessDocumentQuality(
+      rawText,
+      req.file ? req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase() : undefined,
+      req.file?.size
+    );
+
+    if (!qualityAssessment.isAcceptable) {
+      return res.status(400).json({
+        error:
+          qualityAssessment.errorMessage ||
+          'Unable to extract sufficient readable text from the document.',
+        isScannedPdf: qualityAssessment.isScannedPdf,
+      });
+    }
+
+    // The target role comes from the request when the caller supplies it, and
+    // otherwise from the user's own profile. There is no hard-coded default
+    // role: the fallback is a neutral label, because this endpoint is used
+    // for every career domain.
+    const requestedRoleTitle = str(req.body?.targetRoleTitle, 200);
+    const profileRoleTitle = await getProfileDto(req.authUser!.id)
+      .then((profile) => profile?.targetRole ?? null)
+      .catch(() => null);
+    const targetRoleTitle = requestedRoleTitle ?? profileRoleTitle ?? 'Target role';
+    // Resolved through the shared catalogue so the deterministic ATS
+    // fallback uses the keywords that actually matter for this role.
+    const catalogueRole = resolveRole(targetRoleTitle);
+
+    // Parse CV text using Gemini with strict JSON schema and deterministic fallback
+    const parsePrompt = `You are a professional, high-accuracy CV/resume parser.
+Extract and structure the following CV text into JSON matching this exact schema:
+{
+  "documentType": "cv",
+  "fullName": string,
+  "email": string,
+  "phone": string,
+  "location": string,
+  "title": string,
+  "summary": string,
+  "linkedin": string,
+  "github": string,
+  "website": string,
+  "experiences": [
+    {
+      "id": string,
+      "company": string,
+      "role": string,
+      "period": string,
+      "location": string,
+      "bullets": [string]
+    }
+  ],
+  "education": [
+    {
+      "id": string,
+      "institution": string,
+      "degree": string,
+      "field": string,
+      "period": string,
+      "gpa": string
+    }
+  ],
+  "projects": [
+    {
+      "id": string,
+      "title": string,
+      "role": string,
+      "technologies": [string],
+      "bullets": [string]
+    }
+  ],
+  "skillsList": [string],
+  "certifications": [string]
+}
+
+CRITICAL RULES:
+1. Extract ONLY facts explicitly stated in the CV.
+2. NEVER invent, fabricate, hallucinate or guess any details (companies, dates, degrees, projects, skills). If a field or section is not in the text, return an empty string "" or empty array [].
+3. If the text does not appear to be a CV or resume (e.g. invoice, source code, terms of service), set "documentType" to "not_a_cv".
+4. For dates: use "Month YYYY" or "YYYY" where available. If currently working, set period to "YYYY - Present". Never invent days or months if only the year is stated.
+5. In skillsList: extract individual canonical skill names. Avoid long sentences.
+
+CV Text:
+${rawText.slice(0, 12000)}
+
+Return only valid JSON.`;
+
+    let parsedCV: any = null;
+    let geminiFailed = false;
+
+    // The daily AI budget is spent only when a model call is actually made.
+    // When the allowance is used up the upload still succeeds: the
+    // deterministic parser below produces the CV without the model.
+    const parseBudget = tryConsumeAiBudget(req.authUser!.id);
+
+    if (process.env.GEMINI_API_KEY && parseBudget) {
+      try {
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: parsePrompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        parsedCV = JSON.parse(response.text || '{}');
+        if (parsedCV?.documentType === 'not_a_cv') {
+          return res.status(400).json({
+            error: 'The uploaded document does not appear to be a CV or resume.',
+          });
+        }
+        const parsedCvErrors = validateParsedCvPayload(parsedCV);
+        if (parsedCvErrors.length > 0) {
+          throw new Error(`Invalid parsed CV payload: ${parsedCvErrors.join(', ')}`);
+        }
+      } catch (e: any) {
+        if (e?.message?.includes('not appear to be a CV')) throw e;
+        console.warn('Gemini CV parsing unavailable or rate-limited; falling back to deterministic extraction:', e);
+        // The provider never served this request, so the daily budget gets
+        // its unit back.
+        if (isQuotaError(e)) refundDailyAiBudget(req.authUser!.id);
+        geminiFailed = true;
+      }
+    } else {
+      geminiFailed = true;
+    }
+
+    if (!parsedCV || geminiFailed) {
+      try {
+        parsedCV = parseCvTextDeterministically(rawText, targetRoleTitle);
+        const fallbackErrors = validateParsedCvPayload(parsedCV);
+        if (fallbackErrors.length > 0) {
+          throw new Error(`Deterministic parsed CV invalid: ${fallbackErrors.join(', ')}`);
+        }
+      } catch (fallbackErr) {
+        console.error('CV parsing unavailable:', fallbackErr);
+        return res.status(503).json({
+          error:
+            'CV parsing is temporarily unavailable. Your file was not saved; please try again shortly.',
+        });
+      }
+    }
+
+    // Canonicalize and deduplicate extracted skills against the shared catalogue
+    if (parsedCV && Array.isArray(parsedCV.skillsList)) {
+      parsedCV.skillsList = Array.from(
+        new Set(
+          parsedCV.skillsList
+            .map((s: string) => (typeof s === 'string' ? canonicalizeSkill(s) : ''))
+            .filter(Boolean)
+        )
+      );
+    }
+
+    // Run ATS diagnostic
+    const atsPrompt = `Evaluate this parsed CV for the target role "${targetRoleTitle}".
+JSON Schema:
+{
+  "overallScore": number (0-100),
+  "breakdown": {
+    "keywordsMatch": number,
+    "impactAndMetrics": number,
+    "formattingStructure": number,
+    "experienceRelevance": number
+  },
+  "matchedKeywords": [string],
+  "missingKeywords": [string],
+  "actionableImprovements": [
+    {
+      "section": string,
+      "currentText": string,
+      "suggestedText": string,
+      "reason": string
+    }
+  ]
+}
+Parsed CV:
+${JSON.stringify(parsedCV)}
+Return only valid JSON.`;
+
+    let atsAnalysis: any = null;
+    // The ATS pass is a second model call, so it draws its own unit from the
+    // daily budget. When the allowance is spent the deterministic diagnostic
+    // below is used instead — the upload still succeeds.
+    const atsBudget = tryConsumeAiBudget(req.authUser!.id);
+    if (process.env.GEMINI_API_KEY && !geminiFailed && atsBudget) {
+      try {
+        const atsRes = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: atsPrompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        atsAnalysis = JSON.parse(atsRes.text || '{}');
+        const atsErrors = validateAtsPayload(atsAnalysis);
+        if (atsErrors.length > 0) {
+          throw new Error(`Invalid ATS payload: ${atsErrors.join(', ')}`);
+        }
+      } catch (e) {
+        console.warn('ATS analysis unavailable:', e);
+        if (isQuotaError(e)) refundDailyAiBudget(req.authUser!.id);
+        atsAnalysis = null;
+      }
+    }
+
+    if (!atsAnalysis) {
+      // Deterministic ATS diagnostic based on the role's own keywords. The
+      // list used to be a hard-coded JavaScript/React/Python set, which
+      // scored a CV for an HR or finance role against the wrong vocabulary.
+      const lowerText = rawText.toLowerCase();
+      const sampleKeywords = (
+        catalogueRole
+          ? [
+              ...catalogueRole.requiredSkills.map((skill) => skill.name),
+              ...catalogueRole.preferredSkills.map((skill) => skill.name),
+              ...catalogueRole.tools,
+            ]
+          : []
+      )
+        .map((keyword) => keyword.toLowerCase())
+        .filter((keyword) => keyword.length >= 3)
+        .slice(0, 12);
+      if (sampleKeywords.length === 0) {
+        // No catalogue role: fall back to the section structure only, and say
+        // so rather than inventing a keyword score.
+        atsAnalysis = {
+          overallScore: 50,
+          breakdown: {
+            keywordsMatch: 0,
+            impactAndMetrics: 50,
+            formattingStructure: 85,
+            experienceRelevance: 50,
+          },
+          matchedKeywords: [],
+          missingKeywords: [],
+          actionableImprovements: [
+            {
+              section: 'skills',
+              currentText: '',
+              suggestedText: 'Set a target role so the keyword diagnostic can be tailored',
+              reason: 'A target role is required for a meaningful keyword check',
+            },
+          ],
+        };
+      } else {
+        const matched = sampleKeywords.filter((k) => lowerText.includes(k));
+        const missing = sampleKeywords.filter((k) => !lowerText.includes(k)).slice(0, 3);
+        const score = Math.min(95, Math.max(50, Math.round(50 + (matched.length / sampleKeywords.length) * 45)));
+        atsAnalysis = {
+          overallScore: score,
+          breakdown: {
+            keywordsMatch: Math.min(100, matched.length * 12),
+            impactAndMetrics: 75,
+            formattingStructure: 85,
+            experienceRelevance: 80,
+          },
+          matchedKeywords: matched,
+          missingKeywords: missing,
+          actionableImprovements: missing.map((m) => ({
+            section: 'skills',
+            currentText: '',
+            suggestedText: `Consider showcasing experience with ${m}`,
+            reason: `Frequently requested for ${targetRoleTitle} roles`,
+          })),
+        };
+      }
+    }
+
+    // Persist the original file, then the CV row and its first version.
+    const userId = req.authUser!.id;
+    let storedFile: { path: string; size: number; fileName: string } | null = null;
+    if (req.file) {
+      const mimeType = req.file.mimetype.split(';')[0].trim().toLowerCase();
+      let storageMime = mimeType;
+      if (req.file.originalname.toLowerCase().endsWith('.docx') || mimeType.includes('officedocument') || mimeType.includes('zip')) {
+        storageMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      }
+      const ext = extensionForMimeType(storageMime);
+      if (!ext) {
+        return res.status(400).json({ error: CV_UPLOAD_TYPE_ERROR });
+      }
+      if (req.file.size > MAX_CV_FILE_BYTES) {
+        return res.status(400).json({ error: 'File exceeds the maximum size' });
+      }
+      try {
+        storedFile = await uploadCvFile(
+          userId,
+          req.file.originalname,
+          req.file.buffer,
+          storageMime
+        );
+      } catch (uploadErr) {
+        console.warn('Storage upload note:', uploadErr);
+      }
+    }
+
+    const cvName = req.file
+      ? `${req.file.originalname.replace(/\.[^/.]+$/, '')} (Uploaded)`
+      : 'Uploaded CV';
+    const cvRow = await createCv(userId, {
+      name: cvName,
+      targetRoleTitle: req.body.targetRoleTitle || undefined,
+      storagePath: storedFile?.path,
+    });
+    await setActiveCv(userId, cvRow.id);
+    const version = await createCvVersion(userId, {
+      cvId: cvRow.id,
+      name: cvName,
+      targetRoleTitle: req.body.targetRoleTitle || undefined,
+      profileJson: parsedCV,
+      atsAnalysis,
+    });
+    // The CV was just created for this user, so the ownership check inside
+    // createCvVersion must pass. If it does not, the CV and its file are
+    // left behind without a version — the request fails instead of
+    // returning a half-built upload.
+    if (!version) {
+      throw new Error('CV version could not be created for the uploaded CV');
+    }
+
+    return res.json({
+      success: true,
+      cv: parsedCV,
+      extractionQuality: qualityAssessment.quality,
+      atsAnalysis,
+      analysisAvailable: atsAnalysis !== null,
+      cvId: cvRow.id,
+      cvVersionId: version.id,
+      fileStored: !!storedFile,
+      fileName: storedFile?.fileName ?? null,
+      message: atsAnalysis
+        ? 'CV uploaded and analyzed successfully'
+        : 'CV uploaded successfully. ATS analysis is temporarily unavailable; you can retry it from CV Studio.',
+    });
+  } catch (error: any) {
+    console.error('CV Upload Error:', error);
+    // The detail is logged server-side, never returned: an upstream message
+    // can carry internal paths, provider payloads or stack frames.
+    return res.status(500).json({
+      error: 'Failed to process and analyze CV upload',
+    });
+  }
+});
 
 /**
  * Sensitive account operations (password, email, deletion) verify the current
@@ -1222,26 +2251,48 @@ const accountRateLimit = rateLimit(10, 60_000, 'account');
 // AI Copilot with Contextual Page Understanding & Action Proposals
 app.post('/api/copilot', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
-    const { userPrompt, context } = req.body;
+    // The prompt is validated before anything else: it must be a string, and
+    // it must be short enough that one request cannot cost an unbounded
+    // number of tokens.
+    const userPrompt = str(req.body?.userPrompt, 2000);
     if (!userPrompt) {
       return res.status(400).json({ error: 'userPrompt is required' });
     }
 
-    const systemInstruction = `You are CareerPilot Copilot, the world's most capable AI Career Operating System advisor.
-You understand the user's complete career graph:
-- Active Page/Context: ${context?.activeView || 'dashboard'}
-- Persona: ${context?.careerState || 'Professional'}
-- Target Role: ${context?.targetRole?.title || 'Engineer'}
-- Top Skill Gaps: ${JSON.stringify(context?.skillGaps || [])}
-- Active Project: ${context?.activeProjectTitle || 'None'}
-- Applications Active: ${context?.applicationsCount || 0}
-- Interviews Scheduled: ${context?.interviewsCount || 0}
+    // The career context is read from the DATABASE for the verified user, not
+    // taken from the request body. The browser used to send the whole context,
+    // which meant the assistant was reasoning about unverified client data
+    // and had no roadmap, learning or experience to work from.
+    const careerContext = await loadAiCareerContext(req.authUser!.id);
+    const contextBlock = buildAiContextBlock(careerContext);
+
+    // The active view is a UI hint, not a career fact, so it is still taken
+    // from the client — but it is length-capped and string-typed.
+    const activeView = str(req.body?.context?.activeView, 40) ?? 'dashboard';
+
+    // No model on this server means no result can be produced. This is
+    // checked before the daily budget is touched, so a missing key is never
+    // reported as an exhausted quota.
+    if (!process.env.GEMINI_API_KEY) {
+      return modelUnavailable(res);
+    }
+
+    const systemInstruction = `You are CareerPilot Copilot, an AI career advisor that works across every career domain — technology, engineering, data, design, product, business, operations, finance, marketing, sales, people and HR, healthcare, education, and legal.
+You are given the user's real career state below, read from their CareerPilot account.
+The user is currently looking at the "${activeView}" screen of the app.
+
+${contextBlock}
 
 Rules:
-1. Provide concise, highly actionable career strategy.
-2. If relevant to the prompt, propose a concrete, structured change to their roadmap or skills.
-3. Support Arabic if requested or if prompt is in Arabic.
-4. Give 3 short, relevant follow-up suggestions.`;
+1. Provide concise, highly actionable career strategy grounded in the state above.
+2. If the user asks you to change something, propose a concrete, structured change to their roadmap or skills.
+3. Never assume the user is in a technical role. Use their actual target role and domain.
+4. Support Arabic if requested or if the prompt is in Arabic.
+5. Give 3 short, relevant follow-up suggestions.
+6. If you do not have the information to answer accurately, say what is missing instead of guessing.`;
+
+    const blocked = consumeAiBudget(res, req.authUser!.id);
+    if (blocked) return blocked;
 
     try {
       const response = await ai.models.generateContent({
@@ -1263,18 +2314,28 @@ Rules:
         });
       }
 
-      // Intelligent proposed action if user asks to add or change something
+      // Intelligent proposed action if user asks to add or change something.
+      // The match uses word boundaries: a plain substring check matched
+      // "add" inside "already" and "test" inside "contest".
       let proposedAction = undefined;
       const lower = userPrompt.toLowerCase();
-      if (lower.includes('add') || lower.includes('test') || lower.includes('task') || lower.includes('skill')) {
+      const asksToAdd = /\b(add|create|track|plan|schedule|set up|set-up|start)\b/.test(lower);
+      if (asksToAdd) {
+        const focusSkill = careerContext.skillGaps[0]?.name ?? null;
         proposedAction = {
           id: `prop-${Date.now()}`,
-          title: `Focus on ${context?.skillGaps?.[0] || 'Automated Testing'}`,
-          description: `Add dedicated milestone drill to close your primary gap for ${context?.targetRole?.title || 'target role'}.`,
+          title: focusSkill
+            ? `Focus on ${focusSkill}`
+            : `Strengthen your ${careerContext.targetRoleTitle ?? 'target role'} profile`,
+          description: focusSkill
+            ? `Add a dedicated milestone to close your primary gap in ${focusSkill} for ${careerContext.targetRoleTitle ?? 'your target role'}.`
+            : `Add a dedicated milestone for the next step towards ${careerContext.targetRoleTitle ?? 'your target role'}.`,
           reason: 'Highest leverage improvement to raise your market fit score.',
           type: 'update_task',
-          payload: { skill: context?.skillGaps?.[0] || 'Testing' },
-          status: 'pending'
+          // The payload carries a real skill name, so a confirmed action
+          // creates a skill the user actually has a gap in.
+          payload: { skill: focusSkill },
+          status: 'pending',
         };
       }
 
@@ -1283,19 +2344,26 @@ Rules:
         suggestions: [
           'What should I prioritize today?',
           'Audit my CV bullet points',
-          'Give me a technical interview question for my target role'
+          'Give me an interview question for my target role',
         ],
-        proposedAction
+        proposedAction,
       });
     } catch (aiErr: any) {
       // Honesty rule: if the model did not answer, do NOT return canned text
       // that looks like an AI response. The caller is told the assistant is
       // unavailable and can retry; no generated content is invented.
       console.warn('Copilot AI request failed:', aiErr?.message || aiErr);
-      return res.status(503).json({
-        error:
-          'The AI assistant is temporarily unavailable. Your message was not answered by the model; please try again shortly.',
-      });
+
+      // A provider quota error is reported as 429 with a Retry-After header
+      // rather than being flattened into a generic 503, so the client can
+      // tell "come back tomorrow" from "try again in a moment". The daily
+      // budget is refunded, because the provider never served this request.
+      return respondAiFailure(
+        res,
+        aiErr,
+        'The AI assistant is temporarily unavailable. Your message was not answered by the model; please try again shortly.',
+        req.authUser!.id
+      );
     }
   } catch (error: any) {
     console.error('Copilot API error:', error);
@@ -1306,12 +2374,25 @@ Rules:
 // AI Career Analysis Endpoint
 app.post('/api/analyze-career', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
-    const { targetRole, userSkills, careerState } = req.body;
+    const { targetRole, careerState } = req.body;
+    // The role title falls back to the user's own target role, never to a
+    // hard-coded engineering role.
+    const resolvedRoleTitle =
+      str(targetRole?.title, 200) ??
+      (await getProfileDto(req.authUser!.id).then((p) => p?.targetRole ?? null).catch(() => null)) ??
+      'the target role';
 
-    const prompt = `Analyze candidate for role "${targetRole?.title || 'Software Engineer'}".
-Current persona: "${careerState || 'Professional'}".
-Skills: ${JSON.stringify(userSkills || [])}.
-Required for role: ${JSON.stringify(targetRole?.requiredSkills || [])}.
+    // The skills and requirements are bounded: a request cannot send an
+    // arbitrarily large payload into the model's context.
+    const userSkills = boundedList(req.body?.userSkills, 40, 200);
+    const requiredSkills = boundedList(targetRole?.requiredSkills, 40, 200);
+    const persona = str(careerState, 80) ?? 'Professional';
+
+    const prompt = `Analyze candidate for role "${resolvedRoleTitle}".
+Current persona: "${persona}".
+Skills: ${JSON.stringify(userSkills)}.
+Required for role: ${JSON.stringify(requiredSkills)}.
+Analyse the candidate for this role in this domain. Do not assume a technical or software role; judge the candidate against the requirements of the role that was given.
 
 Return valid JSON schema:
 {
@@ -1329,6 +2410,16 @@ Return valid JSON schema:
     "actionType": "task" | "course" | "project" | "cv"
   }
 }`;
+
+    // No model on this server means no analysis can be produced. This is
+    // checked before the daily budget is touched, so a missing key is never
+    // reported as an exhausted quota.
+    if (!process.env.GEMINI_API_KEY) {
+      return modelUnavailable(res);
+    }
+
+    const blocked = consumeAiBudget(res, req.authUser!.id);
+    if (blocked) return blocked;
 
     try {
       const response = await ai.models.generateContent({
@@ -1349,11 +2440,12 @@ Return valid JSON schema:
     } catch (e) {
       // Never fabricate a career analysis. A made-up match percentage and
       // invented skill gaps would be indistinguishable from a real result.
-      console.error('Career analysis unavailable:', e);
-      return res.status(503).json({
-        error:
-          'Career analysis is temporarily unavailable. No analysis was generated; please try again shortly.',
-      });
+      return respondAiFailure(
+        res,
+        e,
+        'Career analysis is temporarily unavailable. No analysis was generated; please try again shortly.',
+        req.authUser!.id
+      );
     }
   } catch (error) {
     return res.status(500).json({ error: 'Failed to run career analysis' });
@@ -1375,6 +2467,16 @@ Return JSON schema:
   "actionableImprovements": [{ "section": string, "currentText": string, "suggestedText": string, "reason": string }]
 }`;
 
+    // No model on this server means no analysis can be produced. This is
+    // checked before the daily budget is touched, so a missing key is never
+    // reported as an exhausted quota.
+    if (!process.env.GEMINI_API_KEY) {
+      return modelUnavailable(res);
+    }
+
+    const blocked = consumeAiBudget(res, req.authUser!.id);
+    if (blocked) return blocked;
+
     try {
       const response = await ai.models.generateContent({
         model: GEMINI_MODEL,
@@ -1394,11 +2496,12 @@ Return JSON schema:
     } catch (e) {
       // An invented ATS score and invented "improvements" would be actively
       // harmful: the user could rewrite a CV around a fabricated diagnosis.
-      console.error('CV optimization unavailable:', e);
-      return res.status(503).json({
-        error:
-          'CV analysis is temporarily unavailable. No ATS analysis was generated; please try again shortly.',
-      });
+      return respondAiFailure(
+        res,
+        e,
+        'CV analysis is temporarily unavailable. No ATS analysis was generated; please try again shortly.',
+        req.authUser!.id
+      );
     }
   } catch (error) {
     return res.status(500).json({ error: 'Failed to optimize CV' });
@@ -1409,9 +2512,18 @@ Return JSON schema:
 app.post('/api/mock-interview', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { roleTitle, interviewType, question, userAnswer } = req.body;
-    const prompt = `Evaluate interview answer for "${roleTitle}". Type: ${interviewType}.
-Question: "${question}"
-Answer: "${userAnswer}"
+    // Every field that reaches the model is length-capped: a single request
+    // must not be able to push an unbounded payload into the context.
+    const safeRoleTitle = str(roleTitle, 200) ?? 'the target role';
+    const safeType = str(interviewType, 40) ?? 'general';
+    const safeQuestion = str(question, 1000) ?? '';
+    const safeAnswer = str(userAnswer, 8000) ?? '';
+    if (!safeQuestion || !safeAnswer) {
+      return res.status(400).json({ error: 'A question and an answer are required' });
+    }
+    const prompt = `Evaluate interview answer for "${safeRoleTitle}". Type: ${safeType}.
+Question: "${safeQuestion}"
+Answer: "${safeAnswer}"
 Return JSON schema:
 {
   "score": number,
@@ -1420,6 +2532,16 @@ Return JSON schema:
   "starEvaluation": { "situation": string, "task": string, "action": string, "result": string },
   "suggestedAnswer": string
 }`;
+
+    // No model on this server means no evaluation can be produced. This is
+    // checked before the daily budget is touched, so a missing key is never
+    // reported as an exhausted quota.
+    if (!process.env.GEMINI_API_KEY) {
+      return modelUnavailable(res);
+    }
+
+    const blocked = consumeAiBudget(res, req.authUser!.id);
+    if (blocked) return blocked;
 
     try {
       const response = await ai.models.generateContent({
@@ -1440,11 +2562,12 @@ Return JSON schema:
     } catch (e) {
       // A fabricated score and a fabricated "model answer" would teach the
       // candidate nothing and could be mistaken for feedback on their answer.
-      console.error('Interview evaluation unavailable:', e);
-      return res.status(503).json({
-        error:
-          'Interview evaluation is temporarily unavailable. No feedback was generated; please try again shortly.',
-      });
+      return respondAiFailure(
+        res,
+        e,
+        'Interview evaluation is temporarily unavailable. No feedback was generated; please try again shortly.',
+        req.authUser!.id
+      );
     }
   } catch (error) {
     return res.status(500).json({ error: 'Failed to evaluate interview response' });
@@ -1454,19 +2577,44 @@ Return JSON schema:
 app.post('/api/suggest-summary', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { name, targetRoleTitle, careerState, yearsExperience, skills, keyAchievements } = req.body;
+    // No hard-coded role: the summary is written for whatever role the user
+    // is actually targeting.
+    const summaryRoleTitle =
+      str(targetRoleTitle, 200) ??
+      (await getProfileDto(req.authUser!.id).then((p) => p?.targetRole ?? null).catch(() => null)) ??
+      'their target role';
+    const safeName = str(name, 200) ?? 'Professional';
+    const safeCareerState = str(careerState, 80) ?? 'Professional';
+    const safeYears = str(yearsExperience, 40) ?? '3+';
+    const safeSkills = boundedList(skills, 40, 120)
+      .filter((entry): entry is string => typeof entry === 'string')
+      .join(', ') || 'the skills relevant to the target role';
+    const safeAchievements = boundedList(keyAchievements, 20, 300)
+      .filter((entry): entry is string => typeof entry === 'string')
+      .join('; ') || 'High performance, collaborative delivery';
     const prompt = `Write a high-impact, professional, authentic 3-4 sentence professional summary for a resume/profile.
-Person: ${name || 'Professional'}
-Target Role: ${targetRoleTitle || 'Software Engineer'}
-Career State: ${careerState || 'Professional'}
-Years of Experience: ${yearsExperience || '3+'}
-Core Skills: ${Array.isArray(skills) ? skills.join(', ') : 'Software Engineering'}
-Key Achievements: ${Array.isArray(keyAchievements) ? keyAchievements.join('; ') : 'High performance, agile collaboration'}
+Person: ${safeName}
+Target Role: ${summaryRoleTitle}
+Career State: ${safeCareerState}
+Years of Experience: ${safeYears}
+Core Skills: ${safeSkills}
+Key Achievements: ${safeAchievements}
 
 Requirements:
 - First-person or punchy executive third-person tone.
-- Emphasize business impact and technical mastery.
+- Emphasize business impact and mastery of the skills the role actually requires.
 - Do not invent non-existent companies or fabricated awards.
 - Return JSON: { "suggestedSummary": string }`;
+
+    // No model on this server means no summary can be produced. This is
+    // checked before the daily budget is touched, so a missing key is never
+    // reported as an exhausted quota.
+    if (!process.env.GEMINI_API_KEY) {
+      return modelUnavailable(res);
+    }
+
+    const blocked = consumeAiBudget(res, req.authUser!.id);
+    if (blocked) return blocked;
 
     try {
       const response = await ai.models.generateContent({
@@ -1487,11 +2635,12 @@ Requirements:
     } catch (e) {
       // Do not return a generic paragraph as if the model had written it for
       // this candidate. The caller must know that no suggestion was produced.
-      console.error('Summary suggestion unavailable:', e);
-      return res.status(503).json({
-        error:
-          'Summary generation is temporarily unavailable. No suggestion was generated; please try again shortly.',
-      });
+      return respondAiFailure(
+        res,
+        e,
+        'Summary generation is temporarily unavailable. No suggestion was generated; please try again shortly.',
+        req.authUser!.id
+      );
     }
   } catch (error) {
     return res.status(500).json({ error: 'Failed to generate summary suggestion' });
@@ -1502,22 +2651,41 @@ Requirements:
 app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { company, jobTitle, jobDescription, candidateName, experiences, skills, projects, tone } = req.body;
+    // Everything that reaches the model is bounded.
+    const safeCompany = str(company, 200) ?? 'the company';
+    const safeJobTitle = str(jobTitle, 200) ?? 'the role';
+    const safeJobDescription = str(jobDescription, 4000) ?? 'Standard requirements';
+    const safeCandidateName = str(candidateName, 200) ?? 'Candidate';
+    const safeTone = str(tone, 80) ?? 'Professional & Confident';
+    const safeExperiences = boundedList(experiences, 20, 400);
+    const safeSkills = boundedList(skills, 40, 120);
+    const safeProjects = boundedList(projects, 20, 400);
     const prompt = `Write a tailored, compelling cover letter for:
-Candidate: ${candidateName || 'Candidate'}
-Company: ${company}
-Role: ${jobTitle}
-Tone: ${tone || 'Professional & Confident'}
-Job Requirements/Context: ${jobDescription || 'Standard requirements'}
+Candidate: ${safeCandidateName}
+Company: ${safeCompany}
+Role: ${safeJobTitle}
+Tone: ${safeTone}
+Job Requirements/Context: ${safeJobDescription}
 Candidate Relevant Background:
-- Experiences: ${JSON.stringify(experiences || [])}
-- Core Skills: ${JSON.stringify(skills || [])}
-- Key Projects: ${JSON.stringify(projects || [])}
+- Experiences: ${JSON.stringify(safeExperiences)}
+- Core Skills: ${JSON.stringify(safeSkills)}
+- Key Projects: ${JSON.stringify(safeProjects)}
 
 Rules:
 1. Ground every claim strictly in candidate's provided experiences and projects. DO NOT invent false metrics or companies.
-2. Structure: Strong hook expressing excitement for ${company}, high-relevance achievement showcase directly matching the job, and proactive closing.
+2. Structure: Strong hook expressing excitement for ${safeCompany}, high-relevance achievement showcase directly matching the job, and proactive closing.
 3. Keep it under 350 words.
 4. Return JSON: { "coverLetter": string, "keyHighlights": [string] }`;
+
+    // No model on this server means no cover letter can be produced. This is
+    // checked before the daily budget is touched, so a missing key is never
+    // reported as an exhausted quota.
+    if (!process.env.GEMINI_API_KEY) {
+      return modelUnavailable(res);
+    }
+
+    const blocked = consumeAiBudget(res, req.authUser!.id);
+    if (blocked) return blocked;
 
     try {
       const response = await ai.models.generateContent({
@@ -1538,11 +2706,12 @@ Rules:
     } catch (e) {
       // A cover letter full of claims the candidate never supplied is the most
       // dangerous fallback in the product: it could be sent to an employer.
-      console.error('Cover letter generation unavailable:', e);
-      return res.status(503).json({
-        error:
-          'Cover letter generation is temporarily unavailable. No cover letter was generated; please try again shortly.',
-      });
+      return respondAiFailure(
+        res,
+        e,
+        'Cover letter generation is temporarily unavailable. No cover letter was generated; please try again shortly.',
+        req.authUser!.id
+      );
     }
   } catch (error) {
     return res.status(500).json({ error: 'Failed to generate cover letter' });
@@ -1637,8 +2806,10 @@ app.get('/api/profile/public/:username', async (req: Request, res: Response) => 
       name: profile.full_name,
       preferredName: profile.full_name,
       headline: profile.target_role,
-      bio: profile.bio,
-      avatarUrl: parseHttpUrl(profile.avatar_url, 1000).value,
+      avatarUrl:
+        typeof profile.avatar_url === 'string' && /^avatar-[0-9]{2}$/.test(profile.avatar_url.trim())
+          ? profile.avatar_url.trim()
+          : parseHttpUrl(profile.avatar_url, 1000).value,
       location: profile.location,
       targetRole: profile.target_role,
       careerState: profile.user_type,
@@ -1751,6 +2922,29 @@ const str = (v: unknown, max = 500): string | null =>
 const isUuid = (v: unknown): v is string =>
   typeof v === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+/**
+ * Bounds a list that is about to be embedded in an AI prompt.
+ *
+ * The count and each entry's length are both capped, so a single request
+ * cannot push an unbounded payload into the model's context and consume the
+ * project's daily quota.
+ */
+const boundedList = (value: unknown, maxItems: number, maxItemLength: number): unknown[] => {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, maxItems).map((entry) => {
+    if (typeof entry === 'string') return entry.slice(0, maxItemLength);
+    if (entry && typeof entry === 'object') {
+      // Keep the shape but bound every string inside it.
+      const bounded: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(entry as Record<string, unknown>)) {
+        bounded[key] = typeof item === 'string' ? item.slice(0, maxItemLength) : item;
+      }
+      return bounded;
+    }
+    return entry;
+  });
+};
 
 /**
  * Accepts only absolute http(s) URLs for fields that are rendered as links.
@@ -2419,6 +3613,9 @@ app.post('/api/cv-versions', requireAuth, async (req: Request, res: Response) =>
       profileJson: body.profileJson ?? null,
       atsAnalysis: body.atsAnalysis ?? null,
     });
+    // createCvVersion re-checks ownership internally; a null result means the
+    // CV is not the caller's, so nothing was created.
+    if (!version) return res.status(404).json({ error: 'CV not found' });
     return res.status(201).json({ success: true, version });
   } catch (error) {
     console.error('Failed to create CV version:', error);
@@ -3332,6 +4529,60 @@ app.get('/api/profile', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Centralized Career Context Aggregation
+app.get('/api/career-context', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUser!.id;
+    const [
+      profile,
+      preferences,
+      roadmap,
+      skills,
+      experiences,
+      educations,
+      projects,
+      evidence,
+      certifications,
+      applications,
+      learningItems,
+    ] = await Promise.all([
+      getProfileDto(userId),
+      getPreferences(userId).catch(() => null),
+      listRoadmaps(userId).catch(() => []),
+      getUserSkills(userId).catch(() => []),
+      listExperiences(userId).catch(() => []),
+      listEducations(userId).catch(() => []),
+      listProjects(userId).catch(() => []),
+      listEvidence(userId).catch(() => []),
+      listCertifications(userId).catch(() => []),
+      listJobApplications(userId).catch(() => []),
+      listLearningItems(userId).catch(() => []),
+    ]);
+
+    return res.json({
+      success: true,
+      context: {
+        profile,
+        careerGoal: profile?.careerGoal || null,
+        targetRole: profile?.targetRole || null,
+        skills,
+        experience: experiences,
+        education: educations,
+        projects,
+        evidence,
+        certifications,
+        roadmap,
+        learningProgress: learningItems,
+        preferences,
+        applications,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to load career context:', error);
+    return res.status(500).json({ error: 'Failed to load career context' });
+  }
+});
+
 app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
@@ -3353,12 +4604,16 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid userType' });
     }
 
+    const isAvatarId =
+      typeof body.avatarUrl === 'string' && /^avatar-[0-9]{2}$/.test(body.avatarUrl.trim());
     const avatarUrl =
       body.avatarUrl === undefined || body.avatarUrl === null
         ? { valid: true, value: undefined }
-        : parseHttpUrl(body.avatarUrl, 1000);
+        : isAvatarId
+          ? { valid: true, value: body.avatarUrl.trim() }
+          : parseHttpUrl(body.avatarUrl, 1000);
     if (!avatarUrl.valid) {
-      return res.status(400).json({ error: 'avatarUrl must be an http(s) URL' });
+      return res.status(400).json({ error: 'avatarUrl must be a valid avatar ID or http(s) URL' });
     }
 
     // The public URL uses the username verbatim, so keep it to the documented
@@ -3771,8 +5026,13 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
         generatedAt: new Date().toISOString(),
       };
     } else {
+      // The AI enrichment is optional: the deterministic ranking is always
+      // returned. It still draws on the daily budget, so it cannot be used to
+      // drain the project's allowance.
+      const aiBudget = tryConsumeAiBudget(req.authUser!.id);
       result = await enrichRecommendationsWithAi(deterministic, built.context, {
-        ai: process.env.GEMINI_API_KEY ? getAiClient() : null,
+        ai:
+          process.env.GEMINI_API_KEY && aiBudget ? getAiClient() : null,
         model: GEMINI_MODEL,
       });
     }

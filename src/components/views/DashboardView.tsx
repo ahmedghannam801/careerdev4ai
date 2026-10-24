@@ -1,24 +1,22 @@
 import React from 'react';
-import { 
-  ArrowRight, 
-  Sparkles, 
-  CheckCircle2, 
-  Clock, 
-  Briefcase, 
-  Target, 
-  Layers, 
-  Calendar, 
-  BookOpen, 
+import {
+  ArrowRight,
+  Sparkles,
+  CheckCircle2,
+  Briefcase,
+  Target,
+  Calendar,
   FileText,
-  AlertCircle,
   Activity,
-  Award,
   ShieldCheck,
-  TrendingUp,
   CheckSquare,
   Square
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { Stagger, StaggerItem } from '../motion/Motion';
+import { CountUp } from '../motion/CountUp';
+import { AnimatedProgress } from '../motion/AnimatedProgress';
+import { EmptyState } from '../ui/EmptyState';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -119,7 +117,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   const upcomingMilestones: MilestoneEntry[] = [...interviewMilestones, ...deadlineMilestones];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <div className="space-y-8">
       {/* Welcome & Role Context Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -250,48 +248,88 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         </div>
       </div>
 
-      {/* CORE SCANNABLE METRICS GRID */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-          <div className="text-xs text-[var(--text-secondary)]">Role Readiness Match</div>
-          <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
-            {analysis.matchPercentage}%
+      {/* CORE SCANNABLE METRICS GRID
+          Only this grid animates. The rest of the dashboard stays still so
+          navigating back to it never feels like the whole page re-enters. */}
+      <Stagger gap={0.06} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StaggerItem>
+          <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
+            <div className="text-xs text-[var(--text-secondary)]">Role Readiness Match</div>
+            <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
+              <CountUp value={analysis.matchPercentage} format={(v) => `${Math.round(v)}%`} />
+            </div>
+            <div className="mt-3">
+              <AnimatedProgress
+                value={analysis.matchPercentage}
+                label="Role readiness match"
+                fillClassName="bg-[var(--color-primary)]"
+              />
+            </div>
+            <div className="mt-2 text-[11px] text-[var(--text-muted)]">
+              measured against {targetRole.title} requirements
+            </div>
           </div>
-          <div className="mt-1 text-[11px] text-[var(--text-muted)]">
-            measured against {targetRole.title} requirements
-          </div>
-        </div>
+        </StaggerItem>
 
-        <div className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-          <div className="text-xs text-[var(--text-secondary)]">Skills Mastered</div>
-          <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
-            {masteredSkillsCount} <span className="text-sm font-normal text-[var(--text-muted)]">/ {skills.length}</span>
+        <StaggerItem>
+          <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
+            <div className="text-xs text-[var(--text-secondary)]">Skills Mastered</div>
+            <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
+              <CountUp value={masteredSkillsCount} />
+              <span className="text-sm font-normal text-[var(--text-muted)]"> / {skills.length}</span>
+            </div>
+            <div className="mt-3">
+              <AnimatedProgress
+                value={skills.length > 0 ? (masteredSkillsCount / skills.length) * 100 : 0}
+                label="Skills mastered"
+                fillClassName="bg-[var(--color-success-strong)]"
+              />
+            </div>
+            <div className="mt-2 text-[11px] text-[var(--text-muted)]">
+              {analysis.criticalGaps.length} critical gaps remaining
+            </div>
           </div>
-          <div className="mt-1 text-[11px] text-[var(--text-muted)]">
-            {analysis.criticalGaps.length} critical gaps remaining
-          </div>
-        </div>
+        </StaggerItem>
 
-        <div className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-          <div className="text-xs text-[var(--text-secondary)]">Roadmap Completion</div>
-          <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
-            {completedTasks} <span className="text-sm font-normal text-[var(--text-muted)]">/ {totalTasks}</span>
+        <StaggerItem>
+          <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
+            <div className="text-xs text-[var(--text-secondary)]">Roadmap Completion</div>
+            <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
+              <CountUp value={completedTasks} />
+              <span className="text-sm font-normal text-[var(--text-muted)]"> / {totalTasks}</span>
+            </div>
+            <div className="mt-3">
+              <AnimatedProgress
+                value={totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0}
+                label="Roadmap completion"
+                fillClassName="bg-[var(--color-accent)]"
+              />
+            </div>
+            <div className="mt-2 text-[11px] text-[var(--text-muted)]">
+              {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}% overall progress
+            </div>
           </div>
-          <div className="mt-1 text-[11px] text-[var(--text-muted)]">
-            {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}% overall progress
-          </div>
-        </div>
+        </StaggerItem>
 
-        <div className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-          <div className="text-xs text-[var(--text-secondary)]">Active Applications</div>
-          <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
-            {activeApplications.length}
+        <StaggerItem>
+          <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
+            <div className="text-xs text-[var(--text-secondary)]">Active Applications</div>
+            <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
+              <CountUp value={activeApplications.length} />
+            </div>
+            <div className="mt-3">
+              <AnimatedProgress
+                value={applications.length > 0 ? (activeApplications.length / applications.length) * 100 : 0}
+                label="Active applications"
+                fillClassName="bg-[var(--color-primary-text)]"
+              />
+            </div>
+            <div className="mt-2 text-[11px] text-[var(--color-primary-text)] font-medium">
+              {interviewCount} interview{interviewCount === 1 ? '' : 's'} in progress
+            </div>
           </div>
-          <div className="mt-1 text-[11px] text-[var(--color-primary-text)] font-medium">
-            {interviewCount} interview{interviewCount === 1 ? '' : 's'} in progress
-          </div>
-        </div>
-      </div>
+        </StaggerItem>
+      </Stagger>
 
       {/* 2-Column Operational Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -436,9 +474,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
             <div className="space-y-3">
               {upcomingMilestones.length === 0 ? (
-                <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50">
-                  <p className="text-xs text-[var(--text-muted)]">No upcoming milestones yet.</p>
-                </div>
+                <EmptyState
+                  compact
+                  icon={Calendar}
+                  title="No upcoming milestones yet"
+                  description="Interview stages and roadmap deadlines appear here as they come up, so nothing important slips."
+                />
               ) : (
                 upcomingMilestones.map((milestone) => (
                   <div

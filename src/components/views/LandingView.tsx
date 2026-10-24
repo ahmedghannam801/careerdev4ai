@@ -1,8 +1,29 @@
-import React from 'react';
-import { ArrowRight, CheckCircle2, Sparkles, Compass, Target, Layers, FileText, Briefcase, Award, ArrowUpRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { ArrowRight, CheckCircle2, Sparkles, ArrowUpRight, Target, Route, GraduationCap, FileBadge2, Menu, X } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { TARGET_ROLES } from '../../data/rolesData';
-import heroImage from '../../assets/images/career_command_hero_1792417630769.jpg';
+import { Logo } from '../brand/Logo';
+import { CareerJourneyVisual } from '../brand/CareerJourneyVisual';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+
+/**
+ * The roles showcased on the landing page.
+ *
+ * One role per career domain, so the first thing a visitor sees is that
+ * CareerPilot is not only for developers.
+ */
+const FEATURED_ROLES = (() => {
+  const seen = new Set<string>();
+  const featured: typeof TARGET_ROLES = [];
+  for (const role of TARGET_ROLES) {
+    if (seen.has(role.domainId)) continue;
+    seen.add(role.domainId);
+    featured.push(role);
+    if (featured.length === 3) break;
+  }
+  return featured;
+})();
 
 interface LandingViewProps {
   onStartOnboarding: () => void;
@@ -10,322 +31,568 @@ interface LandingViewProps {
   onOpenDashboard: () => void;
 }
 
+/** The product's promise, stated once. */
+const HERO_HEADLINE = 'Turn Your Ambition Into a Career Plan.';
+
+const HERO_SUPPORTING =
+  'CareerPilot AI helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.';
+
+/** The problems the platform exists to remove. */
+const FRAGMENTATION_POINTS = [
+  {
+    title: 'Skills are scattered',
+    body: 'A spreadsheet here, a course list there, and no honest picture of what is actually missing.',
+  },
+  {
+    title: 'CVs go stale',
+    body: 'The version you send is out of date before the interview, and it never speaks to the role in front of you.',
+  },
+  {
+    title: 'Learning lacks direction',
+    body: 'Endless courses with no link to the job you want, so effort turns into hours rather than progress.',
+  },
+  {
+    title: 'Applications disconnect',
+    body: 'Every opportunity tracked somewhere else, with no record of what you did, learned, or proved.',
+  },
+];
+
+/** The chain the platform keeps connected. */
+const CAREER_CHAIN = [
+  'Goal',
+  'Skills',
+  'Roadmap',
+  'Learning',
+  'Projects',
+  'Evidence',
+  'CV',
+  'Opportunities',
+];
+
+/** How it works, in the order a career actually unfolds. */
+const HOW_IT_WORKS = [
+  {
+    icon: Target,
+    title: 'Discover your direction',
+    body: 'Set the role you are working towards and get a concrete picture of what that role demands.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Identify your skill gaps',
+    body: 'Compare where you are against the benchmark and see exactly which gaps will hold you back.',
+  },
+  {
+    icon: Route,
+    title: 'Follow your personalized roadmap',
+    body: 'A phased plan that recalculates as you learn, so the next step is always the right one.',
+  },
+  {
+    icon: GraduationCap,
+    title: 'Build evidence and projects',
+    body: 'Turn skills into finished work you can point a hiring manager at.',
+  },
+  {
+    icon: FileBadge2,
+    title: 'Strengthen your CV',
+    body: 'Rewrite, version and target your CV against the role you are applying for.',
+  },
+  {
+    icon: ArrowUpRight,
+    title: 'Move toward real opportunities',
+    body: 'Track applications, prepare for interviews, and keep your momentum visible.',
+  },
+];
+
+/** What the AI actually does — and what it deliberately does not claim. */
+const AI_PROMISES = [
+  {
+    title: 'Grounded in your records',
+    body: 'Every recommendation is drawn from your own goals, skills, progress and learning journey.',
+  },
+  {
+    title: 'Explains the reasoning',
+    body: 'You see why a suggestion was made and which of your records it came from.',
+  },
+  {
+    title: 'Updates as you progress',
+    body: 'Complete a task, close a gap, and the next recommendation moves with you.',
+  },
+];
+
 export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onExploreRoles, onOpenDashboard }) => {
-  const { profile, t } = useCareer();
+  const { profile } = useCareer();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const reduced = useReducedMotion() ?? false;
+
+  const navLinks = [
+    { href: '#how-it-works', label: 'How It Works' },
+    { href: '#ai-guidance', label: 'AI Guidance' },
+    { href: '#personas', label: 'Personas' },
+    { href: '#roles', label: 'Target Roles' },
+  ];
+
+  const closeMobileNav = () => setMobileNavOpen(false);
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)]">
       {/* Top Navbar */}
-      <header className="sticky top-0 z-40 bg-[var(--surface-main)]/90 backdrop-blur-md border-b border-[var(--border-subtle)] px-6 py-4 flex items-center justify-between gap-8 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center font-bold text-base shadow-sm">
-            CP
+      <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--surface-main)]/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Logo variant="icon" className="h-8 w-8 shrink-0" alt="" />
+            <span className="hidden shrink-0 whitespace-nowrap text-base font-semibold tracking-tight text-[var(--text-primary)] sm:inline">
+              CareerPilot AI
+            </span>
           </div>
-          <span className="font-semibold text-base tracking-tight text-[var(--text-primary)] whitespace-nowrap shrink-0">
-            CareerPilot AI
-          </span>
+
+          <nav className="hidden items-center gap-6 text-sm font-medium text-[var(--text-secondary)] md:flex">
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="whitespace-nowrap transition-colors hover:text-[var(--text-primary)]"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => setMobileNavOpen((open) => !open)}
+              aria-expanded={mobileNavOpen}
+              aria-controls="landing-mobile-nav"
+              aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+              className="rounded-lg border border-[var(--color-border)] p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-secondary)] hover:text-[var(--text-primary)] md:hidden"
+            >
+              {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+
+            <button
+              onClick={profile.onboardingCompleted ? onOpenDashboard : onStartOnboarding}
+              className="whitespace-nowrap rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-[background-color,box-shadow,transform] hover:bg-[var(--color-primary-hover)] hover:shadow-sm"
+            >
+              {profile.onboardingCompleted ? 'Open Career Dashboard' : 'Start Your Journey'}
+            </button>
+          </div>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--text-secondary)]">
-          <a href="#journey" className="hover:text-[var(--text-primary)] transition-colors whitespace-nowrap shrink-0">How It Works</a>
-          <a href="#personas" className="hover:text-[var(--text-primary)] transition-colors whitespace-nowrap shrink-0">Personas</a>
-          <a href="#roles" className="hover:text-[var(--text-primary)] transition-colors whitespace-nowrap shrink-0">Target Roles</a>
-          <a href="#ecosystem" className="hover:text-[var(--text-primary)] transition-colors whitespace-nowrap shrink-0">Career Graph</a>
-        </nav>
-
-        <div className="flex items-center gap-3 shrink-0">
-          {profile.onboardingCompleted ? (
-            <button
-              onClick={onOpenDashboard}
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] transition-all whitespace-nowrap shadow-xs"
+        {/* Mobile navigation panel */}
+        <AnimatePresence>
+          {mobileNavOpen && (
+            <motion.div
+              id="landing-mobile-nav"
+              initial={{ opacity: 0, y: reduced ? 0 : -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: reduced ? 0 : -8 }}
+              transition={{ duration: reduced ? 0.01 : 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="border-t border-[var(--color-border)] bg-[var(--surface-main)] px-6 py-3 md:hidden"
             >
-              Open Career Dashboard
-            </button>
-          ) : (
-            <button
-              onClick={onStartOnboarding}
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] transition-all whitespace-nowrap shadow-xs"
-            >
-              Start Your Journey
-            </button>
+              <nav className="flex flex-col">
+                {navLinks.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={closeMobileNav}
+                    className="rounded-lg px-2 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-secondary)] hover:text-[var(--text-primary)]"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </nav>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
       </header>
 
       {/* Hero Section */}
-      <section className="px-6 pt-16 pb-20 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-medium">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Personal Career Operating System</span>
-            </div>
+      <section className="relative overflow-hidden border-b border-[var(--color-border)]">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 cp-brand-wash" />
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[var(--text-primary)] leading-[1.12] text-balance">
-              Build a career, not just a CV.
-            </h1>
-
-            <p className="text-lg text-[var(--text-secondary)] max-w-2xl leading-relaxed">
-              CareerPilot AI connects your goals, skills, roadmap, learning, projects, evidence, CV, applications, and interviews into one intelligent, continuous system.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <button
-                onClick={onStartOnboarding}
-                className="px-6 py-3 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] font-medium text-sm hover:bg-[var(--accent-secondary)] transition-all flex items-center gap-2 shadow-sm"
-              >
-                <span>Start Your Career Journey</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={onExploreRoles}
-                className="px-6 py-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-medium text-sm hover:bg-[var(--surface-main)] transition-all"
-              >
-                Explore Target Roles
-              </button>
-            </div>
-
-            <div className="pt-4 flex items-center gap-6 text-xs text-[var(--text-secondary)]">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
-                <span>Zero fake metrics</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
-                <span>Bi-directional career graph</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
-                <span>Bilingual English & Arabic</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-5">
-            <div className="relative rounded-2xl overflow-hidden border border-[var(--border-subtle)] shadow-xl bg-[var(--surface-main)]">
-              <img
-                src={heroImage}
-                alt="Career Command Center Preview"
-                className="w-full h-80 object-cover"
-                referrerPolicy="no-referrer"
-              />
-              <div className="p-5 space-y-3">
-                <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
-                  <span>PRODUCT PREVIEW</span>
-                  <span className="font-mono text-[var(--text-muted)]">ILLUSTRATIVE</span>
+        <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-16 sm:pt-20 lg:pb-28 lg:pt-24">
+          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-14">
+            {/* Copy column */}
+            <div className="lg:col-span-6 xl:col-span-6">
+              <Reveal>
+                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-3 py-1 text-xs font-medium text-[var(--color-primary-text)] backdrop-blur-sm">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Your personal career operating system</span>
                 </div>
-                <div className="text-sm font-semibold text-[var(--text-primary)]">
-                  Next Best Action Engine
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  Your Next Best Action is derived from your own skills, roadmap and applications —
-                  never from sample data.
+              </Reveal>
+
+              <Reveal delay={0.06}>
+                <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.08] tracking-tight text-[var(--text-primary)] sm:text-5xl lg:text-6xl">
+                  {HERO_HEADLINE}
+                </h1>
+              </Reveal>
+
+              <Reveal delay={0.12}>
+                <p className="mt-6 max-w-xl text-pretty text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
+                  {HERO_SUPPORTING}
                 </p>
-                <div className="pt-2 flex items-center justify-between text-xs font-medium text-[var(--color-primary-text)]">
-                  <span>Readiness scoring</span>
-                  <span>Roadmap tasks →</span>
+              </Reveal>
+
+              <Reveal delay={0.18}>
+                <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4">
+                  <button
+                    onClick={onStartOnboarding}
+                    className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-6 py-3.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-sm transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-[var(--color-primary-hover)] hover:shadow-lg active:translate-y-0 active:scale-[0.98]"
+                  >
+                    <span>Start Your Career Journey</span>
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  </button>
+
+                  <a
+                    href="#how-it-works"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-secondary)] active:translate-y-0 active:scale-[0.98]"
+                  >
+                    Explore How It Works
+                  </a>
                 </div>
-                <p className="text-[10px] text-[var(--text-muted)]">
-                  Illustrative preview. Your account data appears only after you sign in.
-                </p>
-              </div>
+              </Reveal>
+
+              <Reveal delay={0.24}>
+                <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[var(--text-secondary)]">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-[var(--color-success-strong)]" />
+                    <span>Zero fake metrics</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-[var(--color-success-strong)]" />
+                    <span>Bi-directional career graph</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-[var(--color-success-strong)]" />
+                    <span>Bilingual English &amp; Arabic</span>
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+
+            {/* Journey visual */}
+            <div className="lg:col-span-6 xl:col-span-6">
+              <Reveal delay={0.3} distance="soft">
+                <CareerJourneyVisual />
+              </Reveal>
             </div>
           </div>
         </div>
       </section>
 
-      {/* The Connected Career Graph Journey */}
-      <section id="journey" className="px-6 py-20 bg-[var(--surface-secondary)]/50 border-y border-[var(--border-subtle)]">
-        <div className="max-w-7xl mx-auto space-y-12">
-          <div className="text-center max-w-2xl mx-auto space-y-3">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-              One Unified Career Graph
-            </h2>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Changing your target role automatically recalibrates every dependency across your career path.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-center text-xs">
-            {[
-              { step: '01', title: 'Target Role', desc: 'Market expectations & tools' },
-              { step: '02', title: 'Skills & Gaps', desc: 'Dynamic level scoring' },
-              { step: '03', title: 'Roadmap', desc: 'Phased actionable tasks' },
-              { step: '04', title: 'Projects', desc: 'Proof-of-skill deliverables' },
-              { step: '05', title: 'Evidence Hub', desc: 'GitHub & demo links' },
-              { step: '06', title: 'CV Studio', desc: 'Target-role ATS polish' },
-              { step: '07', title: 'Interviews', desc: 'STAR simulator drills' },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] flex flex-col justify-between"
-              >
-                <div className="font-mono text-xs font-semibold text-[var(--color-primary-text)] mb-2">{item.step}</div>
-                <div className="font-semibold text-[var(--text-primary)] mb-1">{item.title}</div>
-                <div className="text-[11px] text-[var(--text-secondary)] leading-snug">{item.desc}</div>
+      {/* Problem — career decisions are fragmented */}
+      <section id="problem" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="max-w-2xl">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                The problem
               </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                Career decisions are fragmented.
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                Everything that shapes your career lives somewhere different, so no single
+                view ever tells you whether you are actually getting closer.
+              </p>
+            </div>
+          </Reveal>
+
+          <Stagger inView gap={0.08} className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {FRAGMENTATION_POINTS.map((point) => (
+              <StaggerItem key={point.title}>
+                <div className="h-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">{point.title}</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">{point.body}</p>
+                </div>
+              </StaggerItem>
             ))}
+          </Stagger>
+        </div>
+      </section>
+
+      {/* Solution + How It Works */}
+      <section id="how-it-works" className="scroll-mt-24 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]/40 px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                How it works
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                CareerPilot brings the journey together.
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                One connected path instead of eight disconnected tools.
+              </p>
+            </div>
+          </Reveal>
+
+          {/* The chain */}
+          <Reveal delay={0.08}>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-center">
+              {CAREER_CHAIN.map((step, index) => (
+                <React.Fragment key={step}>
+                  <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)]">
+                    {step}
+                  </span>
+                  {index < CAREER_CHAIN.length - 1 && (
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 shrink-0 text-[var(--color-border-strong)] rtl:rotate-180"
+                    />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </Reveal>
+
+          <Stagger inView gap={0.09} className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {HOW_IT_WORKS.map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <StaggerItem key={step.title}>
+                  <div className="group h-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-surface)] text-[var(--color-primary-text)] transition-transform duration-200 group-hover:scale-105">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="font-mono text-[11px] font-bold text-[var(--text-muted)]">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <h3 className="mt-4 text-base font-bold text-[var(--text-primary)]">{step.title}</h3>
+                    <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">{step.body}</p>
+                  </div>
+                </StaggerItem>
+              );
+            })}
+          </Stagger>
+        </div>
+      </section>
+
+      {/* AI Intelligence */}
+      <section id="ai-guidance" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12">
+            <div className="lg:col-span-5">
+              <Reveal>
+                <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                  AI intelligence
+                </div>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                  Guidance grounded in your career, not generic advice.
+                </h2>
+                <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
+                  CareerPilot recommends based on the goals you set, the skills you have,
+                  the progress you have made and the courses you have taken — and it shows
+                  its reasoning, so you can judge the advice for yourself.
+                </p>
+              </Reveal>
+            </div>
+
+            <Stagger inView gap={0.1} className="grid grid-cols-1 gap-4 lg:col-span-7 sm:grid-cols-3">
+              {AI_PROMISES.map((promise) => (
+                <StaggerItem key={promise.title}>
+                  <div className="h-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
+                    <div className="mb-3 h-1 w-8 rounded-full bg-[var(--color-accent)]" />
+                    <h3 className="text-sm font-bold text-[var(--text-primary)]">{promise.title}</h3>
+                    <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">{promise.body}</p>
+                  </div>
+                </StaggerItem>
+              ))}
+            </Stagger>
           </div>
         </div>
       </section>
 
       {/* Personas Section */}
-      <section id="personas" className="px-6 py-20 max-w-7xl mx-auto space-y-12">
-        <div className="text-center max-w-2xl mx-auto space-y-3">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-            Tailored for Every Career Stage
-          </h2>
-          <p className="text-sm text-[var(--text-secondary)]">
-            CareerPilot dynamically adapts its priorities, recommendations, and roadmaps based on your persona.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {[
-            {
-              id: 'student',
-              title: 'Student',
-              focus: 'Fundamentals & Internships',
-              desc: 'Foundational coursework, first GitHub repositories, internships, and portfolio development.'
-            },
-            {
-              id: 'fresh_grad',
-              title: 'Fresh Graduate',
-              focus: 'Employability & Proof',
-              desc: 'Bridging academic-to-industry gaps, CV optimization, targeted entry applications, and interview prep.'
-            },
-            {
-              id: 'working_pro',
-              title: 'Working Professional',
-              focus: 'Progression & Promotion',
-              desc: 'Advanced specialization, quantifiable achievements, leadership evidence, and market positioning.'
-            },
-            {
-              id: 'career_switcher',
-              title: 'Career Switcher',
-              focus: 'Transferable Skills',
-              desc: 'Identifying transferable strengths, targeted transition roadmaps, and proof-of-skill portfolio pieces.'
-            },
-            {
-              id: 'exploring',
-              title: 'Exploring',
-              focus: 'Discovery & Fit',
-              desc: 'Comparing emerging disciplines, understanding market compensations, and discovering your optimal path.'
-            }
-          ].map((persona) => (
-            <div
-              key={persona.id}
-              className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40 transition-all flex flex-col justify-between"
-            >
-              <div className="space-y-2">
-                <div className="text-xs font-semibold text-[var(--color-primary-text)]">{persona.focus}</div>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">{persona.title}</h3>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{persona.desc}</p>
+      <section id="personas" className="scroll-mt-24 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]/40 px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                Built around your stage
               </div>
-              <button
-                onClick={onStartOnboarding}
-                className="mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs font-medium text-[var(--color-primary-text)] flex items-center justify-between group"
-              >
-                <span>Select Persona</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-              </button>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                Tailored for every career stage
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                CareerPilot adapts its priorities, recommendations and roadmaps to where
+                you are starting from.
+              </p>
             </div>
-          ))}
+          </Reveal>
+
+          <Stagger inView gap={0.07} className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
+            {[
+              {
+                id: 'student',
+                title: 'Student',
+                focus: 'Fundamentals & Internships',
+                desc: 'Foundational coursework, first GitHub repositories, internships, and portfolio development.',
+              },
+              {
+                id: 'fresh_grad',
+                title: 'Fresh Graduate',
+                focus: 'Employability & Proof',
+                desc: 'Bridging academic-to-industry gaps, CV optimization, targeted entry applications, and interview prep.',
+              },
+              {
+                id: 'working_pro',
+                title: 'Working Professional',
+                focus: 'Progression & Promotion',
+                desc: 'Advanced specialization, quantifiable achievements, leadership evidence, and market positioning.',
+              },
+              {
+                id: 'career_switcher',
+                title: 'Career Switcher',
+                focus: 'Transferable Skills',
+                desc: 'Identifying transferable strengths, targeted transition roadmaps, and proof-of-skill portfolio pieces.',
+              },
+              {
+                id: 'exploring',
+                title: 'Exploring',
+                focus: 'Discovery & Fit',
+                desc: 'Comparing emerging disciplines, understanding market compensations, and discovering your optimal path.',
+              },
+            ].map((persona) => (
+              <StaggerItem key={persona.id}>
+                <div className="flex h-full flex-col justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-primary-text)]">
+                      {persona.focus}
+                    </div>
+                    <h3 className="text-base font-bold text-[var(--text-primary)]">{persona.title}</h3>
+                    <p className="text-xs leading-relaxed text-[var(--text-secondary)]">{persona.desc}</p>
+                  </div>
+                  <button
+                    onClick={onStartOnboarding}
+                    className="group mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3 text-xs font-medium text-[var(--color-primary-text)] transition-colors hover:text-[var(--text-primary)]"
+                  >
+                    <span>Select Persona</span>
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
+                  </button>
+                </div>
+              </StaggerItem>
+            ))}
+          </Stagger>
         </div>
       </section>
 
       {/* Target Roles Preview */}
-      <section id="roles" className="px-6 py-20 bg-[var(--surface-secondary)]/50 border-t border-[var(--border-subtle)]">
-        <div className="max-w-7xl mx-auto space-y-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-                Structured Target Roles
-              </h2>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">
-                Explore comprehensive skill profiles, salary benchmarks, and interview topics.
-              </p>
-            </div>
-            <button
-              onClick={onExploreRoles}
-              className="text-xs font-semibold text-[var(--color-primary-text)] flex items-center gap-1 hover:underline"
-            >
-              <span>View All 8 Roles Catalog</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {TARGET_ROLES.slice(0, 3).map((role) => (
-              <div
-                key={role.id}
-                className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-[var(--text-primary)]">{role.title}</h3>
-                    <div className="text-xs text-[var(--text-muted)]">{role.category} · {role.level}</div>
-                  </div>
-                  <span className="text-xs font-mono font-medium text-[var(--color-success-strong)] bg-[var(--color-success-surface)] px-2 py-0.5 rounded">
-                    {role.salaryRange.split(' ')[0]}
-                  </span>
+      <section id="roles" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                  Target roles
                 </div>
-
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2">
-                  {role.overview}
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                  Structured role profiles
+                </h2>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                  Explore comprehensive skill profiles, salary benchmarks, and interview
+                  topics.
                 </p>
-
-                <div className="pt-2 border-t border-[var(--border-subtle)] space-y-2">
-                  <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Required Skills</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {role.requiredSkills.slice(0, 4).map((skill, idx) => (
-                      <span key={idx} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
-                        {skill.name} (Lvl {skill.minLevel})
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  onClick={onExploreRoles}
-                  className="w-full py-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-xs font-medium text-[var(--color-primary-text)] transition-colors"
-                >
-                  View Role Breakdown →
-                </button>
               </div>
+              <button
+                onClick={onExploreRoles}
+                className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[var(--color-primary-text)] transition-colors hover:underline"
+              >
+                <span>View All {TARGET_ROLES.length} Roles</span>
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </Reveal>
+
+          <Stagger inView gap={0.09} className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {FEATURED_ROLES.map((role) => (
+              <StaggerItem key={role.id}>
+                <div className="flex h-full flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-bold text-[var(--text-primary)]">{role.title}</h3>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {role.category} · {role.level}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded bg-[var(--color-success-surface)] px-2 py-0.5 font-mono text-xs font-medium text-[var(--color-success-strong)]">
+                      {role.salaryRange.startsWith('$') ? role.salaryRange.split(' ')[0] : 'Varies'}
+                    </span>
+                  </div>
+
+                  <p className="mt-4 line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+                    {role.overview}
+                  </p>
+
+                  <div className="mt-auto space-y-2 border-t border-[var(--color-border)] pt-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      Required Skills
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {role.requiredSkills.slice(0, 4).map((skill, idx) => (
+                        <span
+                          key={idx}
+                          className="rounded bg-[var(--color-surface-secondary)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+                        >
+                          {skill.name} (Lvl {skill.minLevel})
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={onExploreRoles}
+                    className="mt-4 w-full rounded-lg bg-[var(--color-surface-secondary)] py-2 text-xs font-medium text-[var(--color-primary-text)] transition-colors hover:bg-[var(--color-accent-surface)]"
+                  >
+                    View Role Breakdown →
+                  </button>
+                </div>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       </section>
 
-      {/* CTA Footer */}
-      <section className="px-6 py-20 max-w-4xl mx-auto text-center space-y-6">
-        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[var(--text-primary)]">
-          Take command of your career trajectory today.
-        </h2>
-        <p className="text-sm text-[var(--text-secondary)] max-w-xl mx-auto">
-          No generic advice. No disconnected templates. Just one unified operating system designed to get you hired and promoted.
-        </p>
-        <div className="pt-4">
-          <button
-            onClick={onStartOnboarding}
-            className="px-8 py-3.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] font-semibold text-sm hover:bg-[var(--accent-secondary)] transition-all shadow-md inline-flex items-center gap-2"
-          >
-            <span>Start Your Career Journey</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+      {/* Final CTA */}
+      <section className="relative overflow-hidden px-6 py-20">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 cp-brand-wash-strong" />
+        <div className="relative mx-auto max-w-3xl text-center">
+          <Reveal>
+            <h2 className="text-balance text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+              Your next career move starts here.
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-[var(--text-secondary)]">
+              One workspace that carries you from ambition to a direction, a roadmap, real
+              evidence, a sharper CV and the opportunities that follow.
+            </p>
+            <div className="mt-8">
+              <button
+                onClick={onStartOnboarding}
+                className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-8 py-3.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-sm transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-[var(--color-primary-hover)] hover:shadow-lg active:translate-y-0 active:scale-[0.98]"
+              >
+                <span>Start Your Career Journey</span>
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </button>
+            </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Quiet Footer */}
-      <footer className="border-t border-[var(--border-subtle)] px-6 py-8 text-xs text-[var(--text-muted)] max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>© 2026 CareerPilot AI. Personal Career Operating System.</div>
-        <div className="flex items-center gap-6">
-          <span>Privacy</span>
-          <span>Terms</span>
-          <span>Status</span>
-          <span>English / العربية</span>
+      <footer className="border-t border-[var(--color-border)] px-6 py-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 text-xs text-[var(--text-muted)]">
+          <Logo variant="full" className="h-10 w-auto self-start sm:h-12" />
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <div>© 2026 CareerPilot AI. Personal Career Operating System.</div>
+            <div className="flex items-center gap-6">
+              <span>Privacy</span>
+              <span>Terms</span>
+              <span>Status</span>
+              <span>English / العربية</span>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

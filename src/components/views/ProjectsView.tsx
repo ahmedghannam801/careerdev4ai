@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, FolderGit2, ExternalLink, Github, CheckCircle2, Clock, X } from 'lucide-react';
+import { Plus, ExternalLink, Github, X } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { ProjectStatus, CareerProject } from '../../types/career';
+import { ProjectStatus } from '../../types/career';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const ProjectsView: React.FC = () => {
-  const { projects, addProject, updateProject, deleteProject, targetRole } = useCareer();
+  const { projects, addProject, updateProject, deleteProject } = useCareer();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -47,7 +48,7 @@ export const ProjectsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -84,11 +85,11 @@ export const ProjectsView: React.FC = () => {
       </div>
 
       {/* Projects List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredProjects.map((project) => (
-          <div
+          <StaggerItem
             key={project.id}
-            className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 flex flex-col justify-between shadow-xs hover:border-[var(--border-strong)] transition-all"
+            className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 flex flex-col justify-between shadow-xs hover:border-[var(--border-strong)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md"
           >
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -133,7 +134,7 @@ export const ProjectsView: React.FC = () => {
                 <ul className="text-xs text-[var(--text-secondary)] space-y-1">
                   {project.deliverables.map((deliv, i) => (
                     <li key={i} className="flex items-center gap-1.5">
-                      <span className="text-[var(--color-primary-text)] font-bold">✓</span>
+                      <span className="text-[var(--color-primary-text)] font-bold">✍</span>
                       <span>{deliv}</span>
                     </li>
                   ))}
@@ -175,9 +176,9 @@ export const ProjectsView: React.FC = () => {
                 Delete
               </button>
             </div>
-          </div>
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       {/* Add Project Modal */}
       {showAddModal && (
@@ -284,6 +285,6 @@ export const ProjectsView: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

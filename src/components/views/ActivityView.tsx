@@ -7,17 +7,16 @@ import {
   Award, 
   FolderGit2, 
   FileText, 
-  Calendar, 
   Filter, 
   ArrowRight,
-  Clock,
-  Sparkles
+  Clock
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { ActivityActionType } from '../../types/career';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
-  const { activities, t } = useCareer();
+  const { activities } = useCareer();
   const [filterType, setFilterType] = useState<string>('all');
 
   const getActionIcon = (type: ActivityActionType) => {
@@ -56,7 +55,7 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
       });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <Reveal className="space-y-6">
       {/* Top Banner */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -118,13 +117,13 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
             <p>Complete tasks, submit applications, or drill interview questions to record activity.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <Stagger inView gap={0.06} className="space-y-3">
             {filteredActivities.map((act) => {
               const Icon = getActionIcon(act.actionType);
               return (
-                <div 
+                <StaggerItem
                   key={act.id}
-                  className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)]/40 transition-colors flex items-center justify-between gap-4"
+                  className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)]/40 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md flex items-center justify-between gap-4"
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-[var(--accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center shrink-0">
@@ -161,12 +160,12 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
                       <ArrowRight className="w-3 h-3" />
                     </button>
                   )}
-                </div>
+                </StaggerItem>
               );
             })}
-          </div>
+          </Stagger>
         )}
       </div>
-    </div>
+    </Reveal>
   );
 };

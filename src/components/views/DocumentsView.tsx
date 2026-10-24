@@ -13,6 +13,7 @@ import {
   FileCode
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { 
@@ -130,7 +131,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <Reveal className="space-y-6">
       {/* Top Header */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -225,11 +226,11 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           </div>
 
           {/* Documents Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredDocs.map((doc) => (
-              <div 
+              <StaggerItem
                 key={doc.id}
-                className="p-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)]/40 transition-colors flex flex-col justify-between space-y-4"
+                className="p-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)]/40 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between space-y-4"
               >
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
@@ -291,9 +292,9 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                     </button>
                   </div>
                 </div>
-              </div>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       )}
 
@@ -318,11 +319,11 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             </button>
           </div>
 
-          <div className="space-y-3">
+          <Stagger inView gap={0.06} className="space-y-3">
             {cvVersions.map((version) => (
-              <div 
+              <StaggerItem
                 key={version.id}
-                className="p-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)]/40 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                className="p-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--accent-primary)]/40 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -375,9 +376,9 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                     </button>
                   )}
                 </div>
-              </div>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       )}
 
@@ -597,6 +598,6 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           </div>
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

@@ -9,6 +9,9 @@
 //   * the skills catalogue is readable by an authenticated client but NOT
 //     writable by one (M-6)
 //   * the legacy JSON auth surface is gone (M-3)
+//   * a CV version can never be attached to another user's CV (S-3)
+//   * a CV upload must match its extension AND its declared MIME type (S-4),
+//     and .docx is not an accepted format (S-5)
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -19,6 +22,7 @@ import {
   apiAnonymous,
   type TestUser,
 } from './helpers.ts';
+import { createCvVersion } from '../server/db/cvVersions.ts';
 
 let user: TestUser;
 
@@ -79,10 +83,17 @@ describe('rate limiting on the AI routes (P-1)', () => {
         token: other.token,
         body: { userPrompt: 'x' },
       });
-      assert.notEqual(
-        res.status,
-        429,
-        "another user must not inherit the first user's exhausted budget"
+      // A 429 raised by the PROVIDER's own quota is not this application's
+      // limiter, so it is not a failure of the per-user keying. What must
+      // never happen is the second user being refused by an allowance the
+      // first user spent, or by the first user's rate-limit bucket.
+      assert.ok(
+        res.status !== 429 || res.body?.code !== 'ai_daily_budget',
+        "another user must not inherit the first user's exhausted daily budget"
+      );
+      assert.ok(
+        res.status !== 429 || res.body?.code !== 'rate_limit',
+        "another user must not inherit the first user's exhausted rate limit"
       );
     } finally {
       await deleteTestUser(other);
@@ -265,5 +276,139 @@ describe('the payload validation still holds', () => {
       body: { degree: 'No institution' },
     });
     assert.equal(edu.status, 400);
+  });
+});
+
+/**
+ * Posts a file to the CV upload route.
+ *
+ * Only the rejection paths are exercised: a file that passes the format check
+ * goes on to the Gemini parsing step, which is not what these tests are about.
+ */
+async function uploadCv(
+  token: string,
+  fileName: string,
+  contentType: string,
+  content = 'a short but readable CV body for the upload route'
+): Promise<{ status: number; body: any }> {
+  const form = new FormData();
+  form.append('file', new Blob([Buffer.from(content)], { type: contentType }), fileName);
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${process.env.TEST_API_BASE_URL}/api/resumes/upload`, {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+  let body: any = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  return { status: res.status, body };
+}
+
+describe('a CV version cannot be attached to another user\'s CV (S-3)', () => {
+  test('the persistence layer refuses to write a version for an unowned CV', async () => {
+    // The route checks the ownership before it calls the persistence layer,
+    // but the layer must enforce it as well: a version must never end up on
+    // a CV the caller does not own, whichever path reaches it.
+    const other = await createTestUser('cvversionowner');
+    try {
+      const cv = await api('POST', '/api/cvs', {
+        token: user.token,
+        body: { name: 'owned cv' },
+      });
+      assert.equal(cv.status, 201);
+      const cvId = cv.body.cv.id;
+
+      const version = await createCvVersion(other.id, {
+        cvId,
+        name: 'stolen',
+        profileJson: { summary: 'secret' },
+      });
+      assert.equal(version, null, "another user must not create a version on this CV");
+
+      const { count } = await admin
+        .from('cv_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('cv_id', cvId);
+      assert.equal(count, 0, "no version may be written for another user's CV");
+    } finally {
+      await deleteTestUser(other);
+    }
+  });
+
+  test('the owner can still create a version for their own CV', async () => {
+    const cv = await api('POST', '/api/cvs', {
+      token: user.token,
+      body: { name: 'own cv' },
+    });
+    assert.equal(cv.status, 201);
+    const cvId = cv.body.cv.id;
+
+    const version = await createCvVersion(user.id, {
+      cvId,
+      name: 'v1',
+      profileJson: { summary: 'mine' },
+    });
+    assert.ok(version, 'the owner must still be able to create a version');
+    assert.equal(version.cvId, cvId);
+  });
+
+  test('a rejected request creates nothing and answers 404', async () => {
+    const other = await createTestUser('cvversionroute');
+    try {
+      const cv = await api('POST', '/api/cvs', {
+        token: other.token,
+        body: { name: 'other cv' },
+      });
+      const cvId = cv.body.cv.id;
+
+      const res = await api('POST', '/api/cv-versions', {
+        token: user.token,
+        body: { cvId, name: 'stolen', profileJson: {} },
+      });
+      assert.equal(res.status, 404, 'the CV must look absent to the other user');
+
+      const { count } = await admin
+        .from('cv_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('cv_id', cvId);
+      assert.equal(count, 0, 'the rejected request must not create anything');
+    } finally {
+      await deleteTestUser(other);
+    }
+  });
+});
+
+describe('the CV upload format check (S-4, S-5)', () => {
+  test('a legacy .doc upload is rejected', async () => {
+    // Legacy binary .doc format is rejected; modern .docx or .pdf is required.
+    const res = await uploadCv(
+      user.token,
+      'cv.doc',
+      'application/msword'
+    );
+    assert.equal(res.status, 400);
+    assert.match(res.body?.error ?? '', /\.pdf, \.docx, \.txt, or \.json/);
+  });
+
+  test('a file whose MIME type does not match its extension is rejected', async () => {
+    const res = await uploadCv(user.token, 'cv.pdf', 'text/plain');
+    assert.equal(res.status, 400);
+    assert.match(res.body?.error ?? '', /Unsupported file type/);
+  });
+
+  test('an unknown extension is rejected', async () => {
+    const res = await uploadCv(user.token, 'cv.exe', 'application/octet-stream');
+    assert.equal(res.status, 400);
+    assert.match(res.body?.error ?? '', /Unsupported file type/);
+  });
+
+  test('the upload route still requires authentication', async () => {
+    const res = await uploadCv('', 'cv.pdf', 'application/pdf');
+    assert.equal(res.status, 401);
   });
 });

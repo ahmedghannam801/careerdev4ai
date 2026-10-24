@@ -6,23 +6,18 @@ import {
   Bell, 
   Shield, 
   Download, 
-  RotateCcw, 
-  Check, 
   User, 
   Mail, 
   Key, 
   Trash2, 
   Sparkles, 
   Lock, 
-  Unlock, 
-  ExternalLink, 
   AlertTriangle, 
-  X,
-  Smartphone,
   Laptop
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
+import { Reveal } from '../motion/Motion';
 
 /**
  * A short, honest description of the browser this session is running in.
@@ -48,9 +43,8 @@ const getClientLabel = (): string => {
 };
 
 export const SettingsView: React.FC = () => {
-  const { 
-    currentUser, 
-    profile, 
+  const {
+    profile,
     updateProfile, 
     settings, 
     updateSettings, 
@@ -61,9 +55,7 @@ export const SettingsView: React.FC = () => {
     privacyPreferences, 
     updatePrivacyPreferences, 
     validateUsername, 
-    exportDataJson, 
-    resetAllData, 
-    t 
+    exportDataJson,
   } = useCareer();
 
   const [activeTab, setActiveTab] = useState<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface'>('account');
@@ -281,7 +273,7 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200 max-w-5xl">
+    <Reveal className="space-y-6 max-w-5xl">
       {/* Top Header */}
       <div className="pb-3 border-b border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
@@ -825,7 +817,7 @@ export const SettingsView: React.FC = () => {
               )}
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
                 <button type="button" onClick={() => setChangePasswordOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Update Password</button>
+                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">Update Password</button>
               </div>
             </form>
           </div>
@@ -866,7 +858,7 @@ export const SettingsView: React.FC = () => {
               )}
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
                 <button type="button" onClick={() => setChangeEmailOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold">Update Email</button>
+                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">Update Email</button>
               </div>
             </form>
           </div>
@@ -909,6 +901,6 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

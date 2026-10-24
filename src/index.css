@@ -155,4 +155,142 @@
     background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
     color: var(--color-primary-text);
   }
+
+  /* --------------------------------------------------------------------
+   * Focus states
+   * ------------------------------------------------------------------
+   * A single, always-visible focus ring for every interactive element.
+   * `:focus-visible` keeps it out of the way of mouse users while still
+   * guaranteeing a keyboard user can always see where they are.
+   */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* Elements that provide their own visible focus treatment opt out. */
+  :where(a, button, input, select, textarea, summary, [tabindex])[data-focus-ring="none"]:focus-visible {
+    outline: none;
+  }
+
+  /* --------------------------------------------------------------------
+   * Press feedback
+   * ------------------------------------------------------------------
+   * Every button answers a press with a tiny scale-down. It reads as a
+   * physical click and costs nothing in performance. Components driven by
+   * the `motion` library set their own transform inline, which wins over
+   * this rule, so the two never fight.
+   */
+  button:not([data-press="none"]) {
+    transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  button:not([data-press="none"]):active {
+    transform: scale(0.98);
+  }
+
+  button:disabled {
+    transform: none;
+  }
+
+  /* --------------------------------------------------------------------
+   * Reduced motion
+   * ------------------------------------------------------------------
+   * CSS-driven movement stops entirely when the visitor asks for reduced
+   * motion. The `motion` library handles its own animations through
+   * `useReducedMotion`, so this rule only covers plain CSS transitions and
+   * keyframes. Loading and status feedback stays visible — only movement
+   * is removed.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* ------------------------------------------------------------------
+   * Skeleton loading placeholder
+   * -----------------------------------------------------------------
+   * A calm, branded shimmer used instead of an abrupt blank area while a
+   * panel's content is still arriving. Built from the same surface and
+   * border tokens as everything else.
+   */
+  .cp-skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--color-surface-secondary);
+    border-radius: 0.5rem;
+  }
+
+  .cp-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--color-text-primary) 6%, transparent) 50%,
+      transparent 100%
+    );
+    animation: cp-shimmer 1.6s infinite;
+  }
+
+  @keyframes cp-shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cp-skeleton::after {
+      animation: none;
+      opacity: 0;
+    }
+  }
+
+  /* ------------------------------------------------------------------
+   * Brand gradient wash
+   * -----------------------------------------------------------------
+   * A restrained decorative gradient built from the approved palette. It
+   * is used sparingly — behind the hero and the final call to action —
+   * so the interface stays calm rather than colourful.
+   */
+  .cp-brand-wash {
+    background-image:
+      radial-gradient(
+        70% 55% at 12% 8%,
+        color-mix(in srgb, var(--color-accent) 38%, transparent) 0%,
+        transparent 62%
+      ),
+      radial-gradient(
+        60% 50% at 88% 4%,
+        color-mix(in srgb, var(--color-primary) 14%, transparent) 0%,
+        transparent 58%
+      );
+  }
+
+  .cp-brand-wash-strong {
+    background-image:
+      radial-gradient(
+        80% 65% at 18% 0%,
+        color-mix(in srgb, var(--color-accent) 52%, transparent) 0%,
+        transparent 66%
+      ),
+      radial-gradient(
+        70% 60% at 92% 12%,
+        color-mix(in srgb, var(--color-primary) 22%, transparent) 0%,
+        transparent 62%
+      );
+  }
 }

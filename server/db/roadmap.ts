@@ -399,6 +399,41 @@ export async function addMilestone(
 }
 
 /**
+ * A stable natural key for a roadmap task.
+ *
+ * Regenerating a roadmap produces a fresh tree, so the database ids change.
+ * The key identifies "the same task" across regenerations: the skill it
+ * targets plus its title. Both are produced deterministically by the
+ * generator, so an unchanged task keeps its key.
+ */
+function taskProgressKey(skillName: string | null | undefined, title: string): string {
+  return `${(skillName ?? '').trim().toLowerCase()}::${title.trim().toLowerCase()}`;
+}
+
+/**
+ * Reads the progress on the profile's current roadmap.
+ *
+ * Used so a regenerated roadmap does not silently throw away work the
+ * learner has already completed.
+ */
+async function captureTaskProgress(
+  profileId: string
+): Promise<Map<string, RoadmapTaskStatus>> {
+  const progress = new Map<string, RoadmapTaskStatus>();
+  const roadmap = await getRoadmap(profileId);
+  if (!roadmap) return progress;
+
+  for (const phase of roadmap.phases ?? []) {
+    for (const milestone of phase.milestones ?? []) {
+      for (const task of milestone.tasks ?? []) {
+        progress.set(taskProgressKey(task.skillName, task.title), task.status);
+      }
+    }
+  }
+  return progress;
+}
+
+/**
  * Creates a complete roadmap — phases, milestones and tasks — in one call.
  *
  * The frontend used to generate this tree locally and never persist it, which
@@ -407,39 +442,148 @@ export async function addMilestone(
  * REAL database ids so the client can address the persisted rows.
  *
  * A profile has at most one roadmap (UNIQUE profile_id), so an existing
- * roadmap is replaced: its phases cascade away with it.
+ * roadmap is replaced: its phases cascade away with it. The learner’s
+ * progress is NOT lost — the status of every task that still exists in the
+ * new tree is carried across, keyed by skill name and title.
  */
 export async function createRoadmapWithTree(
   profileId: string,
   input: CreateRoadmapInput & { phases?: RoadmapTreePhaseInput[] }
 ): Promise<RoadmapDTO> {
+  const priorProgress = await captureTaskProgress(profileId);
+
   const existing = await getRoadmap(profileId);
   if (existing) {
     await deleteRoadmap(profileId);
   }
 
   const roadmap = await createRoadmap(profileId, input);
+  const phasesInput = input.phases ?? [];
 
-  for (const phaseInput of input.phases ?? []) {
-    const phase = await addPhase(profileId, roadmap.id, {
-      phaseNumber: phaseInput.phaseNumber,
-      title: phaseInput.title,
-      description: phaseInput.description,
-      isUnlocked: phaseInput.isUnlocked,
-    });
-    if (!phase) continue;
+  if (phasesInput.length === 0) {
+    return roadmap;
+  }
 
-    for (const milestoneInput of phaseInput.milestones ?? []) {
-      const milestone = await addMilestone(profileId, phase.id, {
-        title: milestoneInput.title,
-        description: milestoneInput.description,
+  // 1. Batch insert phases
+  const phasePayloads = phasesInput.map((phaseInput, index) => ({
+    roadmap_id: roadmap.id,
+    phase_number: phaseInput.phaseNumber,
+    title: phaseInput.title,
+    description: phaseInput.description ?? null,
+    is_unlocked: phaseInput.isUnlocked ?? true,
+    sort_order: index,
+  }));
+
+  const { data: insertedPhases, error: phaseError } = await getSupabaseServer()
+    .from('roadmap_phases')
+    .insert(phasePayloads)
+    .select('id, phase_number, sort_order');
+  if (phaseError) throw phaseError;
+
+  const sortedPhases = ((insertedPhases ?? []) as Array<{ id: string; sort_order: number }>)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  // 2. Prepare and batch insert milestones
+  const milestonePayloads: Array<{
+    phase_id: string;
+    title: string;
+    description: string | null;
+    sort_order: number;
+  }> = [];
+
+  for (let pIdx = 0; pIdx < phasesInput.length; pIdx++) {
+    const phaseInput = phasesInput[pIdx];
+    const phaseRow = sortedPhases[pIdx];
+    if (!phaseRow) continue;
+
+    const milestones = phaseInput.milestones ?? [];
+    for (let mIdx = 0; mIdx < milestones.length; mIdx++) {
+      const mInput = milestones[mIdx];
+      milestonePayloads.push({
+        phase_id: phaseRow.id,
+        title: mInput.title,
+        description: mInput.description ?? null,
+        sort_order: mIdx,
       });
-      if (!milestone) continue;
+    }
+  }
 
-      for (const taskInput of milestoneInput.tasks ?? []) {
-        await addTask(profileId, phase.id, milestone.id, taskInput);
+  let insertedMilestones: Array<{ id: string; phase_id: string; sort_order: number }> = [];
+  if (milestonePayloads.length > 0) {
+    const { data, error: milestoneError } = await getSupabaseServer()
+      .from('roadmap_milestones')
+      .insert(milestonePayloads)
+      .select('id, phase_id, sort_order');
+    if (milestoneError) throw milestoneError;
+    insertedMilestones = (data ?? []) as Array<{ id: string; phase_id: string; sort_order: number }>;
+  }
+
+  // Group milestones by phase_id and sort_order
+  const milestonesByPhase = new Map<string, Array<{ id: string; sort_order: number }>>();
+  for (const m of insertedMilestones) {
+    const list = milestonesByPhase.get(m.phase_id) ?? [];
+    list.push(m);
+    milestonesByPhase.set(m.phase_id, list);
+  }
+  for (const list of milestonesByPhase.values()) {
+    list.sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  // 3. Prepare and batch insert tasks
+  const taskPayloads: Array<{
+    milestone_id: string;
+    title: string;
+    description: string | null;
+    status: RoadmapTaskStatus;
+    skill_id: string | null;
+    skill_name: string | null;
+    deadline: string | null;
+    resource_id: string | null;
+    resource_title: string | null;
+    evidence_id: string | null;
+    estimated_hours: number | null;
+    sort_order: number;
+  }> = [];
+
+  for (let pIdx = 0; pIdx < phasesInput.length; pIdx++) {
+    const phaseRow = sortedPhases[pIdx];
+    if (!phaseRow) continue;
+    const phaseMilestones = milestonesByPhase.get(phaseRow.id) ?? [];
+
+    const pInput = phasesInput[pIdx];
+    for (let mIdx = 0; mIdx < (pInput.milestones ?? []).length; mIdx++) {
+      const milestoneRow = phaseMilestones[mIdx];
+      if (!milestoneRow) continue;
+
+      const mInput = pInput.milestones[mIdx];
+      for (let tIdx = 0; tIdx < (mInput.tasks ?? []).length; tIdx++) {
+        const tInput = mInput.tasks[tIdx];
+        const prior = priorProgress.get(taskProgressKey(tInput.skillName, tInput.title));
+        const status = (prior && prior !== 'not_started' ? prior : (tInput.status ?? 'not_started')) as RoadmapTaskStatus;
+
+        taskPayloads.push({
+          milestone_id: milestoneRow.id,
+          title: tInput.title,
+          description: tInput.description ?? null,
+          status,
+          skill_id: tInput.skillId ?? null,
+          skill_name: tInput.skillName ?? null,
+          deadline: tInput.deadline ?? null,
+          resource_id: tInput.resourceId ?? null,
+          resource_title: tInput.resourceTitle ?? null,
+          evidence_id: tInput.evidenceId ?? null,
+          estimated_hours: tInput.estimatedHours ?? null,
+          sort_order: tIdx,
+        });
       }
     }
+  }
+
+  if (taskPayloads.length > 0) {
+    const { error: taskError } = await getSupabaseServer()
+      .from('roadmap_tasks')
+      .insert(taskPayloads);
+    if (taskError) throw taskError;
   }
 
   return (await getRoadmap(profileId)) ?? roadmap;

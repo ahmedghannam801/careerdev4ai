@@ -1,3 +1,15 @@
+/**
+ * Career types.
+ *
+ * `SkillCategory` and `TargetRole` now live in `shared/` so that the API and
+ * the frontend describe roles with exactly the same contract. They are
+ * re-exported here because every existing frontend import points at this
+ * module.
+ */
+export type { SkillCategory, TargetRole, RoleSkill } from '../../shared/careerTypes.ts';
+
+import type { SkillCategory, TargetRole } from '../../shared/careerTypes.ts';
+
 export type CareerState = 
   | 'student' 
   | 'fresh_graduate' 
@@ -17,16 +29,6 @@ export type CareerGoal =
   | 'explore_careers'
   | 'custom';
 
-export type SkillCategory = 
-  | 'technical'
-  | 'analytical'
-  | 'business'
-  | 'communication'
-  | 'leadership'
-  | 'tools'
-  | 'domain'
-  | 'soft_skills';
-
 export type SkillSource = 
   | 'self_reported'
   | 'ai_estimated'
@@ -45,25 +47,6 @@ export interface UserSkill {
   source: SkillSource;
   evidenceIds: string[];
   lastUpdated: string;
-}
-
-export interface TargetRole {
-  id: string;
-  title: string;
-  category: string;
-  level: 'Entry' | 'Entry-Mid' | 'Mid' | 'Senior' | 'Lead';
-  overview: string;
-  responsibilities: string[];
-  requiredSkills: { name: string; category: SkillCategory; minLevel: number }[];
-  preferredSkills: { name: string; category: SkillCategory; minLevel: number }[];
-  tools: string[];
-  experienceExpectation: string;
-  salaryRange: string;
-  typicalProjects: string[];
-  certifications: string[];
-  interviewTopics: string[];
-  careerProgression: string[];
-  relatedRoles: string[];
 }
 
 export interface CareerAnalysis {
@@ -114,21 +97,6 @@ export interface RoadmapPhase {
   description: string;
   milestones: RoadmapMilestone[];
   isUnlocked: boolean;
-}
-
-export interface LearningResource {
-  id: string;
-  title: string;
-  provider: string;
-  skill: string;
-  skillCategory: SkillCategory;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-  duration: string;
-  cost: 'Free' | 'Paid';
-  language: 'English' | 'Arabic' | 'Bilingual';
-  url: string;
-  prerequisites: string[];
-  recommendationReason: string;
 }
 
 export type ProjectStatus = 'idea' | 'planned' | 'in_progress' | 'completed' | 'published';
@@ -384,16 +352,6 @@ export interface AiProposedAction {
   status: 'pending' | 'accepted' | 'declined';
 }
 
-export interface CareerPathNode {
-  id: string;
-  title: string;
-  level: string;
-  typicalYears: string;
-  salaryRange: string;
-  description: string;
-  nextSteps: string[];
-}
-
 export interface UserEducationEntry {
   id: string;
   institution: string;
@@ -570,5 +528,26 @@ export interface ProfileCompletenessBreakdown {
     impactWeight: number;
     targetView: string;
   }[];
+}
+
+export interface CareerContextSummary {
+  profile: any;
+  careerGoal?: string;
+  targetRole: TargetRole;
+  skills: UserSkill[];
+  skillGaps: string[];
+  experience: UserExperienceEntry[];
+  education: UserEducationEntry[];
+  projects: CareerProject[];
+  evidence: EvidenceItem[];
+  roadmap: RoadmapPhase[];
+  learningProgress: any[];
+  preferences: {
+    aiPreferences: AiPreferences;
+    notificationPreferences: NotificationPreferences;
+    privacyPreferences: PrivacyPreferences;
+  };
+  cv: CVProfile;
+  applications: JobApplication[];
 }
 

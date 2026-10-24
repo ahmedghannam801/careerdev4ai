@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  User, 
   Mail, 
   Phone, 
   MapPin, 
-  Globe, 
   Briefcase, 
   GraduationCap, 
   Award, 
@@ -14,18 +12,15 @@ import {
   Plus, 
   Trash2, 
   Sparkles, 
-  CheckCircle2, 
   ExternalLink, 
   Eye, 
   Share2, 
   Lock, 
   Unlock, 
-  Copy, 
   Check, 
   FileText,
-  AlertCircle,
   X,
-  Camera
+  Smile
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { 
@@ -34,6 +29,8 @@ import {
   UserCertificationEntry, 
   UserLanguageEntry 
 } from '../../types/career';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { CareerPilotAvatar, AvatarSelector } from '../ui/CareerPilotAvatars';
 
 export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const {
@@ -47,13 +44,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     validateUsername,
     aiPreferences,
     privacyPreferences,
-    t
   } = useCareer();
 
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
 
   // Modals state
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [selectedAvatarId, setSelectedAvatarId] = useState(profile.avatarUrl || 'avatar-01');
   const [editBasicOpen, setEditBasicOpen] = useState(false);
   const [editSummaryOpen, setEditSummaryOpen] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
@@ -225,6 +223,19 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       setEditSummaryOpen(false);
     } catch (e: any) {
       setSaveError(e?.message || 'Failed to save your profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAvatar = async () => {
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await updateProfile({ avatarUrl: selectedAvatarId });
+      setAvatarModalOpen(false);
+    } catch (e: any) {
+      setSaveError(e.message || 'Failed to save avatar.');
     } finally {
       setSaving(false);
     }
@@ -491,7 +502,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     ) : null;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <Reveal className="space-y-8">
       {/* A failed DELETE has no modal of its own, so the error is surfaced
           as a page-level banner. */}
       {saveError && !aModalIsOpen && (
@@ -511,17 +522,21 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
             <div className="relative group">
-              <img
-                src={profile.avatarUrl}
-                alt={profile.name}
-                className="w-24 h-24 rounded-2xl object-cover border-2 border-[var(--border-subtle)] shadow-xs group-hover:border-[var(--accent-primary)] transition-colors"
+              <CareerPilotAvatar
+                avatarId={profile.avatarUrl}
+                className="w-24 h-24 rounded-2xl border-2 border-[var(--border-subtle)] shadow-xs group-hover:border-[var(--accent-primary)] transition-colors cursor-pointer"
               />
               <button
-                onClick={() => setEditBasicOpen(true)}
-                className="absolute -bottom-2 -right-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] shadow-xs"
-                title="Change Photo / Edit Profile"
+                type="button"
+                onClick={() => {
+                  setSelectedAvatarId(profile.avatarUrl || 'avatar-01');
+                  setAvatarModalOpen(true);
+                }}
+                className="absolute -bottom-2 -right-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] shadow-xs transition-colors"
+                title="Choose CareerPilot Avatar"
+                aria-label="Choose CareerPilot Avatar"
               >
-                <Camera className="w-3.5 h-3.5" />
+                <Smile className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -1039,11 +1054,11 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <Stagger inView gap={0.06} className="grid grid-cols-2 gap-2.5">
             {profile.languages.map((l) => (
-              <div 
+              <StaggerItem 
                 key={l.id}
-                className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between"
+                className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md"
               >
                 <div>
                   <div className="text-xs font-bold text-[var(--text-primary)]">
@@ -1059,9 +1074,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
-              </div>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
 
         {/* Links */}
@@ -1315,6 +1330,57 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Choose CareerPilot Avatar */}
+      {avatarModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">
+                  Choose Your CareerPilot Avatar
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Select a curated illustrated avatar that represents your professional profile.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAvatarModalOpen(false)}
+                className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <AvatarSelector
+              selectedId={selectedAvatarId}
+              onSelect={(id) => setSelectedAvatarId(id)}
+            />
+
+            {renderSaveError()}
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
+              <button
+                type="button"
+                onClick={() => setAvatarModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-secondary)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAvatar}
+                disabled={saving}
+                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save Avatar'}
               </button>
             </div>
           </div>
@@ -1577,10 +1643,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="p-6 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-6">
               {/* Header Preview */}
               <div className="flex items-center gap-5">
-                <img
-                  src={profile.avatarUrl}
-                  alt={profile.name}
-                  className="w-20 h-20 rounded-2xl object-cover border border-[var(--border-subtle)]"
+                <CareerPilotAvatar
+                  avatarId={profile.avatarUrl}
+                  className="w-20 h-20 rounded-2xl border border-[var(--border-subtle)]"
                 />
                 <div className="space-y-1">
                   <h1 className="text-xl font-bold text-[var(--text-primary)]">
@@ -1733,7 +1798,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleSaveEdu}
                 disabled={saving}
-                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50 hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]"
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
@@ -1811,7 +1876,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleSaveCert}
                 disabled={saving}
-                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50 hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]"
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
@@ -1857,7 +1922,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <button
                 onClick={handleSaveLang}
                 disabled={saving}
-                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50 hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]"
               >
                 {saving ? 'Saving...' : 'Add'}
               </button>
@@ -1865,6 +1930,6 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

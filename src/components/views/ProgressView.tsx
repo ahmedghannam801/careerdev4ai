@@ -1,6 +1,7 @@
 import React from 'react';
-import { Award, Layers, FolderGit2, Briefcase, Target, ShieldCheck, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Award, Layers, FolderGit2, Briefcase, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const ProgressView: React.FC = () => {
   const { 
@@ -10,8 +11,7 @@ export const ProgressView: React.FC = () => {
     projects, 
     evidenceItems, 
     applications, 
-    interviewSessions, 
-    analysis 
+    interviewSessions,
   } = useCareer();
 
   const totalTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks)).length;
@@ -24,7 +24,7 @@ export const ProgressView: React.FC = () => {
   const activeApplications = applications.filter(a => !['rejected', 'withdrawn'].includes(a.stage));
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
@@ -40,8 +40,8 @@ export const ProgressView: React.FC = () => {
       </div>
 
       {/* 4 Primary Progress Pillars */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
+      <Stagger inView gap={0.06} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <Award className="w-4 h-4 text-[var(--color-success-strong)]" />
             <span>Mastered Skills</span>
@@ -52,9 +52,9 @@ export const ProgressView: React.FC = () => {
           <div className="text-xs text-[var(--text-muted)]">
             {inProgressSkills.length} actively advancing
           </div>
-        </div>
+        </StaggerItem>
 
-        <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
+        <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <Layers className="w-4 h-4 text-[var(--color-primary-text)]" />
             <span>Roadmap Completion</span>
@@ -65,9 +65,9 @@ export const ProgressView: React.FC = () => {
           <div className="text-xs text-[var(--text-muted)]">
             {completedTasks} of {totalTasks} tasks done
           </div>
-        </div>
+        </StaggerItem>
 
-        <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
+        <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <FolderGit2 className="w-4 h-4 text-[var(--color-info)]" />
             <span>Shipped Projects</span>
@@ -78,9 +78,9 @@ export const ProgressView: React.FC = () => {
           <div className="text-xs text-[var(--text-muted)]">
             {evidenceItems.length} verified artifacts
           </div>
-        </div>
+        </StaggerItem>
 
-        <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
+        <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <Briefcase className="w-4 h-4 text-[var(--color-warning)]" />
             <span>Active Pipeline</span>
@@ -91,8 +91,8 @@ export const ProgressView: React.FC = () => {
           <div className="text-xs text-[var(--text-muted)]">
             {interviewSessions.length} mock sessions recorded
           </div>
-        </div>
-      </div>
+        </StaggerItem>
+      </Stagger>
 
       {/* Progress Breakdown Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -140,6 +140,6 @@ export const ProgressView: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 };

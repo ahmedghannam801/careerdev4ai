@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { KeyRound, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { Logo } from '../brand/Logo';
+import { backdropVariants, dialogVariants } from '../../lib/motion';
+import { useFocusTrap, useScrollLock } from '../../lib/overlay';
 
 /**
  * Shown only when Supabase reports a `PASSWORD_RECOVERY` session, which is
@@ -16,6 +20,11 @@ export const PasswordRecoveryModal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion() ?? false;
+
+  useScrollLock(!!passwordRecovery);
+  useFocusTrap(!!passwordRecovery, panelRef);
 
   // A fresh link must never show a stale password or a previous success state.
   useEffect(() => {
@@ -27,7 +36,6 @@ export const PasswordRecoveryModal: React.FC = () => {
     setSaving(false);
   }, [passwordRecovery]);
 
-  if (!passwordRecovery) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,13 +68,29 @@ export const PasswordRecoveryModal: React.FC = () => {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="password-recovery-title"
-    >
-      <div className="w-full max-w-md bg-[var(--surface-main)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl p-6 sm:p-8 space-y-5">
+    <AnimatePresence>
+      {passwordRecovery && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            variants={backdropVariants(reduced)}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          />
+          <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="password-recovery-title"
+            className="relative w-full max-w-md space-y-5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 shadow-2xl sm:p-8"
+            variants={dialogVariants(reduced)}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+        <Logo variant="full" className="h-10 sm:h-11 w-auto" />
         <div className="flex items-center gap-2.5 border-b border-[var(--border-subtle)] pb-4">
           <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center">
             <KeyRound className="w-4 h-4" />
@@ -167,7 +191,9 @@ export const PasswordRecoveryModal: React.FC = () => {
             </button>
           </form>
         )}
-      </div>
-    </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 };

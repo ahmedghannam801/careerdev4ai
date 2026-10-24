@@ -5,6 +5,7 @@
 //
 // Ownership: derived from the owning CV (cv_id -> cvs.profile_id).
 import { getSupabaseServer } from './supabase';
+import { getCv } from './cvs';
 
 export interface CvVersionDTO {
   id: string;
@@ -87,11 +88,20 @@ export async function getCvVersion(
   return data ? toDTO(data as CvVersionRow) : null;
 }
 
-/** Creates the next version number for the given CV. */
+/**
+ * Creates the next version number for the given CV.
+ *
+ * The CV must belong to the profile: ownership is established before anything
+ * is written, so a caller can never attach a version to another user's CV.
+ * Returns null when the CV is not owned by the profile.
+ */
 export async function createCvVersion(
   profileId: string,
   input: CreateCvVersionInput
-): Promise<CvVersionDTO> {
+): Promise<CvVersionDTO | null> {
+  const owned = await getCv(profileId, input.cvId);
+  if (!owned) return null;
+
   const { data: existing, error: countError } = await getSupabaseServer()
     .from('cv_versions')
     .select('version_number')
