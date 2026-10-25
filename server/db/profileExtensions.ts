@@ -10,6 +10,7 @@
 // Ownership: profile_id = auth.users.id; the id is always the verified
 // Supabase user id, never a client-supplied value.
 import { getSupabaseServer } from './supabase';
+import { normalizeDateValue } from './dates';
 
 // ---- certifications ----
 
@@ -78,8 +79,8 @@ export async function createCertification(
       profile_id: profileId,
       name: input.name,
       issuer: input.issuer ?? null,
-      issue_date: input.issueDate ?? null,
-      expiry_date: input.expiryDate ?? null,
+      issue_date: input.issueDate ? normalizeDateValue(input.issueDate).date : null,
+      expiry_date: input.expiryDate ? normalizeDateValue(input.expiryDate).date : null,
       url: input.url ?? null,
       credential_id: input.credentialId ?? null,
     })
@@ -97,8 +98,12 @@ export async function updateCertification(
   const patch: Record<string, unknown> = {};
   if (updates.name !== undefined) patch.name = updates.name;
   if (updates.issuer !== undefined) patch.issuer = updates.issuer ?? null;
-  if (updates.issueDate !== undefined) patch.issue_date = updates.issueDate ?? null;
-  if (updates.expiryDate !== undefined) patch.expiry_date = updates.expiryDate ?? null;
+  if (updates.issueDate !== undefined) {
+    patch.issue_date = updates.issueDate ? normalizeDateValue(updates.issueDate).date : null;
+  }
+  if (updates.expiryDate !== undefined) {
+    patch.expiry_date = updates.expiryDate ? normalizeDateValue(updates.expiryDate).date : null;
+  }
   if (updates.url !== undefined) patch.url = updates.url ?? null;
   if (updates.credentialId !== undefined) patch.credential_id = updates.credentialId ?? null;
   // Remove keys whose value is undefined — the Supabase client would otherwise

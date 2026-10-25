@@ -181,7 +181,12 @@ export async function postCvVersion(input: {
 
 export async function patchCvVersion(
   id: string,
-  updates: { name?: string; profileJson?: unknown; atsAnalysis?: unknown }
+  updates: {
+    name?: string;
+    targetRoleTitle?: string;
+    profileJson?: unknown;
+    atsAnalysis?: unknown;
+  }
 ): Promise<CvVersionDTO> {
   const data = await request<{ success: boolean; version: CvVersionDTO }>(
     `/api/cv-versions/${id}`,

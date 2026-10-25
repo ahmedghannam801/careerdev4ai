@@ -235,6 +235,10 @@ export async function listRoadmaps(profileId: string): Promise<RoadmapDTO[]> {
     .from('roadmap_phases')
     .select('id, roadmap_id, phase_number, title, description, is_unlocked, sort_order')
     .in('roadmap_id', roadmapIds)
+    // Negative phase numbers are the staging representation used while a
+    // replacement roadmap is being written. They are never part of the
+    // roadmap the user sees.
+    .gte('phase_number', 1)
     .order('sort_order', { ascending: true });
   if (phaseError) throw phaseError;
   const phases = (phaseRows ?? []) as PhaseRow[];
@@ -434,44 +438,70 @@ async function captureTaskProgress(
 }
 
 /**
- * Creates a complete roadmap — phases, milestones and tasks — in one call.
- *
- * The frontend used to generate this tree locally and never persist it, which
- * meant a new user had no roadmap row at all. The tree is written bottom-up so
- * every foreign key is satisfied in order, and the returned DTO carries the
- * REAL database ids so the client can address the persisted rows.
- *
- * A profile has at most one roadmap (UNIQUE profile_id), so an existing
- * roadmap is replaced: its phases cascade away with it. The learner’s
- * progress is NOT lost — the status of every task that still exists in the
- * new tree is carried across, keyed by skill name and title.
+ * Phase rows being staged for a replacement are inserted with a negative
+ * phase number and a sort order above every real phase. `listRoadmaps` only
+ * returns phase_number >= 1, so a half-written replacement is never visible to
+ * the user, and a failed attempt can be deleted without touching the roadmap
+ * they are currently using.
  */
-export async function createRoadmapWithTree(
-  profileId: string,
-  input: CreateRoadmapInput & { phases?: RoadmapTreePhaseInput[] }
-): Promise<RoadmapDTO> {
-  const priorProgress = await captureTaskProgress(profileId);
+const STAGING_SORT_BASE = 1_000_000;
 
-  const existing = await getRoadmap(profileId);
-  if (existing) {
-    await deleteRoadmap(profileId);
+interface TreePhase {
+  phaseNumber: number;
+  title: string;
+  description?: string;
+  isUnlocked?: boolean;
+  milestones: Array<{
+    title: string;
+    description?: string;
+    tasks: CreateRoadmapTaskInput[];
+  }>;
+}
+
+interface InsertedTree {
+  phaseRows: Array<{ id: string; sortOrder: number }>;
+  milestoneCount: number;
+  taskCount: number;
+}
+
+/**
+ * Normalises the phase numbers of a generated tree. The generator produces
+ * 1..N, but a malformed client payload must not make the final swap violate the
+ * UNIQUE (roadmap_id, phase_number) constraint.
+ */
+function finalPhaseNumbers(phases: TreePhase[]): number[] {
+  const used = new Set<number>();
+  const numbers: number[] = [];
+  for (let index = 0; index < phases.length; index += 1) {
+    const requested = phases[index].phaseNumber;
+    let candidate =
+      Number.isInteger(requested) && requested > 0 ? requested : index + 1;
+    while (used.has(candidate)) candidate += 1;
+    used.add(candidate);
+    numbers.push(candidate);
   }
+  return numbers;
+}
 
-  const roadmap = await createRoadmap(profileId, input);
-  const phasesInput = input.phases ?? [];
-
-  if (phasesInput.length === 0) {
-    return roadmap;
-  }
-
-  // 1. Batch insert phases
-  const phasePayloads = phasesInput.map((phaseInput, index) => ({
-    roadmap_id: roadmap.id,
-    phase_number: phaseInput.phaseNumber,
-    title: phaseInput.title,
-    description: phaseInput.description ?? null,
-    is_unlocked: phaseInput.isUnlocked ?? true,
-    sort_order: index,
+/**
+ * Inserts a complete tree under an existing roadmap row. `staging` controls
+ * only the phase_number/sort_order representation; milestones and tasks are
+ * identical in both modes.
+ */
+async function insertRoadmapTree(
+  roadmapId: string,
+  phases: TreePhase[],
+  priorProgress: Map<string, RoadmapTaskStatus>,
+  staging: boolean
+): Promise<InsertedTree> {
+  const numbers = finalPhaseNumbers(phases);
+  const phasePayloads = phases.map((phase, index) => ({
+    roadmap_id: roadmapId,
+    phase_number: staging ? -(index + 1) : numbers[index],
+    title: phase.title,
+    description: phase.description ?? null,
+    is_unlocked: phase.isUnlocked ?? true,
+    sort_order: staging ? STAGING_SORT_BASE + index : index,
   }));
 
   const { data: insertedPhases, error: phaseError } = await getSupabaseServer()
@@ -480,29 +510,30 @@ export async function createRoadmapWithTree(
     .select('id, phase_number, sort_order');
   if (phaseError) throw phaseError;
 
-  const sortedPhases = ((insertedPhases ?? []) as Array<{ id: string; sort_order: number }>)
-    .sort((a, b) => a.sort_order - b.sort_order);
+  const sortedPhases = ((insertedPhases ?? []) as Array<{
+    id: string;
+    sort_order: number;
+  }>).sort((a, b) => a.sort_order - b.sort_order);
+  if (sortedPhases.length !== phasePayloads.length) {
+    throw new Error(
+      `Roadmap phase insert returned ${sortedPhases.length} of ${phasePayloads.length} rows`
+    );
+  }
 
-  // 2. Prepare and batch insert milestones
   const milestonePayloads: Array<{
     phase_id: string;
     title: string;
     description: string | null;
     sort_order: number;
   }> = [];
-
-  for (let pIdx = 0; pIdx < phasesInput.length; pIdx++) {
-    const phaseInput = phasesInput[pIdx];
+  for (let pIdx = 0; pIdx < phases.length; pIdx += 1) {
     const phaseRow = sortedPhases[pIdx];
-    if (!phaseRow) continue;
-
-    const milestones = phaseInput.milestones ?? [];
-    for (let mIdx = 0; mIdx < milestones.length; mIdx++) {
-      const mInput = milestones[mIdx];
+    const milestones = phases[pIdx].milestones ?? [];
+    for (let mIdx = 0; mIdx < milestones.length; mIdx += 1) {
       milestonePayloads.push({
         phase_id: phaseRow.id,
-        title: mInput.title,
-        description: mInput.description ?? null,
+        title: milestones[mIdx].title,
+        description: milestones[mIdx].description ?? null,
         sort_order: mIdx,
       });
     }
@@ -515,21 +546,28 @@ export async function createRoadmapWithTree(
       .insert(milestonePayloads)
       .select('id, phase_id, sort_order');
     if (milestoneError) throw milestoneError;
-    insertedMilestones = (data ?? []) as Array<{ id: string; phase_id: string; sort_order: number }>;
+    insertedMilestones = (data ?? []) as Array<{
+      id: string;
+      phase_id: string;
+      sort_order: number;
+    }>;
+    if (insertedMilestones.length !== milestonePayloads.length) {
+      throw new Error(
+        `Roadmap milestone insert returned ${insertedMilestones.length} of ${milestonePayloads.length} rows`
+      );
+    }
   }
 
-  // Group milestones by phase_id and sort_order
   const milestonesByPhase = new Map<string, Array<{ id: string; sort_order: number }>>();
-  for (const m of insertedMilestones) {
-    const list = milestonesByPhase.get(m.phase_id) ?? [];
-    list.push(m);
-    milestonesByPhase.set(m.phase_id, list);
+  for (const milestone of insertedMilestones) {
+    const list = milestonesByPhase.get(milestone.phase_id) ?? [];
+    list.push({ id: milestone.id, sort_order: milestone.sort_order });
+    milestonesByPhase.set(milestone.phase_id, list);
   }
   for (const list of milestonesByPhase.values()) {
     list.sort((a, b) => a.sort_order - b.sort_order);
   }
 
-  // 3. Prepare and batch insert tasks
   const taskPayloads: Array<{
     milestone_id: string;
     title: string;
@@ -545,21 +583,20 @@ export async function createRoadmapWithTree(
     sort_order: number;
   }> = [];
 
-  for (let pIdx = 0; pIdx < phasesInput.length; pIdx++) {
+  for (let pIdx = 0; pIdx < phases.length; pIdx += 1) {
     const phaseRow = sortedPhases[pIdx];
-    if (!phaseRow) continue;
     const phaseMilestones = milestonesByPhase.get(phaseRow.id) ?? [];
-
-    const pInput = phasesInput[pIdx];
-    for (let mIdx = 0; mIdx < (pInput.milestones ?? []).length; mIdx++) {
+    const pInput = phases[pIdx];
+    for (let mIdx = 0; mIdx < pInput.milestones.length; mIdx += 1) {
       const milestoneRow = phaseMilestones[mIdx];
       if (!milestoneRow) continue;
-
       const mInput = pInput.milestones[mIdx];
-      for (let tIdx = 0; tIdx < (mInput.tasks ?? []).length; tIdx++) {
+      for (let tIdx = 0; tIdx < (mInput.tasks ?? []).length; tIdx += 1) {
         const tInput = mInput.tasks[tIdx];
         const prior = priorProgress.get(taskProgressKey(tInput.skillName, tInput.title));
-        const status = (prior && prior !== 'not_started' ? prior : (tInput.status ?? 'not_started')) as RoadmapTaskStatus;
+        const status = (
+          prior && prior !== 'not_started' ? prior : (tInput.status ?? 'not_started')
+        ) as RoadmapTaskStatus;
 
         taskPayloads.push({
           milestone_id: milestoneRow.id,
@@ -580,13 +617,192 @@ export async function createRoadmapWithTree(
   }
 
   if (taskPayloads.length > 0) {
-    const { error: taskError } = await getSupabaseServer()
+    const { data, error: taskError } = await getSupabaseServer()
       .from('roadmap_tasks')
-      .insert(taskPayloads);
+      .insert(taskPayloads)
+      .select('id');
     if (taskError) throw taskError;
+    if ((data ?? []).length !== taskPayloads.length) {
+      throw new Error(
+        `Roadmap task insert returned ${(data ?? []).length} of ${taskPayloads.length} rows`
+      );
+    }
   }
 
-  return (await getRoadmap(profileId)) ?? roadmap;
+  return {
+    phaseRows: sortedPhases.map((row) => ({ id: row.id, sortOrder: row.sort_order })),
+    milestoneCount: insertedMilestones.length,
+    taskCount: taskPayloads.length,
+  };
+}
+
+/** Removes any staged (negative-numbered) phase left by an earlier attempt. */
+async function cleanupStagedPhases(roadmapId: string): Promise<void> {
+  const { error } = await getSupabaseServer()
+    .from('roadmap_phases')
+    .delete()
+    .eq('roadmap_id', roadmapId)
+    .lt('phase_number', 0);
+  if (error) {
+    console.warn('Failed to clean up staged roadmap phases:', error);
+  }
+}
+
+/** Maps a persisted roadmap back to the input shape used to rebuild it. */
+function roadmapDtoToTree(roadmap: RoadmapDTO): TreePhase[] {
+  return roadmap.phases.map((phase) => ({
+    phaseNumber: phase.phaseNumber,
+    title: phase.title,
+    description: phase.description ?? undefined,
+    isUnlocked: phase.isUnlocked,
+    milestones: phase.milestones.map((milestone) => ({
+      title: milestone.title,
+      description: milestone.description ?? undefined,
+      tasks: milestone.tasks.map((task) => ({
+        title: task.title,
+        description: task.description ?? undefined,
+        status: task.status,
+        skillId: task.skillId ?? undefined,
+        skillName: task.skillName ?? undefined,
+        deadline: task.deadline ?? undefined,
+        resourceId: task.resourceId ?? undefined,
+        resourceTitle: task.resourceTitle ?? undefined,
+        evidenceId: task.evidenceId ?? undefined,
+        estimatedHours: task.estimatedHours ?? undefined,
+      })),
+    })),
+  }));
+}
+
+/**
+ * Creates or replaces the profile's roadmap in stages.
+ *
+ * A profile has at most one roadmap (UNIQUE profile_id), so a replacement
+ * cannot be inserted as a second roadmap. Instead the new tree is written
+ * under the existing roadmap with negative phase numbers, which `listRoadmaps`
+ * never returns. Only after every phase, milestone and task has been inserted
+ * and counted does the old tree get deleted and the staged phases receive their
+ * real phase numbers. If anything fails before that swap, the staged rows are
+ * removed and the user's previous roadmap is untouched.
+ *
+ * The learner's task progress is preserved across the replacement by the
+ * skill-name + title key used by `captureTaskProgress`.
+ */
+export async function createRoadmapWithTree(
+  profileId: string,
+  input: CreateRoadmapInput & { phases?: RoadmapTreePhaseInput[] }
+): Promise<RoadmapDTO> {
+  const priorProgress = await captureTaskProgress(profileId);
+  const phasesInput = (input.phases ?? []) as TreePhase[];
+  const existing = await getRoadmap(profileId);
+
+  if (!existing) {
+    const roadmap = await createRoadmap(profileId, input);
+    if (phasesInput.length === 0) return roadmap;
+    try {
+      await insertRoadmapTree(roadmap.id, phasesInput, priorProgress, false);
+      return (await getRoadmap(profileId)) ?? roadmap;
+    } catch (error) {
+      // No previous roadmap existed, so the only safe state is no roadmap at
+      // all rather than a half-built tree.
+      await deleteRoadmap(profileId);
+      throw error;
+    }
+  }
+
+  await cleanupStagedPhases(existing.id);
+  const oldPhaseIds = existing.phases.map((phase) => phase.id);
+  const previousMetadata = {
+    title: existing.title,
+    targetRoleTitle: existing.targetRoleTitle,
+    isEnrolled: existing.isEnrolled,
+  };
+
+  let inserted: InsertedTree | null = null;
+  let oldTreeDeleted = false;
+
+  try {
+    inserted = await insertRoadmapTree(existing.id, phasesInput, priorProgress, true);
+
+    // The previous tree is removed only after every replacement row exists.
+    // This must also happen for an intentionally empty tree: replacing a
+    // roadmap with zero phases means the old phases are gone, not kept.
+    if (oldPhaseIds.length > 0) {
+      const { error: deleteError } = await getSupabaseServer()
+        .from('roadmap_phases')
+        .delete()
+        .in('id', oldPhaseIds);
+      if (deleteError) throw deleteError;
+      oldTreeDeleted = true;
+    }
+
+    if (phasesInput.length > 0) {
+      // Finalise phase numbers in one upsert statement, not N round trips.
+      const numbers = finalPhaseNumbers(phasesInput);
+      const finalRows = inserted.phaseRows.map((row, index) => ({
+        id: row.id,
+        roadmap_id: existing.id,
+        phase_number: numbers[index],
+        title: phasesInput[index].title,
+        description: phasesInput[index].description ?? null,
+        is_unlocked: phasesInput[index].isUnlocked ?? true,
+        sort_order: index,
+      }));
+      const { error: finaliseError } = await getSupabaseServer()
+        .from('roadmap_phases')
+        .upsert(finalRows, { onConflict: 'id' });
+      if (finaliseError) throw finaliseError;
+    }
+
+    const { error: metadataError } = await getSupabaseServer()
+      .from('roadmaps')
+      .update({
+        title: input.title,
+        target_role_title: input.targetRoleTitle ?? null,
+        is_enrolled: input.isEnrolled ?? previousMetadata.isEnrolled,
+      })
+      .eq('id', existing.id)
+      .eq('profile_id', profileId);
+    if (metadataError) throw metadataError;
+
+    return (await getRoadmap(profileId)) ?? existing;
+  } catch (error) {
+    // Roll back to a state the user can keep using.
+    try {
+      if (!oldTreeDeleted) {
+        await cleanupStagedPhases(existing.id);
+      } else {
+        // The old tree was deleted but finalisation failed. Remove every row
+        // written by this attempt and rebuild the previous tree exactly as it
+        // was, including task statuses.
+        await getSupabaseServer()
+          .from('roadmap_phases')
+          .delete()
+          .eq('roadmap_id', existing.id);
+        await insertRoadmapTree(
+          existing.id,
+          roadmapDtoToTree(existing),
+          new Map(),
+          false
+        );
+      }
+      await getSupabaseServer()
+        .from('roadmaps')
+        .update({
+          title: previousMetadata.title,
+          target_role_title: previousMetadata.targetRoleTitle,
+          is_enrolled: previousMetadata.isEnrolled,
+        })
+        .eq('id', existing.id)
+        .eq('profile_id', profileId);
+    } catch (rollbackError) {
+      console.error(
+        'Roadmap replacement failed and the previous roadmap could not be restored:',
+        rollbackError
+      );
+    }
+    throw error;
+  }
 }
 
 /** Enrols the profile in its roadmap (the app shows an enrolment gate). */

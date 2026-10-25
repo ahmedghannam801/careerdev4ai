@@ -1,30 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, Check, Upload, FileText, Sparkles, Layers } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ArrowRight, ArrowLeft, Check, Upload, FileText, Sparkles, Layers, Search } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CareerState, CareerGoal } from '../../types/career';
-import { TARGET_ROLES, CAREER_DOMAINS } from '../../data/rolesData';
+import { TARGET_ROLES, CAREER_DOMAINS, searchCareerCatalog } from '../../data/rolesData';
 import { Reveal } from '../motion/Motion';
 import { CVImportModal } from '../cv/CVImportModal';
 import { AvatarSelector, DEFAULT_AVATAR_ID } from '../ui/CareerPilotAvatars';
 
 /**
- * The roles grouped by career domain.
- *
- * The catalogue spans every major career domain, so a flat list of eighty
- * roles is not browsable. Grouping by domain keeps the choice legible
- * without hiding anything.
+ * The roles are grouped by career domain. The catalogue spans every major
+ * career domain, so a flat list of eighty roles is not browsable; the search
+ * box above the list narrows it with the shared fuzzy matcher.
  */
-const GROUPED_ROLES = CAREER_DOMAINS.map((domain) => ({
-  domain,
-  roles: TARGET_ROLES.filter((role) => role.domainId === domain.slug),
-})).filter((group) => group.roles.length > 0);
-
 interface OnboardingViewProps {
   onComplete: () => void;
 }
 
 export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) => {
-  const { profile, updateProfile, setCareerState, setCareerGoal, setPrimaryTargetRole, targetRole, skills, updateSkillLevel } = useCareer();
+  const { profile, updateProfile, setCareerState, setCareerGoal, setPrimaryTargetRole, skills, updateSkillLevel } = useCareer();
   const [step, setStep] = useState<number>(1);
 
   // Form states
@@ -33,7 +26,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   const [location, setLocation] = useState(profile.location || '');
   const [selectedGoal, setSelectedGoal] = useState<CareerGoal>(profile.careerGoal || 'get_promoted');
   const [customGoal, setCustomGoal] = useState('');
-  const [selectedRoleId, setSelectedRoleId] = useState(targetRole.id || 'frontend-engineer');
+  const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [roleQuery, setRoleQuery] = useState('');
   const [showCvModal, setShowCvModal] = useState(false);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>(profile.avatarUrl || DEFAULT_AVATAR_ID);
   const [isSaving, setIsSaving] = useState(false);
@@ -44,6 +38,30 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     if (profile.location && !location) setLocation(profile.location);
     if (profile.avatarUrl && profile.avatarUrl !== selectedAvatarId) setSelectedAvatarId(profile.avatarUrl);
   }, [profile.currentTitle, profile.location, profile.avatarUrl]);
+
+  /**
+   * Role search uses the shared catalogue matcher, the same one the global
+   * search and the role explorer use. With no query the catalogue stays
+   * grouped by domain; a query narrows it to the real matches.
+   */
+  const roleMatches = useMemo(
+    () =>
+      roleQuery.trim()
+        ? searchCareerCatalog(roleQuery, { limit: 60 }).roles.map((match) => match.role)
+        : null,
+    [roleQuery]
+  );
+
+  const groupedRoles = useMemo(() => {
+    const roles = roleMatches ?? TARGET_ROLES;
+    return CAREER_DOMAINS.map((domain) => ({
+      domain,
+      roles: roles.filter((role) => role.domainId === domain.slug),
+    })).filter((group) => group.roles.length > 0);
+  }, [roleMatches]);
+
+  const selectedRoleTitle =
+    TARGET_ROLES.find((role) => role.id === selectedRoleId)?.title ?? '';
 
   const handleNext = async () => {
     if (isSaving) return;
@@ -67,8 +85,11 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         );
         setStep(4);
       } else if (step === 4) {
-        const roleToSave = selectedRoleId || targetRole?.id || 'frontend-engineer';
-        const persisted = await setPrimaryTargetRole(roleToSave);
+        if (!selectedRoleId) {
+          setSaveError('Choose the role you are targeting before continuing.');
+          return;
+        }
+        const persisted = await setPrimaryTargetRole(selectedRoleId);
         if (!persisted) {
           throw new Error('The target role and roadmap were not persisted');
         }
@@ -337,8 +358,46 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
               </p>
             </div>
 
+            <div className="space-y-2">
+              <label
+                htmlFor="onboarding-role-search"
+                className="block text-xs font-semibold text-[var(--text-secondary)]"
+              >
+                Search the role catalogue
+              </label>
+              <div className="relative">
+                <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  id="onboarding-role-search"
+                  type="search"
+                  value={roleQuery}
+                  onChange={(event) => setRoleQuery(event.target.value)}
+                  placeholder="Try “data analyst”, “HR”, “nurse” or “supply chain”"
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 text-[11px] text-[var(--text-muted)]">
+                <span>
+                  {roleMatches
+                    ? `${roleMatches.length} matching role${roleMatches.length === 1 ? '' : 's'}`
+                    : `${TARGET_ROLES.length} roles across ${CAREER_DOMAINS.length} domains`}
+                </span>
+                {selectedRoleTitle && (
+                  <span className="text-[var(--color-primary-text)] font-semibold">
+                    Selected: {selectedRoleTitle}
+                  </span>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-              {GROUPED_ROLES.map((group) => (
+              {groupedRoles.length === 0 && (
+                <div className="p-4 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 text-xs text-[var(--text-secondary)]">
+                  No role matches “{roleQuery.trim()}”. Try a broader term such as the domain
+                  (“data”, “design”, “healthcare”) or clear the search to browse every domain.
+                </div>
+              )}
+              {groupedRoles.map((group) => (
                 <div key={group.domain.slug} className="space-y-2">
                   <div className="sticky top-0 z-10 flex items-center gap-2 bg-[var(--surface-main)]/95 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] backdrop-blur">
                     <Layers className="h-3 w-3" />
@@ -365,11 +424,11 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                           Expectation: {role.experienceExpectation}
                         </div>
                       </div>
-                  {selectedRoleId === role.id && (
-                    <div className="w-5 h-5 rounded-full bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center shrink-0 mt-0.5">
-                      <Check className="w-3 h-3" />
-                    </div>
-                  )}
+                      {selectedRoleId === role.id && (
+                        <div className="w-5 h-5 rounded-full bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center shrink-0 mt-0.5">
+                          <Check className="w-3 h-3" />
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -449,6 +508,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
               {saveError}
             </div>
           )}
+          {step === 4 && !selectedRoleId && !saveError && (
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              Select the role you are targeting to continue. Your skill gaps and roadmap are
+              generated from this choice.
+            </p>
+          )}
           <div className="flex items-center justify-between">
             {step > 1 ? (
               <button
@@ -496,8 +561,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         isOpen={showCvModal}
         onClose={() => setShowCvModal(false)}
         onImportComplete={() => {
-          if (profile.currentTitle) setCurrentTitle(profile.currentTitle);
-          if (profile.location) setLocation(profile.location);
           setShowCvModal(false);
         }}
         onStartFromScratch={() => setShowCvModal(false)}

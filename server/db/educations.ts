@@ -16,6 +16,7 @@
 // column on write and are not returned separately — the same lossy flattening
 // the aggregate endpoint produced, so the frontend contract is unchanged.
 import { getSupabaseServer } from './supabase';
+import { normalizeDateRange, normalizeDateValue } from './dates';
 
 export interface EducationDTO {
   id: string;
@@ -118,6 +119,7 @@ export async function createEducation(
   userId: string,
   input: CreateEducationInput
 ): Promise<EducationDTO> {
+  const dates = normalizeDateRange(input.startDate, input.endDate, input.isCurrent);
   const { data, error } = await getSupabaseServer()
     .from('educations')
     .insert({
@@ -125,9 +127,9 @@ export async function createEducation(
       institution: input.institution,
       degree: input.degree ?? null,
       field_of_study: input.field ?? null,
-      start_date: input.startDate ?? null,
-      end_date: input.isCurrent ? null : (input.endDate ?? null),
-      is_current: input.isCurrent ?? false,
+      start_date: dates.startDate,
+      end_date: dates.endDate,
+      is_current: dates.isCurrent,
       description: educationDescription(input.description, input.gpa, input.coursework),
     })
     .select(EDUCATION_COLUMNS)
@@ -145,9 +147,15 @@ export async function updateEducation(
   if (updates.institution !== undefined) patch.institution = updates.institution;
   if (updates.degree !== undefined) patch.degree = updates.degree;
   if (updates.field !== undefined) patch.field_of_study = updates.field;
-  if (updates.startDate !== undefined) patch.start_date = updates.startDate;
-  if (updates.endDate !== undefined) patch.end_date = updates.endDate;
-  if (updates.isCurrent !== undefined) patch.is_current = updates.isCurrent;
+  if (updates.startDate !== undefined) {
+    patch.start_date = normalizeDateValue(updates.startDate).date;
+  }
+  if (updates.endDate !== undefined || updates.isCurrent !== undefined) {
+    const end = normalizeDateValue(updates.endDate);
+    const current = updates.isCurrent ?? end.isCurrent;
+    patch.is_current = current || end.isCurrent;
+    patch.end_date = current || end.isCurrent ? null : end.date;
+  }
   if (
     updates.description !== undefined ||
     updates.gpa !== undefined ||

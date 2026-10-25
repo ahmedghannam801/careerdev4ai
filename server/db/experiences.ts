@@ -22,6 +22,7 @@
 // returned separately — the same lossy flattening the aggregate endpoint
 // produced, kept here so the existing frontend contract is unchanged.
 import { getSupabaseServer } from './supabase';
+import { normalizeDateRange, normalizeDateValue } from './dates';
 
 export interface ExperienceDTO {
   id: string;
@@ -126,6 +127,7 @@ export async function createExperience(
   userId: string,
   input: CreateExperienceInput
 ): Promise<ExperienceDTO> {
+  const dates = normalizeDateRange(input.startDate, input.endDate, input.isCurrent);
   const { data, error } = await getSupabaseServer()
     .from('experiences')
     .insert({
@@ -134,9 +136,9 @@ export async function createExperience(
       job_title: input.role,
       employment_type: input.employmentType ?? null,
       location: input.location ?? null,
-      start_date: input.startDate ?? null,
-      end_date: input.isCurrent ? null : (input.endDate ?? null),
-      is_current: input.isCurrent ?? false,
+      start_date: dates.startDate,
+      end_date: dates.endDate,
+      is_current: dates.isCurrent,
       description: experienceDescription(input.description, input.achievements),
     })
     .select(EXPERIENCE_COLUMNS)
@@ -155,9 +157,15 @@ export async function updateExperience(
   if (updates.company !== undefined) patch.company = updates.company;
   if (updates.employmentType !== undefined) patch.employment_type = updates.employmentType;
   if (updates.location !== undefined) patch.location = updates.location;
-  if (updates.startDate !== undefined) patch.start_date = updates.startDate;
-  if (updates.endDate !== undefined) patch.end_date = updates.endDate;
-  if (updates.isCurrent !== undefined) patch.is_current = updates.isCurrent;
+  if (updates.startDate !== undefined) {
+    patch.start_date = normalizeDateValue(updates.startDate).date;
+  }
+  if (updates.endDate !== undefined || updates.isCurrent !== undefined) {
+    const end = normalizeDateValue(updates.endDate);
+    const current = updates.isCurrent ?? end.isCurrent;
+    patch.is_current = current || end.isCurrent;
+    patch.end_date = current || end.isCurrent ? null : end.date;
+  }
   if (updates.description !== undefined || updates.achievements !== undefined) {
     patch.description = experienceDescription(updates.description, updates.achievements);
   }

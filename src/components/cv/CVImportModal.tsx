@@ -1,7 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, Check, AlertCircle, X, ChevronDown, ChevronUp, Sparkles, ArrowRight } from 'lucide-react';
+import { Upload, FileText, Check, AlertCircle, AlertTriangle, Info, X, ChevronDown, ChevronUp, Sparkles, ArrowRight, ExternalLink } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { CVProfile } from '../../types/career';
+import {
+  CVProfile,
+  CvExtractionMetadata,
+  CvExtractionQuality,
+  CvImportResult,
+} from '../../types/career';
 
 interface CVImportModalProps {
   isOpen: boolean;
@@ -26,6 +31,9 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
 
   // Review step state
   const [extractedData, setExtractedData] = useState<CVProfile | null>(null);
+  const [extraction, setExtraction] = useState<CvExtractionMetadata | null>(null);
+  const [extractionQuality, setExtractionQuality] = useState<CvExtractionQuality | null>(null);
+  const [importResult, setImportResult] = useState<CvImportResult | null>(null);
   const [step, setStep] = useState<'input' | 'review'>('input');
   const [isImporting, setIsImporting] = useState(false);
 
@@ -75,6 +83,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
 
   const handleExtract = async () => {
     setExtractionError(null);
+    setImportResult(null);
     setIsExtracting(true);
 
     try {
@@ -89,6 +98,8 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
           throw new Error(res.error || 'Failed to extract CV information.');
         }
         setExtractedData(res.cv);
+        setExtraction(res.extraction ?? null);
+        setExtractionQuality(res.extractionQuality ?? null);
         setStep('review');
       } else if (activeTab === 'paste') {
         if (!pastedText.trim() || pastedText.trim().length < 20) {
@@ -101,6 +112,8 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
           throw new Error(res.error || 'Failed to extract pasted CV information.');
         }
         setExtractedData(res.cv);
+        setExtraction(res.extraction ?? null);
+        setExtractionQuality(res.extractionQuality ?? null);
         setStep('review');
       }
     } catch (err: any) {
@@ -112,17 +125,33 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
   };
 
   const handleConfirmImport = async () => {
-    if (!extractedData) return;
+    if (!extractedData || isImporting) return;
+    if (!Object.values(selectedSections).some(Boolean)) {
+      setExtractionError('Select at least one section to import.');
+      return;
+    }
+    setImportResult(null);
+    setExtractionError(null);
     setIsImporting(true);
     try {
-      await importExtractedCvData(extractedData, selectedSections);
+      const result = await importExtractedCvData(extractedData, selectedSections);
+      setImportResult(result);
+      if (!result.success) {
+        setExtractionError(
+          'Some selected information could not be imported. The rows that already succeeded are listed below; retrying only adds what is still missing.'
+        );
+        return;
+      }
       if (onImportComplete) {
         onImportComplete();
       }
       onClose();
     } catch (err: any) {
       console.error('CV Import Failed:', err);
-      setExtractionError(err.message || 'Failed to apply imported CV data.');
+      setExtractionError(
+        err?.message ||
+          'The reviewed information could not be imported. Nothing was hidden: check the fields and try again.'
+      );
     } finally {
       setIsImporting(false);
     }
@@ -136,6 +165,37 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const overallConfidence = extraction ? Math.round(extraction.confidence.overall) : null;
+  const quality: CvExtractionQuality | null =
+    extractionQuality ??
+    (overallConfidence === null
+      ? null
+      : overallConfidence >= 80
+        ? 'high'
+        : overallConfidence >= 55
+          ? 'medium'
+          : 'low');
+  const result = importResult;
+  const hasSelection = Object.values(selectedSections).some(Boolean);
+
+  const confidenceBadge = (score: number | null) => {
+    if (score === null) return null;
+    const tone =
+      score >= 80
+        ? 'text-[var(--color-success-strong)] border-[var(--color-success-strong)]/25 bg-[var(--color-success-surface)]/40'
+        : score >= 55
+          ? 'text-[var(--color-warning)] border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10'
+          : 'text-[var(--color-danger)] border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10';
+    return (
+      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${tone}`}>
+        {score}% confidence
+      </span>
+    );
+  };
+
+  const sectionConfidence = (key: keyof CvExtractionMetadata['confidence']) =>
+    extraction ? Math.round(extraction.confidence[key] ?? 0) : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
       <div className="w-full max-w-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -147,8 +207,8 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               {step === 'input'
-                ? 'Upload your resume or paste its text to automatically populate your profile and calibrate your roadmap.'
-                : 'Select the information you want to import. We prevent duplicate skills and records automatically.'}
+                ? 'Upload your resume or paste its text. We extract the document and show the evidence before anything is imported.'
+                : 'Select the information you want to import. Existing profile values and records are never overwritten.'}
             </p>
           </div>
           <button
@@ -283,10 +343,143 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
           ) : (
             /* Review Step */
             <div className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-[var(--color-success-surface)] border border-[var(--color-success-strong)]/20 text-xs text-[var(--color-success-strong)] flex items-center justify-between">
-                <span className="font-semibold">✓ Information extracted successfully!</span>
-                <span className="text-[11px] opacity-80">Choose what to apply to your profile</span>
+              {result && (
+                <div
+                  role={result.failed > 0 ? 'alert' : 'status'}
+                  className={`p-3.5 rounded-xl border text-xs space-y-2 ${
+                    result.failed > 0
+                      ? 'bg-[var(--color-danger)]/10 border-[var(--color-danger)]/25 text-[var(--color-danger)]'
+                      : 'bg-[var(--color-success-surface)] border-[var(--color-success-strong)]/20 text-[var(--color-success-strong)]'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {result.failed > 0 ? (
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    ) : (
+                      <Check className="w-4 h-4 shrink-0 mt-0.5" />
+                    )}
+                    <div className="space-y-0.5">
+                      <div className="font-semibold">
+                        {result.failed > 0
+                          ? 'Some information was not imported'
+                          : 'Import completed'}
+                      </div>
+                      <div className="opacity-90">
+                        {result.imported} added · {result.skipped} already existed ·{' '}
+                        {result.failed} failed
+                      </div>
+                    </div>
+                  </div>
+                  {result.failed > 0 && (
+                    <div className="space-y-2 pt-1">
+                      {result.sections
+                        .filter((section) => section.failed > 0)
+                        .map((section) => (
+                          <div key={section.section}>
+                            <div className="font-semibold capitalize">{section.section}</div>
+                            <ul className="list-disc pl-4 space-y-0.5">
+                              {section.errors.slice(0, 5).map((message, index) => (
+                                <li key={index}>{message}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-[var(--color-success-surface)] text-[var(--color-success-strong)] flex items-center justify-center shrink-0">
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[var(--text-primary)]">
+                        {quality === 'high'
+                          ? 'Document parsed successfully'
+                          : quality === 'medium'
+                            ? 'Document parsed — please review the fields'
+                            : 'Document parsed with limited confidence'}
+                      </div>
+                      <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                        {extraction
+                          ? `${extraction.format.toUpperCase()} · ${extraction.pageCount} page${
+                              extraction.pageCount === 1 ? '' : 's'
+                            } · ${extraction.layout.replace('-', ' ')} · ${extraction.wordCount.toLocaleString()} words`
+                          : 'Choose which extracted sections to apply to your profile.'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {quality && (
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border ${
+                          quality === 'high'
+                            ? 'text-[var(--color-success-strong)] border-[var(--color-success-strong)]/25 bg-[var(--color-success-surface)]/40'
+                            : quality === 'medium'
+                              ? 'text-[var(--color-warning)] border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10'
+                              : 'text-[var(--color-danger)] border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10'
+                        }`}
+                      >
+                        {quality} quality
+                      </span>
+                    )}
+                    {overallConfidence !== null && (
+                      <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                        {overallConfidence}% overall confidence
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-[var(--text-secondary)]">
+                  Review what was found, untick anything you do not want, then confirm. Existing
+                  profile values and records are never overwritten.
+                </p>
+
+                {extraction && extraction.warnings.length > 0 && (
+                  <div className="rounded-lg border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 p-2.5">
+                    <div className="text-[11px] font-semibold text-[var(--color-warning)] flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>Before you import</span>
+                    </div>
+                    <ul className="list-disc pl-4 mt-1 space-y-0.5 text-[11px] text-[var(--text-secondary)]">
+                      {extraction.warnings.map((warning, index) => (
+                        <li key={index}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {extraction && extraction.evidence.length > 0 && (
+                  <details className="text-[11px]">
+                    <summary className="cursor-pointer font-semibold text-[var(--color-primary-text)] flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5" />
+                      <span>Why these fields? ({extraction.evidence.length} evidence snippets)</span>
+                    </summary>
+                    <div className="mt-2 max-h-40 overflow-y-auto space-y-1 pr-1">
+                      {extraction.evidence.slice(0, 12).map((item, index) => (
+                        <div key={index} className="text-[var(--text-secondary)]">
+                          <span className="font-mono text-[var(--text-muted)]">
+                            {item.field}
+                            {item.page ? ` · p.${item.page}` : ''}:
+                          </span>{' '}
+                          <span>“{item.text}”</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
+
+              {result && result.failed > 0 && (
+                <p className="text-[11px] text-[var(--text-secondary)]">
+                  Retry only creates the records that are still missing. Rows that already
+                  succeeded are skipped, so nothing is duplicated.
+                </p>
+              )}
 
               {/* Section 1: Personal Details */}
               <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/20 overflow-hidden">
@@ -299,6 +492,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       className="rounded accent-[var(--accent-primary)] cursor-pointer"
                     />
                     <span className="text-xs font-bold text-[var(--text-primary)]">Personal Details</span>
+                    {confidenceBadge(sectionConfidence('personal'))}
                   </div>
                   {expandedSections.personal ? <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />}
                 </div>
@@ -309,11 +503,37 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       <div><span className="text-[var(--text-muted)]">Title:</span> <strong className="text-[var(--text-primary)]">{extractedData.title || 'Not specified'}</strong></div>
                       <div><span className="text-[var(--text-muted)]">Location:</span> <strong className="text-[var(--text-primary)]">{extractedData.location || 'Not specified'}</strong></div>
                       <div><span className="text-[var(--text-muted)]">Email:</span> <strong className="text-[var(--text-primary)]">{extractedData.email || 'Not specified'}</strong></div>
+                      <div><span className="text-[var(--text-muted)]">Phone:</span> <strong className="text-[var(--text-primary)]">{extractedData.phone || 'Not specified'}</strong></div>
                     </div>
+                    {(extractedData.linkedin || extractedData.github || extractedData.website) && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {extractedData.linkedin && (
+                          <a href={extractedData.linkedin} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--color-primary-text)] inline-flex items-center gap-1">
+                            LinkedIn <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                        {extractedData.github && (
+                          <a href={extractedData.github} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--color-primary-text)] inline-flex items-center gap-1">
+                            GitHub <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                        {extractedData.website && (
+                          <a href={extractedData.website} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--color-primary-text)] inline-flex items-center gap-1">
+                            Website <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    )}
                     {extractedData.summary && (
-                      <p className="text-[11px] text-[var(--text-secondary)] italic pt-1 border-t border-[var(--border-subtle)]">
-                        "{extractedData.summary}"
-                      </p>
+                      <div className="pt-1 border-t border-[var(--border-subtle)] space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Summary</span>
+                          {confidenceBadge(sectionConfidence('summary'))}
+                        </div>
+                        <p className="text-[11px] text-[var(--text-secondary)] italic">
+                          "{extractedData.summary}"
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}
@@ -332,6 +552,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                     <span className="text-xs font-bold text-[var(--text-primary)]">
                       Work Experience ({extractedData?.experiences?.length || 0})
                     </span>
+                    {confidenceBadge(sectionConfidence('experience'))}
                   </div>
                   {expandedSections.experience ? <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />}
                 </div>
@@ -363,6 +584,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                     <span className="text-xs font-bold text-[var(--text-primary)]">
                       Education ({extractedData?.education?.length || 0})
                     </span>
+                    {confidenceBadge(sectionConfidence('education'))}
                   </div>
                   {expandedSections.education ? <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />}
                 </div>
@@ -394,6 +616,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                     <span className="text-xs font-bold text-[var(--text-primary)]">
                       Skills ({extractedData?.skillsList?.length || 0})
                     </span>
+                    {confidenceBadge(sectionConfidence('skills'))}
                   </div>
                   {expandedSections.skills ? <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />}
                 </div>
@@ -422,6 +645,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       <span className="text-xs font-bold text-[var(--text-primary)]">
                         Projects ({extractedData.projects.length})
                       </span>
+                      {confidenceBadge(sectionConfidence('projects'))}
                     </div>
                     {expandedSections.projects ? <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />}
                   </div>
@@ -433,6 +657,45 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                           <p className="text-[11px] text-[var(--text-secondary)]">{proj.bullets?.[0]}</p>
                         </div>
                       ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section 6: Certifications */}
+              {extractedData?.certifications && extractedData.certifications.length > 0 && (
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/20 overflow-hidden">
+                  <div className="p-3.5 flex items-center justify-between bg-[var(--surface-secondary)]/40 cursor-pointer" onClick={() => toggleAccordion('certifications')}>
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedSections.certifications}
+                        onChange={(e) => { e.stopPropagation(); toggleSection('certifications'); }}
+                        className="rounded accent-[var(--accent-primary)] cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-[var(--text-primary)]">
+                        Certifications ({extractedData.certifications.length})
+                      </span>
+                      {confidenceBadge(sectionConfidence('certifications'))}
+                    </div>
+                    {expandedSections.certifications ? <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />}
+                  </div>
+                  {expandedSections.certifications && (
+                    <div className="p-4 space-y-2 border-t border-[var(--border-subtle)] bg-[var(--surface-main)] text-xs">
+                      {extractedData.certifications.map((name, idx) => {
+                        const detail = extractedData.certificationDetails?.find(
+                          (entry) => entry.name.toLowerCase().trim() === name.toLowerCase().trim()
+                        );
+                        const meta = [detail?.issuer, detail?.issueDate].filter(Boolean).join(' · ');
+                        return (
+                          <div key={idx} className="space-y-0.5">
+                            <strong className="text-[var(--text-primary)]">{name}</strong>
+                            {meta && (
+                              <p className="text-[11px] text-[var(--text-secondary)]">{meta}</p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -460,7 +723,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                   className="px-5 py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-2 disabled:opacity-50 transition-colors shadow-xs"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>{isExtracting ? 'Analyzing with AI…' : 'Extract CV Information'}</span>
+                  <span>{isExtracting ? 'Extracting text and structure…' : 'Extract CV Information'}</span>
                 </button>
               )}
             </>
@@ -469,18 +732,25 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStep('input')}
-                className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
+                disabled={isImporting}
+                className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-50"
               >
                 Back to Upload
               </button>
               <button
                 type="button"
                 onClick={handleConfirmImport}
-                disabled={isImporting}
+                disabled={isImporting || !hasSelection}
                 className="px-6 py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-2 disabled:opacity-50 transition-colors shadow-xs"
               >
                 <Check className="w-4 h-4" />
-                <span>{isImporting ? 'Importing Data…' : 'Import Selected Data & Personalize'}</span>
+                <span>
+                  {isImporting
+                    ? 'Importing Data…'
+                    : result && result.failed > 0
+                      ? 'Retry Failed Items'
+                      : 'Import Selected Information'}
+                </span>
               </button>
             </>
           )}

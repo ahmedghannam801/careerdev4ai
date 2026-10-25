@@ -15,6 +15,10 @@ import {
   EvidenceItem,
   CVProfile,
   CVVersion,
+  CvImportResult,
+  CvImportSectionKey,
+  CvImportSectionResult,
+  CvUploadResult,
   JobListing,
   JobApplication,
   ApplicationStage,
@@ -47,6 +51,12 @@ import {
 import { TARGET_ROLES, resolveRole } from '../data/rolesData';
 import { translations } from '../translations';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
+import { planPersonalImport } from '../../shared/cvImport';
+import {
+  isAtsAnalysisForRole,
+  parseAtsAnalysisFailure,
+  type AtsAnalysisFailure,
+} from '../../shared/atsAnalysis';
 import {
   fetchActivities,
   postActivity,
@@ -88,8 +98,6 @@ import {
   postLanguage,
   patchLanguage,
   deleteLanguage,
-  fetchProfileLinks,
-  fetchCareerIdentity,
   fetchSavedRoles,
   postSavedRole,
   deleteSavedRole,
@@ -104,7 +112,6 @@ import {
   type EvidenceDTO,
   type CertificationDTO,
   type LanguageDTO,
-  type ProfileLinkDTO,
   type SavedRoleDTO,
   type JobApplicationDTO,
   type InterviewSessionDTO,
@@ -369,7 +376,7 @@ interface CareerContextType {
 
   // Projects & Evidence
   projects: CareerProject[];
-  addProject: (project: Omit<CareerProject, 'id' | 'createdAt'>) => void;
+  addProject: (project: Omit<CareerProject, 'id' | 'createdAt'>) => Promise<void>;
   updateProject: (projectId: string, updates: Partial<CareerProject>) => void;
   deleteProject: (projectId: string) => void;
   evidenceItems: EvidenceItem[];
@@ -386,9 +393,14 @@ interface CareerContextType {
   deleteCVVersion: (versionId: string) => void;
   runAiCvOptimization: () => Promise<void>;
   isOptimizingCV: boolean;
-  uploadCvFile: (file: File) => Promise<{ success: boolean; cv?: CVProfile; atsAnalysis?: any; error?: string }>;
-  pasteCvText: (text: string) => Promise<{ success: boolean; cv?: CVProfile; atsAnalysis?: any; error?: string }>;
-  importExtractedCvData: (cv: CVProfile, selectedSections: Record<string, boolean>) => Promise<void>;
+  cvAnalysisError: AtsAnalysisFailure | null;
+  dismissCvAnalysisError: () => void;
+  uploadCvFile: (file: File) => Promise<CvUploadResult>;
+  pasteCvText: (text: string) => Promise<CvUploadResult>;
+  importExtractedCvData: (
+    cv: CVProfile,
+    selectedSections: Record<string, boolean>
+  ) => Promise<CvImportResult>;
   regeneratePersonalizedRoadmap: () => Promise<boolean>;
   careerContext: CareerContextSummary;
   isUploadingCv: boolean;
@@ -1173,7 +1185,8 @@ function toUserNotification(dto: NotificationDTO): UserNotification {
   };
 }
 
-function toCVVersion(dto: CvVersionDTO): CVVersion {  return {
+function toCVVersion(dto: CvVersionDTO): CVVersion {
+  return {
     id: dto.id,
     // The owning CV. Without it a version cannot be duplicated: the copy
     // needs the cv_id to post a new snapshot against.
@@ -1184,6 +1197,14 @@ function toCVVersion(dto: CvVersionDTO): CVVersion {  return {
     profile: (dto.profileJson as CVProfile) ?? emptyCVProfile,
     atsAnalysis: dto.atsAnalysis as CVVersion['atsAnalysis'],
   };
+}
+
+/** True for a server-generated version/cv id, false for a local placeholder. */
+function isPersistedId(id: string | null | undefined): boolean {
+  return Boolean(
+    id &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  );
 }
 
 function toTargetRole(dto: SavedRoleDTO): TargetRole {
@@ -1266,20 +1287,6 @@ function toLanguage(dto: LanguageDTO): UserLanguageEntry {
     id: dto.id,
     language: dto.name,
     proficiency: (dto.proficiency as UserLanguageEntry['proficiency']) ?? 'Professional',
-  };
-}
-
-function toProfessionalLinks(links: ProfileLinkDTO[]): ProfessionalLinks {
-  const map: Record<string, string> = {};
-  for (const link of links) map[link.kind] = link.url;
-  return {
-    linkedin: map['linkedin'],
-    github: map['github'],
-    portfolio: map['portfolio'],
-    personalWebsite: map['personalWebsite'],
-    behance: map['behance'],
-    dribbble: map['dribbble'],
-    twitter: map['twitter'],
   };
 }
 
@@ -1440,10 +1447,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           evidenceList,
           cvList,
           cvVersionList,
-          certificationList,
-          languageList,
-          linkList,
-          identityRecord,
           savedRoleList,
           applicationList,
           interviewList,
@@ -1467,10 +1470,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           fetchEvidence(),
           fetchCvs(),
           fetchCvVersions(),
-          fetchCertifications(),
-          fetchLanguages(),
-          fetchProfileLinks(),
-          fetchCareerIdentity(),
           fetchSavedRoles(),
           fetchJobApplications(),
           fetchInterviewSessions(),
@@ -1551,6 +1550,17 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               dribbble: profileRecord.links.find(l => l.kind === 'dribbble')?.url,
               twitter: profileRecord.links.find(l => l.kind === 'twitter')?.url,
             },
+            careerIdentity: profileRecord.careerIdentity
+              ? {
+                  whoYouAre: profileRecord.careerIdentity.whoYouAre ?? '',
+                  whereYoureGoing: profileRecord.careerIdentity.whereYoureGoing ?? '',
+                  why: profileRecord.careerIdentity.why ?? '',
+                  whatYoureMissing: profileRecord.careerIdentity.whatYoureMissing ?? '',
+                  whatYoureBuilding: profileRecord.careerIdentity.whatYoureBuilding ?? '',
+                  howYourePresenting: profileRecord.careerIdentity.howYourePresenting ?? '',
+                  whereApplying: profileRecord.careerIdentity.whereApplying ?? '',
+                }
+              : prev.careerIdentity,
           }));
         }
         setSecondaryGoals(goalList.map(toSecondaryGoal));
@@ -1560,31 +1570,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setProjects(projectList.map(toCareerProject));
         setEvidenceItems(evidenceList.map(toEvidenceItem));
         setCvVersions(cvVersionList.map(toCVVersion));
-        // certifications / languages / links / careerIdentity live inside `profile`.
-        setProfile(prev => ({
-          ...prev,
-          certifications: certificationList.map(toCertification),
-          languages: languageList.map(toLanguage),
-          links: toProfessionalLinks(linkList),
-          ...(identityRecord
-            ? {
-                careerIdentity: {
-                  whoYouAre: identityRecord.whoYouAre ?? prev.careerIdentity?.whoYouAre ?? '',
-                  whereYoureGoing:
-                    identityRecord.whereYoureGoing ?? prev.careerIdentity?.whereYoureGoing ?? '',
-                  why: identityRecord.why ?? prev.careerIdentity?.why ?? '',
-                  whatYoureMissing:
-                    identityRecord.whatYoureMissing ?? prev.careerIdentity?.whatYoureMissing ?? '',
-                  whatYoureBuilding:
-                    identityRecord.whatYoureBuilding ?? prev.careerIdentity?.whatYoureBuilding ?? '',
-                  howYourePresenting:
-                    identityRecord.howYourePresenting ?? prev.careerIdentity?.howYourePresenting ?? '',
-                  whereApplying:
-                    identityRecord.whereApplying ?? prev.careerIdentity?.whereApplying ?? '',
-                },
-              }
-            : {}),
-        }));
         setSavedRoles(savedRoleList.map(toTargetRole));
         setApplications(applicationList.map(toJobApplication));
         setInterviewSessions(interviewList.map(toInterviewSession));
@@ -1846,7 +1831,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [cvVersions, setCvVersions] = useState<CVVersion[]>([]);
   const [activeCvId, setActiveCvId] = useState<string>('');
   const [isOptimizingCV, setIsOptimizingCV] = useState(false);
+  const [cvAnalysisError, setCvAnalysisError] = useState<AtsAnalysisFailure | null>(null);
   const [isUploadingCv, setIsUploadingCv] = useState(false);
+
+  const dismissCvAnalysisError = () => setCvAnalysisError(null);
 
   // Jobs & Applications
   //
@@ -2470,12 +2458,27 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
     }
 
-    // Check CV alignment
-    if (cvVersions[0] && cvVersions[0].atsAnalysis && cvVersions[0].atsAnalysis.overallScore < 85) {
+    // Check CV alignment. A score belongs to the role its analysis was
+    // generated for; showing an old role's score as the current alignment
+    // would overstate readiness after a target-role change.
+    const latestCv = cvVersions[0];
+    const latestAts = latestCv?.atsAnalysis ?? null;
+    if (latestAts && !isAtsAnalysisForRole(latestCv?.targetRoleTitle, targetRole.title)) {
+      blockers.push({
+        id: 'blk-cv-stale',
+        title: 'CV ATS Analysis Needs a Refresh',
+        description: `Your saved ATS score of ${latestAts.overallScore}% was generated for ${
+          latestCv?.targetRoleTitle || 'an unrecorded target role'
+        }, not ${targetRole.title}. Run a new audit in CV Studio so the score matches your current target.`,
+        severity: 'medium',
+        ctaText: 'Refresh ATS Analysis',
+        ctaView: 'cv-studio'
+      });
+    } else if (latestAts && latestAts.overallScore < 85) {
       blockers.push({
         id: 'blk-cv',
         title: 'CV Optimization Needed for Target Role',
-        description: `Your active CV ATS match score is ${cvVersions[0].atsAnalysis.overallScore}%. Missing key keywords like ${cvVersions[0].atsAnalysis.missingKeywords.slice(0, 2).join(', ')}.`,
+        description: `Your active CV ATS match score for ${targetRole.title} is ${latestAts.overallScore}%. Missing key keywords like ${latestAts.missingKeywords.slice(0, 2).join(', ')}.`,
         severity: 'medium',
         ctaText: 'Optimize in CV Studio',
         ctaView: 'cv-studio'
@@ -2750,7 +2753,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       roadmapVelocity: allTasks.length > 0
         ? Math.round((completedTasks / allTasks.length) * 100)
         : 0,
-      cvAlignment: cvVersions[0]?.atsAnalysis?.overallScore ?? 0,
+      cvAlignment: isAtsAnalysisForRole(
+        cvVersions[0]?.targetRoleTitle,
+        targetRole.title
+      )
+        ? cvVersions[0]?.atsAnalysis?.overallScore ?? 0
+        : 0,
       marketEngagement: Math.min(100, applications.length * 35),
       overallHealth: 0,
     };
@@ -2767,7 +2775,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
 
     return dimensions;
-  }, [skills, evidenceItems, roadmapPhases, cvVersions, applications]);
+  }, [skills, evidenceItems, roadmapPhases, cvVersions, targetRole.title, applications]);
 
   // Weekly Career Review — derived from the user's own persisted data.
   const weeklyReview: WeeklyCareerReview = useMemo(() => {
@@ -3015,7 +3023,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const setPrimaryTargetRole = async (roleId: string): Promise<boolean> => {
     const role = resolveRole(roleId) ?? TARGET_ROLES.find(r => r.id === roleId);
     if (!role) return false;
-    setTargetRole(role);
+    const previousRole = targetRole;
 
     // The skill target levels are derived from the role, so they follow the
     // role automatically (B.4 finding M-2 — the levels are no longer a
@@ -3044,46 +3052,53 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // view of the user's target matches the UI's (B.4 finding M-2).
       await patchProfile({ targetRole: role.title, targetIndustry: role.category });
 
-      let roadmapPersisted = false;
-      try {
-        const roadmap = await createRoadmapApi({
-          title: `${role.title} Roadmap`,
-          targetRoleTitle: role.title,
-          phases: generated.map((phase, phaseIndex) => ({
-            phaseNumber: phase.phaseNumber ?? phaseIndex + 1,
-            title: phase.title,
-            description: phase.description,
-            isUnlocked: phase.isUnlocked,
-            milestones: phase.milestones.map(milestone => ({
-              title: milestone.title,
-              description: milestone.description,
-              tasks: milestone.tasks.map(task => ({
-                title: task.title,
-                description: task.description,
-                status: task.status,
-                skillName: task.skillName,
-                deadline: task.deadline,
-                estimatedHours: task.estimatedHours,
-              })),
+      // A failure here is a failed step, not a warning: the UI must not show a
+      // role whose roadmap was not persisted. The server stages the new tree
+      // and only swaps it in after every row is written, so the previous
+      // roadmap is still intact when this throws.
+      const roadmap = await createRoadmapApi({
+        title: `${role.title} Roadmap`,
+        targetRoleTitle: role.title,
+        phases: generated.map((phase, phaseIndex) => ({
+          phaseNumber: phase.phaseNumber ?? phaseIndex + 1,
+          title: phase.title,
+          description: phase.description,
+          isUnlocked: phase.isUnlocked,
+          milestones: phase.milestones.map(milestone => ({
+            title: milestone.title,
+            description: milestone.description,
+            tasks: milestone.tasks.map(task => ({
+              title: task.title,
+              description: task.description,
+              status: task.status,
+              skillName: task.skillName,
+              deadline: task.deadline,
+              estimatedHours: task.estimatedHours,
             })),
           })),
-        });
-        if (roadmap) {
-          setRoadmapPhases(toRoadmapPhases(roadmap));
-          setIsEnrolledInRoadmap(roadmap.isEnrolled);
-          roadmapPersisted = true;
-        }
-      } catch (roadmapError) {
-        console.warn('Roadmap tree sync note:', roadmapError);
+        })),
+      });
+      if (!roadmap) {
+        throw new Error('The server did not return the persisted roadmap');
       }
 
-      if (!roadmapPersisted) {
-        setRoadmapPhases(generated);
-      }
+      setTargetRole(role);
+      setRoadmapPhases(toRoadmapPhases(roadmap));
+      setIsEnrolledInRoadmap(roadmap.isEnrolled);
       return true;
     } catch (error) {
       console.error('Failed to persist target role:', error);
-      setRoadmapPhases(generated);
+      // The profile PATCH may already have succeeded before the roadmap call
+      // failed. Put the previous target back so the UI, the server and the
+      // roadmap all describe the same role.
+      try {
+        await patchProfile({
+          targetRole: previousRole.title,
+          targetIndustry: previousRole.category,
+        });
+      } catch (rollbackError) {
+        console.error('Failed to roll back target role after roadmap failure:', rollbackError);
+      }
       return false;
     }
   };
@@ -3371,6 +3386,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }));
     } catch (error) {
       console.error('Failed to persist experiences:', error);
+      throw error;
     }
   };
 
@@ -3428,6 +3444,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }));
     } catch (error) {
       console.error('Failed to persist education:', error);
+      throw error;
     }
   };
 
@@ -3909,6 +3926,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
     } catch (error) {
       console.error('Failed to create project:', error);
+      throw error;
     }
   };
 
@@ -4004,7 +4022,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Real CV Upload Pipeline implementation
-  const uploadCvFile = async (file: File): Promise<{ success: boolean; cv?: CVProfile; atsAnalysis?: any; error?: string }> => {
+  const uploadCvFile = async (file: File): Promise<CvUploadResult> => {
     setIsUploadingCv(true);
     try {
       const formData = new FormData();
@@ -4018,9 +4036,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         body: formData
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to parse CV');
+        return {
+          success: false,
+          error: data.error || 'Failed to process this CV. Please try a different file.',
+          code: data.code,
+        };
       }
 
       if (data.cv) {
@@ -4038,16 +4060,29 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setCvVersions(prev => [newVer, ...prev]);
       }
 
-      return { success: true, cv: data.cv, atsAnalysis: data.atsAnalysis };
+      return {
+        success: true,
+        cv: data.cv,
+        extraction: data.extraction,
+        extractionQuality: data.extractionQuality,
+        atsAnalysis: data.atsAnalysis ?? null,
+        analysisAvailable: data.analysisAvailable === true,
+      };
     } catch (e: any) {
       console.error('Upload CV error:', e);
-      return { success: false, error: e.message || 'File extraction failed' };
+      return {
+        success: false,
+        error:
+          e?.message === 'Failed to fetch'
+            ? 'We could not reach the server. Check your connection and try again.'
+            : e.message || 'File extraction failed',
+      };
     } finally {
       setIsUploadingCv(false);
     }
   };
 
-  const pasteCvText = async (text: string): Promise<{ success: boolean; cv?: CVProfile; atsAnalysis?: any; error?: string }> => {
+  const pasteCvText = async (text: string): Promise<CvUploadResult> => {
     setIsUploadingCv(true);
     try {
       const token = await getAccessToken();
@@ -4063,9 +4098,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to parse CV');
+        return {
+          success: false,
+          error: data.error || 'Failed to process the pasted CV text.',
+          code: data.code,
+        };
       }
 
       if (data.cv) {
@@ -4083,159 +4122,386 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setCvVersions(prev => [newVer, ...prev]);
       }
 
-      return { success: true, cv: data.cv, atsAnalysis: data.atsAnalysis };
+      return {
+        success: true,
+        cv: data.cv,
+        extraction: data.extraction,
+        extractionQuality: data.extractionQuality,
+        atsAnalysis: data.atsAnalysis ?? null,
+        analysisAvailable: data.analysisAvailable === true,
+      };
     } catch (e: any) {
       console.error('Paste CV error:', e);
-      return { success: false, error: e.message || 'Text extraction failed' };
+      return {
+        success: false,
+        error:
+          e?.message === 'Failed to fetch'
+            ? 'We could not reach the server. Check your connection and try again.'
+            : e.message || 'Text extraction failed',
+      };
     } finally {
       setIsUploadingCv(false);
     }
   };
 
+  /**
+   * Applies the reviewed CV to the user's profile.
+   *
+   * Each section is persisted through its own endpoint with the real server
+   * rows, so:
+   *   - personal fields are FILL-ONLY (an existing value is never overwritten);
+   *   - duplicates are checked against a fresh server read, not a stale local
+   *     list;
+   *   - a duplicate is reported as skipped, and a failed write is reported as
+   *     failed instead of being swallowed;
+   *   - the review modal can stay open and retry only what failed.
+   *
+   * The roadmap is deliberately NOT regenerated here. During onboarding this
+   * modal is opened before the target role is chosen, so regenerating would
+   * create a roadmap for the default role behind the user's back. The role
+   * step persists the roadmap once the user has picked a role.
+   */
   const importExtractedCvData = async (
     cv: CVProfile,
     selectedSections: Record<string, boolean>
-  ): Promise<void> => {
-    // 1. Personal Information -> Profile
+  ): Promise<CvImportResult> => {
+    const sections: CvImportSectionResult[] = [];
+    const errorMessage = (error: unknown) =>
+      error instanceof Error ? error.message : String(error || 'Unknown error');
+
+    const finishSection = (
+      section: CvImportSectionKey,
+      result: Omit<CvImportSectionResult, 'section'>
+    ) => {
+      sections.push({ section, ...result });
+    };
+
+    const refreshSkillState = async () => {
+      const rows = await fetchUserSkills();
+      setUserSkillRows(rows);
+      const levels: Record<string, number> = {};
+      for (const row of rows) {
+        const name = (row.skill?.name ?? '').toLowerCase();
+        if (!name || row.proficiency === null) continue;
+        levels[name] = row.proficiency;
+      }
+      setSkillLevels(levels);
+    };
+
+    // 1. Personal information -> profile (fill-only; links never overwrite).
     if (selectedSections.personal) {
-      const updates: Partial<UserProfile> = {};
-      if (cv.fullName && cv.fullName.trim() && (!profile.name || profile.name.trim() === '')) {
-        updates.name = cv.fullName.trim();
-      }
-      if (cv.title && cv.title.trim()) {
-        updates.currentTitle = cv.title.trim();
-        updates.headline = cv.title.trim();
-      }
-      if (cv.location && cv.location.trim()) {
-        updates.location = cv.location.trim();
-      }
-      if (cv.summary && cv.summary.trim()) {
-        updates.professionalSummary = cv.summary.trim();
-      }
-      if (Object.keys(updates).length > 0) {
-        await updateProfile(updates);
-      }
-    }
-
-    // 2. Work Experience -> Experiences (with duplicate prevention)
-    if (selectedSections.experience && cv.experiences && cv.experiences.length > 0) {
-      const existing = profile.experiences || [];
-      const toAdd: UserExperienceEntry[] = [];
-      for (const exp of cv.experiences) {
-        const normCompany = exp.company.toLowerCase().trim();
-        const normRole = exp.role.toLowerCase().trim();
-        const isDupe = existing.some(e => e.company.toLowerCase().trim() === normCompany && e.role.toLowerCase().trim() === normRole);
-        if (!isDupe && (exp.company.trim() || exp.role.trim())) {
-          const periodParts = exp.period ? exp.period.split(/[-–|]|\bto\b/i).map(s => s.trim()) : [];
-          const isCurr = exp.period ? /present|current|now/i.test(exp.period) : false;
-          toAdd.push({
-            id: `exp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            company: exp.company.trim(),
-            role: exp.role.trim(),
-            employmentType: 'Full-time',
-            location: exp.location || '',
-            startDate: periodParts[0] || '',
-            endDate: periodParts[1] || (isCurr ? 'Present' : ''),
-            isCurrent: isCurr,
-            description: exp.bullets?.join('. ') || '',
-            achievements: exp.bullets || [],
-            skillsUsed: []
-          });
+      let imported = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      let plan: ReturnType<typeof planPersonalImport> | null = null;
+      try {
+        plan = planPersonalImport(profile, cv);
+        if (Object.keys(plan.updates).length > 0) {
+          await updateProfile(plan.updates);
         }
-      }
-      if (toAdd.length > 0) {
-        await updateProfile({ experiences: [...existing, ...toAdd] });
+        // The counts describe fields that were actually written. They are
+        // copied only after the request resolves, so a failed PATCH is never
+        // reported as "added" (the retry would then show a phantom import).
+        imported = plan.imported;
+        skipped = plan.skipped;
+        finishSection('personal', { imported, skipped, failed, errors });
+      } catch (error) {
+        finishSection('personal', {
+          imported: 0,
+          skipped: plan?.skipped ?? 0,
+          failed: 1,
+          errors: [errorMessage(error)],
+        });
       }
     }
 
-    // 3. Education -> Education records (with duplicate prevention)
-    if (selectedSections.education && cv.education && cv.education.length > 0) {
-      const existing = profile.education || [];
-      const toAdd: UserEducationEntry[] = [];
-      for (const edu of cv.education) {
-        const normInst = edu.institution.toLowerCase().trim();
-        const normDegree = edu.degree.toLowerCase().trim();
-        const isDupe = existing.some(e => e.institution.toLowerCase().trim() === normInst && e.degree.toLowerCase().trim() === normDegree);
-        if (!isDupe && (edu.institution.trim() || edu.degree.trim())) {
-          const periodParts = edu.period ? edu.period.split(/[-–|]|\bto\b/i).map(s => s.trim()) : [];
-          toAdd.push({
-            id: `edu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            institution: edu.institution.trim(),
-            degree: edu.degree.trim(),
-            field: edu.field?.trim() || '',
-            startDate: periodParts[0] || '',
-            endDate: periodParts[1] || (periodParts[0] && !periodParts[1] ? periodParts[0] : ''),
-            current: false,
-            gpa: edu.gpa || ''
-          });
+    // 2. Work experience -> /api/experiences. Dedupe against fresh rows.
+    if (selectedSections.experience && cv.experiences?.length) {
+      let imported = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      const key = (role: string, company: string) =>
+        `${role.toLowerCase().trim()}::${company.toLowerCase().trim()}`;
+      try {
+        const serverRows = await fetchExperiences();
+        const existingKeys = new Set(
+          serverRows.map((entry) => key(entry.role ?? '', entry.company ?? ''))
+        );
+
+        for (const entry of cv.experiences) {
+          const role = entry.role.trim();
+          const company = entry.company.trim();
+          if (!role && !company) continue;
+          const entryKey = key(role, company);
+          if (existingKeys.has(entryKey)) {
+            skipped += 1;
+            continue;
+          }
+          existingKeys.add(entryKey);
+          try {
+            await postExperience({
+              role,
+              company,
+              location: entry.location?.trim() || undefined,
+              startDate: entry.startDate || undefined,
+              endDate: entry.endDate || undefined,
+              isCurrent: entry.isCurrent ?? /present|current|now/i.test(entry.period ?? ''),
+              description: entry.bullets?.join('\n') || undefined,
+              achievements: entry.bullets ?? [],
+            });
+            imported += 1;
+          } catch (error) {
+            failed += 1;
+            errors.push(
+              `${role || 'Experience'}${company ? ` at ${company}` : ''}: ${errorMessage(error)}`
+            );
+          }
         }
-      }
-      if (toAdd.length > 0) {
-        await updateProfile({ education: [...existing, ...toAdd] });
-      }
-    }
 
-    // 4. Skills -> User Skills (with normalization and duplicate prevention)
-    if (selectedSections.skills && cv.skillsList && cv.skillsList.length > 0) {
-      for (const s of cv.skillsList) {
-        const norm = normalizeSkillName(s);
-        const existingSkill = skills.find(existing => normalizeSkillName(existing.name) === norm);
-        if (!existingSkill && s.trim()) {
-          await updateSkillLevel(s.trim(), 3);
+        try {
+          const refreshed = await fetchExperiences();
+          setProfile((prev) => ({
+            ...prev,
+            experiences: refreshed.map(toUserExperience),
+          }));
+        } catch (error) {
+          failed += 1;
+          errors.push(`The imported experience could not be reloaded: ${errorMessage(error)}`);
         }
+      } catch (error) {
+        failed += 1;
+        errors.push(errorMessage(error));
       }
+      finishSection('experience', { imported, skipped, failed, errors });
     }
 
-    // 5. Projects -> Projects (with duplicate prevention)
-    if (selectedSections.projects && cv.projects && cv.projects.length > 0) {
-      for (const p of cv.projects) {
-        const normTitle = p.title.toLowerCase().trim();
-        const isDupe = projects.some(proj => proj.title.toLowerCase().trim() === normTitle);
-        if (!isDupe && p.title.trim()) {
-          await addProject({
-            title: p.title.trim(),
-            goal: p.role || '',
-            description: p.bullets?.join('. ') || p.title,
-            difficulty: 'Intermediate',
-            skills: p.technologies || [],
-            tasks: p.bullets || [],
-            deliverables: ['Project Implementation'],
-            status: 'completed'
-          });
+    // 3. Education -> /api/educations. Dedupe against fresh rows.
+    if (selectedSections.education && cv.education?.length) {
+      let imported = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      const key = (institution: string, degree: string) =>
+        `${institution.toLowerCase().trim()}::${degree.toLowerCase().trim()}`;
+      try {
+        const serverRows = await fetchEducations();
+        const existingKeys = new Set(
+          serverRows.map((entry) => key(entry.institution ?? '', entry.degree ?? ''))
+        );
+
+        for (const entry of cv.education) {
+          const institution = entry.institution.trim();
+          const degree = entry.degree.trim();
+          if (!institution && !degree) continue;
+          const entryKey = key(institution, degree);
+          if (existingKeys.has(entryKey)) {
+            skipped += 1;
+            continue;
+          }
+          existingKeys.add(entryKey);
+          try {
+            await postEducation({
+              institution,
+              degree: degree || undefined,
+              field: entry.field?.trim() || undefined,
+              startDate: entry.startDate || undefined,
+              endDate: entry.endDate || undefined,
+              isCurrent: entry.current ?? false,
+              gpa: entry.gpa?.trim() || undefined,
+            });
+            imported += 1;
+          } catch (error) {
+            failed += 1;
+            errors.push(
+              `${degree || 'Education'}${institution ? ` at ${institution}` : ''}: ${errorMessage(error)}`
+            );
+          }
         }
-      }
-    }
 
-    // 6. Certifications -> Certifications (with duplicate prevention)
-    if (selectedSections.certifications && cv.certifications && cv.certifications.length > 0) {
-      const existing = profile.certifications || [];
-      const toAdd = [];
-      for (const c of cv.certifications) {
-        const norm = c.toLowerCase().trim();
-        const isDupe = existing.some(cert => cert.name.toLowerCase().trim() === norm);
-        if (!isDupe) {
-          toAdd.push({
-            id: `cert-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            name: c.trim(),
-            provider: 'Verified Credential',
-            issueDate: new Date().getFullYear().toString()
-          });
+        try {
+          const refreshed = await fetchEducations();
+          setProfile((prev) => ({
+            ...prev,
+            education: refreshed.map(toUserEducation),
+          }));
+        } catch (error) {
+          failed += 1;
+          errors.push(`The imported education could not be reloaded: ${errorMessage(error)}`);
         }
+      } catch (error) {
+        failed += 1;
+        errors.push(errorMessage(error));
       }
-      if (toAdd.length > 0) {
-        await updateProfile({ certifications: [...existing, ...toAdd] });
-      }
+      finishSection('education', { imported, skipped, failed, errors });
     }
 
-    // Save active CV in context
+    // 4. Skills -> /api/user-skills. The endpoint resolves catalogue ids.
+    if (selectedSections.skills && cv.skillsList?.length) {
+      let imported = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      try {
+        const serverRows = await fetchUserSkills();
+        const existing = new Set(
+          serverRows
+            .map((row) => normalizeSkillName(row.skill?.name ?? ''))
+            .filter(Boolean)
+        );
+
+        for (const rawSkill of cv.skillsList) {
+          const name = rawSkill.trim();
+          if (!name) continue;
+          const normalized = normalizeSkillName(name);
+          if (existing.has(normalized)) {
+            skipped += 1;
+            continue;
+          }
+          existing.add(normalized);
+          try {
+            await postUserSkill({ name, proficiency: 3 });
+            imported += 1;
+          } catch (error) {
+            failed += 1;
+            errors.push(`${name}: ${errorMessage(error)}`);
+          }
+        }
+
+        try {
+          await refreshSkillState();
+        } catch (error) {
+          failed += 1;
+          errors.push(`The imported skills could not be reloaded: ${errorMessage(error)}`);
+        }
+      } catch (error) {
+        failed += 1;
+        errors.push(errorMessage(error));
+      }
+      finishSection('skills', { imported, skipped, failed, errors });
+    }
+
+    // 5. Projects -> /api/projects. Dedupe against fresh rows.
+    if (selectedSections.projects && cv.projects?.length) {
+      let imported = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      try {
+        const serverRows = await fetchProjects();
+        const existingTitles = new Set(
+          serverRows.map((project) => project.title.toLowerCase().trim())
+        );
+
+        for (const project of cv.projects) {
+          const title = project.title.trim();
+          if (!title) continue;
+          const normalizedTitle = title.toLowerCase();
+          if (existingTitles.has(normalizedTitle)) {
+            skipped += 1;
+            continue;
+          }
+          existingTitles.add(normalizedTitle);
+          try {
+            await addProject({
+              title,
+              goal: project.role?.trim() || '',
+              description: project.bullets?.join('\n') || title,
+              difficulty: 'Intermediate',
+              skills: project.technologies ?? [],
+              tasks: project.bullets ?? [],
+              deliverables: [],
+              status: 'completed',
+            });
+            imported += 1;
+          } catch (error) {
+            failed += 1;
+            errors.push(`${title}: ${errorMessage(error)}`);
+          }
+        }
+      } catch (error) {
+        failed += 1;
+        errors.push(errorMessage(error));
+      }
+      finishSection('projects', { imported, skipped, failed, errors });
+    }
+
+    // 6. Certifications -> /api/certifications. The parser only supplies an
+    // issuer/year when the document actually contained one; nothing is
+    // invented to fill the columns.
+    if (selectedSections.certifications && cv.certifications?.length) {
+      let imported = 0;
+      let skipped = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      const detailsByName = new Map(
+        (cv.certificationDetails ?? []).map((detail) => [
+          detail.name.toLowerCase().trim(),
+          detail,
+        ])
+      );
+      try {
+        const serverRows = await fetchCertifications();
+        const existing = new Set(
+          serverRows.map((certification) => certification.name.toLowerCase().trim())
+        );
+
+        for (const rawName of cv.certifications) {
+          const name = rawName.trim();
+          if (!name) continue;
+          const normalizedName = name.toLowerCase();
+          if (existing.has(normalizedName)) {
+            skipped += 1;
+            continue;
+          }
+          existing.add(normalizedName);
+          const detail = detailsByName.get(normalizedName);
+          try {
+            await postCertification({
+              name,
+              issuer: detail?.issuer?.trim() || undefined,
+              issueDate: detail?.issueDate?.trim() || undefined,
+            });
+            imported += 1;
+          } catch (error) {
+            failed += 1;
+            errors.push(`${name}: ${errorMessage(error)}`);
+          }
+        }
+
+        try {
+          const refreshed = await fetchCertifications();
+          setProfile((prev) => ({
+            ...prev,
+            certifications: refreshed.map(toCertification),
+          }));
+        } catch (error) {
+          failed += 1;
+          errors.push(`The imported certifications could not be reloaded: ${errorMessage(error)}`);
+        }
+      } catch (error) {
+        failed += 1;
+        errors.push(errorMessage(error));
+      }
+      finishSection('certifications', { imported, skipped, failed, errors });
+    }
+
+    // Keep the parsed document available to CV Studio and ATS regardless of
+    // which sections the user chose to import.
     setActiveCV(cv);
 
-    // Refresh personalized roadmap with the newly imported context
-    await regeneratePersonalizedRoadmap();
+    const imported = sections.reduce((total, section) => total + section.imported, 0);
+    const skipped = sections.reduce((total, section) => total + section.skipped, 0);
+    const failed = sections.reduce((total, section) => total + section.failed, 0);
+    const errors = sections.flatMap((section) => section.errors);
+
+    return { success: failed === 0, imported, skipped, failed, sections, errors };
   };
 
   const runAiCvOptimization = async () => {
     setIsOptimizingCV(true);
+    setCvAnalysisError(null);
     try {
       const cvText = `
 Name: ${activeCV.fullName}
@@ -4258,25 +4524,95 @@ Skills: ${activeCV.skillsList.join(', ')}
           targetRoleSkills: targetRole.requiredSkills.map(s => s.name)
         })
       });
-      if (res.ok) {
-        const result = await res.json();
-        setCvVersions(prev => {
-          const updated = [...prev];
-          if (updated[0]) {
-            updated[0] = { ...updated[0], atsAnalysis: result };
-          }
-          return updated;
-        });
-      } else {
-        // Never attach an invented ATS result to the user's CV version.
+
+      if (!res.ok) {
+        // Never attach an invented ATS result to the user's CV version, and
+        // never leave the provider's reason (quota, outage) only in the
+        // console. The review UI shows this object verbatim.
         const data = await res.json().catch(() => ({}));
-        console.error(
-          'CV analysis unavailable:',
-          typeof data?.error === 'string' ? data.error : res.status
-        );
+        const failure = parseAtsAnalysisFailure(data, res.status);
+        setCvAnalysisError(failure);
+        console.error('CV analysis unavailable:', failure.code ?? res.status);
+        return;
       }
+
+      const result = await res.json();
+      const latest = cvVersions[0];
+
+      // Persist the result against a real version so a reload cannot bring
+      // back an older analysis for a different role. If persistence fails the
+      // generated result is still shown, with an explicit warning.
+      let persisted: CVVersion | null = null;
+      try {
+        if (latest && isPersistedId(latest.id)) {
+          const dto = await patchCvVersion(latest.id, {
+            atsAnalysis: result,
+            targetRoleTitle: targetRole.title,
+          });
+          persisted = toCVVersion(dto);
+        } else {
+          let cvId = activeCvId;
+          if (!isPersistedId(cvId)) {
+            const created = await postCv({
+              name: latest?.name || 'Current CV',
+              targetRoleTitle: targetRole.title,
+            });
+            cvId = created.id;
+            setActiveCvId(created.id);
+          }
+          const dto = await postCvVersion({
+            cvId,
+            name: latest?.name || 'Current CV',
+            targetRoleTitle: targetRole.title,
+            profileJson: latest?.profile ?? activeCV,
+            atsAnalysis: result,
+          });
+          persisted = toCVVersion(dto);
+        }
+      } catch (error) {
+        console.error('Failed to save CV analysis:', error);
+        setCvAnalysisError({
+          message:
+            'The ATS analysis was generated, but it could not be saved to this CV version. It will disappear after a reload.',
+          code: 'analysis_not_saved',
+          retryAfterSeconds: null,
+        });
+      }
+
+      setCvVersions(prev => {
+        const updated = [...prev];
+        if (persisted) {
+          const index = updated.findIndex(v => v.id === persisted!.id);
+          if (index >= 0) updated[index] = persisted!;
+          else updated.unshift(persisted!);
+        } else if (updated[0]) {
+          // The local fallback still records the role the score belongs to,
+          // so the label can never silently follow a later target-role change.
+          updated[0] = {
+            ...updated[0],
+            atsAnalysis: result,
+            targetRoleTitle: targetRole.title,
+          };
+        } else {
+          updated.unshift({
+            id: `cv-v-${Date.now()}`,
+            name: 'Current CV',
+            targetRoleTitle: targetRole.title,
+            createdAt: new Date().toISOString().split('T')[0],
+            profile: activeCV,
+            atsAnalysis: result,
+          });
+        }
+        return updated;
+      });
     } catch (e) {
       console.error('Failed to optimize CV:', e);
+      setCvAnalysisError({
+        message:
+          'We could not reach the ATS audit service. Check your connection and try again.',
+        code: 'network_error',
+        retryAfterSeconds: null,
+      });
     } finally {
       setIsOptimizingCV(false);
     }
@@ -4743,6 +5079,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         deleteCVVersion,
         runAiCvOptimization,
         isOptimizingCV,
+        cvAnalysisError,
+        dismissCvAnalysisError,
         uploadCvFile,
         pasteCvText,
         importExtractedCvData,

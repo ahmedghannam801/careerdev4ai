@@ -17,34 +17,48 @@ export const ProjectsView: React.FC = () => {
   const [skillsStr, setSkillsStr] = useState('React, TypeScript, Tailwind CSS');
   const [repoUrl, setRepoUrl] = useState('');
   const [demoUrl, setDemoUrl] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredProjects = projects.filter(p => 
     statusFilter === 'all' ? true : p.status === statusFilter
   );
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || isSubmitting) return;
 
-    addProject({
-      title: title.trim(),
-      goal: goal.trim(),
-      description: description.trim(),
-      difficulty,
-      skills: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
-      tasks: ['Scaffold repository structure', 'Implement core features', 'Add unit and e2e tests'],
-      deliverables: ['Production demo', 'Public GitHub repository'],
-      status: 'in_progress',
-      repositoryUrl: repoUrl.trim() || undefined,
-      demoUrl: demoUrl.trim() || undefined
-    });
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      await addProject({
+        title: title.trim(),
+        goal: goal.trim(),
+        description: description.trim(),
+        difficulty,
+        skills: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
+        tasks: ['Scaffold repository structure', 'Implement core features', 'Add unit and e2e tests'],
+        deliverables: ['Production demo', 'Public GitHub repository'],
+        status: 'in_progress',
+        repositoryUrl: repoUrl.trim() || undefined,
+        demoUrl: demoUrl.trim() || undefined
+      });
 
-    setTitle('');
-    setGoal('');
-    setDescription('');
-    setRepoUrl('');
-    setDemoUrl('');
-    setShowAddModal(false);
+      setTitle('');
+      setGoal('');
+      setDescription('');
+      setRepoUrl('');
+      setDemoUrl('');
+      setShowAddModal(false);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'The project could not be saved. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -195,6 +209,14 @@ export const ProjectsView: React.FC = () => {
             </div>
 
             <form onSubmit={handleAddSubmit} className="space-y-4">
+              {submitError && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs text-[var(--color-danger)]"
+                >
+                  {submitError}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Project Title</label>
                 <input
@@ -276,9 +298,10 @@ export const ProjectsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)]"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Create Project
+                  {isSubmitting ? 'Creating…' : 'Create Project'}
                 </button>
               </div>
             </form>

@@ -13,6 +13,7 @@ import {
   Square
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { Stagger, StaggerItem } from '../motion/Motion';
 import { CountUp } from '../motion/CountUp';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
@@ -568,7 +569,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[var(--color-primary-text)]" />
                   <span className="font-medium">
-                    CV Studio (ATS Score: {cvVersions[0]?.atsAnalysis?.overallScore ?? '—'})
+                    CV Studio (
+                    {isAtsAnalysisForRole(cvVersions[0]?.targetRoleTitle, targetRole.title)
+                      ? `ATS Score: ${cvVersions[0]?.atsAnalysis?.overallScore ?? '—'}`
+                      : cvVersions[0]?.atsAnalysis
+                        ? 'Refresh ATS Score'
+                        : 'ATS Score: —'}
+                    )
                   </span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />

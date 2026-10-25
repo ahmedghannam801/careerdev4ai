@@ -140,6 +140,86 @@ export interface EvidenceItem {
   dateAdded: string;
 }
 
+export interface CvExtractionConfidence {
+  overall: number;
+  personal: number;
+  summary: number;
+  experience: number;
+  education: number;
+  skills: number;
+  projects: number;
+  certifications: number;
+}
+
+export interface CvExtractionEvidence {
+  field: string;
+  text: string;
+  page?: number;
+}
+
+/**
+ * Provenance of the structured CV returned by /api/resumes/upload.
+ *
+ * The CV is parsed deterministically from the document text; `confidence` and
+ * `evidence` explain why each field exists, and `warnings` names what was not
+ * found. The review step shows this instead of presenting every field as
+ * equally certain.
+ */
+export interface CvExtractionMetadata {
+  method: 'deterministic';
+  format: 'pdf' | 'docx' | 'txt' | 'json';
+  pageCount: number;
+  layout: 'single-column' | 'two-column' | 'multi-column';
+  characterCount: number;
+  wordCount: number;
+  confidence: CvExtractionConfidence;
+  evidence: CvExtractionEvidence[];
+  warnings: string[];
+}
+
+/** Overall readability grade returned next to the structured CV. */
+export type CvExtractionQuality = 'high' | 'medium' | 'low' | 'failed';
+
+export interface CvUploadResult {
+  success: boolean;
+  cv?: CVProfile;
+  extraction?: CvExtractionMetadata;
+  extractionQuality?: CvExtractionQuality;
+  atsAnalysis?: ATSAnalysis | null;
+  analysisAvailable?: boolean;
+  error?: string;
+  code?: string;
+}
+
+export type CvImportSectionKey =
+  | 'personal'
+  | 'experience'
+  | 'education'
+  | 'skills'
+  | 'projects'
+  | 'certifications';
+
+/**
+ * The outcome of one import section. The review modal keeps the imported
+ * counts visible so a partial failure is never reported as a full success.
+ */
+export interface CvImportSectionResult {
+  section: CvImportSectionKey;
+  imported: number;
+  skipped: number;
+  failed: number;
+  errors: string[];
+}
+
+export interface CvImportResult {
+  success: boolean;
+  imported: number;
+  skipped: number;
+  failed: number;
+  sections: CvImportSectionResult[];
+  errors: string[];
+}
+
 export interface CVProfile {
   fullName: string;
   email: string;
@@ -147,6 +227,9 @@ export interface CVProfile {
   location: string;
   title: string;
   summary: string;
+  linkedin?: string;
+  github?: string;
+  website?: string;
   experiences: {
     id: string;
     company: string;
@@ -154,6 +237,9 @@ export interface CVProfile {
     period: string;
     location: string;
     bullets: string[];
+    startDate?: string;
+    endDate?: string;
+    isCurrent?: boolean;
   }[];
   education: {
     id: string;
@@ -162,6 +248,9 @@ export interface CVProfile {
     field: string;
     period: string;
     gpa?: string;
+    startDate?: string;
+    endDate?: string;
+    current?: boolean;
   }[];
   projects: {
     id: string;
@@ -173,6 +262,7 @@ export interface CVProfile {
   }[];
   skillsList: string[];
   certifications: string[];
+  certificationDetails?: Array<{ name: string; issuer: string; issueDate: string }>;
 }
 
 export interface ATSAnalysis {

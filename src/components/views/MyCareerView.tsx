@@ -17,6 +17,7 @@ import {
   Star
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { MilestoneCategory, CareerGoal } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
@@ -150,8 +151,17 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     }))
   ].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
-  // The ATS score of the newest CV snapshot, if the user has one.
-  const latestCvAtsScore = cvVersions[0]?.atsAnalysis?.overallScore ?? null;
+  // The ATS score of the newest CV snapshot, but only when it was produced
+  // for the current target role. An old role's score is not current alignment.
+  const latestCvVersion = cvVersions[0];
+  const latestCvAtsIsCurrent = isAtsAnalysisForRole(
+    latestCvVersion?.targetRoleTitle,
+    targetRole.title
+  );
+  const latestCvAtsScore = latestCvAtsIsCurrent
+    ? latestCvVersion?.atsAnalysis?.overallScore ?? null
+    : null;
+  const latestCvAtsNeedsRefresh = Boolean(latestCvVersion?.atsAnalysis) && !latestCvAtsIsCurrent;
 
   // Asset Scorecard calculation
   const assetScorecard = [
@@ -184,7 +194,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       status: latestCvAtsScore !== null ? 'Complete' : 'Needs Improvement',
       desc: latestCvAtsScore !== null
         ? `ATS Match Score: ${latestCvAtsScore}% tailored for ${targetRole.title}`
-        : 'No ATS score yet — run an ATS audit in CV Studio',
+        : latestCvAtsNeedsRefresh
+          ? `Saved ATS score was generated for ${latestCvVersion?.targetRoleTitle || 'another role'} — run a new audit for ${targetRole.title}`
+          : 'No ATS score yet — run an ATS audit in CV Studio',
       view: 'cv-studio'
     },
     {

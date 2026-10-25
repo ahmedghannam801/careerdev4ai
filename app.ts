@@ -10,7 +10,6 @@
  */
 import express, { Request, Response } from 'express';
 import multer from 'multer';
-import { inflateSync, inflateRawSync } from 'node:zlib';
 // The *web* build of the SDK is imported deliberately. It is the build the
 // browser already receives, it uses `fetch` rather than `google-auth-library`
 // (ADC, child processes, the local filesystem), and it therefore runs unchanged
@@ -18,6 +17,14 @@ import { inflateSync, inflateRawSync } from 'node:zlib';
 // code that is useless here and cannot be bundled for Cloudflare.
 import { GoogleGenAI } from '@google/genai/web';
 import { verifySupabaseToken } from './server/auth/supabase-auth.ts';
+import {
+  assessDocumentQuality,
+  extractDocument,
+  extractTextDocument,
+  type DocumentExtraction,
+  type DocumentFormat,
+} from './server/cv/documentExtraction.ts';
+import { parseStructuredCv } from './server/cv/parseStructuredCv.ts';
 
 // Express request augmentation.
 //
@@ -391,432 +398,6 @@ const CV_UPLOAD_TYPES: Record<string, string[]> = {
 const CV_UPLOAD_TYPE_ERROR =
   'Unsupported file type. Please upload a .pdf, .docx, .txt, or .json file.';
 
-/**
- * Production-grade zero-dependency DOCX text extractor.
- * Reads word/document.xml from OOXML ZIP archive.
- * Preserves tables by converting cells to pipe-delimited text and detects bullet/numbered lists.
- */
-function extractTextFromDocx(buffer: Buffer): string {
-  let offset = 0;
-  while (offset < buffer.length - 4) {
-    if (buffer.readUInt32LE(offset) === 0x04034b50) {
-      const compression = buffer.readUInt16LE(offset + 8);
-      const compressedSize = buffer.readUInt32LE(offset + 18);
-      const nameLen = buffer.readUInt16LE(offset + 26);
-      const extraLen = buffer.readUInt16LE(offset + 28);
-      const name = buffer.toString('utf8', offset + 30, offset + 30 + nameLen);
-      const dataStart = offset + 30 + nameLen + extraLen;
-
-      if (name === 'word/document.xml') {
-        let xml = '';
-        try {
-          if (compression === 8) {
-            xml = inflateRawSync(buffer.subarray(dataStart, dataStart + compressedSize)).toString('utf8');
-          } else if (compression === 0) {
-            xml = buffer.subarray(dataStart, dataStart + compressedSize).toString('utf8');
-          }
-        } catch (e) {
-          console.warn('[docx] failed to inflate word/document.xml:', e);
-          return '';
-        }
-
-        // 1. Convert tables (<w:tbl>) into paragraphs where table cells are joined by " | "
-        const processedXml = xml.replace(/<w:tbl\b[^>]*>([\s\S]*?)<\/w:tbl>/g, (_match, tblContent) => {
-          const rows = tblContent.match(/<w:tr\b[^>]*>[\s\S]*?<\/w:tr>/g) || [];
-          const tablePs: string[] = [];
-          for (const row of rows) {
-            const cells = row.match(/<w:tc\b[^>]*>[\s\S]*?<\/w:tc>/g) || [];
-            const cellTexts = cells
-              .map((cell: string) => {
-                const paragraphs = cell.match(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g) || [];
-                return paragraphs
-                  .map((p: string) => {
-                    const texts = p.match(/<w:t\b[^>]*>([^<]*)<\/w:t>/g) || [];
-                    return texts.map((t: string) => t.replace(/<[^>]+>/g, '')).join('');
-                  })
-                  .join(' ')
-                  .trim();
-              })
-              .filter((t: string) => t.length > 0);
-
-            if (cellTexts.length > 0) {
-              tablePs.push(`<w:p><w:r><w:t>${cellTexts.join(' | ')}</w:t></w:r></w:p>`);
-            }
-          }
-          return tablePs.join('');
-        });
-
-        // 2. Extract paragraphs, identifying list items (<w:numPr>) and formatting
-        const paragraphs = processedXml.match(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g) || [];
-        const lines = paragraphs
-          .map((p) => {
-            const isList = /<w:numPr\b[^>]*>/.test(p);
-            // Replace <w:tab/> with space and <w:br/> with newline
-            const cleanP = p.replace(/<w:tab\b[^>]*\/?>/g, ' ').replace(/<w:br\b[^>]*\/?>/g, '\n');
-            const texts = cleanP.match(/<w:t\b[^>]*>([^<]*)<\/w:t>/g) || [];
-            let lineText = texts.map((t) => t.replace(/<[^>]+>/g, '')).join('').trim();
-            if (lineText && isList && !/^[•\-*]/.test(lineText)) {
-              lineText = '• ' + lineText;
-            }
-            return lineText;
-          })
-          .filter((line) => line.trim().length > 0);
-
-        return lines.join('\n');
-      }
-      offset = dataStart + compressedSize;
-    } else {
-      offset++;
-    }
-  }
-  return '';
-}
-
-/**
- * Parses a PDF literal string with balanced and escaped parenthesis handling and octal decoding.
- */
-function parsePdfLiteralString(str: string, startIdx: number): { text: string; endIdx: number } {
-  let result = '';
-  let i = startIdx + 1;
-  let depth = 1;
-  while (i < str.length) {
-    const char = str[i];
-    if (char === '\\') {
-      i++;
-      if (i >= str.length) break;
-      const next = str[i];
-      if (next === 'n') { result += '\n'; i++; }
-      else if (next === 'r') { result += '\r'; i++; }
-      else if (next === 't') { result += '\t'; i++; }
-      else if (next === 'b') { result += '\b'; i++; }
-      else if (next === 'f') { result += '\f'; i++; }
-      else if (next === '(' || next === ')' || next === '\\') { result += next; i++; }
-      else if (/[0-7]/.test(next)) {
-        let octal = next;
-        i++;
-        if (i < str.length && /[0-7]/.test(str[i])) { octal += str[i]; i++; }
-        if (i < str.length && /[0-7]/.test(str[i])) { octal += str[i]; i++; }
-        result += String.fromCharCode(parseInt(octal, 8));
-      } else if (next === '\r' || next === '\n') {
-        if (next === '\r' && i + 1 < str.length && str[i + 1] === '\n') i++;
-        i++;
-      } else {
-        result += next;
-        i++;
-      }
-    } else if (char === '(') {
-      depth++;
-      result += '(';
-      i++;
-    } else if (char === ')') {
-      depth--;
-      if (depth === 0) {
-        return { text: result, endIdx: i + 1 };
-      }
-      result += ')';
-      i++;
-    } else {
-      result += char;
-      i++;
-    }
-  }
-  return { text: result, endIdx: i };
-}
-
-/**
- * Parses a PDF hexadecimal string (< ... >), handling ASCII hex and UTF-16BE / CID.
- */
-function parsePdfHexString(str: string, startIdx: number): { text: string; endIdx: number } {
-  let hex = '';
-  let i = startIdx + 1;
-  while (i < str.length) {
-    const char = str[i];
-    if (char === '>') {
-      i++;
-      break;
-    }
-    if (/[0-9a-fA-F]/.test(char)) {
-      hex += char;
-    }
-    i++;
-  }
-  if (hex.length % 2 !== 0) hex += '0';
-
-  let decoded = '';
-  if (hex.length >= 4 && hex.length % 4 === 0) {
-    let isUtf16 = false;
-    if (hex.slice(0, 4).toUpperCase() === 'FEFF') {
-      isUtf16 = true;
-      hex = hex.slice(4);
-    } else {
-      let zeroes = 0;
-      for (let j = 0; j < hex.length; j += 4) {
-        if (hex.slice(j, j + 2) === '00') zeroes++;
-      }
-      if (zeroes > (hex.length / 4) * 0.7) {
-        isUtf16 = true;
-      }
-    }
-
-    if (isUtf16) {
-      for (let j = 0; j < hex.length; j += 4) {
-        const code = parseInt(hex.slice(j, j + 4), 16);
-        if (code > 0) decoded += String.fromCharCode(code);
-      }
-      return { text: decoded, endIdx: i };
-    }
-  }
-
-  for (let j = 0; j < hex.length; j += 2) {
-    const code = parseInt(hex.slice(j, j + 2), 16);
-    if (code >= 32 && code <= 126) {
-      decoded += String.fromCharCode(code);
-    } else if (code === 10 || code === 13 || code === 9) {
-      decoded += ' ';
-    }
-  }
-  return { text: decoded, endIdx: i };
-}
-
-/**
- * Robust stream text extractor parsing Tj, TJ, and text positioning operators.
- */
-function extractTextFromPdfStream(streamText: string): string {
-  let output = '';
-  let i = 0;
-  const len = streamText.length;
-
-  while (i < len) {
-    const ch = streamText[i];
-
-    if (ch === '(') {
-      const parsed = parsePdfLiteralString(streamText, i);
-      i = parsed.endIdx;
-      while (i < len && /\s/.test(streamText[i])) i++;
-      if (streamText.slice(i, i + 2) === 'Tj') {
-        output += parsed.text;
-        i += 2;
-      } else if (streamText[i] === "'") {
-        output += '\n' + parsed.text;
-        i += 1;
-      } else if (streamText[i] === '"') {
-        output += '\n' + parsed.text;
-        i += 1;
-      } else {
-        output += parsed.text + ' ';
-      }
-      continue;
-    }
-
-    if (ch === '<' && streamText[i + 1] !== '<') {
-      const parsed = parsePdfHexString(streamText, i);
-      i = parsed.endIdx;
-      while (i < len && /\s/.test(streamText[i])) i++;
-      if (streamText.slice(i, i + 2) === 'Tj') {
-        output += parsed.text;
-        i += 2;
-      } else {
-        output += parsed.text + ' ';
-      }
-      continue;
-    }
-
-    if (ch === '[') {
-      let j = i + 1;
-      let arrayText = '';
-      while (j < len && streamText[j] !== ']') {
-        if (streamText[j] === '(') {
-          const parsed = parsePdfLiteralString(streamText, j);
-          arrayText += parsed.text;
-          j = parsed.endIdx;
-        } else if (streamText[j] === '<' && streamText[j + 1] !== '<') {
-          const parsed = parsePdfHexString(streamText, j);
-          arrayText += parsed.text;
-          j = parsed.endIdx;
-        } else if (/[-0-9]/.test(streamText[j])) {
-          let numStr = '';
-          while (j < len && /[-0-9.]/.test(streamText[j])) {
-            numStr += streamText[j];
-            j++;
-          }
-          const num = parseFloat(numStr);
-          if (num <= -120) {
-            arrayText += ' ';
-          }
-        } else {
-          j++;
-        }
-      }
-      i = j + 1;
-      while (i < len && /\s/.test(streamText[i])) i++;
-      if (streamText.slice(i, i + 2) === 'TJ') {
-        output += arrayText;
-        i += 2;
-      } else {
-        output += arrayText + ' ';
-      }
-      continue;
-    }
-
-    if (ch === 'T' && streamText[i + 1] === '*') {
-      output += '\n';
-      i += 2;
-      continue;
-    }
-    if (
-      ch === 'T' &&
-      (streamText[i + 1] === 'd' || streamText[i + 1] === 'D') &&
-      (i === 0 || /\s/.test(streamText[i - 1])) &&
-      (i + 2 >= len || /\s/.test(streamText[i + 2]))
-    ) {
-      output += '\n';
-      i += 2;
-      continue;
-    }
-    if (
-      ch === 'E' &&
-      streamText[i + 1] === 'T' &&
-      (i === 0 || /\s/.test(streamText[i - 1])) &&
-      (i + 2 >= len || /\s/.test(streamText[i + 2]))
-    ) {
-      output += '\n';
-      i += 2;
-      continue;
-    }
-
-    i++;
-  }
-
-  return output;
-}
-
-/**
- * Extracts readable text streams from PDF buffers using stream inflation and structure-aware parsing.
- */
-function extractTextFromPdf(buffer: Buffer): string {
-  let text = '';
-  const bufStr = buffer.toString('binary');
-  const streamRegex = /stream[\r\n]+([\s\S]*?)[\r\n]+endstream/g;
-  let match: RegExpExecArray | null;
-  while ((match = streamRegex.exec(bufStr)) !== null) {
-    const rawStream = Buffer.from(match[1], 'binary');
-    let decompressed: Buffer | null = null;
-    try {
-      decompressed = inflateSync(rawStream);
-    } catch {
-      try {
-        decompressed = inflateRawSync(rawStream);
-      } catch {
-        decompressed = rawStream;
-      }
-    }
-    if (decompressed) {
-      const streamText = decompressed.toString('latin1');
-      const extracted = extractTextFromPdfStream(streamText);
-      if (extracted.trim()) {
-        text += extracted + '\n\n';
-      }
-    }
-  }
-
-  if (text.trim().length < 50) {
-    const rawVisible = buffer
-      .toString('utf8')
-      .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-      .replace(/\s+/g, ' ');
-    if (rawVisible.length > text.length) {
-      text = rawVisible;
-    }
-  }
-
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .join('\n');
-}
-
-/**
- * Assesses the extraction quality of an uploaded CV.
- * Catches scanned/image PDFs, unreadable documents, binary garbage, and non-CV text.
- */
-function assessDocumentQuality(
-  rawText: string,
-  fileExtension?: string,
-  fileSize?: number
-): {
-  isAcceptable: boolean;
-  isScannedPdf: boolean;
-  quality: 'high' | 'medium' | 'low' | 'failed';
-  errorMessage?: string;
-} {
-  const trimmed = rawText.trim();
-  const totalLength = trimmed.length;
-
-  // 1. Scanned / image-only PDF check
-  if (fileExtension === '.pdf' && fileSize && fileSize > 25000 && totalLength < 80) {
-    return {
-      isAcceptable: false,
-      isScannedPdf: true,
-      quality: 'failed',
-      errorMessage:
-        'We could not extract readable text from this document. It appears to be a scanned or image-based PDF. Automated text extraction without OCR is not supported for scanned images. Please upload a text-based PDF or DOCX, or paste your CV text directly.',
-    };
-  }
-
-  // 2. Minimum readable characters
-  if (totalLength < 50) {
-    return {
-      isAcceptable: false,
-      isScannedPdf: false,
-      quality: 'failed',
-      errorMessage:
-        'We could not reliably read this CV. The document has insufficient readable text. Please upload a clearer PDF or DOCX, or paste your CV text directly.',
-    };
-  }
-
-  // 3. Printable character ratio (avoid binary noise)
-  const printableMatches = trimmed.match(/[\x20-\x7E\n\r\t\u00A0-\u024F\u0600-\u06FF]/g) || [];
-  const printableRatio = printableMatches.length / totalLength;
-  if (printableRatio < 0.6) {
-    return {
-      isAcceptable: false,
-      isScannedPdf: false,
-      quality: 'failed',
-      errorMessage:
-        'The uploaded document could not be decoded into readable text. Please check the file encoding or upload a standard DOCX/PDF.',
-    };
-  }
-
-  // 4. CV signal detection
-  const cvSignalRegex =
-    /\b(experience|education|skills|projects|employment|curriculum\s+vitae|resume|qualification|university|college|bachelor|master|degree|engineer|analyst|developer|manager|specialist|consultant|responsibilities|achievements)\b/i;
-  const contactSignalRegex =
-    /\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|\+?\d[\d\s.-]{8,}\d|linkedin\.com|github\.com)\b/i;
-
-  const hasCvSignals = cvSignalRegex.test(trimmed);
-  const hasContact = contactSignalRegex.test(trimmed);
-
-  if (!hasCvSignals && !hasContact && totalLength < 300) {
-    return {
-      isAcceptable: false,
-      isScannedPdf: false,
-      quality: 'failed',
-      errorMessage:
-        'The uploaded document does not appear to be a CV or resume. Please upload a valid resume.',
-    };
-  }
-
-  let quality: 'high' | 'medium' | 'low' = 'low';
-  if (totalLength > 400 && hasCvSignals && hasContact) {
-    quality = 'high';
-  } else if (totalLength > 200 && (hasCvSignals || hasContact)) {
-    quality = 'medium';
-  }
-
-  return { isAcceptable: true, isScannedPdf: false, quality };
-}
-
 // Canonical skill lookup map built from CATALOG_SKILL_NAMES
 const CANONICAL_SKILL_MAP = new Map<string, string>();
 for (const skill of CATALOG_SKILL_NAMES) {
@@ -884,253 +465,6 @@ function canonicalizeSkill(rawSkill: string): string {
     return CANONICAL_SKILL_MAP.get(stripped)!;
   }
   return trimmed;
-}
-
-/**
- * Deterministic CV parser used when document text is extracted and
- * Gemini is offline, rate-limited, or unavailable. Never invents data.
- */
-function parseCvTextDeterministically(rawText: string, targetRoleTitle: string): JsonObject {
-  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-
-  let email = '';
-  let phone = '';
-  let location = '';
-  let fullName = '';
-  let linkedin = '';
-  let github = '';
-  let website = '';
-  const title = targetRoleTitle || '';
-
-  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
-  const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\+?\d[\d\s.-]{8,}\d/;
-  const locationRegex = /\b([A-Z][a-zA-Z\s.-]+,\s*[A-Z]{2}\b|[A-Z][a-zA-Z\s.-]+,\s*[A-Z][a-zA-Z\s]+)/;
-  const linkedinRegex = /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|profile)\/([a-zA-Z0-9_-]+)/i;
-  const githubRegex = /(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9_-]+)/i;
-  const urlRegex = /https?:\/\/[^\s]+/i;
-
-  for (const line of lines.slice(0, 20)) {
-    if (!email && emailRegex.test(line)) {
-      email = line.match(emailRegex)![0];
-    }
-    if (!phone && phoneRegex.test(line)) {
-      phone = line.match(phoneRegex)![0].trim();
-    }
-    if (!location && locationRegex.test(line)) {
-      location = line.match(locationRegex)![0].trim();
-    }
-    if (!linkedin && linkedinRegex.test(line)) {
-      linkedin = line.match(linkedinRegex)![0];
-    }
-    if (!github && githubRegex.test(line)) {
-      github = line.match(githubRegex)![0];
-    }
-    if (!website && urlRegex.test(line) && !line.includes('linkedin.com') && !line.includes('github.com')) {
-      website = line.match(urlRegex)![0];
-    }
-  }
-
-  // Name extraction: first non-contact line with 2-4 capitalized words
-  for (const line of lines.slice(0, 6)) {
-    const clean = line.replace(/^[#*\s_-]+/, '').replace(/[#*\s_-]+$/, '').trim();
-    if (
-      clean.length > 2 &&
-      clean.length < 50 &&
-      !emailRegex.test(clean) &&
-      !phoneRegex.test(clean) &&
-      !urlRegex.test(clean) &&
-      !/resume|curriculum|vitae|\bcv\b|profile|summary|experience|portfolio/i.test(clean) &&
-      /^[A-Z][a-zA-Z'.\-]+(?:\s+[A-Z][a-zA-Z'.\-]+){1,3}$/.test(clean)
-    ) {
-      fullName = clean;
-      break;
-    }
-  }
-
-  const sections: Record<string, string[]> = {
-    header: [],
-    summary: [],
-    experience: [],
-    education: [],
-    skills: [],
-    projects: [],
-    certifications: [],
-    languages: [],
-  };
-
-  let currentSection = 'header';
-  const headingMap = [
-    { regex: /^(?:professional\s+)?summary|career\s+objective|profile|about(?:\s+me)?\b/i, key: 'summary' },
-    { regex: /^(?:work\s+|professional\s+)?experience|employment(?:\s+history)?|work\s+history|career\s+history\b/i, key: 'experience' },
-    { regex: /^education|academic(?:\s+background|\s+history)?|qualifications\b/i, key: 'education' },
-    { regex: /^(?:technical\s+|core\s+)?skills|core\s+competencies|technologies|tools(?:\s+&\s+tech)?\b/i, key: 'skills' },
-    { regex: /^(?:key\s+|personal\s+|technical\s+)?projects|portfolio\b/i, key: 'projects' },
-    { regex: /^certifications|certificates|licenses|credentials|courses\b/i, key: 'certifications' },
-    { regex: /^languages(?:\s+spoken|\s+proficiency)?\b/i, key: 'languages' },
-  ];
-
-  for (const line of lines) {
-    const clean = line.replace(/^[\s#*_-]+/, '').replace(/[\s#*_-]+$/, '').trim();
-    let matched = false;
-    if (clean.length < 40) {
-      for (const h of headingMap) {
-        if (h.regex.test(clean)) {
-          currentSection = h.key;
-          matched = true;
-          break;
-        }
-      }
-    }
-    if (!matched) {
-      sections[currentSection].push(line);
-    }
-  }
-
-  // Only real summary text from the document
-  const summary = sections.summary.join(' ').slice(0, 1500).trim();
-
-  // Skills normalized through canonical skill map
-  const rawSkillsText = sections.skills.join(', ');
-  const rawSkillsList = Array.from(
-    new Set(
-      rawSkillsText
-        .split(/[,•|·\n\r/]/)
-        .map((s) => s.replace(/^[*\s\-•]+/, '').replace(/[:]$/, '').trim())
-        .filter((s) => s.length >= 2 && s.length <= 40 && !headingMap.some((h) => h.regex.test(s)))
-    )
-  );
-  const skillsList = Array.from(new Set(rawSkillsList.map(canonicalizeSkill).filter(Boolean))).slice(0, 30);
-
-  const experiences: Array<{
-    id: string;
-    company: string;
-    role: string;
-    period: string;
-    location: string;
-    bullets: string[];
-  }> = [];
-
-  const expLines = sections.experience;
-  let currExp: (typeof experiences)[0] | null = null;
-  const dateRangeRegex =
-    /\b((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}[\/.-])?\s*(?:19\d\d|20\d\d))\s*(?:–|-|to|until)\s*(Present|Current|Now|(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}[\/.-])?\s*(?:19\d\d|20\d\d)))/i;
-
-  for (const line of expLines) {
-    const isBullet = /^[•\-*]/.test(line);
-    const dateMatch = line.match(dateRangeRegex);
-
-    if (!isBullet && (dateMatch || line.includes(' | '))) {
-      if (currExp && (currExp.company || currExp.role)) {
-        experiences.push(currExp);
-      }
-      const parts = line.split(/[-–|]/).map((p) => p.trim());
-      const comp = parts[0] || '';
-      const r = parts[1] || '';
-      const period = dateMatch ? dateMatch[0].trim() : parts[2] || '';
-
-      currExp = {
-        id: 'exp-' + Math.random().toString(36).slice(2, 9),
-        company: comp.replace(dateRangeRegex, '').trim(),
-        role: r.replace(dateRangeRegex, '').trim(),
-        period,
-        location: '',
-        bullets: [],
-      };
-    } else if (currExp && isBullet) {
-      const bulletText = line.replace(/^[•\-*\s]+/, '').trim();
-      if (bulletText) currExp.bullets.push(bulletText);
-    } else if (currExp && line.trim().length > 0) {
-      if (!currExp.role && line.length < 50 && !currExp.bullets.length) {
-        currExp.role = line.trim();
-      } else {
-        currExp.bullets.push(line.trim());
-      }
-    }
-  }
-  if (currExp && (currExp.company || currExp.role)) {
-    experiences.push(currExp);
-  }
-
-  const education: Array<{
-    id: string;
-    institution: string;
-    degree: string;
-    field: string;
-    period: string;
-    gpa: string;
-  }> = [];
-
-  const eduLines = sections.education;
-  for (const line of eduLines) {
-    if (line.length > 5) {
-      const yearMatch = line.match(/\b(19\d\d|20\d\d)\b/);
-      const degreeMatch = line.match(
-        /\b(bachelor|master|ph\.?d|b\.?s\.?|m\.?s\.?|b\.?a\.?|m\.?b\.?a\.?|diploma|associate)\b[^\n,–|]*/i
-      );
-      const parts = line.split(/[-–|,]/).map((p) => p.trim());
-
-      education.push({
-        id: 'edu-' + Math.random().toString(36).slice(2, 9),
-        institution: parts[0] || line,
-        degree: degreeMatch ? degreeMatch[0].trim() : '',
-        field: '',
-        period: yearMatch ? yearMatch[0] : '',
-        gpa: '',
-      });
-      if (education.length >= 4) break;
-    }
-  }
-
-  const projects: Array<{
-    id: string;
-    title: string;
-    role: string;
-    technologies: string[];
-    bullets: string[];
-  }> = [];
-
-  let currProj: (typeof projects)[0] | null = null;
-  for (const line of sections.projects) {
-    const isBullet = /^[•\-*]/.test(line);
-    if (!isBullet && line.length > 3 && line.length < 80) {
-      if (currProj) projects.push(currProj);
-      currProj = {
-        id: 'proj-' + Math.random().toString(36).slice(2, 9),
-        title: line.replace(/^[#*\s-]+/, '').trim(),
-        role: '',
-        technologies: [],
-        bullets: [],
-      };
-    } else if (currProj && isBullet) {
-      const bulletText = line.replace(/^[•\-*\s]+/, '').trim();
-      if (bulletText) currProj.bullets.push(bulletText);
-    } else if (currProj && line.trim().length > 0) {
-      currProj.bullets.push(line.trim());
-    }
-  }
-  if (currProj) projects.push(currProj);
-
-  const certifications = sections.certifications
-    .map((c) => c.replace(/^[•\-*\s]+/, '').trim())
-    .filter((c) => c.length > 2 && c.length < 100)
-    .slice(0, 10);
-
-  return {
-    fullName,
-    email,
-    phone,
-    location,
-    title: title || experiences[0]?.role || '',
-    summary,
-    linkedin,
-    github,
-    website,
-    experiences,
-    education,
-    projects,
-    skillsList,
-    certifications,
-  };
 }
 
 // Initialize Gemini Client
@@ -1215,55 +549,6 @@ function isNumberInRange(value: unknown, min = 0, max = 100): value is number {
     value >= min &&
     value <= max
   );
-}
-
-function validateParsedCvPayload(value: unknown): string[] {
-  if (!isJsonObject(value)) return ['response is not an object'];
-  const errors: string[] = [];
-  for (const key of ['fullName', 'email', 'phone', 'location', 'title', 'summary']) {
-    if (typeof value[key] !== 'string') errors.push(key);
-  }
-  for (const key of ['experiences', 'education', 'projects', 'skillsList', 'certifications']) {
-    if (!Array.isArray(value[key])) errors.push(key);
-  }
-  if (Array.isArray(value.experiences)) {
-    value.experiences.forEach((entry, index) => {
-      if (!isJsonObject(entry)) {
-        errors.push(`experiences[${index}]`);
-        return;
-      }
-      for (const key of ['id', 'company', 'role', 'period', 'location']) {
-        if (typeof entry[key] !== 'string') errors.push(`experiences[${index}].${key}`);
-      }
-      if (!isStringArray(entry.bullets)) errors.push(`experiences[${index}].bullets`);
-    });
-  }
-  if (Array.isArray(value.education)) {
-    value.education.forEach((entry, index) => {
-      if (!isJsonObject(entry)) {
-        errors.push(`education[${index}]`);
-        return;
-      }
-      for (const key of ['id', 'institution', 'degree', 'field', 'period', 'gpa']) {
-        if (typeof entry[key] !== 'string') errors.push(`education[${index}].${key}`);
-      }
-    });
-  }
-  if (Array.isArray(value.projects)) {
-    value.projects.forEach((entry, index) => {
-      if (!isJsonObject(entry)) {
-        errors.push(`projects[${index}]`);
-        return;
-      }
-      for (const key of ['id', 'title', 'role']) {
-        if (typeof entry[key] !== 'string') errors.push(`projects[${index}].${key}`);
-      }
-      for (const key of ['technologies', 'bullets']) {
-        if (!isStringArray(entry[key])) errors.push(`projects[${index}].${key}`);
-      }
-    });
-  }
-  return errors;
 }
 
 function validateAtsPayload(value: unknown): string[] {
@@ -1864,12 +1149,23 @@ function respondAiFailure(
 }
 
 // CV Upload Pipeline (POST /api/resumes/upload)
-// The route makes up to two Gemini calls (parsing and ATS analysis), so it
-// carries the same limiter as the other AI routes. Without it, repeated
-// uploads were the cheapest way to exhaust the project's daily quota.
+//
+// This is a staged pipeline, not a single model call:
+//
+//   1. the real document format is decoded (PDF text layer / DOCX OOXML);
+//   2. the extracted text is assessed for quality and scanned/image-only PDFs
+//      are rejected with a specific message (OCR is not implemented);
+//   3. a deterministic parser builds the structured CV, with evidence and
+//      confidence for every field;
+//   4. the review UI shows that result and the user confirms it before the
+//      import is persisted.
+//
+// Gemini is used only for the optional ATS diagnostic on the already-parsed CV.
+// It is never the parser of record, so a provider failure cannot lose or invent
+// the user's CV data. The route still carries the AI limiter for the ATS call.
 app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'), async (req: Request, res: Response) => {
   try {
-    let rawText = '';
+    let extraction: DocumentExtraction | null = null;
 
     if (req.file) {
       const originalName = req.file.originalname.toLowerCase();
@@ -1886,33 +1182,36 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
         return res.status(400).json({ error: CV_UPLOAD_TYPE_ERROR });
       }
 
-      // Extract text content from buffer
-      if (extension === '.docx') {
-        rawText = extractTextFromDocx(req.file.buffer);
-      } else if (extension === '.pdf') {
-        rawText = extractTextFromPdf(req.file.buffer);
-      } else {
-        rawText = req.file.buffer.toString('utf-8');
-      }
-    } else if (req.body.text) {
-      rawText = req.body.text;
+      extraction = await extractDocument(
+        req.file.buffer,
+        extension.slice(1) as DocumentFormat
+      );
     } else {
-      return res.status(400).json({ error: 'No CV file or text provided' });
+      const pastedText = str(req.body?.text, 200_000);
+      if (!pastedText) {
+        return res.status(400).json({ error: 'No CV file or text provided' });
+      }
+      extraction = extractTextDocument(pastedText);
     }
 
-    // Validate document readability and quality
-    const qualityAssessment = assessDocumentQuality(
-      rawText,
-      req.file ? req.file.originalname.slice(req.file.originalname.lastIndexOf('.')).toLowerCase() : undefined,
-      req.file?.size
-    );
+    // Validate document readability and quality before parsing. A scanned PDF
+    // is reported as scanned; it is not silently treated as an empty CV.
+    const qualityAssessment = assessDocumentQuality(extraction);
 
     if (!qualityAssessment.isAcceptable) {
       return res.status(400).json({
         error:
           qualityAssessment.errorMessage ||
           'Unable to extract sufficient readable text from the document.',
+        code: qualityAssessment.isScannedPdf ? 'scanned_pdf' : 'unreadable_document',
         isScannedPdf: qualityAssessment.isScannedPdf,
+        document: {
+          format: extraction.format,
+          pageCount: extraction.pageCount,
+          layout: extraction.layout,
+          characterCount: extraction.characterCount,
+          wordCount: extraction.wordCount,
+        },
       });
     }
 
@@ -1929,128 +1228,61 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
     // fallback uses the keywords that actually matter for this role.
     const catalogueRole = resolveRole(targetRoleTitle);
 
-    // Parse CV text using Gemini with strict JSON schema and deterministic fallback
-    const parsePrompt = `You are a professional, high-accuracy CV/resume parser.
-Extract and structure the following CV text into JSON matching this exact schema:
-{
-  "documentType": "cv",
-  "fullName": string,
-  "email": string,
-  "phone": string,
-  "location": string,
-  "title": string,
-  "summary": string,
-  "linkedin": string,
-  "github": string,
-  "website": string,
-  "experiences": [
-    {
-      "id": string,
-      "company": string,
-      "role": string,
-      "period": string,
-      "location": string,
-      "bullets": [string]
-    }
-  ],
-  "education": [
-    {
-      "id": string,
-      "institution": string,
-      "degree": string,
-      "field": string,
-      "period": string,
-      "gpa": string
-    }
-  ],
-  "projects": [
-    {
-      "id": string,
-      "title": string,
-      "role": string,
-      "technologies": [string],
-      "bullets": [string]
-    }
-  ],
-  "skillsList": [string],
-  "certifications": [string]
-}
-
-CRITICAL RULES:
-1. Extract ONLY facts explicitly stated in the CV.
-2. NEVER invent, fabricate, hallucinate or guess any details (companies, dates, degrees, projects, skills). If a field or section is not in the text, return an empty string "" or empty array [].
-3. If the text does not appear to be a CV or resume (e.g. invoice, source code, terms of service), set "documentType" to "not_a_cv".
-4. For dates: use "Month YYYY" or "YYYY" where available. If currently working, set period to "YYYY - Present". Never invent days or months if only the year is stated.
-5. In skillsList: extract individual canonical skill names. Avoid long sentences.
-
-CV Text:
-${rawText.slice(0, 12000)}
-
-Return only valid JSON.`;
-
-    let parsedCV: any = null;
-    let geminiFailed = false;
-
-    // The daily AI budget is spent only when a model call is actually made.
-    // When the allowance is used up the upload still succeeds: the
-    // deterministic parser below produces the CV without the model.
-    const parseBudget = tryConsumeAiBudget(req.authUser!.id);
-
-    if (process.env.GEMINI_API_KEY && parseBudget) {
-      try {
-        const response = await ai.models.generateContent({
-          model: GEMINI_MODEL,
-          contents: parsePrompt,
-          config: { responseMimeType: 'application/json' },
-        });
-        parsedCV = JSON.parse(response.text || '{}');
-        if (parsedCV?.documentType === 'not_a_cv') {
-          return res.status(400).json({
-            error: 'The uploaded document does not appear to be a CV or resume.',
-          });
-        }
-        const parsedCvErrors = validateParsedCvPayload(parsedCV);
-        if (parsedCvErrors.length > 0) {
-          throw new Error(`Invalid parsed CV payload: ${parsedCvErrors.join(', ')}`);
-        }
-      } catch (e: any) {
-        if (e?.message?.includes('not appear to be a CV')) throw e;
-        console.warn('Gemini CV parsing unavailable or rate-limited; falling back to deterministic extraction:', e);
-        // The provider never served this request, so the daily budget gets
-        // its unit back.
-        if (isQuotaError(e)) refundDailyAiBudget(req.authUser!.id);
-        geminiFailed = true;
-      }
-    } else {
-      geminiFailed = true;
+    // Stage 3: deterministic structured extraction. This is intentionally the
+    // only parser of record; there is no model fallback that can hallucinate a
+    // company, date or degree when the provider is unavailable.
+    let parsedCV: ReturnType<typeof parseStructuredCv>['cv'];
+    let extractionMetadata: ReturnType<typeof parseStructuredCv>['metadata'];
+    try {
+      const parsed = parseStructuredCv(extraction);
+      parsedCV = parsed.cv;
+      extractionMetadata = parsed.metadata;
+    } catch (parseErr) {
+      console.error('Deterministic CV parsing failed:', parseErr);
+      return res.status(422).json({
+        error:
+          'We could read the document but could not recognise its structure. Please review the text or paste your CV content.',
+        code: 'parse_failed',
+        document: {
+          format: extraction.format,
+          pageCount: extraction.pageCount,
+          layout: extraction.layout,
+          characterCount: extraction.characterCount,
+          wordCount: extraction.wordCount,
+        },
+      });
     }
 
-    if (!parsedCV || geminiFailed) {
-      try {
-        parsedCV = parseCvTextDeterministically(rawText, targetRoleTitle);
-        const fallbackErrors = validateParsedCvPayload(parsedCV);
-        if (fallbackErrors.length > 0) {
-          throw new Error(`Deterministic parsed CV invalid: ${fallbackErrors.join(', ')}`);
-        }
-      } catch (fallbackErr) {
-        console.error('CV parsing unavailable:', fallbackErr);
-        return res.status(503).json({
-          error:
-            'CV parsing is temporarily unavailable. Your file was not saved; please try again shortly.',
-        });
-      }
+    const hasStructuredContent =
+      Boolean(parsedCV.fullName || parsedCV.email || parsedCV.phone) ||
+      parsedCV.experiences.length > 0 ||
+      parsedCV.education.length > 0 ||
+      parsedCV.skillsList.length > 0 ||
+      parsedCV.projects.length > 0;
+
+    if (!hasStructuredContent) {
+      return res.status(422).json({
+        error:
+          'We could not identify any CV fields in this document. Please check that it contains your experience, education or skills, or paste your CV text.',
+        code: 'no_structured_content',
+        document: {
+          format: extraction.format,
+          pageCount: extraction.pageCount,
+          layout: extraction.layout,
+          characterCount: extraction.characterCount,
+          wordCount: extraction.wordCount,
+        },
+      });
     }
 
     // Canonicalize and deduplicate extracted skills against the shared catalogue
-    if (parsedCV && Array.isArray(parsedCV.skillsList)) {
-      parsedCV.skillsList = Array.from(
-        new Set(
-          parsedCV.skillsList
-            .map((s: string) => (typeof s === 'string' ? canonicalizeSkill(s) : ''))
-            .filter(Boolean)
-        )
-      );
-    }
+    parsedCV.skillsList = Array.from(
+      new Set(
+        parsedCV.skillsList
+          .map((skill) => canonicalizeSkill(skill))
+          .filter(Boolean)
+      )
+    );
 
     // Run ATS diagnostic
     const atsPrompt = `Evaluate this parsed CV for the target role "${targetRoleTitle}".
@@ -2079,11 +1311,11 @@ ${JSON.stringify(parsedCV)}
 Return only valid JSON.`;
 
     let atsAnalysis: any = null;
-    // The ATS pass is a second model call, so it draws its own unit from the
-    // daily budget. When the allowance is spent the deterministic diagnostic
+    // The ATS pass draws its own unit from the daily budget. When the
+    // allowance is spent, or the provider fails, the deterministic diagnostic
     // below is used instead — the upload still succeeds.
     const atsBudget = tryConsumeAiBudget(req.authUser!.id);
-    if (process.env.GEMINI_API_KEY && !geminiFailed && atsBudget) {
+    if (process.env.GEMINI_API_KEY && atsBudget) {
       try {
         const atsRes = await ai.models.generateContent({
           model: GEMINI_MODEL,
@@ -2106,7 +1338,7 @@ Return only valid JSON.`;
       // Deterministic ATS diagnostic based on the role's own keywords. The
       // list used to be a hard-coded JavaScript/React/Python set, which
       // scored a CV for an HR or finance role against the wrong vocabulary.
-      const lowerText = rawText.toLowerCase();
+      const lowerText = extraction.text.toLowerCase();
       const sampleKeywords = (
         catalogueRole
           ? [
@@ -2220,6 +1452,7 @@ Return only valid JSON.`;
     return res.json({
       success: true,
       cv: parsedCV,
+      extraction: extractionMetadata,
       extractionQuality: qualityAssessment.quality,
       atsAnalysis,
       analysisAvailable: atsAnalysis !== null,

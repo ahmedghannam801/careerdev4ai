@@ -9,6 +9,7 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { Reveal } from '../motion/Motion';
 import { CVImportModal } from '../cv/CVImportModal';
+import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
 
 export const CVStudioView: React.FC = () => {
   const {
@@ -18,6 +19,8 @@ export const CVStudioView: React.FC = () => {
     saveCVVersion,
     runAiCvOptimization,
     isOptimizingCV,
+    cvAnalysisError,
+    dismissCvAnalysisError,
     targetRole,
     aiPreferences,
     privacyPreferences,
@@ -29,7 +32,14 @@ export const CVStudioView: React.FC = () => {
   const [versionName, setVersionName] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
 
-  const latestAnalysis = cvVersions[0]?.atsAnalysis;
+  const latestVersion = cvVersions[0];
+  const latestAnalysis = latestVersion?.atsAnalysis;
+  const analysisRole = resolveAtsAnalysisRole(
+    latestVersion?.targetRoleTitle,
+    targetRole.title
+  );
+  const analysisRoleLabel = analysisRole.roleTitle ?? 'your saved CV';
+  const retryDelay = formatRetryDelay(cvAnalysisError?.retryAfterSeconds);
 
   const handlePrint = () => {
     window.print();
@@ -87,6 +97,36 @@ export const CVStudioView: React.FC = () => {
         </div>
       </div>
 
+      {/* A failed audit is shown where the user started it, with the real
+          provider reason and any retry window. It is never only logged. */}
+      {cvAnalysisError && (
+        <div
+          role="alert"
+          className="p-4 rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 flex items-start gap-3"
+        >
+          <AlertCircle className="w-4 h-4 text-[var(--color-warning)] shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="text-xs font-bold text-[var(--text-primary)]">
+              ATS audit unavailable
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              {cvAnalysisError.message}
+            </p>
+            {retryDelay && (
+              <p className="text-[11px] text-[var(--color-warning)] font-medium">
+                Try again in about {retryDelay}.
+              </p>
+            )}
+          </div>
+          <button
+            onClick={dismissCvAnalysisError}
+            className="px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
         <button
@@ -107,7 +147,10 @@ export const CVStudioView: React.FC = () => {
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          ATS Analysis & Recommendations{latestAnalysis ? ` (${latestAnalysis.overallScore}%)` : ''}
+          ATS Analysis & Recommendations
+          {latestAnalysis
+            ? ` (${latestAnalysis.overallScore}%${analysisRole.isStale ? ' · previous role' : ''})`
+            : ''}
         </button>
         <button
           onClick={() => setActiveTab('versions')}
@@ -273,13 +316,43 @@ export const CVStudioView: React.FC = () => {
       {/* TAB 2: ATS ANALYSIS */}
       {activeTab === 'ats' && latestAnalysis && (
         <div className="space-y-6">
+          {analysisRole.isStale && (
+            <div className="p-4 rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 flex flex-col sm:flex-row sm:items-center gap-3">
+              <AlertCircle className="w-4 h-4 text-[var(--color-warning)] shrink-0" />
+              <div className="flex-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+                <span className="font-bold text-[var(--text-primary)]">
+                  This analysis is out of date for your target role.
+                </span>{' '}
+                It was generated for {analysisRoleLabel}, but your current target is{' '}
+                {targetRole.title}. The score below has not been applied to your
+                current readiness.
+              </div>
+              <button
+                onClick={runAiCvOptimization}
+                disabled={isOptimizingCV || !aiWritingEnabled}
+                title={
+                  aiWritingEnabled
+                    ? undefined
+                    : 'Enable AI Writing Assistance and Career Graph AI Grounding in Settings.'
+                }
+                className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-[11px] font-semibold whitespace-nowrap disabled:opacity-50"
+              >
+                {isOptimizingCV ? 'Analyzing…' : `Audit for ${targetRole.title}`}
+              </button>
+            </div>
+          )}
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">ATS Match Diagnostic</span>
                 <h2 className="text-xl font-bold text-[var(--text-primary)] mt-0.5">
-                  Alignment for {targetRole.title}
+                  Alignment for {analysisRoleLabel}
                 </h2>
+                {analysisRole.isStale && (
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                    Current target: {targetRole.title}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--color-primary-text)]">
@@ -357,6 +430,36 @@ export const CVStudioView: React.FC = () => {
         </div>
       )}
 
+      {/* Empty ATS state: a missing analysis must be explained, not a blank tab. */}
+      {activeTab === 'ats' && !latestAnalysis && (
+        <div className="p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-center space-y-3">
+          <Sparkles className="w-6 h-6 text-[var(--color-primary-text)] mx-auto" />
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">No ATS analysis yet</h2>
+          <p className="text-xs text-[var(--text-secondary)] max-w-lg mx-auto leading-relaxed">
+            Run an ATS audit to compare this CV against the keywords and requirements
+            for {targetRole.title}.
+          </p>
+          <button
+            onClick={runAiCvOptimization}
+            disabled={isOptimizingCV || !aiWritingEnabled}
+            title={
+              aiWritingEnabled
+                ? undefined
+                : 'Enable AI Writing Assistance and Career Graph AI Grounding in Settings.'
+            }
+            className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
+          >
+            {isOptimizingCV ? 'Analyzing…' : 'Run ATS Audit'}
+          </button>
+          {!aiWritingEnabled && (
+            <p className="text-[11px] text-[var(--color-warning)]">
+              Enable AI Writing Assistance and Career Graph AI Grounding in Settings
+              to run an audit.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* TAB 3: VERSIONS */}
       {activeTab === 'versions' && (
         <div className="space-y-4">
@@ -367,7 +470,7 @@ export const CVStudioView: React.FC = () => {
                 <div key={v.id} className="p-4 rounded-xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)] flex items-center justify-between text-xs">
                   <div>
                     <div className="font-bold text-sm text-[var(--text-primary)]">{v.name}</div>
-                    <div className="text-[var(--text-muted)]">Target: {v.targetRoleTitle} · Created {v.createdAt}</div>
+                    <div className="text-[var(--text-muted)]">Target: {v.targetRoleTitle || 'Not recorded'} · Created {v.createdAt}</div>
                   </div>
                   <div className="flex items-center gap-3">
                     {v.atsAnalysis && (

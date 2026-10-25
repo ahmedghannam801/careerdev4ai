@@ -60,6 +60,23 @@ describe('authentication', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body?.profile?.id, userA.id);
   });
+
+  test('concurrent requests with the same token keep the caller identity', async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 12 }, () => api('GET', '/api/profile', { token: userA.token }))
+    );
+    for (const res of responses) {
+      assert.equal(res.status, 200);
+      assert.equal(res.body?.profile?.id, userA.id);
+    }
+  });
+
+  test('an invalid token is still rejected while a valid token is cached', async () => {
+    const valid = await api('GET', '/api/profile', { token: userA.token });
+    assert.equal(valid.status, 200);
+    const invalid = await api('GET', '/api/profile', { token: 'not.a.real.jwt' });
+    assert.equal(invalid.status, 401);
+  });
 });
 
 describe('validation', () => {
