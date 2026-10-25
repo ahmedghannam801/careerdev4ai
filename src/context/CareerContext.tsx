@@ -2195,7 +2195,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     try {
       const token = await getAccessToken();
       const res = await fetch(`/api/profile/check-username?username=${encodeURIComponent(username)}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        cache: 'no-store',
       });
       const data = await res.json();
       if (!res.ok) {

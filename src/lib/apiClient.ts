@@ -41,7 +41,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(path, { ...init, headers });
+  // Never satisfy an authenticated read from the browser HTTP cache. The
+  // server also sends Cache-Control: no-store, but an entry written before
+  // that change may still exist, so the client opts out as well.
+  const res = await fetch(path, { cache: 'no-store', ...init, headers });
   let payload: unknown = null;
   try {
     payload = await res.json();

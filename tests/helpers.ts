@@ -177,6 +177,7 @@ export async function readUserSkillRows(userId: string): Promise<any[]> {
 export interface ApiResponse {
   status: number;
   body: any;
+  headers: Headers;
 }
 
 export async function api(
@@ -206,7 +207,7 @@ export async function api(
   } catch {
     body = null;
   }
-  return { status: res.status, body };
+  return { status: res.status, body, headers: res.headers };
 }
 
 /**
@@ -237,5 +238,5 @@ export async function apiAnonymous(
   } catch {
     body = null;
   }
-  return { status: res.status, body };
+  return { status: res.status, body, headers: res.headers };
 }

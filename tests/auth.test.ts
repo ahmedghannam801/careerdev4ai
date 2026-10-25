@@ -77,6 +77,20 @@ describe('authentication', () => {
     const invalid = await api('GET', '/api/profile', { token: 'not.a.real.jwt' });
     assert.equal(invalid.status, 401);
   });
+
+  test('authenticated responses are explicitly non-cacheable', async () => {
+    // Regression: a newly created CV version did not appear after a reload
+    // because the browser reused a heuristically cached /api/cv-versions body.
+    for (const path of ['/api/cv-versions', '/api/cvs', '/api/profile']) {
+      const res = await api('GET', path, { token: userA.token });
+      assert.equal(res.status, 200, `${path} should succeed`);
+      assert.match(
+        res.headers.get('cache-control') ?? '',
+        /no-store/,
+        `${path} must send Cache-Control: no-store`
+      );
+    }
+  });
 });
 
 describe('validation', () => {

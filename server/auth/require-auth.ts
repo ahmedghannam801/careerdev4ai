@@ -16,6 +16,11 @@ export async function requireAuth(
   res: Response,
   next: NextFunction
 ) {
+  // Authenticated payloads are private and change as the user works. Without
+  // an explicit directive a browser may reuse a heuristically cached response
+  // and show a stale list (for example, a CV version created after the cache
+  // entry was written) even though the database already has the new row.
+  res.setHeader('Cache-Control', 'no-store');
   try {
     const result = await verifySupabaseToken(req.headers.authorization);
     if (result.status !== 'valid') {
