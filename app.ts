@@ -527,7 +527,11 @@ const ai = {
 // available Flash model without editing code. Evaluated dynamically so
 // Cloudflare Pages environment variables injected per-request are respected.
 function getGeminiModel(): string {
-  return process.env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite';
+  const model = process.env.GEMINI_MODEL?.trim();
+  if (!model || model === 'gemini-3.8-flash') {
+    return 'gemini-3.1-flash-lite';
+  }
+  return model;
 }
 
 // Structured-output validators.
