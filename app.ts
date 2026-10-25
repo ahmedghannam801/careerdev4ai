@@ -482,13 +482,15 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 let aiClient: GoogleGenAI | null = null;
+let aiClientApiKey: string | null = null;
 
 function getAiClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not configured');
-    }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+  if (!aiClient || aiClientApiKey !== apiKey) {
+    aiClientApiKey = apiKey;
     aiClient = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -522,9 +524,11 @@ const ai = {
 };
 
 // The model is configurable so an operator can move to a newer or more
-// available Flash model without editing code. The default remains the model
-// the product was validated against.
-const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+// available Flash model without editing code. Evaluated dynamically so
+// Cloudflare Pages environment variables injected per-request are respected.
+function getGeminiModel(): string {
+  return process.env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite';
+}
 
 // Structured-output validators.
 //
@@ -688,6 +692,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     modelConfigured: Boolean(process.env.GEMINI_API_KEY),
+    modelName: getGeminiModel(),
   });
 });
 
@@ -1318,7 +1323,7 @@ Return only valid JSON.`;
     if (process.env.GEMINI_API_KEY && atsBudget) {
       try {
         const atsRes = await ai.models.generateContent({
-          model: GEMINI_MODEL,
+          model: getGeminiModel(),
           contents: atsPrompt,
           config: { responseMimeType: 'application/json' },
         });
@@ -1529,7 +1534,7 @@ Rules:
 
     try {
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model: getGeminiModel(),
         contents: userPrompt,
         config: {
           systemInstruction,
@@ -1656,7 +1661,7 @@ Return valid JSON schema:
 
     try {
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model: getGeminiModel(),
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -1693,8 +1698,8 @@ app.post('/api/optimize-cv', requireAuth, aiRateLimit, async (req: Request, res:
 CV: ${cvText}
 Return JSON schema:
 {
-  "overallScore": number,
-  "breakdown": { "keywordsMatch": number, "impactAndMetrics": number, "formattingStructure": number, "experienceRelevance": number },
+  "overallScore": number (integer 0-100),
+  "breakdown": { "keywordsMatch": number (integer 0-100), "impactAndMetrics": number (integer 0-100), "formattingStructure": number (integer 0-100), "experienceRelevance": number (integer 0-100) },
   "matchedKeywords": [string],
   "missingKeywords": [string],
   "actionableImprovements": [{ "section": string, "currentText": string, "suggestedText": string, "reason": string }]
@@ -1712,7 +1717,7 @@ Return JSON schema:
 
     try {
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model: getGeminiModel(),
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -1778,7 +1783,7 @@ Return JSON schema:
 
     try {
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model: getGeminiModel(),
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -1851,7 +1856,7 @@ Requirements:
 
     try {
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model: getGeminiModel(),
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -1922,7 +1927,7 @@ Rules:
 
     try {
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model: getGeminiModel(),
         contents: prompt,
         config: { responseMimeType: 'application/json' },
       });
@@ -4266,7 +4271,7 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
       result = await enrichRecommendationsWithAi(deterministic, built.context, {
         ai:
           process.env.GEMINI_API_KEY && aiBudget ? getAiClient() : null,
-        model: GEMINI_MODEL,
+        model: getGeminiModel(),
       });
     }
 

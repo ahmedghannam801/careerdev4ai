@@ -258,7 +258,7 @@ export async function enrichRecommendationsWithAi(
   try {
     const response = await Promise.race([
       options.ai.models.generateContent({
-        model: options.model ?? 'gemini-3.8-flash',
+        model: options.model ?? (process.env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite'),
         contents: buildPrompt(candidates, context),
         config: {
           responseMimeType: 'application/json',
