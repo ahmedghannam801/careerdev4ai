@@ -350,6 +350,24 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         <main className="flex-1 p-4 sm:p-8 max-w-7xl mx-auto w-full">
           {children}
         </main>
+
+        {/* Global Authenticated Shell Footer */}
+        <footer className="mt-auto border-t border-[var(--border-subtle)] px-4 sm:px-8 py-3 text-xs text-[var(--text-muted)]">
+          <div className="flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-2">
+            <span>© 2026 CareerPilot AI</span>
+            <span>
+              Developed by{' '}
+              <a
+                href="https://www.linkedin.com/in/ahmed-ebrahim2"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline transition-colors"
+              >
+                Ahmed Ebrahim
+              </a>
+            </span>
+          </div>
+        </footer>
       </div>
 
       {/* Mobile Drawer Menu */}

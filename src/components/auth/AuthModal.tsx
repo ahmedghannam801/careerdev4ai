@@ -340,6 +340,17 @@ export const AuthModal: React.FC = () => {
                 </button>
               </p>
             )}
+            <div className="mt-2.5 pt-2 border-t border-[var(--border-subtle)]/40 text-[11px] text-[var(--text-muted)]">
+              <span>Developed by </span>
+              <a
+                href="https://www.linkedin.com/in/ahmed-ebrahim2"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline transition-colors"
+              >
+                Ahmed Ebrahim
+              </a>
+            </div>
           </div>
           </motion.div>
         </div>

@@ -259,6 +259,15 @@ tests/                    Integration tests
 - **Supabase** is the only identity and persistence provider. Production
   migrations must be applied to the target project before deploying.
 
+## Developer
+
+**Ahmed Ebrahim**
+
+- LinkedIn: [https://www.linkedin.com/in/ahmed-ebrahim2](https://www.linkedin.com/in/ahmed-ebrahim2)
+- GitHub: [https://github.com/ahmedghannam801](https://github.com/ahmedghannam801)
+- Email: [ahmedghannam801@gmail.com](mailto:ahmedghannam801@gmail.com)
+- Phone: [+201027053876](tel:+201027053876)
+
 ## License
 
 No license file is included in this repository. All rights are reserved unless

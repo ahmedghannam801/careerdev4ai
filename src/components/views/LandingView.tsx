@@ -585,7 +585,21 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
         <div className="mx-auto flex max-w-7xl flex-col gap-6 text-xs text-[var(--text-muted)]">
           <Logo variant="full" className="h-10 w-auto self-start sm:h-12" />
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <div>© 2026 CareerPilot AI. Personal Career Operating System.</div>
+            <div>
+              <span>© 2026 CareerPilot AI. Personal Career Operating System.</span>
+              <span className="mx-2 text-[var(--border-subtle)]">·</span>
+              <span>
+                Developed by{' '}
+                <a
+                  href="https://www.linkedin.com/in/ahmed-ebrahim2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] underline transition-colors"
+                >
+                  Ahmed Ebrahim
+                </a>
+              </span>
+            </div>
             <div className="flex items-center gap-6">
               <span>Privacy</span>
               <span>Terms</span>

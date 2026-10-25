@@ -13,7 +13,12 @@ import {
   Sparkles, 
   Lock, 
   AlertTriangle, 
-  Laptop
+  Laptop,
+  Info,
+  Phone,
+  Linkedin,
+  Github,
+  ExternalLink
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -58,7 +63,7 @@ export const SettingsView: React.FC = () => {
     exportDataJson,
   } = useCareer();
 
-  const [activeTab, setActiveTab] = useState<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface' | 'about'>('account');
 
   // Change Password state
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -303,6 +308,7 @@ export const SettingsView: React.FC = () => {
           { id: 'ai', label: 'AI Preferences', icon: Sparkles },
           { id: 'notifications', label: 'Notifications', icon: Bell },
           { id: 'interface', label: 'Localization & Theme', icon: Globe },
+          { id: 'about', label: 'About & Developer', icon: Info },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -776,6 +782,135 @@ export const SettingsView: React.FC = () => {
                   <Moon className="w-3.5 h-3.5" />
                   <span>Dark</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: ABOUT & DEVELOPER */}
+      {activeTab === 'about' && (
+        <div className="space-y-6">
+          {/* Platform Overview */}
+          <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-[var(--text-primary)]">
+                  CareerPilot AI
+                </h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Your Personal Career Operating System: goals, skills, roadmaps, learning, projects, evidence, CVs, job applications, and interview practice in one unified workspace.
+                </p>
+              </div>
+              <span className="self-start sm:self-auto shrink-0 px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-[var(--accent-surface)] text-[var(--color-primary-text)] border border-[var(--border-subtle)]">
+                v1.0.0 GA
+              </span>
+            </div>
+          </div>
+
+          {/* Developer Information Card */}
+          <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
+            <div className="border-b border-[var(--border-subtle)] pb-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                Developed by
+              </div>
+              <h3 className="text-xl font-bold text-[var(--text-primary)] mt-1">
+                Ahmed Ebrahim
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                Software Engineer & Creator of CareerPilot AI
+              </p>
+            </div>
+
+            {/* Contact Information */}
+            <div className="space-y-3">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                Contact
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <a
+                  href="mailto:ahmedghannam801@gmail.com"
+                  className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] hover:border-[var(--color-primary-text)]/30 transition-all flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[var(--surface-main)] text-[var(--color-primary-text)] border border-[var(--border-subtle)]">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[var(--text-primary)]">Email</div>
+                      <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                        ahmedghannam801@gmail.com
+                      </div>
+                    </div>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors shrink-0" />
+                </a>
+
+                <a
+                  href="tel:+201027053876"
+                  className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] hover:border-[var(--color-primary-text)]/30 transition-all flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[var(--surface-main)] text-[var(--color-primary-text)] border border-[var(--border-subtle)]">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[var(--text-primary)]">Phone</div>
+                      <div className="text-[11px] text-[var(--text-secondary)] truncate font-mono">
+                        +201027053876
+                      </div>
+                    </div>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors shrink-0" />
+                </a>
+              </div>
+            </div>
+
+            {/* Profiles */}
+            <div className="space-y-3 pt-2">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                Profiles
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <a
+                  href="https://www.linkedin.com/in/ahmed-ebrahim2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] hover:border-[#0A66C2]/40 transition-all flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[var(--surface-main)] text-[#0A66C2] border border-[var(--border-subtle)]">
+                      <Linkedin className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[var(--text-primary)]">LinkedIn</div>
+                      <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                        ahmed-ebrahim2
+                      </div>
+                    </div>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors shrink-0" />
+                </a>
+
+                <a
+                  href="https://github.com/ahmedghannam801"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] hover:border-[var(--color-primary-text)]/30 transition-all flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[var(--surface-main)] text-[var(--text-primary)] border border-[var(--border-subtle)]">
+                      <Github className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[var(--text-primary)]">GitHub</div>
+                      <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                        ahmedghannam801
+                      </div>
+                    </div>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors shrink-0" />
+                </a>
               </div>
             </div>
           </div>
