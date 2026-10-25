@@ -26,12 +26,16 @@
 
 /** Matches the provider's daily-request quota error. */
 export function isQuotaError(error: unknown): boolean {
+  if (!error) return false;
+  const status =
+    (error as { status?: number; statusCode?: number })?.status ??
+    (error as { status?: number; statusCode?: number })?.statusCode;
+  if (status === 429) return true;
   const message = String((error as { message?: unknown })?.message ?? error ?? '');
   return (
     message.includes('RESOURCE_EXHAUSTED') ||
     message.includes('429') ||
-    message.includes('quota exceeded') ||
-    message.includes('Quota exceeded')
+    /quota/i.test(message)
   );
 }
 

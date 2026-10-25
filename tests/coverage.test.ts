@@ -7,10 +7,10 @@
 //
 // The Gemini-backed routes (`/api/resumes/upload`, `/api/analyze-career`,
 // `/api/optimize-cv`, `/api/mock-interview`, `/api/suggest-summary`,
-// `/api/generate-cover-letter`) are covered for their AUTH contract and for
-// their behaviour when the model is not configured. Whether a model is
-// configured is a property of the SERVER (it loads `.env`), so the suite asks
-// the server through `/api/health` rather than guessing from its own
+// `/api/generate-cover-letter`, `/api/copilot`) are covered for their AUTH
+// contract and for their behaviour when the model is not configured. Whether a
+// model is configured is a property of the SERVER (it loads `.env`), so the
+// suite asks the server through `/api/health` rather than guessing from its own
 // environment — and it asserts that each route returns an explicit failure
 // and never substitutes invented content for a real model response.
 import { test, describe, before, after } from 'node:test';
@@ -339,7 +339,7 @@ describe('the notifications read-all endpoint', () => {
   });
 });
 
-describe('the AI routes reject an unauthenticated or malformed request', () => {
+describe('the AI routes reject an unauthenticated request', () => {
   test('every AI route requires a session', async () => {
     for (const path of [
       '/api/resumes/upload',
@@ -348,12 +348,137 @@ describe('the AI routes reject an unauthenticated or malformed request', () => {
       '/api/mock-interview',
       '/api/suggest-summary',
       '/api/generate-cover-letter',
+      '/api/copilot',
     ]) {
       const res = await api('POST', path, { body: {} });
       assert.equal(res.status, 401, `${path} must require a session`);
     }
   });
+});
 
+describe('the Copilot endpoint (/api/copilot)', () => {
+  // ─── 1. Authentication ────────────────────────────────────────────────────
+  test('unauthenticated request is rejected with 401', async () => {
+    const res = await api('POST', '/api/copilot', {
+      body: { userPrompt: 'What should I learn next?' },
+    });
+    assert.equal(res.status, 401);
+  });
+
+  // ─── 2. Missing prompt ────────────────────────────────────────────────────
+  test('missing userPrompt is rejected with 400', async () => {
+    const res = await api('POST', '/api/copilot', {
+      token: user.token,
+      body: {},
+    });
+    assert.equal(res.status, 400);
+    assert.match(String(res.body?.error ?? ''), /userPrompt/i);
+  });
+
+  // ─── 3. Oversized prompt is safely truncated, not forwarded raw ───────────
+  // The server caps userPrompt to 2000 chars; a 3000-char prompt must either
+  // succeed (truncated) or fail with 400/429/503 — NEVER with 500.
+  test('an oversized prompt does not crash the server', async () => {
+    const longPrompt = 'What should I learn? '.repeat(200); // > 2000 chars
+    const res = await api('POST', '/api/copilot', {
+      token: user.token,
+      body: { userPrompt: longPrompt, context: { activeView: 'dashboard' } },
+    });
+    // 400 (truncated to empty), 200 (answered), 429 (quota), 503 (no model).
+    // 500 is the only unacceptable outcome.
+    assert.notEqual(res.status, 500, 'a long prompt must not cause a 500 error');
+  });
+
+  // ─── 4. No fabricated answer when the model is absent ─────────────────────
+  test('no content is invented when no model is configured', async (t) => {
+    const health = await api('GET', '/api/health');
+    if (health.body?.modelConfigured === true) {
+      t.skip('the server has a model configured; this test only applies when GEMINI_API_KEY is absent');
+      return;
+    }
+    const res = await api('POST', '/api/copilot', {
+      token: user.token,
+      body: { userPrompt: 'What should I learn next?' },
+    });
+    assert.equal(res.status, 503, 'must report the model as unavailable');
+    assert.equal(
+      res.body?.code,
+      'model_unavailable',
+      'must carry the model_unavailable code'
+    );
+    // The response must NOT contain a "text" field that looks like AI output.
+    assert.equal(res.body?.text, undefined, 'must not fabricate an answer');
+  });
+
+  // ─── 5. When model is configured, real answer or honest failure ────────────
+  test('returns a real answer or an explicit failure, never invents content', async () => {
+    const res = await api('POST', '/api/copilot', {
+      token: user.token,
+      body: {
+        userPrompt: 'What should I learn next for my target role?',
+        context: { activeView: 'dashboard' },
+      },
+    });
+
+    if (res.status === 200) {
+      assert.equal(typeof res.body?.text, 'string', 'must return a text field');
+      assert.ok((res.body?.text?.length ?? 0) > 0, 'text must not be empty');
+      // Never expose secrets or server internals.
+      assert.equal(res.body?.apiKey, undefined, 'must not expose API key');
+      assert.equal(res.body?.details, undefined, 'must not expose internal details');
+    } else {
+      // 429 (quota) or 503 (unavailable) are the only valid non-200 outcomes.
+      assert.ok(
+        res.status === 429 || res.status === 503,
+        `must answer 200, 429, or 503 — got ${res.status}`
+      );
+      assert.equal(typeof res.body?.error, 'string', 'must explain the failure');
+      assert.equal(res.body?.text, undefined, 'must not fabricate an answer on failure');
+    }
+  });
+
+  // ─── 6. Cross-user isolation ───────────────────────────────────────────────
+  // User B's Copilot call must never reuse User A's exhausted daily budget.
+  test("cross-user isolation — User B is not blocked by User A's budget", async () => {
+    const other = await createTestUser('copilot-other');
+    try {
+      const res = await api('POST', '/api/copilot', {
+        token: other.token,
+        body: {
+          userPrompt: 'What are my biggest skill gaps?',
+          context: { activeView: 'skills' },
+        },
+      });
+      assert.ok(
+        !(res.status === 429 && res.body?.code === 'ai_daily_budget'),
+        "User B must not inherit User A's exhausted daily budget"
+      );
+      assert.ok(
+        !(res.status === 429 && res.body?.code === 'rate_limit'),
+        "User B must not inherit User A's rate-limit bucket"
+      );
+    } finally {
+      await deleteTestUser(other);
+    }
+  });
+
+  // ─── 7. No server secrets in response ──────────────────────────────────────
+  test('the response never contains server-side secrets', async () => {
+    const res = await api('POST', '/api/copilot', {
+      token: user.token,
+      body: {
+        userPrompt: 'Describe my career state in detail.',
+        context: { activeView: 'dashboard' },
+      },
+    });
+    const body = JSON.stringify(res.body ?? '');
+    assert.ok(!body.includes('service_role'), 'must not expose service-role key');
+    assert.ok(!body.includes('SUPABASE_SERVICE_ROLE'), 'must not expose env var name');
+    assert.ok(!body.includes('apiKey'), 'must not expose Gemini API key field');
+  });
+});
+
+describe('the AI routes fail honestly when model is absent or quota exhausted', () => {
   test('the AI routes fail honestly when no model is available', async (t) => {
     // Whether a model is configured is a property of the SERVER, not of the
     // test process: the server loads `.env`, so the suite asks the server
