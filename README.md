@@ -122,8 +122,26 @@ implementation.
 ```bash
 npm ci
 npm run build
-npx wrangler pages deploy dist --project-name careerpilot4ai
+npx wrangler pages deploy dist --project-name careerpilot4ai --branch main
 ```
+
+`--branch main` is what targets the **Production** environment
+(`careerpilot4ai.pages.dev`). Pages maps the production branch to Production and
+every other branch to a Preview environment, and Wrangler derives the branch from
+the current Git branch when `--branch` is omitted. Without the explicit flag, a
+deploy from any other branch silently publishes a preview URL and leaves
+`careerpilot4ai.pages.dev` on the old build.
+
+Use the npm scripts, which encode the same targets:
+
+| Script | Target |
+| --- | --- |
+| `npm run cf:deploy` | Production (`--branch main`) — updates `careerpilot4ai.pages.dev` |
+| `npm run cf:preview` | Preview (`--branch preview`) — alias `preview.careerpilot4ai.pages.dev` |
+| `npm run cf:dev` | Local Pages runtime on `http://localhost:8788` |
+| `npm run cf:deployments` | List deployments for the project |
+
+Preview URLs are public by default and carry `X-Robots-Tag: noindex`.
 
 Configure these in the Pages project (Settings → Environment variables) for
 **both** Production and Preview:
