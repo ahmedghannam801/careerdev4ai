@@ -78,6 +78,8 @@ export interface TargetRolePickerProps {
   renderDomain?: (domain: (typeof CAREER_DOMAINS)[number], count: number) => React.ReactNode;
   /** Placeholder for the search box. */
   searchPlaceholder?: string;
+  /** Optional id so a surrounding <label htmlFor> can name the search box. */
+  searchInputId?: string;
   className?: string;
 }
 
@@ -89,6 +91,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
   renderSpecialisation,
   renderDomain,
   searchPlaceholder = 'Search a role — e.g. "financial analyst"',
+  searchInputId,
   className = '',
 }) => {
   // The domain the picker opens on: the explicitly supplied one, otherwise
@@ -224,6 +227,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
       <div className="relative">
         <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-3" />
         <input
+          id={searchInputId}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

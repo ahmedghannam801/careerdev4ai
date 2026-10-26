@@ -70,8 +70,8 @@ export interface DocumentQualityAssessment {
 
 const PDF_SCANNED_MESSAGE =
   'This PDF appears to be a scanned or image-only document with no text layer. ' +
-  'OCR is not supported, so the text cannot be read reliably. Please upload a ' +
-  'text-based PDF or DOCX, or paste your CV text.';
+  'OCR is not supported for scanned PDFs. Please upload a text-based PDF or ' +
+  'DOCX, or paste your CV text.';
 
 const PDF_UNREADABLE_MESSAGE =
   'The PDF could not be read. It may be encrypted, password-protected or ' +

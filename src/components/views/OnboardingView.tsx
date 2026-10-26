@@ -364,6 +364,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             <TargetRolePicker
               selectedRoleId={selectedRoleId || null}
               onSelect={(role) => setSelectedRoleId(role.id)}
+              searchInputId="onboarding-role-search"
               searchPlaceholder="Try “data analyst”, “HR”, “nurse” or “supply chain”"
               renderSpecialisation={(role) => (
                 <button

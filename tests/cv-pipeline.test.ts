@@ -230,7 +230,7 @@ describe('scanned / image-only PDFs', () => {
     assert.equal(quality.isScannedPdf, true);
     assert.equal(quality.quality, 'failed');
     assert.match(quality.errorMessage ?? '', /scanned or image-only/i);
-    assert.match(quality.errorMessage ?? '', /OCR is not supported/i);
+    assert.match(quality.errorMessage ?? '', /OCR is not supported for scanned PDFs\./);
   });
 
   test('produce no fabricated CV fields', () => {
@@ -582,5 +582,19 @@ describe('ATS analysis integrity', () => {
     assert.equal(formatRetryDelay(3600), '1 hour');
     assert.equal(formatRetryDelay(5400), '1 hour 30 minutes');
     assert.equal(formatRetryDelay(19620), '5 hours 27 minutes');
+  });
+
+  test('the upload route never substitutes a fabricated ATS score', () => {
+    // A deterministic fallback here would be a silent downgrade: the user
+    // would see a score that no model produced. The upload must store null
+    // and let CV Studio run a real retry through /api/optimize-cv.
+    const source = readFileSync(join(REPO_ROOT, 'app.ts'), 'utf8');
+    const start = source.indexOf("app.post('/api/resumes/upload'");
+    const end = source.indexOf("app.post('/api/analyze-career'", start);
+    assert.ok(start >= 0 && end > start, 'the upload route must be present');
+    const route = source.slice(start, end);
+    assert.match(route, /atsAnalysis\s*=\s*null/);
+    assert.doesNotMatch(route, /deterministic ATS diagnostic/i);
+    assert.doesNotMatch(route, /overallScore:\s*(?:50|score)\b/);
   });
 });

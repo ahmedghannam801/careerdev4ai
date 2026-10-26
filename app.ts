@@ -117,7 +117,7 @@ import {
   quotaRetryAfterSeconds,
   refundDailyAiBudget,
 } from './server/ai/quota.ts';
-import { resolveRole, CATALOG_SKILL_NAMES } from './shared/careerRoles.ts';
+import { CATALOG_SKILL_NAMES } from './shared/careerRoles.ts';
 import {
   uploadCvFile,
   createCvFileDownloadUrl,
@@ -1242,9 +1242,6 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
       .then((profile) => profile?.targetRole ?? null)
       .catch(() => null);
     const targetRoleTitle = requestedRoleTitle ?? profileRoleTitle ?? 'Target role';
-    // Resolved through the shared catalogue so the deterministic ATS
-    // fallback uses the keywords that actually matter for this role.
-    const catalogueRole = resolveRole(targetRoleTitle);
 
     // Stage 3: deterministic structured extraction. This is intentionally the
     // only parser of record; there is no model fallback that can hallucinate a
@@ -1330,8 +1327,10 @@ Return only valid JSON.`;
 
     let atsAnalysis: any = null;
     // The ATS pass draws its own unit from the daily budget. When the
-    // allowance is spent, or the provider fails, the deterministic diagnostic
-    // below is used instead — the upload still succeeds.
+    // allowance is spent, the provider is unavailable or the provider returns
+    // an invalid payload, the upload still succeeds but NO score is invented.
+    // The version is stored with atsAnalysis = null and CV Studio offers a
+    // real retry through /api/optimize-cv.
     const atsBudget = tryConsumeAiBudget(req.authUser!.id);
     if (process.env.GEMINI_API_KEY && atsBudget) {
       try {
@@ -1349,69 +1348,6 @@ Return only valid JSON.`;
         console.warn('ATS analysis unavailable:', e);
         if (isQuotaError(e)) refundDailyAiBudget(req.authUser!.id);
         atsAnalysis = null;
-      }
-    }
-
-    if (!atsAnalysis) {
-      // Deterministic ATS diagnostic based on the role's own keywords. The
-      // list used to be a hard-coded JavaScript/React/Python set, which
-      // scored a CV for an HR or finance role against the wrong vocabulary.
-      const lowerText = extraction.text.toLowerCase();
-      const sampleKeywords = (
-        catalogueRole
-          ? [
-              ...catalogueRole.requiredSkills.map((skill) => skill.name),
-              ...catalogueRole.preferredSkills.map((skill) => skill.name),
-              ...catalogueRole.tools,
-            ]
-          : []
-      )
-        .map((keyword) => keyword.toLowerCase())
-        .filter((keyword) => keyword.length >= 3)
-        .slice(0, 12);
-      if (sampleKeywords.length === 0) {
-        // No catalogue role: fall back to the section structure only, and say
-        // so rather than inventing a keyword score.
-        atsAnalysis = {
-          overallScore: 50,
-          breakdown: {
-            keywordsMatch: 0,
-            impactAndMetrics: 50,
-            formattingStructure: 85,
-            experienceRelevance: 50,
-          },
-          matchedKeywords: [],
-          missingKeywords: [],
-          actionableImprovements: [
-            {
-              section: 'skills',
-              currentText: '',
-              suggestedText: 'Set a target role so the keyword diagnostic can be tailored',
-              reason: 'A target role is required for a meaningful keyword check',
-            },
-          ],
-        };
-      } else {
-        const matched = sampleKeywords.filter((k) => lowerText.includes(k));
-        const missing = sampleKeywords.filter((k) => !lowerText.includes(k)).slice(0, 3);
-        const score = Math.min(95, Math.max(50, Math.round(50 + (matched.length / sampleKeywords.length) * 45)));
-        atsAnalysis = {
-          overallScore: score,
-          breakdown: {
-            keywordsMatch: Math.min(100, matched.length * 12),
-            impactAndMetrics: 75,
-            formattingStructure: 85,
-            experienceRelevance: 80,
-          },
-          matchedKeywords: matched,
-          missingKeywords: missing,
-          actionableImprovements: missing.map((m) => ({
-            section: 'skills',
-            currentText: '',
-            suggestedText: `Consider showcasing experience with ${m}`,
-            reason: `Frequently requested for ${targetRoleTitle} roles`,
-          })),
-        };
       }
     }
 
