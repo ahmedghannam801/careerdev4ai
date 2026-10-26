@@ -1,31 +1,22 @@
 /**
  * CareerPilot AI — official brand asset pipeline.
  * -----------------------------------------------------------------------------
- * Turns the two approved brand assets in `src/assets/brand/official/` into every
+ * Turns the approved brand assets in `src/assets/brand/official/` into every
  * derivative the platform ships:
  *
  *   official/careerpilot-icon.png  ->  app / favicon / PWA icon set
- *   official/careerpilot-logo.png  ->  full horizontal lockup
+ *   official/careerpilot-logo.png  ->  larger UI presentation and social card
  *
  * The official files are NEVER redrawn, recoloured, restretched or re-lettered.
  * The only operations applied are:
  *
- *   1. removal of the plain white *field* the artwork was supplied on, so the
- *      mark can sit on any surface, and
- *   2. trimming of the supplied outer margin.
+ *   1. removal of the plain white *field* from opaque source art, so the mark
+ *      can sit on any surface,
+ *   2. trimming of the supplied outer margin, and
+ *   3. proportional resizing for each target size.
  *
- * The white that belongs to the artwork itself is preserved:
- *   - the swoosh that separates the cap from the ribbon is part of the
- *     background field (it is connected to the outside of the artwork), and
- *   - the counters of the letters in the wordmark are enclosed by the glyphs.
- * Both are pure white in the supplied assets, so both are keyed out exactly
- * like the background field — on any surface they reveal what is behind the
- * logo, which is how the supplied artwork reads on its own white background.
- *
- * Anti-aliased edge pixels are un-premultiplied against white so the mark keeps
- * a clean edge on dark surfaces instead of carrying a white halo. Only
- * chromatic pixels are un-premultiplied: the neutral grey tagline has no
- * saturated channel, so un-premultiplying it would darken its letter edges.
+ * Transparent source art is used as supplied: white details inside the mark
+ * belong to the artwork and are never keyed out.
  *
  * Run with:  npm run brand
  */
@@ -55,18 +46,21 @@ const BRAND = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Keys the white field out of an RGBA image.
+ * Prepares supplied art for compositing.
  *
- * Every pixel whose weakest channel is at least `NEAR_WHITE` is treated as
- * background and becomes transparent — this covers the outer field and the
- * enclosed letter counters, which are both pure white in the supplied art.
- * Chromatic edge pixels are un-premultiplied against white so the mark keeps
- * a clean edge on dark surfaces.
+ * Art that already carries transparency is returned unchanged: white details
+ * inside the mark (an orbit line, for example) are part of the artwork. Opaque
+ * art is assumed to have been supplied on a plain white field, which is keyed
+ * out below.
  */
-async function keyOutWhite(file) {
+async function prepareArtwork(file) {
   const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: W, height: H, channels: C } = info;
   if (C !== 4) throw new Error(`Expected 4 channels, received ${C}`);
+
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 255) return { data, info };
+  }
 
   const at = (x, y) => (y * W + x) * 4;
   const minChannel = (x, y) => Math.min(data[at(x, y)], data[at(x, y) + 1], data[at(x, y) + 2]);
@@ -203,10 +197,10 @@ async function build() {
   await mkdir(PUBLIC_BRAND_DIR, { recursive: true });
 
   /* ------------------------------------------------------------------ */
-  /* 1. Icon: key the white field, trim, centre on a square canvas.       */
+  /* 1. Icon: prepare the art, trim, centre on a square canvas.           */
   /* ------------------------------------------------------------------ */
   console.log('→ icon');
-  const iconRaw = await keyOutWhite(OFFICIAL_ICON);
+  const iconRaw = await prepareArtwork(OFFICIAL_ICON);
   const iconSquare = await squareCanvas(iconRaw, 0.94, 512);
 
   // Bundled copy — imported by the React <Logo> component.
@@ -245,14 +239,14 @@ async function build() {
     .toFile(path.join(PUBLIC_BRAND_DIR, 'maskable-512.png'));
 
   /* ------------------------------------------------------------------ */
-  /* 2. Full lockup: key the white field, trim, keep the artwork intact.  */
+  /* 2. Large UI asset: prepare the art, trim, keep the artwork intact.   */
   /* ------------------------------------------------------------------ */
-  console.log('→ lockup');
-  const logoRaw = await keyOutWhite(OFFICIAL_LOGO);
+  console.log('→ logo');
+  const logoRaw = await prepareArtwork(OFFICIAL_LOGO);
   const logoBounds = artworkBounds(logoRaw.data, logoRaw.info);
 
   // The artwork is reproduced at its original scale; only the supplied outer
-  // margin is replaced by a small, even transparent one so the lockup can be
+  // margin is replaced by a small, even transparent one so the mark can be
   // sized responsively without the whitespace dominating the box.
   const cropped = await sharp(logoRaw.data, {
     raw: { width: logoRaw.info.width, height: logoRaw.info.height, channels: 4 },
@@ -270,7 +264,7 @@ async function build() {
   const padY = Math.round(logoBounds.height * 0.06);
   const lockup = await sharp(cropped)
     .extend({ top: padY, bottom: padY, left: padX, right: padX, background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    // The lockup is shown at most ~490px wide in the UI, so 1200px keeps it
+    // The mark is displayed at a modest size in the UI, so 1200px keeps it
     // sharp on high-density screens without shipping an oversized file.
     .resize({ width: 1200, kernel: 'lanczos3' })
     .png(PNG_OUTPUT)
@@ -313,10 +307,13 @@ async function build() {
   await writeFile(path.join(PUBLIC_DIR, 'site.webmanifest'), `${JSON.stringify(manifest, null, 2)}\n`);
 
   /* ------------------------------------------------------------------ */
-  /* 5. Social card — the official lockup on the brand background.      */
+  /* 5. Social card — the official mark on the brand background.        */
   /* ------------------------------------------------------------------ */
   console.log('→ og image');
-  const ogLockup = await sharp(lockup).resize({ width: 900, kernel: 'lanczos3' }).png().toBuffer();
+  const ogLockup = await sharp(lockup)
+    .resize({ width: 900, height: 500, fit: 'inside', kernel: 'lanczos3' })
+    .png()
+    .toBuffer();
   const ogLockupMeta = await sharp(ogLockup).metadata();
   await sharp({
     create: { width: 1200, height: 630, channels: 4, background: BRAND.lightBackground },

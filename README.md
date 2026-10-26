@@ -262,15 +262,14 @@ tests/                    Integration tests
 - **No live job feed.** The Jobs view builds searches on LinkedIn, Indeed,
   Google Jobs and Wellfound. The application does not invent listings or
   application links.
-- **Branding assets** are integrated. The two approved logo files live in
-  `src/assets/brand/official/` and are the single source of truth: the icon-only
-  symbol and the full "CareerPilot AI" lockup. `npm run brand` regenerates every
-  derivative from them (`src/assets/brand/*.png` for the UI, `public/brand/*` for
-  the favicon, PWA and Open Graph set). The UI renders the logo through
-  `src/components/brand/Logo.tsx`; nothing else may reference an image file
-  directly. The artwork is never redrawn or recoloured — only the supplied outer
-  margin is trimmed and the white field is keyed out so the mark can sit on any
-  surface.
+- **Branding assets** are integrated. The approved logo files live in
+  `src/assets/brand/official/` and are the single source of truth. `npm run brand`
+  regenerates every derivative from them (`src/assets/brand/*.png` for the UI,
+  `public/brand/*` for the favicon, PWA and Open Graph set). The UI renders the
+  logo through `src/components/brand/Logo.tsx`; nothing else may reference an
+  image file directly. The artwork is never redrawn or recoloured — only the
+  supplied outer margin is trimmed and, for opaque source art, the white field
+  is keyed out so the mark can sit on any surface.
 - **Gemini** is the only external AI provider. Without `GEMINI_API_KEY` the AI
   routes return an explicit `503` and the UI reports that AI is unavailable;
   no canned AI output is substituted.
