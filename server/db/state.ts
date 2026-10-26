@@ -9,6 +9,7 @@ import { getSupabaseServer } from './supabase';
 import { getProfile, upsertProfile } from './profiles';
 import { getPreferences, upsertPreferences } from './preferences';
 import { getUserSkills, upsertUserSkill, DEFAULT_SKILL_CATEGORY } from './userSkills';
+import { resolveTargetRoleWrite } from '../targetRole.ts';
 
 export interface StatePayload {
   profile?: any;
@@ -80,6 +81,16 @@ export function unmappedStateFields(payload: StatePayload): string[] {
   for (const key of UNMAPPED_SETTINGS_FIELDS) {
     if (s[key] !== undefined && s[key] !== null) out.push('settings.' + key);
   }
+  // A target role that is not a real domain/role pair is reported instead of
+  // being silently dropped, so the caller can see it was not applied.
+  if (payload.targetRole !== undefined && payload.targetRole !== null) {
+    const outcome = resolveTargetRoleWrite({
+      domainId: payload.targetRole?.domainId,
+      roleId: payload.targetRole?.id,
+      title: payload.targetRole?.title,
+    });
+    if (!outcome.ok || !outcome.value) out.push('targetRole');
+  }
   return out;
 }
 
@@ -101,7 +112,23 @@ export async function saveState(
   if (p.careerGoal !== undefined) profileUpdates.career_goal = p.careerGoal ?? null;
   if (p.industry !== undefined) profileUpdates.target_industry = p.industry ?? null;
   if (p.onboardingCompleted !== undefined) profileUpdates.onboarding_completed = !!p.onboardingCompleted;
-  if (payload.targetRole?.title !== undefined) profileUpdates.target_role = payload.targetRole.title;
+  // The target role is a hierarchical selection (domain + specialisation), so
+  // it is validated on the server here too. An invalid selection is NOT
+  // written and is reported through unmappedStateFields() instead of being
+  // stored as a broken target role.
+  const targetRoleOutcome = resolveTargetRoleWrite({
+    domainId: payload.targetRole?.domainId,
+    roleId: payload.targetRole?.id,
+    title: payload.targetRole?.title,
+  });
+  if (targetRoleOutcome.ok && targetRoleOutcome.value) {
+    profileUpdates.target_role = targetRoleOutcome.value.title;
+    // The parent domain is persisted next to the specialisation so the
+    // hierarchy survives a logout/login.
+    if (p.industry === undefined) {
+      profileUpdates.target_industry = targetRoleOutcome.value.domainLabel;
+    }
+  }
   if (Object.keys(profileUpdates).length > 0) {
     await upsertProfile(userId, profileUpdates);
   }

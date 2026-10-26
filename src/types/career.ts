@@ -118,6 +118,33 @@ export interface CareerProject {
   completedAt?: string;
 }
 
+/**
+ * One volunteer stint.
+ *
+ * A volunteer experience is a domain of its own: it is not an employment
+ * entry, so it never appears in the CV timeline. It records the
+ * organisation, the role taken on, the duration, the responsibilities, the
+ * achievements and the skills it gave the user — plus the projects that
+ * evidence it.
+ */
+export interface VolunteerExperience {
+  id: string;
+  organization: string;
+  role: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  isCurrent: boolean;
+  description: string;
+  responsibilities: string[];
+  achievements: string[];
+  skills: string[];
+  /** The ids of the projects this stint is evidenced by. */
+  projectIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type EvidenceType = 
   | 'github'
   | 'demo'

@@ -219,6 +219,16 @@ export function buildAiContextBlock(context: AiCareerContext): string {
       lines.push(`- Core responsibilities of the role: ${role.responsibilities.slice(0, 5).join('; ')}`);
     }
   }
+  // The target role is an EXPLICIT user selection, so the model is told to
+  // treat it as authoritative. It may still point out that another path might
+  // suit the user better, but only as a suggestion the user can act on — it
+  // must never present the target role as changed.
+  if (context.targetRoleTitle) {
+    lines.push(
+      '- The target role above was explicitly chosen by the user. Treat it as authoritative: plan, recommend and advise for THAT role.',
+      '- If another career path would suit the user better, offer it only as an alternative to consider. Never state or imply that their target role has changed.',
+    );
+  }
   if (context.skillGaps.length) {
     lines.push(
       `- Skill gaps (current -> target): ${context.skillGaps.map((g) => `${g.name} (${g.current}->${g.target})`).join('; ')}`,

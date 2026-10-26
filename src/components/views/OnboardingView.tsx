@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowRight, ArrowLeft, Check, Upload, FileText, Sparkles, Layers, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, ArrowLeft, Check, Upload, FileText, Sparkles } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CareerState, CareerGoal } from '../../types/career';
-import { TARGET_ROLES, CAREER_DOMAINS, searchCareerCatalog } from '../../data/rolesData';
+import { TARGET_ROLES, CAREER_DOMAINS } from '../../data/rolesData';
 import { Reveal } from '../motion/Motion';
 import { CVImportModal } from '../cv/CVImportModal';
 import { AvatarSelector, DEFAULT_AVATAR_ID } from '../ui/CareerPilotAvatars';
+import { TargetRolePicker } from '../career/TargetRolePicker';
 
 /**
- * The roles are grouped by career domain. The catalogue spans every major
- * career domain, so a flat list of eighty roles is not browsable; the search
- * box above the list narrows it with the shared fuzzy matcher.
+ * The target role is chosen as a hierarchy: the career domain first, then the
+ * specialisation inside it. The catalogue spans every major career domain, so
+ * the picker derives the specialisations from the selected domain instead of
+ * listing every role at once.
  */
 interface OnboardingViewProps {
   onComplete: () => void;
@@ -27,7 +29,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   const [selectedGoal, setSelectedGoal] = useState<CareerGoal>(profile.careerGoal || 'get_promoted');
   const [customGoal, setCustomGoal] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState('');
-  const [roleQuery, setRoleQuery] = useState('');
   const [showCvModal, setShowCvModal] = useState(false);
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>(profile.avatarUrl || DEFAULT_AVATAR_ID);
   const [isSaving, setIsSaving] = useState(false);
@@ -38,27 +39,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     if (profile.location && !location) setLocation(profile.location);
     if (profile.avatarUrl && profile.avatarUrl !== selectedAvatarId) setSelectedAvatarId(profile.avatarUrl);
   }, [profile.currentTitle, profile.location, profile.avatarUrl]);
-
-  /**
-   * Role search uses the shared catalogue matcher, the same one the global
-   * search and the role explorer use. With no query the catalogue stays
-   * grouped by domain; a query narrows it to the real matches.
-   */
-  const roleMatches = useMemo(
-    () =>
-      roleQuery.trim()
-        ? searchCareerCatalog(roleQuery, { limit: 60 }).roles.map((match) => match.role)
-        : null,
-    [roleQuery]
-  );
-
-  const groupedRoles = useMemo(() => {
-    const roles = roleMatches ?? TARGET_ROLES;
-    return CAREER_DOMAINS.map((domain) => ({
-      domain,
-      roles: roles.filter((role) => role.domainId === domain.slug),
-    })).filter((group) => group.roles.length > 0);
-  }, [roleMatches]);
 
   const selectedRoleTitle =
     TARGET_ROLES.find((role) => role.id === selectedRoleId)?.title ?? '';
@@ -363,24 +343,11 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 htmlFor="onboarding-role-search"
                 className="block text-xs font-semibold text-[var(--text-secondary)]"
               >
-                Search the role catalogue
+                Choose your career domain, then your specialisation
               </label>
-              <div className="relative">
-                <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  id="onboarding-role-search"
-                  type="search"
-                  value={roleQuery}
-                  onChange={(event) => setRoleQuery(event.target.value)}
-                  placeholder="Try “data analyst”, “HR”, “nurse” or “supply chain”"
-                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
-                />
-              </div>
               <div className="flex items-center justify-between gap-3 text-[11px] text-[var(--text-muted)]">
                 <span>
-                  {roleMatches
-                    ? `${roleMatches.length} matching role${roleMatches.length === 1 ? '' : 's'}`
-                    : `${TARGET_ROLES.length} roles across ${CAREER_DOMAINS.length} domains`}
+                  {TARGET_ROLES.length} specialisations across {CAREER_DOMAINS.length} domains
                 </span>
                 {selectedRoleTitle && (
                   <span className="text-[var(--color-primary-text)] font-semibold">
@@ -390,50 +357,43 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
               </div>
             </div>
 
-            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-              {groupedRoles.length === 0 && (
-                <div className="p-4 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 text-xs text-[var(--text-secondary)]">
-                  No role matches “{roleQuery.trim()}”. Try a broader term such as the domain
-                  (“data”, “design”, “healthcare”) or clear the search to browse every domain.
-                </div>
-              )}
-              {groupedRoles.map((group) => (
-                <div key={group.domain.slug} className="space-y-2">
-                  <div className="sticky top-0 z-10 flex items-center gap-2 bg-[var(--surface-main)]/95 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] backdrop-blur">
-                    <Layers className="h-3 w-3" />
-                    <span>{group.domain.label}</span>
-                    <span className="font-mono text-[var(--text-muted)]/70">({group.roles.length})</span>
+            {/* The target role is a hierarchy: level 1 is the career domain and
+                level 2 is the specialisation inside it. The picker derives the
+                specialisations from the role catalogue, so the two levels can
+                never disagree. */}
+            <TargetRolePicker
+              selectedRoleId={selectedRoleId || null}
+              onSelect={(role) => setSelectedRoleId(role.id)}
+              searchPlaceholder="Try “data analyst”, “HR”, “nurse” or “supply chain”"
+              renderSpecialisation={(role) => (
+                <button
+                  key={role.id}
+                  type="button"
+                  onClick={() => setSelectedRoleId(role.id)}
+                  className={`w-full p-4 rounded-xl border text-left transition-all flex items-start justify-between ${
+                    selectedRoleId === role.id
+                      ? 'bg-[var(--accent-surface)]/60 border-[var(--accent-primary)] text-[var(--text-primary)]'
+                      : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
+                  }`}
+                >
+                  <div className="space-y-1 pr-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm text-[var(--text-primary)]">{role.title}</span>
+                      <span className="text-xs text-[var(--text-muted)]">· {role.category}</span>
+                    </div>
+                    <div className="text-xs text-[var(--text-secondary)] line-clamp-1">{role.overview}</div>
+                    <div className="text-[11px] text-[var(--text-muted)] pt-1">
+                      Expectation: {role.experienceExpectation}
+                    </div>
                   </div>
-                  {group.roles.map((role) => (
-                    <button
-                      key={role.id}
-                      onClick={() => setSelectedRoleId(role.id)}
-                      className={`w-full p-4 rounded-xl border text-left transition-all flex items-start justify-between ${
-                        selectedRoleId === role.id
-                          ? 'bg-[var(--accent-surface)]/60 border-[var(--accent-primary)] text-[var(--text-primary)]'
-                          : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
-                      }`}
-                    >
-                      <div className="space-y-1 pr-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-[var(--text-primary)]">{role.title}</span>
-                          <span className="text-xs text-[var(--text-muted)]">· {role.category}</span>
-                        </div>
-                        <div className="text-xs text-[var(--text-secondary)] line-clamp-1">{role.overview}</div>
-                        <div className="text-[11px] text-[var(--text-muted)] pt-1">
-                          Expectation: {role.experienceExpectation}
-                        </div>
-                      </div>
-                      {selectedRoleId === role.id && (
-                        <div className="w-5 h-5 rounded-full bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center shrink-0 mt-0.5">
-                          <Check className="w-3 h-3" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
+                  {selectedRoleId === role.id && (
+                    <div className="w-5 h-5 rounded-full bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="w-3 h-3" />
+                    </div>
+                  )}
+                </button>
+              )}
+            />
           </Reveal>
         )}
 

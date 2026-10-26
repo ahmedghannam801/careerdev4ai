@@ -16,6 +16,7 @@ import {
   type ProfileLinkDTO,
   type CareerIdentityDTO,
 } from './profileExtensions';
+import { resolveTargetRole } from '../../shared/targetRoleSelection.ts';
 
 export interface ProfileDTO {
   id: string;
@@ -39,6 +40,20 @@ export interface ProfileDTO {
   customGoalText: string | null;
   targetRole: string | null;
   targetIndustry: string | null;
+  /**
+   * The catalogue id of the selected target role.
+   *
+   * `targetRole` stores the role's canonical title; the id is the stable
+   * identifier of the same catalogue entry.
+   */
+  targetRoleId: string | null;
+  /**
+   * The parent career domain of the selected target role (level 1).
+   *
+   * Derived from the selected role through the career catalogue, so the
+   * hierarchy can never disagree with the specialisation that was chosen.
+   */
+  targetRoleDomain: string | null;
   userType: string | null;
   onboardingCompleted: boolean;
   isPublic: boolean;
@@ -128,6 +143,8 @@ export async function getProfileDto(profileId: string): Promise<ProfileDTO | nul
     getCareerIdentity(profileId),
   ]);
 
+  const targetRole = resolveTargetRole(row.target_role);
+
   return {
     id: row.id,
     fullName: row.full_name,
@@ -150,6 +167,11 @@ export async function getProfileDto(profileId: string): Promise<ProfileDTO | nul
     customGoalText: row.custom_goal_text,
     targetRole: row.target_role,
     targetIndustry: row.target_industry,
+    // The parent domain is a function of the selected role, not a second
+    // stored fact: the catalogue is the single source of truth for the
+    // hierarchy, so the two can never drift apart.
+    targetRoleId: targetRole?.id ?? null,
+    targetRoleDomain: targetRole?.domainId ?? null,
     userType: row.user_type,
     onboardingCompleted: row.onboarding_completed,
     isPublic: row.is_public,

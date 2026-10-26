@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { Plus, ExternalLink, Github, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Plus, ExternalLink, Github, X, HeartHandshake } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { ProjectStatus } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const ProjectsView: React.FC = () => {
-  const { projects, addProject, updateProject, deleteProject } = useCareer();
+  const { projects, addProject, updateProject, deleteProject, volunteerExperiences } = useCareer();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -20,9 +20,28 @@ export const ProjectsView: React.FC = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredProjects = projects.filter(p => 
+  const filteredProjects = projects.filter(p =>
     statusFilter === 'all' ? true : p.status === statusFilter
   );
+
+  /**
+   * The volunteering stints each project is evidence for — the other
+   * direction of the volunteer <-> project link.
+   *
+   * The volunteer records already carry the ids of the projects they evidence,
+   * so the reverse map is derived here instead of being fetched per project.
+   */
+  const volunteeringByProject = useMemo(() => {
+    const map = new Map<string, { organization: string; role: string }[]>();
+    for (const entry of volunteerExperiences) {
+      for (const projectId of entry.projectIds) {
+        const list = map.get(projectId) ?? [];
+        list.push({ organization: entry.organization, role: entry.role });
+        map.set(projectId, list);
+      }
+    }
+    return map;
+  }, [volunteerExperiences]);
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,6 +173,26 @@ export const ProjectsView: React.FC = () => {
                   ))}
                 </ul>
               </div>
+
+              {/* The volunteering this project is evidence for. */}
+              {(volunteeringByProject.get(project.id) ?? []).length > 0 && (
+                <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1">
+                  <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase flex items-center gap-1.5">
+                    <HeartHandshake className="w-3 h-3" />
+                    Volunteering
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(volunteeringByProject.get(project.id) ?? []).map((entry, i) => (
+                      <span
+                        key={i}
+                        className="text-[11px] px-2 py-0.5 rounded bg-[var(--accent-surface)] text-[var(--color-primary-text)]"
+                      >
+                        {entry.role} · {entry.organization}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Links & Actions */}

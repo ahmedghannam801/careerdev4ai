@@ -92,6 +92,7 @@ import {
   type NotificationType,
 } from './server/db/notifications.ts';
 import { getProfileDto, updateProfileDto } from './server/db/profile.ts';
+import { resolveTargetRoleWrite } from './server/targetRole.ts';
 import { getPreferences, upsertPreferences } from './server/db/preferences.ts';
 import {
   listBookmarks,
@@ -150,6 +151,14 @@ import {
   updateProject,
   deleteProject,
 } from './server/db/projects.ts';
+import {
+  listVolunteerExperiences,
+  getVolunteerExperience,
+  createVolunteerExperience,
+  updateVolunteerExperience,
+  deleteVolunteerExperience,
+  listVolunteerExperiencesForProject,
+} from './server/db/volunteer.ts';
 import {
   listEvidence,
   getEvidence,
@@ -2164,6 +2173,27 @@ const str = (v: unknown, max = 500): string | null =>
 const isUuid = (v: unknown): v is string =>
   typeof v === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+/** A calendar date in ISO form, e.g. "2026-03-01". */
+const isIsoDate = (v: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(v);
+/**
+ * A list of trimmed, non-empty strings, capped in both count and length.
+ *
+ * Used for the free-text lists a volunteer stint carries (responsibilities,
+ * achievements, skills) so a hostile body cannot store unbounded strings.
+ */
+const stringList = (v: unknown, maxItems: number, maxLength: number): string[] =>
+  Array.isArray(v)
+    ? v
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim().slice(0, maxLength))
+        .filter((item) => item.length > 0)
+        .slice(0, maxItems)
+    : [];
+/** A list of uuids, capped in count. Non-uuid entries are dropped. */
+const uuidList = (v: unknown, maxItems: number): string[] =>
+  Array.isArray(v)
+    ? v.filter((item): item is string => typeof item === 'string' && isUuid(item)).slice(0, maxItems)
+    : [];
 
 /**
  * Bounds a list that is about to be embedded in an AI prompt.
@@ -3031,6 +3061,159 @@ app.delete('/api/projects/:id', requireAuth, async (req: Request, res: Response)
   }
 });
 
+// The OTHER direction of the volunteer <-> project link: which volunteering
+// stints a project is evidence for. Ownership is the verified user id, so a
+// project that is not the caller's returns nothing.
+app.get('/api/projects/:id/volunteer', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const volunteer = await listVolunteerExperiencesForProject(req.authUser!.id, req.params.id);
+    return res.json({ success: true, volunteer });
+  } catch (error) {
+    console.error('Failed to load the volunteering for a project:', error);
+    return res.status(500).json({ error: 'Failed to load volunteering' });
+  }
+});
+
+// ---- Volunteer experience ----
+//
+// A volunteer stint is its own domain: it has an organisation, a role, a
+// duration, responsibilities, achievements and the skills it gave the user.
+// It is deliberately kept out of `public.experiences`, which holds employment
+// and feeds the CV builder.
+//
+// Ownership is always the verified Supabase user id. A link to a project is
+// only accepted when that project belongs to the same user.
+app.get('/api/volunteer', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const volunteer = await listVolunteerExperiences(req.authUser!.id);
+    return res.json({ success: true, volunteer });
+  } catch (error) {
+    console.error('Failed to list volunteer experience:', error);
+    return res.status(500).json({ error: 'Failed to load volunteer experience' });
+  }
+});
+
+app.get('/api/volunteer/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const volunteer = await getVolunteerExperience(req.authUser!.id, req.params.id);
+    if (!volunteer) return res.status(404).json({ error: 'Volunteer experience not found' });
+    return res.json({ success: true, volunteer });
+  } catch (error) {
+    console.error('Failed to load volunteer experience:', error);
+    return res.status(500).json({ error: 'Failed to load volunteer experience' });
+  }
+});
+
+app.post('/api/volunteer', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const organization = str(body.organization, 200);
+    if (!organization) return res.status(400).json({ error: 'Organisation is required' });
+    const role = str(body.role, 200);
+    if (!role) return res.status(400).json({ error: 'Role is required' });
+
+    const startDate = str(body.startDate, 20);
+    const endDate = str(body.endDate, 20);
+    if (startDate && !isIsoDate(startDate)) {
+      return res.status(400).json({ error: 'startDate must be an ISO date (YYYY-MM-DD)' });
+    }
+    if (endDate && !isIsoDate(endDate)) {
+      return res.status(400).json({ error: 'endDate must be an ISO date (YYYY-MM-DD)' });
+    }
+    if (startDate && endDate && endDate < startDate) {
+      return res.status(400).json({ error: 'endDate must not be before startDate' });
+    }
+    const isCurrent = body.isCurrent === true;
+    if (isCurrent && endDate) {
+      return res.status(400).json({ error: 'A current volunteering stint cannot have an end date' });
+    }
+
+    const volunteer = await createVolunteerExperience(req.authUser!.id, {
+      organization,
+      role,
+      location: str(body.location, 200) ?? undefined,
+      startDate: startDate ?? undefined,
+      endDate: endDate ?? undefined,
+      isCurrent,
+      description: str(body.description, 4000) ?? undefined,
+      responsibilities: stringList(body.responsibilities, 50, 500),
+      achievements: stringList(body.achievements, 50, 500),
+      skills: stringList(body.skills, 50, 120),
+      projectIds: uuidList(body.projectIds, 50),
+    });
+    return res.status(201).json({ success: true, volunteer });
+  } catch (error) {
+    console.error('Failed to create volunteer experience:', error);
+    return res.status(500).json({ error: 'Failed to create volunteer experience' });
+  }
+});
+
+app.patch('/api/volunteer/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const body = req.body ?? {};
+
+    const organization =
+      body.organization === undefined ? undefined : (str(body.organization, 200) ?? undefined);
+    if (body.organization !== undefined && !organization) {
+      return res.status(400).json({ error: 'Organisation is required' });
+    }
+    const role = body.role === undefined ? undefined : (str(body.role, 200) ?? undefined);
+    if (body.role !== undefined && !role) {
+      return res.status(400).json({ error: 'Role is required' });
+    }
+    const startDate = body.startDate === undefined ? undefined : str(body.startDate, 20);
+    if (body.startDate !== undefined && startDate && !isIsoDate(startDate)) {
+      return res.status(400).json({ error: 'startDate must be an ISO date (YYYY-MM-DD)' });
+    }
+    const endDate = body.endDate === undefined ? undefined : str(body.endDate, 20);
+    if (body.endDate !== undefined && endDate && !isIsoDate(endDate)) {
+      return res.status(400).json({ error: 'endDate must be an ISO date (YYYY-MM-DD)' });
+    }
+    if (startDate && endDate && endDate < startDate) {
+      return res.status(400).json({ error: 'endDate must not be before startDate' });
+    }
+    if (body.isCurrent === true && endDate) {
+      return res.status(400).json({ error: 'A current volunteering stint cannot have an end date' });
+    }
+
+    const volunteer = await updateVolunteerExperience(req.authUser!.id, req.params.id, {
+      organization,
+      role,
+      location: body.location === undefined ? undefined : (str(body.location, 200) ?? ''),
+      startDate: body.startDate === undefined ? undefined : (startDate ?? ''),
+      endDate: body.endDate === undefined ? undefined : (endDate ?? ''),
+      isCurrent: typeof body.isCurrent === 'boolean' ? body.isCurrent : undefined,
+      description: body.description === undefined ? undefined : (str(body.description, 4000) ?? ''),
+      responsibilities:
+        body.responsibilities === undefined ? undefined : stringList(body.responsibilities, 50, 500),
+      achievements:
+        body.achievements === undefined ? undefined : stringList(body.achievements, 50, 500),
+      skills: body.skills === undefined ? undefined : stringList(body.skills, 50, 120),
+      projectIds: body.projectIds === undefined ? undefined : uuidList(body.projectIds, 50),
+    });
+    if (!volunteer) return res.status(404).json({ error: 'Volunteer experience not found' });
+    return res.json({ success: true, volunteer });
+  } catch (error) {
+    console.error('Failed to update volunteer experience:', error);
+    return res.status(500).json({ error: 'Failed to update volunteer experience' });
+  }
+});
+
+app.delete('/api/volunteer/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const deleted = await deleteVolunteerExperience(req.authUser!.id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Volunteer experience not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete volunteer experience:', error);
+    return res.status(500).json({ error: 'Failed to delete volunteer experience' });
+  }
+});
+
 // ---- Evidence ----
 app.get('/api/evidence', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -3893,6 +4076,33 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
       }
     }
 
+    // The target role is a hierarchical selection: level 1 is a career domain
+    // and level 2 is a specialisation (a catalogue role). The pair is
+    // validated HERE, on the server, so an unknown domain, an unknown
+    // specialisation or a specialisation from another domain can never be
+    // stored — regardless of what the client sent.
+    const targetRoleWrite = resolveTargetRoleWrite({
+      domainId: body.targetRoleDomain,
+      roleId: body.targetRoleId,
+      title: body.targetRole,
+    });
+    if (!targetRoleWrite.ok) {
+      return res
+        .status(targetRoleWrite.status)
+        .json({ error: targetRoleWrite.error, code: targetRoleWrite.code });
+    }
+    // The canonical title is what is persisted. The parent domain is stored
+    // next to it so the hierarchy survives a logout/login, and it is only
+    // written when the caller did not state an industry of its own.
+    const explicitIndustry = body.targetIndustry !== undefined;
+    const targetRoleTitle = targetRoleWrite.value?.title;
+    const targetIndustry =
+      targetRoleWrite.value && !explicitIndustry
+        ? targetRoleWrite.value.domainLabel
+        : body.targetIndustry === null
+          ? undefined
+          : (str(body.targetIndustry, 200) ?? undefined);
+
     const profile = await updateProfileDto(req.authUser!.id, {
       fullName: str(body.fullName, 200) ?? undefined,
       preferredName:
@@ -3922,9 +4132,8 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
       careerGoal: body.careerGoal === null ? undefined : (str(body.careerGoal, 2000) ?? undefined),
       customGoalText:
         body.customGoalText === null ? undefined : (str(body.customGoalText, 2000) ?? undefined),
-      targetRole: body.targetRole === null ? undefined : (str(body.targetRole, 200) ?? undefined),
-      targetIndustry:
-        body.targetIndustry === null ? undefined : (str(body.targetIndustry, 200) ?? undefined),
+      targetRole: targetRoleTitle === undefined ? undefined : targetRoleTitle,
+      targetIndustry,
       userType: (userType ?? undefined) as string | undefined,
       onboardingCompleted:
         typeof body.onboardingCompleted === 'boolean' ? body.onboardingCompleted : undefined,

@@ -43,6 +43,30 @@ export interface ProjectDTO {
   completedAt: string | null;
 }
 
+/**
+ * One volunteer stint.
+ *
+ * A volunteer experience is its own domain: it is NOT an employment entry,
+ * so it never appears in the CV timeline.
+ */
+export interface VolunteerExperienceDTO {
+  id: string;
+  organization: string;
+  role: string;
+  location: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  isCurrent: boolean;
+  description: string | null;
+  responsibilities: string[];
+  achievements: string[];
+  skills: string[];
+  /** The ids of the projects this stint is evidenced by. */
+  projectIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface EvidenceDTO {
   id: string;
   title: string;
@@ -250,6 +274,61 @@ export async function patchProject(
 
 export async function deleteProject(id: string): Promise<void> {
   await request<{ success: boolean }>(`/api/projects/${id}`, { method: 'DELETE' });
+}
+
+// ---- Volunteer experience ----
+export async function fetchVolunteerExperiences(): Promise<VolunteerExperienceDTO[]> {
+  const data = await request<{ success: boolean; volunteer: VolunteerExperienceDTO[] }>(
+    '/api/volunteer'
+  );
+  return data.volunteer ?? [];
+}
+
+export async function postVolunteerExperience(input: {
+  organization: string;
+  role: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  isCurrent?: boolean;
+  description?: string;
+  responsibilities?: string[];
+  achievements?: string[];
+  skills?: string[];
+  projectIds?: string[];
+}): Promise<VolunteerExperienceDTO> {
+  const data = await request<{ success: boolean; volunteer: VolunteerExperienceDTO }>(
+    '/api/volunteer',
+    { method: 'POST', body: JSON.stringify(input) }
+  );
+  return data.volunteer;
+}
+
+export async function patchVolunteerExperience(
+  id: string,
+  updates: Partial<{
+    organization: string;
+    role: string;
+    location: string;
+    startDate: string;
+    endDate: string;
+    isCurrent: boolean;
+    description: string;
+    responsibilities: string[];
+    achievements: string[];
+    skills: string[];
+    projectIds: string[];
+  }>
+): Promise<VolunteerExperienceDTO> {
+  const data = await request<{ success: boolean; volunteer: VolunteerExperienceDTO }>(
+    `/api/volunteer/${id}`,
+    { method: 'PATCH', body: JSON.stringify(updates) }
+  );
+  return data.volunteer;
+}
+
+export async function deleteVolunteerExperience(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/api/volunteer/${id}`, { method: 'DELETE' });
 }
 
 // ---- Evidence ----

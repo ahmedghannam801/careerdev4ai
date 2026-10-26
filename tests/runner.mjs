@@ -228,6 +228,8 @@ async function main() {
     join(TESTS_DIR, 'b5.test.ts'),
     join(TESTS_DIR, 'career-catalog.test.ts'),
     join(TESTS_DIR, 'cv-pipeline.test.ts'),
+    join(TESTS_DIR, 'target-role.test.ts'),
+    join(TESTS_DIR, 'volunteer.test.ts'),
   ].filter((file) => existsSync(file));
 
   if (testFiles.length === 0) {

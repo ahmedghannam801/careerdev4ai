@@ -24,7 +24,8 @@ import {
   Activity,
   FolderClosed,
   MoreHorizontal,
-  LogOut
+  LogOut,
+  HeartHandshake
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { GlobalSearchModal } from './GlobalSearchModal';
@@ -73,6 +74,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
     { id: 'skills', label: t('navSkills'), icon: Award },
     { id: 'learning', label: t('navLearn'), icon: BookOpen },
     { id: 'projects', label: t('navProjects'), icon: FolderGit2 },
+    { id: 'volunteer', label: t('navVolunteer'), icon: HeartHandshake },
     { id: 'cv-studio', label: t('navCV'), icon: FileText },
     { id: 'jobs', label: t('navJobs'), icon: Briefcase },
     { id: 'applications', label: t('navApplications'), icon: Calendar },

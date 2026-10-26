@@ -116,6 +116,19 @@ export interface ProfileDTO {
   customGoalText: string | null;
   targetRole: string | null;
   targetIndustry: string | null;
+  /**
+   * The catalogue id of the selected target role (level 2).
+   *
+   * `targetRole` stores the role's canonical title; this is its stable id.
+   */
+  targetRoleId: string | null;
+  /**
+   * The parent career domain of the selected target role (level 1).
+   *
+   * Derived from the selected role through the career catalogue, so the
+   * hierarchy can never disagree with the specialisation that was chosen.
+   */
+  targetRoleDomain: string | null;
   userType: string | null;
   onboardingCompleted: boolean;
   isPublic: boolean;

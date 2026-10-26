@@ -12,6 +12,7 @@ import {
   RoadmapTask,
   RoadmapTaskStatus,
   CareerProject,
+  VolunteerExperience,
   EvidenceItem,
   CVProfile,
   CVVersion,
@@ -49,6 +50,7 @@ import {
   CareerContextSummary,
 } from '../types/career';
 import { TARGET_ROLES, resolveRole } from '../data/rolesData';
+import { validateTargetRoleSelection } from '../../shared/targetRoleSelection';
 import { translations } from '../translations';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
 import { planPersonalImport } from '../../shared/cvImport';
@@ -87,6 +89,10 @@ import {
   postProject,
   patchProject,
   deleteProject as deleteProjectApi,
+  fetchVolunteerExperiences,
+  postVolunteerExperience,
+  patchVolunteerExperience,
+  deleteVolunteerExperience as deleteVolunteerExperienceApi,
   fetchEvidence,
   postEvidence,
   deleteEvidence as deleteEvidenceApi,
@@ -115,6 +121,7 @@ import {
   type SavedRoleDTO,
   type JobApplicationDTO,
   type InterviewSessionDTO,
+  type VolunteerExperienceDTO,
 } from '../lib/coreApi';
 import {
   fetchRoadmap,
@@ -379,6 +386,17 @@ interface CareerContextType {
   addProject: (project: Omit<CareerProject, 'id' | 'createdAt'>) => Promise<void>;
   updateProject: (projectId: string, updates: Partial<CareerProject>) => void;
   deleteProject: (projectId: string) => void;
+
+  // Volunteer experience — its own domain, separate from employment.
+  volunteerExperiences: VolunteerExperience[];
+  addVolunteerExperience: (
+    input: Omit<VolunteerExperience, 'id' | 'createdAt' | 'updatedAt'>
+  ) => Promise<VolunteerExperience>;
+  updateVolunteerExperience: (
+    id: string,
+    updates: Partial<VolunteerExperience>
+  ) => Promise<VolunteerExperience>;
+  deleteVolunteerExperience: (id: string) => Promise<void>;
   evidenceItems: EvidenceItem[];
   addEvidence: (evidence: Omit<EvidenceItem, 'id' | 'dateAdded'>) => void;
   deleteEvidence: (evidenceId: string) => void;
@@ -1103,6 +1121,25 @@ function toCareerProject(dto: ProjectDTO): CareerProject {
   };
 }
 
+function toVolunteerExperience(dto: VolunteerExperienceDTO): VolunteerExperience {
+  return {
+    id: dto.id,
+    organization: dto.organization,
+    role: dto.role,
+    location: dto.location ?? '',
+    startDate: dto.startDate ?? '',
+    endDate: dto.endDate ?? '',
+    isCurrent: dto.isCurrent,
+    description: dto.description ?? '',
+    responsibilities: dto.responsibilities,
+    achievements: dto.achievements,
+    skills: dto.skills,
+    projectIds: dto.projectIds,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+  };
+}
+
 function toEvidenceItem(dto: EvidenceDTO): EvidenceItem {
   return {
     id: dto.id,
@@ -1444,6 +1481,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           activityList,
           coverLetterList,
           projectList,
+          volunteerList,
           evidenceList,
           cvList,
           cvVersionList,
@@ -1467,6 +1505,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           fetchActivities(),
           fetchCoverLetters(),
           fetchProjects(),
+          fetchVolunteerExperiences(),
           fetchEvidence(),
           fetchCvs(),
           fetchCvVersions(),
@@ -1568,6 +1607,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setActivities(activityList.map(toActivity));
         setCoverLetters(coverLetterList.map(toCoverLetter));
         setProjects(projectList.map(toCareerProject));
+        setVolunteerExperiences(volunteerList.map(toVolunteerExperience));
         setEvidenceItems(evidenceList.map(toEvidenceItem));
         setCvVersions(cvVersionList.map(toCVVersion));
         setSavedRoles(savedRoleList.map(toTargetRole));
@@ -1817,6 +1857,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Projects & Evidence
   // Projects — PostgreSQL is the source of truth (B.3.7).
   const [projects, setProjects] = useState<CareerProject[]>([]);
+  // Volunteer experience — PostgreSQL is the source of truth.
+  const [volunteerExperiences, setVolunteerExperiences] = useState<VolunteerExperience[]>([]);
   // Evidence — PostgreSQL is the source of truth (B.3.7).
   const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
 
@@ -2911,6 +2953,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setUserSkillRows([]);
     setRoadmapPhases([]);
     setIsEnrolledInRoadmap(false);
+    setVolunteerExperiences([]);
     setLearningCatalog([]);
     setLearningItems([]);
     setLearningRecommendations([]);
@@ -3024,6 +3067,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const setPrimaryTargetRole = async (roleId: string): Promise<boolean> => {
     const role = resolveRole(roleId) ?? TARGET_ROLES.find(r => r.id === roleId);
     if (!role) return false;
+    // The selection is hierarchical: a domain (level 1) and a specialisation
+    // (level 2). The pair is validated here for a fast, clear rejection and
+    // again on the server, which is the authority.
+    const selection = validateTargetRoleSelection({
+      domainId: role.domainId,
+      specializationId: role.id,
+    });
+    if (!selection.ok) return false;
     const previousRole = targetRole;
 
     // The skill target levels are derived from the role, so they follow the
@@ -3051,7 +3102,15 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     try {
       // The target role is persisted alongside the roadmap so the server's
       // view of the user's target matches the UI's (B.4 finding M-2).
-      await patchProfile({ targetRole: role.title, targetIndustry: role.category });
+      //
+      // The selection is hierarchical: the domain is level 1 and the
+      // specialisation is level 2. Both are sent so the server can validate
+      // that the pair is a real domain/role combination — the server is the
+      // authority, this is only the fast path.
+      await patchProfile({
+        targetRoleId: role.id,
+        targetRoleDomain: role.domainId,
+      });
 
       // A failure here is a failed step, not a warning: the UI must not show a
       // role whose roadmap was not persisted. The server stages the new tree
@@ -3094,8 +3153,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // roadmap all describe the same role.
       try {
         await patchProfile({
-          targetRole: previousRole.title,
-          targetIndustry: previousRole.category,
+          targetRoleId: previousRole.id,
+          targetRoleDomain: previousRole.domainId,
         });
       } catch (rollbackError) {
         console.error('Failed to roll back target role after roadmap failure:', rollbackError);
@@ -3959,6 +4018,59 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } catch (error) {
       console.error('Failed to delete project:', error);
     }
+  };
+
+  // ---- Volunteer experience ----
+  //
+  // A volunteer stint is its own domain. It is NOT written into the
+  // employment timeline, so it never shows up in the CV builder.
+
+  const addVolunteerExperience = async (
+    input: Omit<VolunteerExperience, 'id' | 'createdAt' | 'updatedAt'>
+  ) => {
+    const dto = await postVolunteerExperience({
+      organization: input.organization,
+      role: input.role,
+      location: input.location || undefined,
+      startDate: input.startDate || undefined,
+      endDate: input.endDate || undefined,
+      isCurrent: input.isCurrent,
+      description: input.description || undefined,
+      responsibilities: input.responsibilities,
+      achievements: input.achievements,
+      skills: input.skills,
+      projectIds: input.projectIds,
+    });
+    setVolunteerExperiences(prev => [toVolunteerExperience(dto), ...prev]);
+    return toVolunteerExperience(dto);
+  };
+
+  const updateVolunteerExperience = async (
+    id: string,
+    updates: Partial<VolunteerExperience>
+  ) => {
+    const dto = await patchVolunteerExperience(id, {
+      organization: updates.organization,
+      role: updates.role,
+      location: updates.location,
+      startDate: updates.startDate,
+      endDate: updates.endDate,
+      isCurrent: updates.isCurrent,
+      description: updates.description,
+      responsibilities: updates.responsibilities,
+      achievements: updates.achievements,
+      skills: updates.skills,
+      projectIds: updates.projectIds,
+    });
+    setVolunteerExperiences(prev =>
+      prev.map((item) => (item.id === id ? toVolunteerExperience(dto) : item))
+    );
+    return toVolunteerExperience(dto);
+  };
+
+  const deleteVolunteerExperience = async (id: string) => {
+    await deleteVolunteerExperienceApi(id);
+    setVolunteerExperiences(prev => prev.filter((item) => item.id !== id));
   };
 
   const addEvidence = async (evidence: Omit<EvidenceItem, 'id' | 'dateAdded'>) => {
@@ -5068,6 +5180,10 @@ Skills: ${activeCV.skillsList.join(', ')}
         addProject,
         updateProject,
         deleteProject,
+        volunteerExperiences,
+        addVolunteerExperience,
+        updateVolunteerExperience,
+        deleteVolunteerExperience,
         evidenceItems,
         addEvidence,
         deleteEvidence,
