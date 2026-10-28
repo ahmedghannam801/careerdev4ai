@@ -55,6 +55,7 @@ import { translate } from '../translations/sourceStrings';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
 import { apiUrl } from '../lib/native';
 import { planPersonalImport } from '../../shared/cvImport';
+import { buildCvDocument } from '../../shared/cvDocument';
 import {
   isAtsAnalysisForRole,
   parseAtsAnalysisFailure,
@@ -406,6 +407,7 @@ interface CareerContextType {
   activeCV: CVProfile;
   cvVersions: CVVersion[];
   updateCV: (updates: Partial<CVProfile>) => void;
+  loadCVFromMyData: () => void;
   saveCVVersion: (name: string) => void;
   duplicateCVVersion: (versionId: string) => void;
   renameCVVersion: (versionId: string, newName: string) => void;
@@ -3648,6 +3650,105 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setActiveCV(prev => ({ ...prev, ...updates }));
   };
 
+  /**
+   * Fills the editor from the records the platform already holds.
+   *
+   * The editor used to start empty unless the candidate had imported a CV by
+   * hand, even though their experience, education, projects, volunteering,
+   * completed courses, certificates and rated skills were all on file. This
+   * maps those records onto the document.
+   *
+   * The merge is one-directional: anything the candidate has already written
+   * is kept, and only the gaps are filled. Their words are never replaced by
+   * the platform's.
+   */
+  const loadCVFromMyData = () => {
+    const completedCourseItems = learningItems.filter((item) => item.status === 'completed');
+    const courses = completedCourseItems
+      .map((item) => {
+        const course = learningCatalog.find((entry) => entry.id === item.courseId);
+        return course
+          ? {
+              id: item.id,
+              title: course.title,
+              provider: course.provider,
+              description: item.notes ?? '',
+            }
+          : null;
+      })
+      .filter((entry): entry is { id: string; title: string; provider: string; description: string } =>
+        entry !== null
+      );
+
+    const document = buildCvDocument(
+      {
+        profile: {
+          fullName: profile.name,
+          email: profile.email,
+          phone: profile.phone ?? '',
+          location: profile.location,
+          title: profile.headline ?? profile.currentTitle ?? '',
+          summary: '',
+        },
+        experiences: profile.experiences.map((entry) => ({
+          id: entry.id,
+          role: entry.role,
+          company: entry.company,
+          location: entry.location,
+          startDate: entry.startDate,
+          endDate: entry.endDate,
+          isCurrent: entry.isCurrent,
+          description: entry.description,
+          bullets: entry.achievements,
+        })),
+        education: profile.education.map((entry) => ({
+          id: entry.id,
+          institution: entry.institution,
+          degree: entry.degree,
+          field: entry.field,
+          startDate: entry.startDate,
+          endDate: entry.endDate,
+          isCurrent: entry.current,
+          description: entry.coursework?.join(', ') ?? '',
+        })),
+        projects: projects.map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          role: entry.goal ?? '',
+          link: entry.repositoryUrl ?? undefined,
+          technologies: entry.skills,
+          bullets: entry.deliverables,
+          description: entry.description,
+        })),
+        volunteering: volunteerExperiences.map((entry) => ({
+          id: entry.id,
+          organization: entry.organization,
+          role: entry.role,
+          location: entry.location,
+          startDate: entry.startDate,
+          endDate: entry.endDate,
+          isCurrent: entry.isCurrent,
+          description: entry.description,
+          achievements: entry.achievements,
+          responsibilities: entry.responsibilities,
+        })),
+        certifications: profile.certifications.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          issuer: entry.provider,
+          issueDate: entry.issueDate,
+          description: '',
+        })),
+        courses,
+        skills: skills.map((skill) => ({ name: skill.name, level: skill.currentLevel })),
+        links: [],
+      },
+      activeCV
+    );
+
+    setActiveCV((prev) => ({ ...prev, ...document }));
+  };
+
   const saveCVVersion = async (name: string) => {
     try {
       // A version belongs to a CV. A user who has never created one still
@@ -4745,6 +4846,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         activeCV,
         cvVersions,
         updateCV,
+        loadCVFromMyData,
         saveCVVersion,
         duplicateCVVersion,
         renameCVVersion,

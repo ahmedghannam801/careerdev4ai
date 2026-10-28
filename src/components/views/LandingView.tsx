@@ -239,7 +239,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                     className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-6 py-3.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-sm transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-[var(--color-primary-hover)] hover:shadow-lg active:translate-y-0 active:scale-[0.98]"
                   >
                     <span>{t('Start Your Career Journey')}</span>
-                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
                   </button>
 
                   <a
@@ -501,7 +501,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[var(--color-primary-text)] transition-colors hover:underline"
               >
                 <span>View All {TARGET_ROLES.length} Roles</span>
-                <ArrowUpRight className="h-3.5 w-3.5" />
+                <ArrowUpRight className="h-3.5 w-3.5 rtl:-rotate-90" />
               </button>
             </div>
           </Reveal>
@@ -573,7 +573,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-8 py-3.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-sm transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-[var(--color-primary-hover)] hover:shadow-lg active:translate-y-0 active:scale-[0.98]"
               >
                 <span>{t('Start Your Career Journey')}</span>
-                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
               </button>
             </div>
           </Reveal>

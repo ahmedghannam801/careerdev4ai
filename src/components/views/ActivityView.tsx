@@ -157,7 +157,7 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
                       className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--color-primary-text)] flex items-center gap-1 transition-colors shrink-0"
                     >
                       <span>{t('View')}</span>
-                      <ArrowRight className="w-3 h-3" />
+                      <ArrowRight className="w-3 h-3 rtl:rotate-180" />
                     </button>
                   )}
                 </StaggerItem>

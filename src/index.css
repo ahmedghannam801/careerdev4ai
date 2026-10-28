@@ -215,6 +215,84 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /* ------------------------------------------------------------------
+   * Icons must not be squeezed by their neighbours.
+   * -----------------------------------------------------------------
+   * Tailwind's preflight sets `display: block` on every svg. An svg with a
+   * block display box has a minimum content width of zero, so the browser is
+   * free to shrink it below the width the component asked for. Inside a flex
+   * row that is what actually happens: a `w-3.5` icon next to a long label
+   * is squeezed into a narrow sliver while its height stays the same, and it
+   * appears to have escaped its button.
+   *
+   * `flex-shrink: 0` is the fix, and it is applied to the icon library's own
+   * class so every icon is covered without each call site having to remember
+   * it. Icons are fixed-size decorations; nothing in this application needs
+   * one to be squashed to fit.
+   */
+  .lucide {
+    flex-shrink: 0;
+  }
+}
+
+/* ----------------------------------------------------------------------
+ * Printing a CV.
+ * --------------------------------------------------------------------
+ * The print button is the way a candidate takes their CV out of the
+ * application, so what comes out of the printer has to be the document and
+ * nothing else: no navigation, no buttons, no sidebars, no other tabs.
+ *
+ * The paper preview carries `data-cv-print`. Everything that is neither the
+ * paper nor part of it is taken out of the flow, so the printed document is
+ * the CV and not a page of blank space followed by the CV. An ancestor of
+ * the paper has to stay — the paper needs somewhere to live — but its other
+ * children do not, and each of those is removed by the same rule.
+ */
+@media print {
+  @page {
+    margin: 14mm;
+    size: A4;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  body *:not([data-cv-print]):not([data-cv-print] *):not(:has([data-cv-print])) {
+    display: none !important;
+  }
+
+  /* Anything painted over the paper — a drawer, a toast, an overlay — is
+     hidden without being taken out of the flow. */
+  body * {
+    visibility: hidden;
+  }
+
+  [data-cv-print],
+  [data-cv-print] * {
+    visibility: visible;
+  }
+
+  [data-cv-print] {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  /* A heading is never left at the foot of a page, and a bullet is never
+     split across two of them. */
+  [data-cv-print] h3 {
+    break-after: avoid;
+  }
+
+  [data-cv-print] li {
+    break-inside: avoid;
+  }
 }
 
 @layer components {

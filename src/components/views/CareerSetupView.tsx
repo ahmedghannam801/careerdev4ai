@@ -72,7 +72,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
             className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
             <span>{t('View Gap Analysis')}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
           </button>
         </div>
       </div>

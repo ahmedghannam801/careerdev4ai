@@ -666,7 +666,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
           className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
         >
           {isSaving ? 'Saving…' : step === stepCount - 1 ? 'Finish setup' : 'Continue'}
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
         </button>
       </div>
     </div>

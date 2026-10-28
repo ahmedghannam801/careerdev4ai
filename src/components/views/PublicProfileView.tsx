@@ -134,7 +134,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
             onClick={onBack}
             className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline flex items-center gap-1.5"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
             <span>{t('Back to CareerPilot')}</span>
           </button>
         </div>

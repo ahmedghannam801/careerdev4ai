@@ -272,6 +272,46 @@ export interface CvImportResult {
   errors: string[];
 }
 
+/**
+ * One professional link as it appears on a CV.
+ *
+ * The URL and label belong to the profile's link record, so editing them here
+ * writes back to the profile. The order and the enabled flag belong to this
+ * CV alone: the same person may show a GitHub link on one CV and not on
+ * another.
+ */
+export interface CVLink {
+  /** The id of the profile link record this came from. */
+  id: string;
+  /** The kind of link: linkedin, github, portfolio, behance, dribbble, kaggle, medium, other. */
+  kind: string;
+  label: string;
+  url: string;
+  /** Whether this link is shown on this CV. */
+  enabled: boolean;
+}
+
+/** One volunteering stint, as it appears on a CV. */
+export interface CVVolunteering {
+  id: string;
+  organization: string;
+  role: string;
+  period: string;
+  location?: string;
+  /** The candidate's own description, or the one the assistant wrote. */
+  description: string;
+  bullets: string[];
+}
+
+/** One completed course, as it appears on a CV. */
+export interface CVCourse {
+  id: string;
+  title: string;
+  provider: string;
+  /** The candidate's own line about the course, or the one the assistant wrote. */
+  description: string;
+}
+
 export interface CVProfile {
   fullName: string;
   email: string;
@@ -303,6 +343,8 @@ export interface CVProfile {
     startDate?: string;
     endDate?: string;
     current?: boolean;
+    /** The line shown under the degree. */
+    description?: string;
   }[];
   projects: {
     id: string;
@@ -311,10 +353,29 @@ export interface CVProfile {
     link?: string;
     technologies: string[];
     bullets: string[];
+    /** The short line shown above the bullets. */
+    description?: string;
   }[];
   skillsList: string[];
   certifications: string[];
-  certificationDetails?: Array<{ name: string; issuer: string; issueDate: string }>;
+  certificationDetails?: Array<{
+    name: string;
+    issuer: string;
+    issueDate: string;
+    /** The line shown under the certificate. */
+    description?: string;
+  }>;
+  /**
+   * The professional links shown on this CV, in the order they are shown.
+   *
+   * Optional because a CV snapshot saved before links were editable has
+   * none; the studio treats that as "no links chosen" rather than an error.
+   */
+  links?: CVLink[];
+  /** The volunteering stints shown on this CV. */
+  volunteering?: CVVolunteering[];
+  /** The completed courses shown on this CV. */
+  courses?: CVCourse[];
 }
 
 export interface ATSAnalysis {

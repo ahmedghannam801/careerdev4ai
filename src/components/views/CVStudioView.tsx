@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { BuiltCvPanel } from '../cv/BuiltCvPanel';
+import { CvPreview } from '../cv/CvPreview';
+import { CvSectionEditor } from '../cv/CvSectionEditor';
 import { Reveal } from '../motion/Motion';
 import { CVImportModal } from '../cv/CVImportModal';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
@@ -16,6 +18,7 @@ export const CVStudioView: React.FC = () => {
   const {
     activeCV,
     updateCV,
+    loadCVFromMyData,
     cvVersions,
     saveCVVersion,
     runAiCvOptimization,
@@ -24,7 +27,14 @@ export const CVStudioView: React.FC = () => {
     dismissCvAnalysisError,
     targetRole,
     aiPreferences,
-    privacyPreferences, t } = useCareer();
+    privacyPreferences,
+    profile,
+    skills,
+    projects,
+    volunteerExperiences,
+    learningItems,
+    learningCatalog,
+    t } = useCareer();
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
   const [activeTab, setActiveTab] = useState<'editor' | 'ats' | 'versions' | 'built'>('editor');
@@ -41,6 +51,38 @@ export const CVStudioView: React.FC = () => {
   const analysisRoleLabel = analysisRole.roleTitle ?? t('your saved CV');
   const retryDelay = formatRetryDelay(cvAnalysisError?.retryAfterSeconds);
 
+  // The records the editor writes from. Only a course the candidate has
+  // actually completed is offered, because an in-progress course is not a
+  // line on a CV.
+  const completedCourses = learningItems
+    .filter((item) => item.status === 'completed')
+    .map((item) => {
+      const course = learningCatalog.find((entry) => entry.id === item.courseId);
+      return course
+        ? { id: item.id, title: course.title, provider: course.provider }
+        : null;
+    })
+    .filter((entry): entry is { id: string; title: string; provider: string } => entry !== null);
+
+  const editorSource = {
+    experiences: profile.experiences.map((entry) => ({
+      id: entry.id,
+      role: entry.role,
+      company: entry.company,
+    })),
+    projects: projects.map((entry) => ({ id: entry.id, title: entry.title })),
+    volunteering: volunteerExperiences.map((entry) => ({
+      id: entry.id,
+      organization: entry.organization,
+      role: entry.role,
+    })),
+    certifications: profile.certifications.map((entry) => ({ id: entry.id, name: entry.name })),
+    courses: completedCourses,
+  };
+
+  // The skills the candidate has actually rated. The assistant is told to
+  // choose from these and from nothing else.
+  const ratedSkills = skills.map((skill) => skill.name);
   const handlePrint = () => {
     window.print();
   };
@@ -87,13 +129,18 @@ export const CVStudioView: React.FC = () => {
             <span>{isOptimizingCV ? t('Analyzing ATS Keywords...') : t('Run ATS Audit')}</span>
           </button>
 
-          <button
-            onClick={handlePrint}
-            className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>{t('Print / Export PDF')}</span>
-          </button>
+          {/* Printing is offered only where there is a document to print.
+              The print stylesheet keeps the paper preview and nothing else,
+              so a print started from another tab would come out blank. */}
+          {activeTab === 'editor' && (
+            <button
+              onClick={handlePrint}
+              className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>{t('Print / Export PDF')}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -182,62 +229,13 @@ export const CVStudioView: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Form Controls (5 cols) */}
           <div className="lg:col-span-5 space-y-4">
-            <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Contact & Header')}</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">{t('Full Name')}</label>
-                  <input
-                    type="text"
-                    value={activeCV.fullName}
-                    onChange={(e) => updateCV({ fullName: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">{t('Target Role Headline')}</label>
-                  <input
-                    type="text"
-                    value={activeCV.title}
-                    onChange={(e) => updateCV({ title: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">{t('Email')}</label>
-                    <input
-                      type="email"
-                      value={activeCV.email}
-                      onChange={(e) => updateCV({ email: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">{t('Location')}</label>
-                    <input
-                      type="text"
-                      value={activeCV.location}
-                      onChange={(e) => updateCV({ location: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Executive Summary')}</h3>
-              <textarea
-                rows={4}
-                value={activeCV.summary}
-                onChange={(e) => updateCV({ summary: e.target.value })}
-                className="w-full p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed"
-              />
-              <div className="text-[11px] text-[var(--text-muted)]">
-                {t('Tip: Quantify your results using the X-Y-Z format: "Accomplished [X], as measured by [Y], by doing [Z]".')}
-              </div>
-            </div>
+            <CvSectionEditor
+              cv={activeCV}
+              update={updateCV}
+              targetRoleTitle={targetRole.title}
+              source={editorSource}
+              ratedSkills={ratedSkills}
+            />
 
             <button
               onClick={() => setShowVersionModal(true)}
@@ -245,83 +243,24 @@ export const CVStudioView: React.FC = () => {
             >
               {t('Save as New Version Snapshot')}
             </button>
+
+            <button
+              onClick={loadCVFromMyData}
+              className="w-full py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)]" />
+              {t('Fill from my records')}
+            </button>
+            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed -mt-2">
+              {t(
+                'Brings in your experience, education, projects, volunteering, completed courses, certificates and rated skills. Anything you have already written is kept.'
+              )}
+            </p>
           </div>
 
           {/* Right Clean Paper Preview (7 cols) */}
           <div className="lg:col-span-7">
-            <div className="p-8 sm:p-12 rounded-2xl bg-white border border-[var(--border-subtle)] shadow-md text-slate-900 font-sans space-y-6">
-              {/* Paper Header */}
-              <div className="border-b border-slate-200 pb-4 text-center space-y-1">
-                <h2 className="text-2xl font-bold tracking-tight text-slate-900">{activeCV.fullName}</h2>
-                <div className="text-xs font-semibold text-[var(--color-print-primary)] tracking-wide uppercase">{activeCV.title}</div>
-                <div className="text-xs text-slate-500 flex items-center justify-center gap-2 pt-1">
-                  <span>{activeCV.email}</span>
-                  <span>·</span>
-                  <span>{activeCV.phone}</span>
-                  <span>·</span>
-                  <span>{activeCV.location}</span>
-                </div>
-              </div>
-
-              {/* Summary */}
-              <div className="space-y-1.5">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-                  {t('Professional Summary')}
-                </div>
-                <p className="text-xs text-slate-700 leading-relaxed">
-                  {activeCV.summary}
-                </p>
-              </div>
-
-              {/* Experience */}
-              <div className="space-y-3">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-                  {t('Work Experience')}
-                </div>
-                <div className="space-y-3">
-                  {activeCV.experiences.map((exp) => (
-                    <div key={exp.id} className="space-y-1 text-xs">
-                      <div className="flex justify-between font-bold text-slate-900">
-                        <span>{exp.role} — {exp.company}</span>
-                        <span className="font-mono text-slate-500 font-normal">{exp.period}</span>
-                      </div>
-                      <div className="text-[11px] text-slate-500">{exp.location}</div>
-                      <ul className="list-disc list-inside space-y-1 text-slate-700 pt-0.5">
-                        {exp.bullets.map((b, i) => (
-                          <li key={i} className="leading-relaxed">{b}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Education */}
-              <div className="space-y-2">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-                  {t('Education')}
-                </div>
-                {activeCV.education.map((edu) => (
-                  <div key={edu.id} className="flex justify-between text-xs">
-                    <div>
-                      <span className="font-bold text-slate-900">{edu.degree} in {edu.field}</span>
-                      <span className="text-slate-500"> — {edu.institution}</span>
-                    </div>
-                    <span className="font-mono text-slate-500">{edu.period}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Skills */}
-              <div className="space-y-1.5">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-                  {t('Core Skills & Technologies')}
-                </div>
-                <div className="text-xs text-slate-700">
-                  {activeCV.skillsList.join(' · ')}
-                </div>
-              </div>
-            </div>
+            <CvPreview cv={activeCV} />
           </div>
         </div>
       )}

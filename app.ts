@@ -124,6 +124,16 @@ import {
 } from './server/db/volunteerOpportunities.ts';
 import { buildCvFromProfile } from './server/cv/buildCv.ts';
 import {
+  generateCvAssistText,
+  type CvAssistRequest,
+} from './server/cv/aiAssist.ts';
+import {
+  isCvAssistField,
+  isCvAssistLength,
+  isCvAssistSourceKind,
+  isCvAssistTone,
+} from './shared/cvAiAssist.ts';
+import {
   listDismissedGuides,
   dismissGuide,
 } from './server/db/guides.ts';
@@ -1984,6 +1994,92 @@ ${groundingRules()}
     }
   } catch (error) {
     return res.status(500).json({ error: 'Failed to generate cover letter' });
+  }
+});
+
+// AI-assisted writing for one CV field.
+//
+// The model writes from the candidate's own record: the record is read from
+// the database for the verified user id, and the answer is checked back
+// against it before it is returned. The client cannot talk the model into a
+// career the candidate does not have.
+app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const field = body.field;
+    if (!isCvAssistField(field)) {
+      return res.status(400).json({ error: 'A valid CV field is required' });
+    }
+
+    const sourceKind = isCvAssistSourceKind(body.sourceKind) ? body.sourceKind : undefined;
+    const sourceId = str(body.sourceId, 64) ?? undefined;
+
+    // No model on this server means no text can be produced. This is checked
+    // before the daily budget is touched, so a missing key is never reported
+    // as an exhausted quota.
+    if (!process.env.GEMINI_API_KEY) {
+      return modelUnavailable(res);
+    }
+
+    const request: CvAssistRequest = {
+      field,
+      sourceKind,
+      sourceId,
+      context: str(body.context, 1200) ?? undefined,
+      existingText: str(body.existingText, 4000) ?? undefined,
+      targetRoleTitle: str(body.targetRoleTitle, 200) ?? undefined,
+      tone: isCvAssistTone(body.tone) ? body.tone : undefined,
+      length: isCvAssistLength(body.length) ? body.length : undefined,
+      language: body.language === 'ar' ? 'ar' : 'en',
+      attempt: typeof body.attempt === 'number' && Number.isFinite(body.attempt)
+        ? Math.max(0, Math.min(20, Math.floor(body.attempt)))
+        : 0,
+    };
+
+    const blocked = consumeAiBudget(res, req.authUser!.id);
+    if (blocked) return blocked;
+
+    try {
+      const outcome = await generateCvAssistText(
+        req.authUser!.id,
+        request,
+        ai,
+        getGeminiModel()
+      );
+
+      if (!outcome.ok) {
+        if (outcome.reason === 'source_not_found') {
+          return res.status(404).json({
+            error:
+              'That item could not be found in your records, so nothing was written. Reload the page and try again.',
+          });
+        }
+        return res.status(503).json({
+          error:
+            'The AI assistant returned an invalid response. Nothing was written; please try again shortly.',
+        });
+      }
+
+      return res.json({
+        success: true,
+        text: outcome.result.text,
+        bullets: outcome.result.bullets,
+        removedClaims: outcome.result.removedClaims,
+        groundingNote: outcome.result.groundingNote,
+      });
+    } catch (error) {
+      // Never substitute invented text for a failed model call. The candidate
+      // is told that nothing was written.
+      return respondAiFailure(
+        res,
+        error,
+        'AI assistance is temporarily unavailable. Nothing was written; please try again shortly.',
+        req.authUser!.id
+      );
+    }
+  } catch (error) {
+    console.error('CV assist error:', error);
+    return res.status(500).json({ error: 'Failed to write this CV section' });
   }
 });
 

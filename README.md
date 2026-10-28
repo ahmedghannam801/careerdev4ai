@@ -322,6 +322,13 @@ server/db/volunteerOpportunities.ts  Ranks the volunteering catalogue for the
                             domain.
 server/cv/buildCv.ts        Assembles a CV from the user's own records. It
                             never invents, and it reports what is missing.
+server/cv/aiAssist.ts       Writes one CV section for the verified user. The
+                            record is read from the database and the answer is
+                            checked back against it before it is returned.
+shared/cvAiAssist.ts        The contract for that operation, shared by the
+                            server and the client.
+shared/cvDocument.ts        Maps the platform's records onto a CV document,
+                            keeping anything the user has already written.
 server/ai/grounding.ts      Checks model output against the user's real record.
 server/ai/groundingProfile.ts  Builds that record from the database.
 ```
@@ -339,6 +346,7 @@ server/ai/groundingProfile.ts  Builds that record from the database.
 | `GET /api/volunteer/opportunities` | The real volunteering catalogue, ranked for the user |
 | `POST`/`DELETE /api/volunteer/opportunities/:id/save` | Save or unsave an opportunity |
 | `GET /api/cv/build` | A CV assembled from the user's own records |
+| `POST /api/cv/ai-assist` | Write one CV section from the user's own record |
 | `GET /api/guides`, `POST /api/guides/:key/dismiss` | Which guided tours the user has seen |
 
 ### Localisation

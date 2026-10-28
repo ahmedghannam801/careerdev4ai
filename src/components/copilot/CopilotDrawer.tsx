@@ -72,7 +72,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           className="text-[var(--color-primary-text)] hover:underline flex items-center gap-1 text-xs shrink-0"
         >
           {t('View Analysis')}
-          <ArrowRight className="w-3 h-3" />
+          <ArrowRight className="w-3 h-3 rtl:rotate-180" />
         </button>
       </div>
 

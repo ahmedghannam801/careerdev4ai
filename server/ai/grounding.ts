@@ -48,6 +48,15 @@ export interface GroundingProfile {
   projects: string[];
   /** Numbers that appear in the user's own descriptions and achievements. */
   metrics: string[];
+  /**
+   * Text the user has written themselves, beyond the structured records.
+   *
+   * A candidate editing a CV may name something in their own draft that is
+   * not in the database — an employer from an old CV they imported, say.
+   * That is still their own claim, so it is treated as known rather than as
+   * something the model invented.
+   */
+  ownText?: string[];
 }
 
 /**
@@ -117,6 +126,24 @@ export function buildGroundingProfile(input: {
 }
 
 /**
+ * Adds the candidate's own writing to their record.
+ *
+ * The profile says what the database holds. This adds what the candidate has
+ * typed — their notes about a job, the draft already in the field, the record
+ * the server resolved for them. Those are their own claims, so the check must
+ * treat them as known: a metric or a name they wrote is not something the
+ * model made up.
+ */
+export function withOwnText(
+  profile: GroundingProfile,
+  texts: string[]
+): GroundingProfile {
+  const own = texts.map((text) => text.trim()).filter(Boolean);
+  if (own.length === 0) return profile;
+  return { ...profile, ownText: [...(profile.ownText ?? []), ...own] };
+}
+
+/**
  * Checks a model-produced string against the user's record.
  *
  * Returns every claim that could not be found. An empty array means the
@@ -147,7 +174,20 @@ export function findUngroundedClaims(
         value === metric ||
         value.replace(/\s+/g, '') === metric.replace(/\s+/g, '')
     );
-    if (!known) {
+    // A number the candidate wrote themselves is their own claim, so it
+    // passes even when the database does not hold it.
+    const writtenByUser = (profile.ownText ?? []).some((entry) => {
+      for (const own of entry.matchAll(METRIC_PATTERN)) {
+        if (
+          own[0].trim().toLowerCase().replace(/\s+/g, '') ===
+          metric.replace(/\s+/g, '')
+        ) {
+          return true;
+        }
+      }
+      return false;
+    });
+    if (!known && !writtenByUser) {
       claims.push({ claim: match[0].trim(), kind: 'metric' });
     }
   }
@@ -241,6 +281,9 @@ function buildHaystack(profile: GroundingProfile): string {
     ...profile.certifications,
     ...profile.projects,
     ...profile.metrics,
+    // The candidate's own writing is part of their record: a name they wrote
+    // in their own notes is not something the model invented.
+    ...(profile.ownText ?? []),
   ]
     .join(' \n ')
     .toLowerCase();

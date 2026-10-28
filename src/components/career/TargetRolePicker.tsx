@@ -212,7 +212,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
               {role.level} · {role.category}
             </div>
           </div>
-          <ChevronRight className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 mt-0.5" />
+          <ChevronRight className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 mt-0.5 rtl:rotate-180" />
         </div>
         <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 line-clamp-2 leading-relaxed">
           {role.overview}
@@ -285,7 +285,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
                   onClick={() => chooseDomain(null)}
                   className="text-[11px] text-[var(--color-primary-text)] hover:underline flex items-center gap-1"
                 >
-                  <ArrowLeft className="w-3 h-3" />
+                  <ArrowLeft className="w-3 h-3 rtl:rotate-180" />
                   {t('All domains')}
                 </button>
               )}

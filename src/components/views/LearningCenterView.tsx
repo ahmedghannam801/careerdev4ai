@@ -629,12 +629,12 @@ export const LearningCenterView: React.FC = () => {
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-2.5 text-[var(--text-muted)]" />
+          <Search size={14} className="pointer-events-none absolute start-2.5 top-2.5 text-[var(--text-muted)]" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t('Search courses, providers or skills')}
-            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-2 pl-8 pr-3 text-sm text-[var(--text-primary)]"
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-2 ps-8 pe-3 text-sm text-[var(--text-primary)]"
           />
         </div>
         <select

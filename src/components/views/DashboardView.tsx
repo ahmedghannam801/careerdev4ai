@@ -187,7 +187,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               className="px-4 py-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] flex items-center justify-center gap-1 transition-colors"
             >
               <span>{t('View Full Roadmap')}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
             </button>
           </div>
         </div>
@@ -577,7 +577,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                     )
                   </span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)] rtl:rotate-180" />
               </button>
 
               <button
@@ -588,7 +588,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                   <Briefcase className="w-4 h-4 text-[var(--color-success-strong)]" />
                   <span className="font-medium">{t('Job Search & Applications')}</span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)] rtl:rotate-180" />
               </button>
 
               <button
@@ -599,7 +599,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                   <Target className="w-4 h-4 text-[var(--color-warning)]" />
                   <span className="font-medium">{t('AI Mock Interview Simulator')}</span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)] rtl:rotate-180" />
               </button>
             </div>
           </div>

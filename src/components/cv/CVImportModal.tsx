@@ -266,7 +266,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
                   <span>{t('Start Scratch')}</span>
                 </button>
               </div>

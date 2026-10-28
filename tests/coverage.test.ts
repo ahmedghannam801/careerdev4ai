@@ -349,6 +349,7 @@ describe('the AI routes reject an unauthenticated request', () => {
       '/api/suggest-summary',
       '/api/generate-cover-letter',
       '/api/copilot',
+      '/api/cv/ai-assist',
     ]) {
       const res = await api('POST', path, { body: {} });
       assert.equal(res.status, 401, `${path} must require a session`);

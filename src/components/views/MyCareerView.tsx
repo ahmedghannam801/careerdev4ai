@@ -355,7 +355,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               className="px-4 py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
             >
               <span>{t('View Active Roadmap')}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
             </button>
           </div>
         </div>
@@ -451,7 +451,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 className="self-start px-3 py-1.5 rounded-lg bg-[var(--surface-main)] hover:bg-[var(--accent-primary)] hover:text-[var(--color-on-primary)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--color-primary-text)] flex items-center gap-1.5 transition-colors shadow-2xs"
               >
                 <span>{blocker.ctaText}</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
               </button>
             </div>
           ))}

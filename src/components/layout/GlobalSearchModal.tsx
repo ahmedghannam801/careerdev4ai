@@ -185,7 +185,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       <Sparkles className="w-4 h-4" />
                       <span>{t('Ask AI Copilot for Personalized Strategy')}</span>
                     </div>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 rtl:rotate-180" />
                   </button>
                 </div>
               )}

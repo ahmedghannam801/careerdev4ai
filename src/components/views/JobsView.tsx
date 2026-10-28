@@ -99,7 +99,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           className="px-4 py-2 rounded-xl bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-xs font-semibold text-[var(--color-primary-text)] border border-[var(--border-subtle)] flex items-center gap-1.5 transition-colors self-start md:self-auto"
         >
           <span>Applications Pipeline ({applications.length})</span>
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
         </button>
       </div>
 
@@ -211,7 +211,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors"
         >
           <span>{t('Track a role you found')}</span>
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
         </button>
       </div>
     </Reveal>

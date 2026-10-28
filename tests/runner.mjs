@@ -250,6 +250,10 @@ async function main() {
     join(TESTS_DIR, 'personalization-api.test.ts'),
     join(TESTS_DIR, 'grounding.test.ts'),
     join(TESTS_DIR, 'localization.test.ts'),
+    // The CV studio's writing assistant and the document it builds from the
+    // platform's records. Pure, like the two above: no database needed.
+    join(TESTS_DIR, 'cv-studio.test.ts'),
+    join(TESTS_DIR, 'cv-preview.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

@@ -288,7 +288,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-90"
                 >
                   {t('Apply on their site')}
-                  <ArrowUpRight className="h-3 w-3" />
+                  <ArrowUpRight className="h-3 w-3 rtl:-rotate-90" />
                 </a>
                 {onRecordStint && (
                   <button
