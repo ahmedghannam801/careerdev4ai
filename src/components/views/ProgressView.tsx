@@ -11,8 +11,7 @@ export const ProgressView: React.FC = () => {
     projects, 
     evidenceItems, 
     applications, 
-    interviewSessions,
-  } = useCareer();
+    interviewSessions, t,} = useCareer();
 
   const totalTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks)).length;
   const completedTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks.filter(t => t.status === 'completed'))).length;
@@ -28,14 +27,14 @@ export const ProgressView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">MEASURABLE OUTCOMES</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('MEASURABLE OUTCOMES')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Career Progression Dashboard
+            {t('Career Progression Dashboard')}
           </h1>
         </div>
 
         <div className="text-xs text-[var(--text-muted)]">
-          Target Role: <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>
+          {t('Target Role:')} <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>
         </div>
       </div>
 
@@ -44,52 +43,52 @@ export const ProgressView: React.FC = () => {
         <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <Award className="w-4 h-4 text-[var(--color-success-strong)]" />
-            <span>Mastered Skills</span>
+            <span>{t('Mastered Skills')}</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
             {masteredSkills.length} <span className="text-sm font-normal text-[var(--text-muted)]">/ {skills.length}</span>
           </div>
           <div className="text-xs text-[var(--text-muted)]">
-            {inProgressSkills.length} actively advancing
+            {inProgressSkills.length} {t('actively advancing')}
           </div>
         </StaggerItem>
 
         <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <Layers className="w-4 h-4 text-[var(--color-primary-text)]" />
-            <span>Roadmap Completion</span>
+            <span>{t('Roadmap Completion')}</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
             {roadmapPct}%
           </div>
           <div className="text-xs text-[var(--text-muted)]">
-            {completedTasks} of {totalTasks} tasks done
+            {completedTasks} {t('of')} {totalTasks} {t('tasks done')}
           </div>
         </StaggerItem>
 
         <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <FolderGit2 className="w-4 h-4 text-[var(--color-info)]" />
-            <span>Shipped Projects</span>
+            <span>{t('Shipped Projects')}</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
             {completedProjects.length} <span className="text-sm font-normal text-[var(--text-muted)]">/ {projects.length}</span>
           </div>
           <div className="text-xs text-[var(--text-muted)]">
-            {evidenceItems.length} verified artifacts
+            {evidenceItems.length} {t('verified artifacts')}
           </div>
         </StaggerItem>
 
         <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <Briefcase className="w-4 h-4 text-[var(--color-warning)]" />
-            <span>Active Pipeline</span>
+            <span>{t('Active Pipeline')}</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
             {activeApplications.length}
           </div>
           <div className="text-xs text-[var(--text-muted)]">
-            {interviewSessions.length} mock sessions recorded
+            {interviewSessions.length} {t('mock sessions recorded')}
           </div>
         </StaggerItem>
       </Stagger>
@@ -100,7 +99,7 @@ export const ProgressView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
           <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
-            <span>Mastered Skills for {targetRole.title}</span>
+            <span>{t('Mastered Skills for')} {targetRole.title}</span>
           </h3>
 
           <div className="space-y-2.5">
@@ -111,7 +110,7 @@ export const ProgressView: React.FC = () => {
                   <span className="text-[var(--text-muted)]"> · {sk.category}</span>
                 </div>
                 <span className="font-mono text-[var(--color-success-strong)] font-medium">
-                  Level {sk.currentLevel}/5 (Target Satisfied)
+                  {t('Level')} {sk.currentLevel}/5 ({t('Target Satisfied')})
                 </span>
               </div>
             ))}
@@ -122,7 +121,7 @@ export const ProgressView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
           <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-[var(--color-primary-text)]" />
-            <span>Verifiable Evidence Artifacts</span>
+            <span>{t('Verifiable Evidence Artifacts')}</span>
           </h3>
 
           <div className="space-y-2.5">
@@ -133,7 +132,7 @@ export const ProgressView: React.FC = () => {
                   <span className="text-[var(--text-muted)]"> · {ev.type}</span>
                 </div>
                 <span className="text-[var(--color-primary-text)] font-medium">
-                  {ev.skillNames.length} Skills Linked
+                  {ev.skillNames.length} {t('Skills Linked')}
                 </span>
               </div>
             ))}

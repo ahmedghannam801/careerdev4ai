@@ -25,7 +25,7 @@ interface JobsViewProps {
  * PostgreSQL).
  */
 export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
-  const { targetRole, profile, applications } = useCareer();
+  const { targetRole, profile, applications, t} = useCareer();
 
   const [keywords, setKeywords] = useState(targetRole.title);
   const [location, setLocation] = useState(profile.location || '');
@@ -83,7 +83,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
           <div className="text-xs text-[var(--text-secondary)] font-semibold uppercase tracking-wider">
-            Job Search
+            {t('Job Search')}
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
             Find roles for {targetRole.title}
@@ -108,7 +108,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
         <Info className="w-4 h-4 text-[var(--color-primary-text)] shrink-0 mt-0.5" />
         <div className="space-y-1 text-xs text-[var(--text-secondary)]">
           <p className="font-semibold text-[var(--text-primary)]">
-            No live job feed is connected in this release.
+            {t('No live job feed is connected in this release.')}
           </p>
           <p>
             CareerPilot does not display invented vacancies or placeholder application links. The
@@ -123,31 +123,31 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
-              Job title or keywords
+              {t('Job title or keywords')}
             </label>
             <div className="relative">
-              <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-3" />
+              <Search className="w-4 h-4 text-[var(--text-muted)] absolute start-3 top-3" />
               <input
                 type="text"
                 value={keywords}
                 onChange={(event) => setKeywords(event.target.value)}
-                placeholder="e.g. Frontend Engineer"
-                className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                placeholder={t('e.g. Frontend Engineer')}
+                className="w-full ps-9 pe-3.5 py-2.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
-              Location (optional)
+              {t('Location (optional)')}
             </label>
             <div className="relative">
-              <MapPin className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-3" />
+              <MapPin className="w-4 h-4 text-[var(--text-muted)] absolute start-3 top-3" />
               <input
                 type="text"
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
-                placeholder="e.g. Remote or Berlin"
-                className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                placeholder={t('e.g. Remote or Berlin')}
+                className="w-full ps-9 pe-3.5 py-2.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
           </div>
@@ -181,7 +181,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
         <div>
           <h2 className="text-sm font-bold text-[var(--text-primary)]">
-            What employers usually ask for
+            {t('What employers usually ask for')}
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
             These are the requirements defined for your target role. Use them to read a posting and
@@ -210,7 +210,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           onClick={() => onNavigate('applications')}
           className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors"
         >
-          <span>Track a role you found</span>
+          <span>{t('Track a role you found')}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

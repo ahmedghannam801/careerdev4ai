@@ -120,7 +120,7 @@ const AI_PROMISES = [
 ];
 
 export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onExploreRoles, onOpenDashboard }) => {
-  const { profile } = useCareer();
+  const { profile, t} = useCareer();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const reduced = useReducedMotion() ?? false;
 
@@ -141,7 +141,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
           <div className="flex min-w-0 items-center gap-2.5">
             <Logo variant="icon" className="h-8 w-8 shrink-0" alt="" />
             <span className="hidden shrink-0 whitespace-nowrap text-base font-semibold tracking-tight text-[var(--text-primary)] sm:inline">
-              CareerPilot AI
+              {t('CareerPilot AI')}
             </span>
           </div>
 
@@ -216,7 +216,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
               <Reveal>
                 <div className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]/70 px-3 py-1 text-xs font-medium text-[var(--color-primary-text)] backdrop-blur-sm">
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span>Your personal career operating system</span>
+                  <span>{t('Your personal career operating system')}</span>
                 </div>
               </Reveal>
 
@@ -238,7 +238,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                     onClick={onStartOnboarding}
                     className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-6 py-3.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-sm transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-[var(--color-primary-hover)] hover:shadow-lg active:translate-y-0 active:scale-[0.98]"
                   >
-                    <span>Start Your Career Journey</span>
+                    <span>{t('Start Your Career Journey')}</span>
                     <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                   </button>
 
@@ -246,7 +246,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                     href="#how-it-works"
                     className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-secondary)] active:translate-y-0 active:scale-[0.98]"
                   >
-                    Explore How It Works
+                    {t('Explore How It Works')}
                   </a>
                 </div>
               </Reveal>
@@ -255,15 +255,15 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[var(--text-secondary)]">
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="h-4 w-4 text-[var(--color-success-strong)]" />
-                    <span>Zero fake metrics</span>
+                    <span>{t('Zero fake metrics')}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="h-4 w-4 text-[var(--color-success-strong)]" />
-                    <span>Bi-directional career graph</span>
+                    <span>{t('Bi-directional career graph')}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="h-4 w-4 text-[var(--color-success-strong)]" />
-                    <span>Bilingual English &amp; Arabic</span>
+                    <span>{t('Bilingual English &amp; Arabic')}</span>
                   </div>
                 </div>
               </Reveal>
@@ -285,10 +285,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
           <Reveal>
             <div className="max-w-2xl">
               <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                The problem
+                {t('The problem')}
               </div>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                Career decisions are fragmented.
+                {t('Career decisions are fragmented.')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
                 Everything that shapes your career lives somewhere different, so no single
@@ -316,13 +316,13 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
           <Reveal>
             <div className="mx-auto max-w-2xl text-center">
               <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                How it works
+                {t('How it works')}
               </div>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                CareerPilot brings the journey together.
+                {t('CareerPilot brings the journey together.')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                One connected path instead of eight disconnected tools.
+                {t('One connected path instead of eight disconnected tools.')}
               </p>
             </div>
           </Reveal>
@@ -377,10 +377,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
             <div className="lg:col-span-5">
               <Reveal>
                 <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                  AI intelligence
+                  {t('AI intelligence')}
                 </div>
                 <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                  Guidance grounded in your career, not generic advice.
+                  {t('Guidance grounded in your career, not generic advice.')}
                 </h2>
                 <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
                   CareerPilot recommends based on the goals you set, the skills you have,
@@ -411,10 +411,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
           <Reveal>
             <div className="mx-auto max-w-2xl text-center">
               <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                Built around your stage
+                {t('Built around your stage')}
               </div>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                Tailored for every career stage
+                {t('Tailored for every career stage')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
                 CareerPilot adapts its priorities, recommendations and roadmaps to where
@@ -469,7 +469,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                     onClick={onStartOnboarding}
                     className="group mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3 text-xs font-medium text-[var(--color-primary-text)] transition-colors hover:text-[var(--text-primary)]"
                   >
-                    <span>Select Persona</span>
+                    <span>{t('Select Persona')}</span>
                     <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
                   </button>
                 </div>
@@ -486,10 +486,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                  Target roles
+                  {t('Target roles')}
                 </div>
                 <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                  Structured role profiles
+                  {t('Structured role profiles')}
                 </h2>
                 <p className="mt-2 text-sm text-[var(--text-secondary)]">
                   Explore comprehensive skill profiles, salary benchmarks, and interview
@@ -528,7 +528,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
 
                   <div className="mt-auto space-y-2 border-t border-[var(--color-border)] pt-4">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                      Required Skills
+                      {t('Required Skills')}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {role.requiredSkills.slice(0, 4).map((skill, idx) => (
@@ -546,7 +546,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                     onClick={onExploreRoles}
                     className="mt-4 w-full rounded-lg bg-[var(--color-surface-secondary)] py-2 text-xs font-medium text-[var(--color-primary-text)] transition-colors hover:bg-[var(--color-accent-surface)]"
                   >
-                    View Role Breakdown →
+                    {t('View Role Breakdown →')}
                   </button>
                 </div>
               </StaggerItem>
@@ -561,7 +561,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
         <div className="relative mx-auto max-w-3xl text-center">
           <Reveal>
             <h2 className="text-balance text-3xl font-bold tracking-tight text-[var(--text-primary)] sm:text-4xl">
-              Your next career move starts here.
+              {t('Your next career move starts here.')}
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-[var(--text-secondary)]">
               One workspace that carries you from ambition to a direction, a roadmap, real
@@ -572,7 +572,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 onClick={onStartOnboarding}
                 className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-8 py-3.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-sm transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-[var(--color-primary-hover)] hover:shadow-lg active:translate-y-0 active:scale-[0.98]"
               >
-                <span>Start Your Career Journey</span>
+                <span>{t('Start Your Career Journey')}</span>
                 <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
             </div>
@@ -596,15 +596,15 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                   rel="noopener noreferrer"
                   className="font-medium text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] underline transition-colors"
                 >
-                  Ahmed Ebrahim
+                  {t('Ahmed Ebrahim')}
                 </a>
               </span>
             </div>
             <div className="flex items-center gap-6">
-              <span>Privacy</span>
-              <span>Terms</span>
-              <span>Status</span>
-              <span>English / العربية</span>
+              <span>{t('Privacy')}</span>
+              <span>{t('Terms')}</span>
+              <span>{t('Status')}</span>
+              <span>{t('English / العربية')}</span>
             </div>
           </div>
         </div>

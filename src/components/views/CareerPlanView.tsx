@@ -8,16 +8,16 @@ interface CareerPlanViewProps {
 }
 
 export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) => {
-  const { roadmapPhases, targetRole, profile } = useCareer();
+  const { roadmapPhases, targetRole, profile, t} = useCareer();
 
   return (
     <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">PROGRESSION STRATEGY</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('PROGRESSION STRATEGY')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Personal Career Plan for {targetRole.title}
+            {t('Personal Career Plan for')} {targetRole.title}
           </h1>
         </div>
 
@@ -25,7 +25,7 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
           onClick={() => onNavigate('roadmap')}
           className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
-          <span>Open Interactive Roadmap</span>
+          <span>{t('Open Interactive Roadmap')}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -34,13 +34,13 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3 shadow-xs">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">
           <Sparkles className="w-4 h-4" />
-          <span>Strategic Trajectory Overview</span>
+          <span>{t('Strategic Trajectory Overview')}</span>
         </div>
         <h2 className="text-lg font-bold text-[var(--text-primary)]">
-          From {profile.careerState.replace('_', ' ')} to Mid-Level {targetRole.title}
+          {t('From')} {t(profile.careerState.replace('_', ' '))} {t('to Mid-Level')} {targetRole.title}
         </h2>
         <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-3xl">
-          This 5-phase dynamic career architecture addresses your assessed gaps in priority order. Advancing through each phase unlocks the next tier of proof and prepares you for competitive market applications.
+          {t('This 5-phase dynamic career architecture addresses your assessed gaps in priority order. Advancing through each phase unlocks the next tier of proof and prepares you for competitive market applications.')}
         </p>
       </div>
 
@@ -79,13 +79,13 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
 
                 <div className="flex items-center gap-4 text-xs shrink-0">
                   <span className="font-mono tabular-nums text-[var(--text-muted)]">
-                    {completedTasks} / {totalTasks} Tasks Completed
+                    {completedTasks} / {totalTasks} {t('Tasks Completed')}
                   </span>
                   <button
                     onClick={() => onNavigate('roadmap')}
                     className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
                   >
-                    View Tasks →
+                    {t('View Tasks →')}
                   </button>
                 </div>
               </div>

@@ -96,6 +96,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
   onProgressDraft,
   compact = false,
 }) => {
+  const { t } = useCareer();
   const reason =
     recommendation?.aiExplanation ??
     recommendation?.reason ??
@@ -120,9 +121,9 @@ const CourseCard: React.FC<CourseCardProps> = ({
           <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
             <span>{course.provider}</span>
             <span aria-hidden>•</span>
-            <span>{FORMAT_LABELS[course.format]}</span>
+            <span>{t(FORMAT_LABELS[course.format])}</span>
             <span aria-hidden>•</span>
-            <span>{course.level}</span>
+            <span>{t(course.level)}</span>
           </div>
           <h3 className="mt-1 text-base font-semibold text-[var(--text-primary)] leading-snug">
             {course.title}
@@ -137,7 +138,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
 
       <div className="mt-3 flex flex-wrap gap-2">
         <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${AVAILABILITY_STYLES[course.availability]}`}>
-          {AVAILABILITY_LABELS[course.availability]}
+          {t(AVAILABILITY_LABELS[course.availability])}
         </span>
         {course.durationHours !== null && (
           <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
@@ -146,17 +147,17 @@ const CourseCard: React.FC<CourseCardProps> = ({
         )}
         {roleRelevance !== null && (
           <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
-            <Target size={11} /> {roleRelevance}% role fit
+            <Target size={11} /> {roleRelevance}% {t('role fit')}
           </span>
         )}
         {isCompleted && (
           <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-success-strong)]">
-            <CheckCircle2 size={11} /> Completed
+            <CheckCircle2 size={11} /> {t('Completed')}
           </span>
         )}
         {isDismissed && (
           <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">
-            Dismissed
+            {t('Dismissed')}
           </span>
         )}
       </div>
@@ -164,18 +165,18 @@ const CourseCard: React.FC<CourseCardProps> = ({
       {reason && (
         <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-3">
           <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            <Sparkles size={12} /> Why this now
+            <Sparkles size={12} /> {t('Why this now')}
           </div>
           <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-secondary)]">{reason}</p>
           {recommendation?.aiSkillGap && (
             <p className="mt-2 text-xs text-[var(--text-secondary)]">
-              <span className="font-semibold text-[var(--text-primary)]">Skill gap:</span>{' '}
+              <span className="font-semibold text-[var(--text-primary)]">{t('Skill gap:')}</span>{' '}
               {recommendation.aiSkillGap}
             </p>
           )}
           {recommendation?.aiRoadmapLink && (
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              <span className="font-semibold text-[var(--text-primary)]">Roadmap link:</span>{' '}
+              <span className="font-semibold text-[var(--text-primary)]">{t('Roadmap link:')}</span>{' '}
               {recommendation.aiRoadmapLink}
             </p>
           )}
@@ -197,7 +198,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
 
       {recommendation && recommendation.gapsAddressed.length > 0 && (
         <p className="mt-2 text-xs text-[var(--text-muted)]">
-          Gap addressed:{' '}
+          {t('Gap addressed:')}{' '}
           {recommendation.gapsAddressed
             .slice(0, 2)
             .map((gap) => `${gap.skill} ${gap.currentLevel}→${gap.targetLevel}`)
@@ -214,7 +215,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
       {(isInProgress || isCompleted) && (
         <div className="mt-3">
           <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
-            <span>Progress</span>
+            <span>{t('Progress')}</span>
             <span>{item?.progressPercent ?? 0}%</span>
           </div>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
@@ -226,7 +227,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
           {isInProgress && (
             <div className="mt-2 flex items-center gap-2">
               <input
-                aria-label={`Progress for ${course.title}`}
+                aria-label={`${t('Progress for')} ${course.title}`}
                 type="range"
                 min={0}
                 max={100}
@@ -240,7 +241,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
                 onClick={() => onProgress(course.id, draft)}
                 className="rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
               >
-                Save
+                {t('Save')}
               </button>
             </div>
           )}
@@ -254,7 +255,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
             onClick={() => onStart(course.id, recommendation?.reason)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] hover:opacity-90"
           >
-            <PlayCircle size={14} /> {isInProgress ? 'Continue' : 'Start'}
+            <PlayCircle size={14} /> {t(isInProgress ? 'Continue' : 'Start')}
           </button>
         )}
         {!isCompleted && (
@@ -263,7 +264,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
             onClick={() => onComplete(course.id)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--color-success-strong)]/40 hover:text-[var(--color-success-strong)]"
           >
-            <CheckCircle2 size={14} /> Complete
+            <CheckCircle2 size={14} /> {t('Complete')}
           </button>
         )}
         {!isSaved && !isInProgress && !isCompleted && (
@@ -272,7 +273,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
             onClick={() => onSave(course.id, recommendation?.reason)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
           >
-            <BookmarkPlus size={14} /> Save
+            <BookmarkPlus size={14} /> {t('Save')}
           </button>
         )}
         {isSaved && (
@@ -282,7 +283,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-success-strong)]"
           >
-            <BookmarkCheck size={14} /> Saved
+            <BookmarkCheck size={14} /> {t('Saved')}
           </motion.span>
         )}
         {!isCompleted && (
@@ -291,7 +292,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
             onClick={() => onDismiss(course.id, recommendation?.reason)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           >
-            <X size={14} /> Dismiss
+            <X size={14} /> {t('Dismiss')}
           </button>
         )}
         {(isSaved || isInProgress || isDismissed) && (
@@ -300,7 +301,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
             onClick={() => onRemove(course.id)}
             className="text-xs text-[var(--text-muted)] underline-offset-2 hover:underline"
           >
-            Remove
+            {t('Remove')}
           </button>
         )}
         <a
@@ -309,7 +310,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
           rel="noopener noreferrer"
           className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--color-accent-strong)] hover:underline"
         >
-          Open resource <ExternalLink size={12} />
+          {t('Open resource')} <ExternalLink size={12} />
         </a>
       </div>
     </article>
@@ -331,8 +332,7 @@ export const LearningCenterView: React.FC = () => {
     completeLearningCourse,
     updateLearningProgress,
     removeLearningCourse,
-    targetRole,
-  } = useCareer();
+    targetRole, t} = useCareer();
 
   const [tab, setTab] = useState<HubTab>('recommended');
   const [category, setCategory] = useState('all');
@@ -468,14 +468,13 @@ export const LearningCenterView: React.FC = () => {
       <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
-            <Sparkles size={14} /> AI Learning Hub
+            <Sparkles size={14} /> {t('AI Learning Hub')}
           </div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-            What should you learn next?
+            {t('What should you learn next?')}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">
-            {learningRecommendationMeta.targetRoleTitle ?? targetRole.title}: recommendations are ranked
-            from your skill gaps, roadmap and learning history. Every course is a real catalogue entry.
+            {learningRecommendationMeta.targetRoleTitle ?? targetRole.title}: {t('recommendations are ranked from your skill gaps, roadmap and learning history. Every course is a real catalogue entry.')}
           </p>
         </div>
         <button
@@ -485,7 +484,7 @@ export const LearningCenterView: React.FC = () => {
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90 disabled:opacity-50"
         >
           <RefreshCw size={15} className={isLearningLoading ? 'animate-spin' : ''} />
-          {isLearningLoading ? 'Ranking…' : 'Refresh recommendations'}
+          {t(isLearningLoading ? 'Ranking…' : 'Refresh recommendations')}
         </button>
       </div>
 
@@ -493,7 +492,7 @@ export const LearningCenterView: React.FC = () => {
         <div className="flex items-start gap-2 rounded-xl border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 p-3 text-sm text-[var(--color-danger)]">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <div>
-            <div className="font-semibold">Learning Hub request failed</div>
+            <div className="font-semibold">{t('Learning Hub request failed')}</div>
             <div className="text-xs">{learningError}</div>
           </div>
         </div>
@@ -503,29 +502,29 @@ export const LearningCenterView: React.FC = () => {
         {learningRecommendationMeta.aiUsed ? (
           <span className="inline-flex items-center gap-1.5">
             <Sparkles size={13} className="text-[var(--color-accent-strong)]" />
-            AI explanations are active. Candidate courses and scores remain deterministic.
+            {t('AI explanations are active. Candidate courses and scores remain deterministic.')}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5">
             <AlertCircle size={13} className="text-[var(--text-muted)]" />
-            Deterministic ranking is active.
+            {t('Deterministic ranking is active.')}
             {learningRecommendationMeta.aiFallbackReason
               ? ` ${learningRecommendationMeta.aiFallbackReason}`
               : ''}
           </span>
         )}
         <span className="mx-2 text-[var(--text-muted)]">•</span>
-        {learningRecommendationMeta.skillGapCount} skill gaps
+        {learningRecommendationMeta.skillGapCount} {t('skill gaps')}
         <span className="mx-2 text-[var(--text-muted)]">•</span>
-        {learningRecommendationMeta.roadmapSkillCount} roadmap skills
+        {learningRecommendationMeta.roadmapSkillCount} {t('roadmap skills')}
         <span className="mx-2 text-[var(--text-muted)]">•</span>
-        {learningRecommendationMeta.weeklyHours}h/week, {learningRecommendationMeta.budget.replace('_', ' ')}
+        {learningRecommendationMeta.weeklyHours}{t('h/week')}, {t(learningRecommendationMeta.budget.replace('_', ' '))}
       </div>
 
       {top && (
         <section className="rounded-2xl border border-[var(--color-accent)]/25 bg-gradient-to-br from-[var(--color-accent)]/10 via-[var(--bg-surface)] to-[var(--bg-surface)] p-5">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
-            <Trophy size={14} /> Next best step
+            <Trophy size={14} /> {t('Next best step')}
           </div>
           <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
             <div>
@@ -547,9 +546,9 @@ export const LearningCenterView: React.FC = () => {
             <div className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
               <div className="text-3xl font-bold text-[var(--color-accent-strong)]">{Math.round(top.score)}</div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                deterministic
+                {t('deterministic')}
                 <br />
-                match score
+                {t('match score')}
               </div>
             </div>
           </div>
@@ -559,10 +558,10 @@ export const LearningCenterView: React.FC = () => {
       <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
-            <Filter size={14} /> Learning preferences
+            <Filter size={14} /> {t('Learning preferences')}
           </div>
           <label className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-            Hours/week
+            {t('Hours/week')}
             <input
               type="number"
               min={1}
@@ -573,31 +572,31 @@ export const LearningCenterView: React.FC = () => {
             />
           </label>
           <label className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-            Budget
+            {t('Budget')}
             <select
               value={budget}
               onChange={(event) => setBudget(event.target.value as typeof budget)}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[var(--text-primary)]"
             >
-              <option value="free_only">Free only</option>
-              <option value="low">Prefer free</option>
-              <option value="any">Any price</option>
+              <option value="free_only">{t('Free only')}</option>
+              <option value="low">{t('Prefer free')}</option>
+              <option value="any">{t('Any price')}</option>
             </select>
           </label>
           <label className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-            Format
+            {t('Format')}
             <select
               value={preferredFormat}
               onChange={(event) => setPreferredFormat(event.target.value as CourseFormat | 'any')}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[var(--text-primary)]"
             >
-              <option value="any">Any format</option>
-              <option value="course">Course</option>
-              <option value="learning_path">Learning path</option>
-              <option value="professional_certificate">Professional certificate</option>
-              <option value="tutorial">Tutorial</option>
-              <option value="video">Video</option>
-              <option value="playlist">Playlist</option>
+              <option value="any">{t('Any format')}</option>
+              <option value="course">{t('Course')}</option>
+              <option value="learning_path">{t('Learning path')}</option>
+              <option value="professional_certificate">{t('Professional certificate')}</option>
+              <option value="tutorial">{t('Tutorial')}</option>
+              <option value="video">{t('Video')}</option>
+              <option value="playlist">{t('Playlist')}</option>
             </select>
           </label>
           <button
@@ -606,7 +605,7 @@ export const LearningCenterView: React.FC = () => {
             disabled={isLearningLoading}
             className="ml-auto rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--color-accent)] disabled:opacity-50"
           >
-            Apply
+            {t('Apply')}
           </button>
         </div>
       </section>
@@ -623,7 +622,7 @@ export const LearningCenterView: React.FC = () => {
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            {entry.label} <span className="text-[11px] opacity-70">{entry.count}</span>
+            {t(entry.label)} <span className="text-[11px] opacity-70">{entry.count}</span>
           </button>
         ))}
       </div>
@@ -634,7 +633,7 @@ export const LearningCenterView: React.FC = () => {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search courses, providers or skills"
+            placeholder={t('Search courses, providers or skills')}
             className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-2 pl-8 pr-3 text-sm text-[var(--text-primary)]"
           />
         </div>
@@ -643,10 +642,10 @@ export const LearningCenterView: React.FC = () => {
           onChange={(event) => setCategory(event.target.value)}
           className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
         >
-          <option value="all">All categories</option>
+          <option value="all">{t('All categories')}</option>
           {categories.map((entry) => (
             <option key={entry} value={entry}>
-              {entry}
+              {t(entry)}
             </option>
           ))}
         </select>
@@ -655,10 +654,10 @@ export const LearningCenterView: React.FC = () => {
           onChange={(event) => setLevel(event.target.value)}
           className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
         >
-          <option value="all">All levels</option>
+          <option value="all">{t('All levels')}</option>
           {(['Beginner', 'Intermediate', 'Advanced'] as CourseLevel[]).map((entry) => (
             <option key={entry} value={entry}>
-              {entry}
+              {t(entry)}
             </option>
           ))}
         </select>
@@ -667,10 +666,10 @@ export const LearningCenterView: React.FC = () => {
           onChange={(event) => setAvailability(event.target.value)}
           className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
         >
-          <option value="all">All availability</option>
+          <option value="all">{t('All availability')}</option>
           {Object.entries(AVAILABILITY_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
@@ -679,10 +678,10 @@ export const LearningCenterView: React.FC = () => {
           onChange={(event) => setFormat(event.target.value)}
           className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
         >
-          <option value="all">All formats</option>
+          <option value="all">{t('All formats')}</option>
           {Object.entries(FORMAT_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
@@ -693,7 +692,7 @@ export const LearningCenterView: React.FC = () => {
           {filteredRecommendations.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)]">
               <BookOpen size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
-              No recommendations match these filters. Increase your budget or clear a filter.
+              {t('No recommendations match these filters. Increase your budget or clear a filter.')}
             </div>
           ) : (
             <Stagger key="recommended" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -713,8 +712,8 @@ export const LearningCenterView: React.FC = () => {
             <EmptyState
               compact
               icon={BookmarkCheck}
-              title="Nothing saved yet"
-              description="Save a course from your recommendations and it will wait here until you are ready to start it."
+              title={t('Nothing saved yet')}
+              description={t('Save a course from your recommendations and it will wait here until you are ready to start it.')}
             />
           ) : (
             <Stagger key="saved" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -734,8 +733,8 @@ export const LearningCenterView: React.FC = () => {
             <EmptyState
               compact
               icon={PlayCircle}
-              title="No course in progress"
-              description="Start a course and it will appear here, with the progress you have made so far."
+              title={t('No course in progress')}
+              description={t('Start a course and it will appear here, with the progress you have made so far.')}
             />
           ) : (
             <Stagger key="in_progress" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -755,8 +754,8 @@ export const LearningCenterView: React.FC = () => {
             <EmptyState
               compact
               icon={CheckCircle2}
-              title="No completed learning yet"
-              description="Finish a course and it will be recorded here as learning evidence for your career."
+              title={t('No completed learning yet')}
+              description={t('Finish a course and it will be recorded here as learning evidence for your career.')}
             />
           ) : (
             completedItems.map(({ item, course }) => (
@@ -768,12 +767,12 @@ export const LearningCenterView: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-[var(--text-primary)]">{course.title}</div>
                   <div className="text-xs text-[var(--text-secondary)]">
-                    {course.provider} · {AVAILABILITY_LABELS[course.availability]} · completed{' '}
+                    {course.provider} · {t(AVAILABILITY_LABELS[course.availability])} · {t('completed')}{' '}
                     {item.completedAt ? new Date(item.completedAt).toLocaleDateString() : ''}
                   </div>
                 </div>
                 <span className="rounded-full border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] px-2 py-1 text-[11px] font-medium text-[var(--color-success-strong)]">
-                  Learning evidence recorded
+                  {t('Learning evidence recorded')}
                 </span>
                 <a
                   href={course.url}
@@ -781,7 +780,7 @@ export const LearningCenterView: React.FC = () => {
                   rel="noopener noreferrer"
                   className="text-xs font-medium text-[var(--color-accent-strong)] hover:underline"
                 >
-                  Open
+                  {t('Open')}
                 </a>
               </div>
             ))
@@ -794,12 +793,12 @@ export const LearningCenterView: React.FC = () => {
           {learningCatalog.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)] md:col-span-2 xl:col-span-3">
               <BookOpen size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
-              The course catalogue could not be loaded. Refresh the page to try again.
+              {t('The course catalogue could not be loaded. Refresh the page to try again.')}
             </div>
           ) : catalogFiltered.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)] md:col-span-2 xl:col-span-3">
               <Search size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
-              No courses match these filters. Clear a filter or search term.
+              {t('No courses match these filters. Clear a filter or search term.')}
             </div>
           ) : (
             <Stagger key="catalog" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -814,8 +813,7 @@ export const LearningCenterView: React.FC = () => {
       )}
 
       <footer className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--text-secondary)]">
-        Completing a course records learning progress; it does not automatically mark a skill as
-        mastered. Update skill levels explicitly in the Skills Center.
+        {t('Completing a course records learning progress; it does not automatically mark a skill as mastered. Update skill levels explicitly in the Skills Center.')}
       </footer>
     </Reveal>
   );

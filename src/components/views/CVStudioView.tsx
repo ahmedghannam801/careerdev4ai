@@ -7,6 +7,7 @@ import {
   Printer
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { BuiltCvPanel } from '../cv/BuiltCvPanel';
 import { Reveal } from '../motion/Motion';
 import { CVImportModal } from '../cv/CVImportModal';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
@@ -23,11 +24,10 @@ export const CVStudioView: React.FC = () => {
     dismissCvAnalysisError,
     targetRole,
     aiPreferences,
-    privacyPreferences,
-  } = useCareer();
+    privacyPreferences, t } = useCareer();
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
-  const [activeTab, setActiveTab] = useState<'editor' | 'ats' | 'versions'>('editor');
+  const [activeTab, setActiveTab] = useState<'editor' | 'ats' | 'versions' | 'built'>('editor');
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionName, setVersionName] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -38,7 +38,7 @@ export const CVStudioView: React.FC = () => {
     latestVersion?.targetRoleTitle,
     targetRole.title
   );
-  const analysisRoleLabel = analysisRole.roleTitle ?? 'your saved CV';
+  const analysisRoleLabel = analysisRole.roleTitle ?? t('your saved CV');
   const retryDelay = formatRetryDelay(cvAnalysisError?.retryAfterSeconds);
 
   const handlePrint = () => {
@@ -58,9 +58,9 @@ export const CVStudioView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">CV WORKSPACE & ATS OPTIMIZER</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('CV WORKSPACE & ATS OPTIMIZER')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            CV Studio for {targetRole.title}
+            {t('CV Studio for')} {targetRole.title}
           </h1>
         </div>
 
@@ -70,7 +70,7 @@ export const CVStudioView: React.FC = () => {
             className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Import / Paste</span>
+            <span>{t('Import / Paste')}</span>
           </button>
 
           <button
@@ -79,12 +79,12 @@ export const CVStudioView: React.FC = () => {
             title={
               aiWritingEnabled
                 ? undefined
-                : 'Enable AI Writing Assistance and Career Graph AI Grounding in Settings.'
+                : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
             }
             className="px-3.5 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--color-primary-text)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isOptimizingCV ? 'animate-spin' : ''}`} />
-            <span>{isOptimizingCV ? 'Analyzing ATS Keywords...' : 'Run ATS Audit'}</span>
+            <span>{isOptimizingCV ? t('Analyzing ATS Keywords...') : t('Run ATS Audit')}</span>
           </button>
 
           <button
@@ -92,7 +92,7 @@ export const CVStudioView: React.FC = () => {
             className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print / Export PDF</span>
+            <span>{t('Print / Export PDF')}</span>
           </button>
         </div>
       </div>
@@ -107,14 +107,14 @@ export const CVStudioView: React.FC = () => {
           <AlertCircle className="w-4 h-4 text-[var(--color-warning)] shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0 space-y-1">
             <div className="text-xs font-bold text-[var(--text-primary)]">
-              ATS audit unavailable
+              {t('ATS audit unavailable')}
             </div>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
               {cvAnalysisError.message}
             </p>
             {retryDelay && (
               <p className="text-[11px] text-[var(--color-warning)] font-medium">
-                Try again in about {retryDelay}.
+                {t('Try again in about')} {retryDelay}.
               </p>
             )}
           </div>
@@ -122,7 +122,7 @@ export const CVStudioView: React.FC = () => {
             onClick={dismissCvAnalysisError}
             className="px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           >
-            Dismiss
+            {t('Dismiss')}
           </button>
         </div>
       )}
@@ -137,7 +137,7 @@ export const CVStudioView: React.FC = () => {
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          Document Editor & Preview
+          {t('Document Editor & Preview')}
         </button>
         <button
           onClick={() => setActiveTab('ats')}
@@ -147,9 +147,9 @@ export const CVStudioView: React.FC = () => {
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          ATS Analysis & Recommendations
+          {t('ATS Analysis & Recommendations')}
           {latestAnalysis
-            ? ` (${latestAnalysis.overallScore}%${analysisRole.isStale ? ' · previous role' : ''})`
+            ? ` (${latestAnalysis.overallScore}%${analysisRole.isStale ? ` · ${t('previous role')}` : ''})`
             : ''}
         </button>
         <button
@@ -160,9 +160,22 @@ export const CVStudioView: React.FC = () => {
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          Version History ({cvVersions.length})
+          {t('Version History')} ({cvVersions.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('built')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            activeTab === 'built'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          {t('Built From My Data')}
         </button>
       </div>
+
+      {/* TAB 0: THE CV ASSEMBLED FROM THE USER'S OWN RECORDS */}
+      {activeTab === 'built' && <BuiltCvPanel />}
 
       {/* TAB 1: DOCUMENT EDITOR */}
       {activeTab === 'editor' && (
@@ -170,10 +183,10 @@ export const CVStudioView: React.FC = () => {
           {/* Left Form Controls (5 cols) */}
           <div className="lg:col-span-5 space-y-4">
             <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Contact & Header</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Contact & Header')}</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Full Name</label>
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">{t('Full Name')}</label>
                   <input
                     type="text"
                     value={activeCV.fullName}
@@ -182,7 +195,7 @@ export const CVStudioView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Target Role Headline</label>
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">{t('Target Role Headline')}</label>
                   <input
                     type="text"
                     value={activeCV.title}
@@ -192,7 +205,7 @@ export const CVStudioView: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Email</label>
+                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">{t('Email')}</label>
                     <input
                       type="email"
                       value={activeCV.email}
@@ -201,7 +214,7 @@ export const CVStudioView: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Location</label>
+                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">{t('Location')}</label>
                     <input
                       type="text"
                       value={activeCV.location}
@@ -214,7 +227,7 @@ export const CVStudioView: React.FC = () => {
             </div>
 
             <div className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Executive Summary</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Executive Summary')}</h3>
               <textarea
                 rows={4}
                 value={activeCV.summary}
@@ -222,7 +235,7 @@ export const CVStudioView: React.FC = () => {
                 className="w-full p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed"
               />
               <div className="text-[11px] text-[var(--text-muted)]">
-                Tip: Quantify your results using the X-Y-Z format: "Accomplished [X], as measured by [Y], by doing [Z]".
+                {t('Tip: Quantify your results using the X-Y-Z format: "Accomplished [X], as measured by [Y], by doing [Z]".')}
               </div>
             </div>
 
@@ -230,7 +243,7 @@ export const CVStudioView: React.FC = () => {
               onClick={() => setShowVersionModal(true)}
               className="w-full py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] transition-colors"
             >
-              Save as New Version Snapshot
+              {t('Save as New Version Snapshot')}
             </button>
           </div>
 
@@ -253,7 +266,7 @@ export const CVStudioView: React.FC = () => {
               {/* Summary */}
               <div className="space-y-1.5">
                 <div className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-                  Professional Summary
+                  {t('Professional Summary')}
                 </div>
                 <p className="text-xs text-slate-700 leading-relaxed">
                   {activeCV.summary}
@@ -263,7 +276,7 @@ export const CVStudioView: React.FC = () => {
               {/* Experience */}
               <div className="space-y-3">
                 <div className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-                  Work Experience
+                  {t('Work Experience')}
                 </div>
                 <div className="space-y-3">
                   {activeCV.experiences.map((exp) => (
@@ -286,7 +299,7 @@ export const CVStudioView: React.FC = () => {
               {/* Education */}
               <div className="space-y-2">
                 <div className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-                  Education
+                  {t('Education')}
                 </div>
                 {activeCV.education.map((edu) => (
                   <div key={edu.id} className="flex justify-between text-xs">
@@ -302,7 +315,7 @@ export const CVStudioView: React.FC = () => {
               {/* Skills */}
               <div className="space-y-1.5">
                 <div className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-                  Core Skills & Technologies
+                  {t('Core Skills & Technologies')}
                 </div>
                 <div className="text-xs text-slate-700">
                   {activeCV.skillsList.join(' · ')}
@@ -321,11 +334,11 @@ export const CVStudioView: React.FC = () => {
               <AlertCircle className="w-4 h-4 text-[var(--color-warning)] shrink-0" />
               <div className="flex-1 text-xs text-[var(--text-secondary)] leading-relaxed">
                 <span className="font-bold text-[var(--text-primary)]">
-                  This analysis is out of date for your target role.
+                  {t('This analysis is out of date for your target role.')}
                 </span>{' '}
-                It was generated for {analysisRoleLabel}, but your current target is{' '}
-                {targetRole.title}. The score below has not been applied to your
-                current readiness.
+                {t('It was generated for')} {analysisRoleLabel}
+                {t(', but your current target is')} {targetRole.title}
+                {t('. The score below has not been applied to your current readiness.')}
               </div>
               <button
                 onClick={runAiCvOptimization}
@@ -333,32 +346,32 @@ export const CVStudioView: React.FC = () => {
                 title={
                   aiWritingEnabled
                     ? undefined
-                    : 'Enable AI Writing Assistance and Career Graph AI Grounding in Settings.'
+                    : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
                 }
                 className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-[11px] font-semibold whitespace-nowrap disabled:opacity-50"
               >
-                {isOptimizingCV ? 'Analyzing…' : `Audit for ${targetRole.title}`}
+                {isOptimizingCV ? t('Analyzing…') : `${t('Audit for')} ${targetRole.title}`}
               </button>
             </div>
           )}
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">ATS Match Diagnostic</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">{t('ATS Match Diagnostic')}</span>
                 <h2 className="text-xl font-bold text-[var(--text-primary)] mt-0.5">
-                  Alignment for {analysisRoleLabel}
+                  {t('Alignment for')} {analysisRoleLabel}
                 </h2>
                 {analysisRole.isStale && (
                   <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    Current target: {targetRole.title}
+                    {t('Current target:')} {targetRole.title}
                   </p>
                 )}
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--color-primary-text)]">
                   {latestAnalysis.overallScore} / 100
                 </div>
-                <div className="text-xs text-[var(--text-muted)]">Benchmark Passing Score: 75</div>
+                <div className="text-xs text-[var(--text-muted)]">{t('Benchmark Passing Score: 75')}</div>
               </div>
             </div>
 
@@ -377,7 +390,7 @@ export const CVStudioView: React.FC = () => {
               <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-2">
                 <div className="text-xs font-bold text-[var(--color-success-strong)] flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Matched Keywords ({latestAnalysis.matchedKeywords.length})</span>
+                  <span>{t('Matched Keywords')} ({latestAnalysis.matchedKeywords.length})</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {latestAnalysis.matchedKeywords.map((kw, i) => (
@@ -391,7 +404,7 @@ export const CVStudioView: React.FC = () => {
               <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-2">
                 <div className="text-xs font-bold text-[var(--color-warning)] flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4" />
-                  <span>Missing Role Keywords ({latestAnalysis.missingKeywords.length})</span>
+                  <span>{t('Missing Role Keywords')} ({latestAnalysis.missingKeywords.length})</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {latestAnalysis.missingKeywords.map((kw, i) => (
@@ -405,22 +418,22 @@ export const CVStudioView: React.FC = () => {
 
             {/* Bullet Point Improvements */}
             <div className="space-y-3 pt-2">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Actionable Bullet Point Improvements</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Actionable Bullet Point Improvements')}</h3>
               <div className="space-y-3">
                 {latestAnalysis.actionableImprovements.map((imp, i) => (
                   <div key={i} className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-2 text-xs">
                     {imp.currentText && (
                       <div>
-                        <span className="font-semibold text-[var(--text-muted)]">Current: </span>
+                        <span className="font-semibold text-[var(--text-muted)]">{t('Current:')} </span>
                         <span className="line-through text-[var(--text-secondary)]">{imp.currentText}</span>
                       </div>
                     )}
                     <div>
-                      <span className="font-semibold text-[var(--color-success-strong)]">Suggested: </span>
+                      <span className="font-semibold text-[var(--color-success-strong)]">{t('Suggested:')} </span>
                       <span className="font-medium text-[var(--text-primary)]">{imp.suggestedText}</span>
                     </div>
                     <div className="text-[11px] text-[var(--color-primary-text)] font-medium pt-1">
-                      Reason: {imp.reason}
+                      {t('Reason:')} {imp.reason}
                     </div>
                   </div>
                 ))}
@@ -434,10 +447,10 @@ export const CVStudioView: React.FC = () => {
       {activeTab === 'ats' && !latestAnalysis && (
         <div className="p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-center space-y-3">
           <Sparkles className="w-6 h-6 text-[var(--color-primary-text)] mx-auto" />
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">No ATS analysis yet</h2>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('No ATS analysis yet')}</h2>
           <p className="text-xs text-[var(--text-secondary)] max-w-lg mx-auto leading-relaxed">
-            Run an ATS audit to compare this CV against the keywords and requirements
-            for {targetRole.title}.
+            {t('Run an ATS audit to compare this CV against the keywords and requirements for')}{' '}
+            {targetRole.title}.
           </p>
           <button
             onClick={runAiCvOptimization}
@@ -445,16 +458,15 @@ export const CVStudioView: React.FC = () => {
             title={
               aiWritingEnabled
                 ? undefined
-                : 'Enable AI Writing Assistance and Career Graph AI Grounding in Settings.'
+                : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
             }
             className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
           >
-            {isOptimizingCV ? 'Analyzing…' : 'Run ATS Audit'}
+            {isOptimizingCV ? t('Analyzing…') : t('Run ATS Audit')}
           </button>
           {!aiWritingEnabled && (
             <p className="text-[11px] text-[var(--color-warning)]">
-              Enable AI Writing Assistance and Career Graph AI Grounding in Settings
-              to run an audit.
+              {t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings to run an audit.')}
             </p>
           )}
         </div>
@@ -464,13 +476,15 @@ export const CVStudioView: React.FC = () => {
       {activeTab === 'versions' && (
         <div className="space-y-4">
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Saved CV Snapshots</h3>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Saved CV Snapshots')}</h3>
             <div className="space-y-3">
               {cvVersions.map((v) => (
                 <div key={v.id} className="p-4 rounded-xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)] flex items-center justify-between text-xs">
                   <div>
                     <div className="font-bold text-sm text-[var(--text-primary)]">{v.name}</div>
-                    <div className="text-[var(--text-muted)]">Target: {v.targetRoleTitle || 'Not recorded'} · Created {v.createdAt}</div>
+                    <div className="text-[var(--text-muted)]">
+                      {t('Target:')} {v.targetRoleTitle || t('Not recorded')} · {t('Created')} {v.createdAt}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     {v.atsAnalysis && (
@@ -482,7 +496,7 @@ export const CVStudioView: React.FC = () => {
                       onClick={() => updateCV(v.profile)}
                       className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)]"
                     >
-                      Restore Snapshot
+                      {t('Restore Snapshot')}
                     </button>
                   </div>
                 </div>
@@ -496,16 +510,16 @@ export const CVStudioView: React.FC = () => {
       {showVersionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
           <div className="w-full max-w-sm bg-[var(--surface-main)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl p-6 space-y-4">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Save CV Version</h3>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Save CV Version')}</h3>
             <form onSubmit={handleSaveVersion} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Version Name</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Version Name')}</label>
                 <input
                   type="text"
                   required
                   value={versionName}
                   onChange={(e) => setVersionName(e.target.value)}
-                  placeholder="e.g. Frontend Engineer - Tech Focus v2"
+                  placeholder={t('e.g. Frontend Engineer - Tech Focus v2')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
                 />
               </div>
@@ -515,13 +529,13 @@ export const CVStudioView: React.FC = () => {
                   onClick={() => setShowVersionModal(false)}
                   className="px-3 py-1.5 rounded-lg text-xs text-[var(--text-secondary)]"
                 >
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]"
                 >
-                  Save Snapshot
+                  {t('Save Snapshot')}
                 </button>
               </div>
             </form>

@@ -5,7 +5,7 @@ import { EvidenceType } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const EvidenceView: React.FC = () => {
-  const { evidenceItems, addEvidence, deleteEvidence } = useCareer();
+  const { evidenceItems, addEvidence, deleteEvidence, t} = useCareer();
   const [selectedType, setSelectedType] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -55,9 +55,9 @@ export const EvidenceView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">VERIFIABLE PROOF HUB</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('VERIFIABLE PROOF HUB')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Evidence Records & Skill Validation
+            {t('Evidence Records & Skill Validation')}
           </h1>
         </div>
 
@@ -66,7 +66,7 @@ export const EvidenceView: React.FC = () => {
           className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Evidence Artifact</span>
+          <span>{t('Add Evidence Artifact')}</span>
         </button>
       </div>
 
@@ -80,19 +80,19 @@ export const EvidenceView: React.FC = () => {
               : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          All Evidence ({evidenceItems.length})
+          {t('All Evidence')} ({evidenceItems.length})
         </button>
-        {evidenceTypes.map((t) => (
+        {evidenceTypes.map((evidenceType) => (
           <button
-            key={t}
-            onClick={() => setSelectedType(t)}
+            key={evidenceType}
+            onClick={() => setSelectedType(evidenceType)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
-              selectedType === t
+              selectedType === evidenceType
                 ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
                 : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            {t}
+            {t(evidenceType)}
           </button>
         ))}
       </div>
@@ -108,7 +108,7 @@ export const EvidenceView: React.FC = () => {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                    <span className="capitalize">{item.type}</span>
+                    <span className="capitalize">{t(item.type)}</span>
                     <span>·</span>
                     <span className="font-mono text-[11px]">{item.dateAdded}</span>
                   </div>
@@ -118,7 +118,7 @@ export const EvidenceView: React.FC = () => {
                 {item.verified && (
                   <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-success-strong)] bg-[var(--color-success-surface)] px-2 py-0.5 rounded">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Verified</span>
+                    <span>{t('Verified')}</span>
                   </span>
                 )}
               </div>
@@ -129,7 +129,7 @@ export const EvidenceView: React.FC = () => {
 
               {/* Linked Skills */}
               <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1.5">
-                <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">Validated Competencies</div>
+                <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">{t('Validated Competencies')}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {item.skillNames.map((sk, i) => (
                     <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--color-primary-text)] font-medium">
@@ -149,7 +149,7 @@ export const EvidenceView: React.FC = () => {
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-[var(--color-primary-text)] hover:underline font-medium"
                 >
-                  <span>Verify Link</span>
+                  <span>{t('Verify Link')}</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               ) : <div />}
@@ -158,7 +158,7 @@ export const EvidenceView: React.FC = () => {
                 onClick={() => deleteEvidence(item.id)}
                 className="text-xs text-[var(--text-muted)] hover:text-[var(--color-danger)] transition-colors"
               >
-                Delete
+                {t('Delete')}
               </button>
             </div>
           </StaggerItem>
@@ -170,7 +170,7 @@ export const EvidenceView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
           <div className="w-full max-w-md bg-[var(--surface-main)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
-              <h3 className="text-base font-bold text-[var(--text-primary)]">Add Evidence Artifact</h3>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Add Evidence Artifact')}</h3>
               <button 
                 onClick={() => setShowAddModal(false)}
                 className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded"
@@ -181,44 +181,44 @@ export const EvidenceView: React.FC = () => {
 
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Title</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Title')}</label>
                 <input
                   type="text"
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Meta Frontend Certification or GitHub Repository"
+                  placeholder={t('e.g. Meta Frontend Certification or GitHub Repository')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Artifact Type</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Artifact Type')}</label>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as EvidenceType)}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] capitalize"
                 >
-                  {evidenceTypes.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                  {evidenceTypes.map((evidenceType) => (
+                    <option key={evidenceType} value={evidenceType}>{t(evidenceType)}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Description</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Description')}</label>
                 <textarea
                   required
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe how this artifact demonstrates mastery..."
+                  placeholder={t('Describe how this artifact demonstrates mastery...')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">URL / Link</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('URL / Link')}</label>
                 <input
                   type="url"
                   value={url}
@@ -229,7 +229,7 @@ export const EvidenceView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Validated Skills (comma separated)</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Validated Skills (comma separated)')}</label>
                 <input
                   type="text"
                   value={skillNamesStr}
@@ -244,13 +244,13 @@ export const EvidenceView: React.FC = () => {
                   onClick={() => setShowAddModal(false)}
                   className="px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
                 >
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)]"
                 >
-                  Attach Evidence
+                  {t('Attach Evidence')}
                 </button>
               </div>
             </form>

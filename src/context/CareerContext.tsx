@@ -8,7 +8,6 @@ import {
   SkillCategory,
   CareerAnalysis,
   RoadmapPhase,
-  RoadmapMilestone,
   RoadmapTask,
   RoadmapTaskStatus,
   CareerProject,
@@ -52,7 +51,9 @@ import {
 import { TARGET_ROLES, resolveRole } from '../data/rolesData';
 import { validateTargetRoleSelection } from '../../shared/targetRoleSelection';
 import { translations } from '../translations';
+import { translate } from '../translations/sourceStrings';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
+import { apiUrl } from '../lib/native';
 import { planPersonalImport } from '../../shared/cvImport';
 import {
   isAtsAnalysisForRole,
@@ -125,7 +126,7 @@ import {
 } from '../lib/coreApi';
 import {
   fetchRoadmap,
-  createRoadmap as createRoadmapApi,
+  generatePersonalizedRoadmap as generatePersonalizedRoadmapApi,
   patchRoadmapTaskStatus,
   enrollInRoadmap as enrollInRoadmapApi,
   addRoadmapTask,
@@ -460,7 +461,7 @@ interface CareerContextType {
   updateNotificationPreferences: (updates: Partial<NotificationPreferences>) => void;
   privacyPreferences: PrivacyPreferences;
   updatePrivacyPreferences: (updates: Partial<PrivacyPreferences>) => void;
-  t: (key: keyof typeof translations.en) => string;
+  t: (key: string) => string;
   exportDataJson: () => void;
   resetAllData: () => void;
 }
@@ -541,379 +542,6 @@ export function normalizeSkillName(name: string): string {
   return aliases[clean] || clean.replace(/[^a-z0-9+#]/g, '');
 }
 
-/**
- * A roadmap deadline, expressed as a date relative to today.
- *
- * Deadlines used to be hard-coded strings, which meant every generated
- * roadmap carried the same dates no matter when it was created.
- */
-function roadmapDeadline(weeksFromNow: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + weeksFromNow * 7);
-  return date.toISOString().slice(0, 10);
-}
-
-interface RoadmapGenerationContext {
-  userSkills?: UserSkill[];
-  skillLevels?: Record<string, number>;
-  experiences?: UserExperienceEntry[];
-  projects?: CareerProject[];
-  cv?: CVProfile | null;
-  careerGoal?: CareerGoal;
-  /** Completed or in-progress learning items, used to raise skill baselines. */
-  learningItems?: { courseId: string; status: string; title?: string }[];
-  /** Skills the learner has already completed in a previous roadmap. */
-  completedSkillNames?: string[];
-}
-
-export function generateInitialRoadmap(
-  role: TargetRole,
-  context?: RoadmapGenerationContext
-): RoadmapPhase[] {
-  const reqSkills = role.requiredSkills || [];
-  const prefSkills = role.preferredSkills || [];
-  const allRoleSkills = [...reqSkills, ...prefSkills];
-
-  // Map user skill proficiencies
-  const userSkillMap = new Map<string, number>();
-  if (context?.userSkills) {
-    for (const sk of context.userSkills) {
-      userSkillMap.set(normalizeSkillName(sk.name), sk.currentLevel);
-    }
-  }
-  if (context?.skillLevels) {
-    for (const [k, v] of Object.entries(context.skillLevels)) {
-      userSkillMap.set(normalizeSkillName(k), v);
-    }
-  }
-
-  // Detect skills mentioned in CV or experiences or projects
-  const demonstratedSkillNames = new Set<string>();
-  if (context?.cv?.skillsList) {
-    for (const s of context.cv.skillsList) demonstratedSkillNames.add(normalizeSkillName(s));
-  }
-  if (context?.experiences) {
-    for (const e of context.experiences) {
-      for (const s of e.skillsUsed || []) demonstratedSkillNames.add(normalizeSkillName(s));
-      const descLower = (e.description || '').toLowerCase();
-      for (const rsk of allRoleSkills) {
-        if (descLower.includes(rsk.name.toLowerCase())) demonstratedSkillNames.add(normalizeSkillName(rsk.name));
-      }
-    }
-  }
-  if (context?.projects) {
-    for (const p of context.projects) {
-      for (const s of p.skills || []) demonstratedSkillNames.add(normalizeSkillName(s));
-    }
-  }
-  // Learning progress counts as evidence: a skill the learner has already
-  // studied through the Learning Hub is not a cold gap.
-  if (context?.learningItems) {
-    for (const item of context.learningItems) {
-      if (item.status !== 'completed' && item.status !== 'in_progress') continue;
-      for (const sk of allRoleSkills) {
-        const title = (item.title || '').toLowerCase();
-        if (title && title.includes(sk.name.toLowerCase())) {
-          demonstratedSkillNames.add(normalizeSkillName(sk.name));
-        }
-      }
-    }
-  }
-  // Skills already completed in an earlier roadmap stay completed.
-  if (context?.completedSkillNames) {
-    for (const name of context.completedSkillNames) {
-      demonstratedSkillNames.add(normalizeSkillName(name));
-    }
-  }
-
-  // Evaluate skills into: gaps (high priority), strengthen (medium priority), and covered (low/complete)
-  const criticalGaps: { name: string; current: number; target: number; gap: number }[] = [];
-  const strengthenSkills: { name: string; current: number; target: number; gap: number }[] = [];
-  const coveredSkills: { name: string; current: number; target: number }[] = [];
-
-  for (const sk of reqSkills) {
-    const norm = normalizeSkillName(sk.name);
-    let current = userSkillMap.get(norm);
-    if (current === undefined) {
-      // If demonstrated in CV/experience, give baseline level 3; otherwise 1
-      current = demonstratedSkillNames.has(norm) ? 3 : 1;
-    }
-    const target = sk.minLevel;
-    const gap = Math.max(0, target - current);
-
-    if (gap >= 2 || current <= 1) {
-      criticalGaps.push({ name: sk.name, current, target, gap });
-    } else if (gap === 1) {
-      strengthenSkills.push({ name: sk.name, current, target, gap });
-    } else {
-      coveredSkills.push({ name: sk.name, current, target });
-    }
-  }
-
-  // If no critical gaps, pick top required skills
-  if (criticalGaps.length === 0 && strengthenSkills.length === 0) {
-    for (const sk of reqSkills.slice(0, 2)) {
-      strengthenSkills.push({ name: sk.name, current: 3, target: sk.minLevel, gap: 1 });
-    }
-  }
-
-  const primaryGapSkill = criticalGaps[0] || strengthenSkills[0] || { name: reqSkills[0]?.name || 'Core Foundations', current: 1, target: 4, gap: 3 };
-  const secondaryGapSkill = criticalGaps[1] || strengthenSkills[1] || {
-    name: reqSkills[1]?.name || 'Domain Architecture',
-    current: 2,
-    target: reqSkills[1]?.minLevel || 4,
-    gap: 2,
-  };
-
-  let taskCounter = 1;
-
-  // Phase 1: Critical Skill Gaps & Foundations
-  const phase1Milestones: RoadmapMilestone[] = [
-    {
-      id: 'ms-1-1',
-      title: `${primaryGapSkill.name} Mastery & Targeted Gap Closure`,
-      description: `Bridge your highest-priority gap in ${primaryGapSkill.name} from baseline to target level ${primaryGapSkill.target}/5.`,
-      completedTasksCount: 0,
-      tasks: [
-        {
-          id: `t-${taskCounter++}`,
-          title: `Complete comprehensive drills on core ${primaryGapSkill.name} principles`,
-          description: `Study the fundamental practices, methods and workflows required for ${role.title}.`,
-          status: 'in_progress',
-          skillName: primaryGapSkill.name,
-          deadline: roadmapDeadline(1),
-          estimatedHours: 8,
-        },
-        {
-          id: `t-${taskCounter++}`,
-          title: `Complete applied practice exercises using ${primaryGapSkill.name}`,
-          description: `Work through realistic exercises that simulate ${role.title} day-to-day requirements.`,
-          status: 'not_started',
-          skillName: primaryGapSkill.name,
-          deadline: roadmapDeadline(2),
-          estimatedHours: 10,
-        },
-      ],
-    },
-    {
-      id: 'ms-1-2',
-      title: `${secondaryGapSkill.name} Competency & Workflow Integration`,
-      description: `Level up in ${secondaryGapSkill.name} to satisfy ${role.title} baseline requirements.`,
-      completedTasksCount: 0,
-      tasks: [
-        {
-          id: `t-${taskCounter++}`,
-          title: `Synthesize best practices and reference approaches for ${secondaryGapSkill.name}`,
-          description: `Analyse the standards, guidance and worked examples that define good practice.`,
-          status: 'not_started',
-          skillName: secondaryGapSkill.name,
-          deadline: roadmapDeadline(3),
-          estimatedHours: 6,
-        },
-      ],
-    },
-  ];
-
-  // If user has covered skills, add a milestone celebrating and validating them
-  if (coveredSkills.length > 0) {
-    phase1Milestones.push({
-      id: 'ms-1-3',
-      title: `Verified Competencies (${coveredSkills.map(s => s.name).slice(0, 2).join(', ')})`,
-      description: `Recognize your demonstrated strength and maintain readiness.`,
-      completedTasksCount: 1,
-      tasks: [
-        {
-          id: `t-${taskCounter++}`,
-          title: `Baseline validated: ${coveredSkills[0].name} proficiency verified`,
-          description: `Your existing experience and confidence in ${coveredSkills[0].name} are accounted for in this roadmap.`,
-          status: 'completed',
-          skillName: coveredSkills[0].name,
-          estimatedHours: 4,
-        },
-      ],
-    });
-  }
-
-  // Phase 2: Applied Projects & Proof of Skill
-  const project1Title = role.typicalProjects?.[0] || `${role.title} Showcase Project`;
-  const project2Title = role.typicalProjects?.[1] || `${role.title} Advanced Application`;
-  const primaryTool = role.tools?.[0] || 'the tools used in the role';
-
-  const phase2Milestones: RoadmapMilestone[] = [
-    {
-      id: 'ms-2-1',
-      title: `Project 1: ${project1Title}`,
-      description: `Plan and deliver a tangible piece of work that reflects professional ${role.title} standards.`,
-      completedTasksCount: 0,
-      tasks: [
-        {
-          id: `t-${taskCounter++}`,
-          title: `Define the scope, requirements and deliverables for ${project1Title}`,
-          description: `Document what good looks like, the steps involved and the measures of success.`,
-          status: 'in_progress',
-          skillName: primaryGapSkill.name,
-          deadline: roadmapDeadline(5),
-          estimatedHours: 12,
-        },
-        {
-          id: `t-${taskCounter++}`,
-          title: `Produce and present a working deliverable using ${primaryTool}`,
-          description: `Deliver a verifiable work sample with documented results and a walkthrough.`,
-          status: 'not_started',
-          skillName: role.tools?.[1] || primaryGapSkill.name,
-          deadline: roadmapDeadline(7),
-          estimatedHours: 16,
-        },
-      ],
-    },
-    {
-      id: 'ms-2-2',
-      title: `Project 2: ${project2Title}`,
-      description: `Demonstrate end-to-end execution on complex real-world problems.`,
-      completedTasksCount: 0,
-      tasks: [
-        {
-          id: `t-${taskCounter++}`,
-          title: `Deliver a complete case study for ${project2Title}`,
-          description: `Showcase the outcomes you achieved and the decisions you made along the way.`,
-          status: 'not_started',
-          deadline: roadmapDeadline(9),
-          estimatedHours: 14,
-        },
-      ],
-    },
-  ];
-
-  // Phase 3: Portfolio Evidence & Certification
-  const certName = role.certifications?.[0] || `${role.title} Professional Credential`;
-  const evidenceSuggestion = role.evidenceSuggestions?.[0];
-  const phase3Milestones: RoadmapMilestone[] = [
-    {
-      id: 'ms-3-1',
-      title: `Credential & Verifiable Evidence: ${certName}`,
-      description: `Earn recognized certification and anchor proof items to your public profile.`,
-      completedTasksCount: 0,
-      tasks: [
-        {
-          id: `t-${taskCounter++}`,
-          title: `Prepare and pass ${certName} curriculum`,
-          description: `Review the official exam topics and complete practice assessments.`,
-          status: 'not_started',
-          estimatedHours: 20,
-        },
-        {
-          id: `t-${taskCounter++}`,
-          title: `Attach project evidence to CareerPilot Evidence Hub`,
-          description: evidenceSuggestion
-            ? `Link your supporting artefacts and links to your profile — for example: ${evidenceSuggestion}.`
-            : `Link your supporting artefacts, links and measurable outcomes to your profile.`,
-          status: 'not_started',
-          estimatedHours: 3,
-        },
-      ],
-    },
-  ];
-
-  // Phase 4: Market Preparation & CV Alignment
-  const phase4Milestones: RoadmapMilestone[] = [
-    {
-      id: 'ms-4-1',
-      title: `CV & Keyword Calibration for ${role.title}`,
-      description: `Align your CV narrative, keywords and role expectations in CV Studio.`,
-      completedTasksCount: 0,
-      tasks: [
-        {
-          id: `t-${taskCounter++}`,
-          title: `Tailor CV summary and achievements to ${role.title}`,
-          description: `Run the keyword and evidence diagnostic, then target a strong alignment score.`,
-          status: 'not_started',
-          estimatedHours: 4,
-        },
-      ],
-    },
-  ];
-
-  // Phase 5: Interview Readiness & Targeted Applications
-  const interviewTopic = role.interviewTopics?.[0] || 'Core Role Principles';
-  // Not every goal is "apply for a job": someone building a portfolio or
-  // specialising needs a different final step than an active applicant.
-  const isJobSearchGoal =
-    !context?.careerGoal ||
-    ['get_first_job', 'get_internship', 'switch_career', 'freelance', 'explore_careers'].includes(
-      context.careerGoal,
-    );
-  const phase5Milestones: RoadmapMilestone[] = [
-    {
-      id: 'ms-5-1',
-      title: `Interview Simulation & ${isJobSearchGoal ? 'Targeted Applications' : 'Targeted Outreach'}`,
-      description: `Rehearse the key topics (${interviewTopic}) and put yourself forward for relevant opportunities.`,
-      completedTasksCount: 0,
-      tasks: [
-        {
-          id: `t-${taskCounter++}`,
-          title: `Complete a mock interview on ${interviewTopic}`,
-          description: `Practice STAR framework responses in the Interview Prep simulator.`,
-          status: 'not_started',
-          estimatedHours: 4,
-        },
-        {
-          id: `t-${taskCounter++}`,
-          title: isJobSearchGoal
-            ? `Submit 5 targeted applications with tailored profiles`
-            : `Prepare 5 targeted approaches to relevant roles or clients`,
-          description: isJobSearchGoal
-            ? `Track application stages and follow-up milestones in Applications view.`
-            : `Track each approach and follow-up in the Applications view so nothing is missed.`,
-          status: 'not_started',
-          estimatedHours: 5,
-        },
-      ],
-    },
-  ];
-
-  return [
-    {
-      id: 'phase-1',
-      phaseNumber: 1,
-      title: `Phase 1: Priority Skill Gaps & Foundations`,
-      description: `Close critical skill gaps between your current proficiency and ${role.title} standards.`,
-      isUnlocked: true,
-      milestones: phase1Milestones,
-    },
-    {
-      id: 'phase-2',
-      phaseNumber: 2,
-      title: `Phase 2: Applied Projects & Practical Mastery`,
-      description: `Deliver proof-of-work projects matching professional expectations for ${role.title}.`,
-      isUnlocked: true,
-      milestones: phase2Milestones,
-    },
-    {
-      id: 'phase-3',
-      phaseNumber: 3,
-      title: `Phase 3: Portfolio Evidence & Professional Credentials`,
-      description: `Solidify your market standing with industry certifications and verified evidence.`,
-      isUnlocked: false,
-      milestones: phase3Milestones,
-    },
-    {
-      id: 'phase-4',
-      phaseNumber: 4,
-      title: `Phase 4: Market Preparation & CV Optimization`,
-      description: `Tune your CV bullet points and keyword alignment specifically for ${role.title} openings.`,
-      isUnlocked: false,
-      milestones: phase4Milestones,
-    },
-    {
-      id: 'phase-5',
-      phaseNumber: 5,
-      title: `Phase 5: Interview Simulation & Targeted Applications`,
-      description: `Execute your search pipeline with interview readiness and high-match applications.`,
-      isUnlocked: false,
-      milestones: phase5Milestones,
-    },
-  ];
-}
 
 // Maps a Supabase Auth user to the application's account shape.
 // The id is always auth.users.id — the same value as public.profiles.id.
@@ -1077,6 +705,7 @@ function toRoadmapPhases(dto: RoadmapDTO | null): RoadmapPhase[] {
     phaseNumber: phase.phaseNumber,
     title: phase.title,
     description: phase.description ?? '',
+    goal: phase.goal ?? null,
     isUnlocked: phase.isUnlocked,
     milestones: phase.milestones.map((milestone) => ({
       id: milestone.id,
@@ -1095,6 +724,13 @@ function toRoadmapPhases(dto: RoadmapDTO | null): RoadmapPhase[] {
         resourceTitle: task.resourceTitle ?? undefined,
         evidenceId: task.evidenceId ?? undefined,
         estimatedHours: task.estimatedHours ?? 0,
+        difficulty: task.difficulty ?? null,
+        prerequisites: task.prerequisites ?? [],
+        skillNames: task.skillNames ?? [],
+        projectTitles: task.projectTitles ?? [],
+        resources: task.resources ?? [],
+        priority: task.priority ?? null,
+        rationale: task.rationale ?? null,
       })),
     })),
   }));
@@ -2164,7 +1800,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const generateAiCoverLetter = async (company: string, jobTitle: string, jobDesc: string, tone = 'Professional & Confident') => {
     try {
       const token = await getAccessToken();
-      const res = await fetch('/api/generate-cover-letter', {
+      const res = await fetch(apiUrl('/api/generate-cover-letter'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2202,7 +1838,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const suggestAiSummary = async (): Promise<string> => {
     try {
       const token = await getAccessToken();
-      const res = await fetch('/api/suggest-summary', {
+      const res = await fetch(apiUrl('/api/suggest-summary'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2236,7 +1872,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const validateUsername = async (username: string): Promise<{ available: boolean; message: string }> => {
     try {
       const token = await getAccessToken();
-      const res = await fetch(`/api/profile/check-username?username=${encodeURIComponent(username)}`, {
+      const res = await fetch(apiUrl(`/api/profile/check-username?username=${encodeURIComponent(username)}`), {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         cache: 'no-store',
       });
@@ -3032,38 +2668,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Target Role Change Handler
-  /**
-   * Learning items joined with their course title.
-   *
-   * The roadmap generator uses this to recognise a skill the learner has
-   * already studied through the Learning Hub, so it is not treated as a cold
-   * gap.
-   */
-  const learningItemsForRoadmap = () =>
-    learningItems.map((item) => ({
-      courseId: item.courseId,
-      status: item.status,
-      title: learningCatalog.find((course) => course.id === item.courseId)?.title,
-    }));
-
-  /**
-   * Skills the learner has already completed in the current roadmap.
-   *
-   * Regenerating a roadmap must not throw away completed work, so the
-   * generator is told which skills are already done.
-   */
-  const completedRoadmapSkillNames = (): string[] => {
-    const names: string[] = [];
-    for (const phase of roadmapPhases) {
-      for (const milestone of phase.milestones ?? []) {
-        for (const task of milestone.tasks ?? []) {
-          if (task.status === 'completed' && task.skillName) names.push(task.skillName);
-        }
-      }
-    }
-    return names;
-  };
-
   const setPrimaryTargetRole = async (roleId: string): Promise<boolean> => {
     const role = resolveRole(roleId) ?? TARGET_ROLES.find(r => r.id === roleId);
     if (!role) return false;
@@ -3082,23 +2686,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // separate local list that has to be rewritten by hand).
     // The user's own levels are untouched.
 
-    // The roadmap is persisted server-side (B.3.9, finding H-1). It used to be
-    // generated locally and never written, so a new user had no roadmap row
-    // and the locally generated tree was lost on the next load.
-    //
-    // The tree is sent to POST /api/roadmap, which writes the phases,
-    // milestones and tasks and returns the roadmap with the REAL database ids.
-    // The local state is then replaced by the server's roadmap.
-    const generated = generateInitialRoadmap(role, {
-      userSkills: skills,
-      skillLevels,
-      experiences: profile.experiences,
-      projects,
-      cv: activeCV,
-      careerGoal: profile.careerGoal,
-      learningItems: learningItemsForRoadmap(),
-      completedSkillNames: completedRoadmapSkillNames(),
-    });
+    // The roadmap is generated on the server from the user's target role and
+    // their own skill ratings, then persisted. The plan used to be assembled
+    // in this file from a fixed five-phase template that was identical for
+    // every career; the server-side generator derives it from the role
+    // catalogue and the user's real gaps.
     try {
       // The target role is persisted alongside the roadmap so the server's
       // view of the user's target matches the UI's (B.4 finding M-2).
@@ -3116,28 +2708,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // role whose roadmap was not persisted. The server stages the new tree
       // and only swaps it in after every row is written, so the previous
       // roadmap is still intact when this throws.
-      const roadmap = await createRoadmapApi({
-        title: `${role.title} Roadmap`,
-        targetRoleTitle: role.title,
-        phases: generated.map((phase, phaseIndex) => ({
-          phaseNumber: phase.phaseNumber ?? phaseIndex + 1,
-          title: phase.title,
-          description: phase.description,
-          isUnlocked: phase.isUnlocked,
-          milestones: phase.milestones.map(milestone => ({
-            title: milestone.title,
-            description: milestone.description,
-            tasks: milestone.tasks.map(task => ({
-              title: task.title,
-              description: task.description,
-              status: task.status,
-              skillName: task.skillName,
-              deadline: task.deadline,
-              estimatedHours: task.estimatedHours,
-            })),
-          })),
-        })),
-      });
+      const roadmap = await generatePersonalizedRoadmapApi();
       if (!roadmap) {
         throw new Error('The server did not return the persisted roadmap');
       }
@@ -3164,39 +2735,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const regeneratePersonalizedRoadmap = async (): Promise<boolean> => {
-    const generated = generateInitialRoadmap(targetRole, {
-      userSkills: skills,
-      skillLevels,
-      experiences: profile.experiences,
-      projects,
-      cv: activeCV,
-      careerGoal: profile.careerGoal,
-      learningItems: learningItemsForRoadmap(),
-      completedSkillNames: completedRoadmapSkillNames(),
-    });
     try {
-      const roadmap = await createRoadmapApi({
-        title: `${targetRole.title} Roadmap`,
-        targetRoleTitle: targetRole.title,
-        phases: generated.map((phase, phaseIndex) => ({
-          phaseNumber: phase.phaseNumber ?? phaseIndex + 1,
-          title: phase.title,
-          description: phase.description,
-          isUnlocked: phase.isUnlocked,
-          milestones: phase.milestones.map(milestone => ({
-            title: milestone.title,
-            description: milestone.description,
-            tasks: milestone.tasks.map(task => ({
-              title: task.title,
-              description: task.description,
-              status: task.status,
-              skillName: task.skillName,
-              deadline: task.deadline,
-              estimatedHours: task.estimatedHours,
-            })),
-          })),
-        })),
-      });
+      const roadmap = await generatePersonalizedRoadmapApi();
       if (roadmap) {
         setRoadmapPhases(toRoadmapPhases(roadmap));
         setIsEnrolledInRoadmap(roadmap.isEnrolled);
@@ -3205,7 +2745,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } catch (error) {
       console.error('Failed to regenerate roadmap:', error);
     }
-    setRoadmapPhases(generated);
     return false;
   };
 
@@ -3716,7 +3255,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setIsAnalyzing(true);
     try {
       const token = await getAccessToken();
-      const res = await fetch('/api/analyze-career', {
+      const res = await fetch(apiUrl('/api/analyze-career'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -4143,7 +3682,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       formData.append('targetRoleTitle', targetRole.title);
 
       const token = await getAccessToken();
-      const res = await fetch('/api/resumes/upload', {
+      const res = await fetch(apiUrl('/api/resumes/upload'), {
         method: 'POST',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData
@@ -4199,7 +3738,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setIsUploadingCv(true);
     try {
       const token = await getAccessToken();
-      const res = await fetch('/api/resumes/upload', {
+      const res = await fetch(apiUrl('/api/resumes/upload'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -4625,7 +4164,7 @@ Education: ${activeCV.education.map(ed => `${ed.degree} in ${ed.field} - ${ed.in
 Skills: ${activeCV.skillsList.join(', ')}
 `;
       const token = await getAccessToken();
-      const res = await fetch('/api/optimize-cv', {
+      const res = await fetch(apiUrl('/api/optimize-cv'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -4850,7 +4389,7 @@ Skills: ${activeCV.skillsList.join(', ')}
       // the browser. Sending the whole context used to mean the assistant was
       // reasoning about unverified client data.
       const token = await getAccessToken();
-      const res = await fetch('/api/copilot', {
+      const res = await fetch(apiUrl('/api/copilot'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -5003,9 +4542,25 @@ Skills: ${activeCV.skillsList.join(', ')}
     }
   };
 
-  const t = (key: keyof typeof translations.en): string => {
+  /**
+   * Translates a string for the current interface language.
+   *
+   * Two kinds of key are accepted:
+   *
+   *   - a legacy catalogue key, e.g. `t('navRoadmap')`;
+   *   - the English source text itself, e.g. `t('Your roadmap')`, which is
+   *     looked up in the Arabic source-string catalogue.
+   *
+   * Anything that has no Arabic entry falls back to the English source, so a
+   * missing translation degrades to English rather than to a broken label.
+   */
+  const t = (key: string): string => {
     const lang = settings.language;
-    return translations[lang]?.[key] || translations.en[key] || key;
+    const legacy = (translations[lang] as Record<string, string> | undefined)?.[key];
+    if (legacy) return legacy;
+    const english = (translations.en as Record<string, string>)[key];
+    if (english) return english;
+    return translate(key, lang);
   };
 
   const exportDataJson = () => {

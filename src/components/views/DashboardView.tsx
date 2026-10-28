@@ -69,8 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     weeklyReview,
     careerHealth,
     cvVersions,
-    t 
-  } = useCareer();
+    t} = useCareer();
 
   // Find next pending roadmap tasks
   const pendingTasks = roadmapPhases
@@ -97,7 +96,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     .map(a => ({
       id: `milestone-interview-${a.id}`,
       kind: 'interview' as const,
-      label: `${a.stage.charAt(0).toUpperCase()}${a.stage.slice(1)} Stage`,
+      label: `${a.stage.charAt(0).toUpperCase()}${a.stage.slice(1)} ${t('Stage')}`,
       date: a.nextActionDate || '',
       title: a.company,
       detail: a.interviewStageDetails || a.role
@@ -109,7 +108,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     .map(({ task, milestoneTitle }) => ({
       id: `milestone-deadline-${task.id}`,
       kind: 'deadline' as const,
-      label: 'Roadmap Deadline',
+      label: t('Roadmap Deadline'),
       date: task.deadline || '',
       title: task.title,
       detail: milestoneTitle
@@ -125,7 +124,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
             <span>{profile.careerState.replace('_', ' ').toUpperCase()}</span>
             <span>·</span>
-            <span>TARGETING: {targetRole.title.toUpperCase()}</span>
+            <span>{t('TARGETING:')} {targetRole.title.toUpperCase()}</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
             {t('dashboardWelcome')}, {profile.name}
@@ -137,14 +136,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             onClick={() => onNavigate('my-career')}
             className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-primary)] transition-colors"
           >
-            Switch Target Role
+            {t('Switch Target Role')}
           </button>
           <button
             onClick={onOpenCopilot}
             className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Consult Copilot</span>
+            <span>{t('Consult Copilot')}</span>
           </button>
         </div>
       </div>
@@ -155,11 +154,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <div className="space-y-3 max-w-2xl">
             <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)] flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Next Best Action</span>
+              <span>{t('Next Best Action')}</span>
             </div>
 
             <h2 className="text-xl font-bold text-[var(--text-primary)]">
-              {analysis.nextBestAction?.title || 'Review Core Skill Milestones'}
+              {analysis.nextBestAction?.title || t('Review Core Skill Milestones')}
             </h2>
 
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
@@ -167,7 +166,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             </p>
 
             <div className="pt-1 text-xs text-[var(--text-muted)] flex items-center gap-2">
-              <span className="font-medium text-[var(--text-primary)]">Why am I seeing this?</span>
+              <span className="font-medium text-[var(--text-primary)]">{t('Why am I seeing this?')}</span>
               <span>·</span>
               <span>{analysis.nextBestAction?.reason}</span>
             </div>
@@ -180,14 +179,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 className="px-4 py-2.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] flex items-center justify-center gap-1.5 transition-all shadow-xs"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Mark Action Complete</span>
+                <span>{t('Mark Action Complete')}</span>
               </button>
             )}
             <button
               onClick={() => onNavigate('roadmap')}
               className="px-4 py-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] flex items-center justify-center gap-1 transition-colors"
             >
-              <span>View Full Roadmap</span>
+              <span>{t('View Full Roadmap')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -199,10 +198,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-[var(--color-primary-text)]" />
-            <h2 className="text-base font-bold text-[var(--text-primary)]">Today's High-Impact Actions</h2>
+            <h2 className="text-base font-bold text-[var(--text-primary)]">{t('Today\'s High-Impact Actions')}</h2>
           </div>
           <span className="text-xs text-[var(--text-muted)] font-mono">
-            {dailyActions.filter(a => a.completed).length} of {dailyActions.length} completed
+            {dailyActions.filter(a => a.completed).length} {t('of')} {dailyActions.length} {t('completed')}
           </span>
         </div>
 
@@ -240,7 +239,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                     }}
                     className="text-[var(--color-primary-text)] hover:underline font-semibold"
                   >
-                    Open →
+                    {t('Open →')}
                   </button>
                 </div>
               </div>
@@ -255,26 +254,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
       <Stagger gap={0.06} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StaggerItem>
           <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-            <div className="text-xs text-[var(--text-secondary)]">Role Readiness Match</div>
+            <div className="text-xs text-[var(--text-secondary)]">{t('Role Readiness Match')}</div>
             <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
               <CountUp value={analysis.matchPercentage} format={(v) => `${Math.round(v)}%`} />
             </div>
             <div className="mt-3">
               <AnimatedProgress
                 value={analysis.matchPercentage}
-                label="Role readiness match"
+                label={t('Role readiness match')}
                 fillClassName="bg-[var(--color-primary)]"
               />
             </div>
             <div className="mt-2 text-[11px] text-[var(--text-muted)]">
-              measured against {targetRole.title} requirements
+              {t('measured against')} {targetRole.title} {t('requirements')}
             </div>
           </div>
         </StaggerItem>
 
         <StaggerItem>
           <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-            <div className="text-xs text-[var(--text-secondary)]">Skills Mastered</div>
+            <div className="text-xs text-[var(--text-secondary)]">{t('Skills Mastered')}</div>
             <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
               <CountUp value={masteredSkillsCount} />
               <span className="text-sm font-normal text-[var(--text-muted)]"> / {skills.length}</span>
@@ -282,19 +281,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             <div className="mt-3">
               <AnimatedProgress
                 value={skills.length > 0 ? (masteredSkillsCount / skills.length) * 100 : 0}
-                label="Skills mastered"
+                label={t('Skills mastered')}
                 fillClassName="bg-[var(--color-success-strong)]"
               />
             </div>
             <div className="mt-2 text-[11px] text-[var(--text-muted)]">
-              {analysis.criticalGaps.length} critical gaps remaining
+              {analysis.criticalGaps.length} {t('critical gaps remaining')}
             </div>
           </div>
         </StaggerItem>
 
         <StaggerItem>
           <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-            <div className="text-xs text-[var(--text-secondary)]">Roadmap Completion</div>
+            <div className="text-xs text-[var(--text-secondary)]">{t('Roadmap Completion')}</div>
             <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
               <CountUp value={completedTasks} />
               <span className="text-sm font-normal text-[var(--text-muted)]"> / {totalTasks}</span>
@@ -302,31 +301,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             <div className="mt-3">
               <AnimatedProgress
                 value={totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0}
-                label="Roadmap completion"
+                label={t('Roadmap completion')}
                 fillClassName="bg-[var(--color-accent)]"
               />
             </div>
             <div className="mt-2 text-[11px] text-[var(--text-muted)]">
-              {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}% overall progress
+              {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}% {t('overall progress')}
             </div>
           </div>
         </StaggerItem>
 
         <StaggerItem>
           <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-            <div className="text-xs text-[var(--text-secondary)]">Active Applications</div>
+            <div className="text-xs text-[var(--text-secondary)]">{t('Active Applications')}</div>
             <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
               <CountUp value={activeApplications.length} />
             </div>
             <div className="mt-3">
               <AnimatedProgress
                 value={applications.length > 0 ? (activeApplications.length / applications.length) * 100 : 0}
-                label="Active applications"
+                label={t('Active applications')}
                 fillClassName="bg-[var(--color-primary-text)]"
               />
             </div>
             <div className="mt-2 text-[11px] text-[var(--color-primary-text)] font-medium">
-              {interviewCount} interview{interviewCount === 1 ? '' : 's'} in progress
+              {interviewCount} {interviewCount === 1 ? t('interview') : t('interviews')} {t('in progress')}
             </div>
           </div>
         </StaggerItem>
@@ -340,14 +339,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">Primary Skill Gaps</h3>
-                <p className="text-xs text-[var(--text-secondary)]">Calculated against {targetRole.title} industry benchmarks</p>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Primary Skill Gaps')}</h3>
+                <p className="text-xs text-[var(--text-secondary)]">{t('Calculated against')} {targetRole.title} {t('industry benchmarks')}</p>
               </div>
               <button
                 onClick={() => onNavigate('skills')}
                 className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
               >
-                Manage Skills →
+                {t('Manage Skills →')}
               </button>
             </div>
 
@@ -357,7 +356,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-[var(--text-primary)]">{gap.skill}</span>
-                      <span className="text-xs text-[var(--text-muted)]">· Current Level {gap.current} → Target Level {gap.target}</span>
+                      <span className="text-xs text-[var(--text-muted)]">· {t('Current Level')} {gap.current} → {t('Target Level')} {gap.target}</span>
                     </div>
                     <div className="text-xs text-[var(--text-secondary)]">{gap.reason}</div>
                   </div>
@@ -365,7 +364,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                     onClick={() => onNavigate('learning')}
                     className="self-start sm:self-auto px-3 py-1.5 rounded bg-[var(--surface-main)] hover:bg-[var(--accent-surface)] text-xs font-medium text-[var(--color-primary-text)] border border-[var(--border-subtle)] whitespace-nowrap transition-colors"
                   >
-                    View Resource
+                    {t('View Resource')}
                   </button>
                 </div>
               ))}
@@ -377,14 +376,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-[var(--text-primary)]">Active Portfolio Project</h3>
-                  <p className="text-xs text-[var(--text-secondary)]">Proof of skill for hiring managers</p>
+                  <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Active Portfolio Project')}</h3>
+                  <p className="text-xs text-[var(--text-secondary)]">{t('Proof of skill for hiring managers')}</p>
                 </div>
                 <button
                   onClick={() => onNavigate('projects')}
                   className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
                 >
-                  All Projects →
+                  {t('All Projects →')}
                 </button>
               </div>
 
@@ -392,7 +391,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="font-bold text-sm text-[var(--text-primary)]">{activeProject.title}</div>
-                    <div className="text-xs text-[var(--text-muted)]">{activeProject.difficulty} · Status: {activeProject.status.replace('_', ' ')}</div>
+                    <div className="text-xs text-[var(--text-muted)]">{activeProject.difficulty} · {t('Status:')} {activeProject.status.replace('_', ' ')}</div>
                   </div>
                   {activeProject.repositoryUrl && (
                     <a
@@ -401,7 +400,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                       rel="noopener noreferrer"
                       className="text-xs text-[var(--color-primary-text)] hover:underline font-medium"
                     >
-                      Repository ↗
+                      {t('Repository ↗')}
                     </a>
                   )}
                 </div>
@@ -425,17 +424,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">Weekly Career Review</h3>
-                <p className="text-xs text-[var(--text-secondary)]">Week {weeklyReview.weekNumber} · {weeklyReview.startDate} - {weeklyReview.endDate}</p>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Weekly Career Review')}</h3>
+                <p className="text-xs text-[var(--text-secondary)]">{t('Week')} {weeklyReview.weekNumber} · {weeklyReview.startDate} - {weeklyReview.endDate}</p>
               </div>
               <span className="font-mono text-xs font-bold text-[var(--color-success-strong)] bg-[var(--color-success-surface)] px-2.5 py-1 rounded">
-                Health Score: {weeklyReview.healthScore}/100
+                {t('Health Score:')} {weeklyReview.healthScore}/100
               </span>
             </div>
 
             <div className="space-y-3 text-xs">
               <div>
-                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">Accomplishments This Week</div>
+                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">{t('Accomplishments This Week')}</div>
                 <ul className="space-y-1 text-[var(--text-secondary)]">
                   {weeklyReview.keyAchievements.map((ach, i) => (
                     <li key={i} className="flex items-start gap-2">
@@ -447,7 +446,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               </div>
 
               <div className="pt-2 border-t border-[var(--border-subtle)]">
-                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">Priorities For Next Week</div>
+                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">{t('Priorities For Next Week')}</div>
                 <ul className="space-y-1 text-[var(--text-secondary)]">
                   {weeklyReview.nextWeekPriorities.map((pri, i) => (
                     <li key={i} className="flex items-start gap-2">
@@ -468,7 +467,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-[var(--color-primary-text)]" />
-                <span>Upcoming Milestones</span>
+                <span>{t('Upcoming Milestones')}</span>
               </h3>
               <span className="text-xs text-[var(--text-muted)]">{currentMonthLabel}</span>
             </div>
@@ -478,8 +477,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 <EmptyState
                   compact
                   icon={Calendar}
-                  title="No upcoming milestones yet"
-                  description="Interview stages and roadmap deadlines appear here as they come up, so nothing important slips."
+                  title={t('No upcoming milestones yet')}
+                  description={t('Interview stages and roadmap deadlines appear here as they come up, so nothing important slips.')}
                 />
               ) : (
                 upcomingMilestones.map((milestone) => (
@@ -510,7 +509,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                         onClick={() => onNavigate('interviews')}
                         className="mt-2 text-xs font-semibold text-[var(--color-primary-text)] hover:underline block"
                       >
-                        Prepare STAR Answers →
+                        {t('Prepare STAR Answers →')}
                       </button>
                     )}
                   </div>
@@ -524,7 +523,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-[var(--color-success-strong)]" />
-                <span>Career Health Breakdown</span>
+                <span>{t('Career Health Breakdown')}</span>
               </h3>
               <span className="font-mono text-xs font-bold text-[var(--text-primary)]">
                 {careerHealth.overallHealth}%
@@ -533,10 +532,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
             <div className="space-y-3 text-xs">
               {[
-                { label: 'Skills Confidence', val: careerHealth.skillsConfidence, hint: 'Mastered vs remaining gaps' },
-                { label: 'Evidence Coverage', val: careerHealth.evidenceCoverage, hint: 'GitHub repos and live demos' },
-                { label: 'CV Role Alignment', val: careerHealth.cvAlignment, hint: 'ATS keyword match score' },
-                { label: 'Market Engagement', val: careerHealth.marketEngagement, hint: 'Tracked active applications' }
+                { label: t('Skills Confidence'), val: careerHealth.skillsConfidence, hint: t('Mastered vs remaining gaps') },
+                { label: t('Evidence Coverage'), val: careerHealth.evidenceCoverage, hint: t('GitHub repos and live demos') },
+                { label: t('CV Role Alignment'), val: careerHealth.cvAlignment, hint: t('ATS keyword match score') },
+                { label: t('Market Engagement'), val: careerHealth.marketEngagement, hint: t('Tracked active applications') }
               ].map((dim, i) => (
                 <div key={i} className="space-y-1">
                   <div className="flex justify-between text-[11px]">
@@ -558,7 +557,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           {/* Quick Nav Tools */}
           <div className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
             <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-              Career Workspaces
+              {t('Career Workspaces')}
             </h3>
 
             <div className="space-y-1.5 text-xs">
@@ -571,10 +570,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                   <span className="font-medium">
                     CV Studio (
                     {isAtsAnalysisForRole(cvVersions[0]?.targetRoleTitle, targetRole.title)
-                      ? `ATS Score: ${cvVersions[0]?.atsAnalysis?.overallScore ?? '—'}`
+                      ? `${t('ATS Score:')} ${cvVersions[0]?.atsAnalysis?.overallScore ?? '—'}`
                       : cvVersions[0]?.atsAnalysis
-                        ? 'Refresh ATS Score'
-                        : 'ATS Score: —'}
+                        ? t('Refresh ATS Score')
+                        : `${t('ATS Score:')} —`}
                     )
                   </span>
                 </div>
@@ -587,7 +586,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               >
                 <div className="flex items-center gap-2">
                   <Briefcase className="w-4 h-4 text-[var(--color-success-strong)]" />
-                  <span className="font-medium">Job Search & Applications</span>
+                  <span className="font-medium">{t('Job Search & Applications')}</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               </button>
@@ -598,7 +597,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               >
                 <div className="flex items-center gap-2">
                   <Target className="w-4 h-4 text-[var(--color-warning)]" />
-                  <span className="font-medium">AI Mock Interview Simulator</span>
+                  <span className="font-medium">{t('AI Mock Interview Simulator')}</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               </button>

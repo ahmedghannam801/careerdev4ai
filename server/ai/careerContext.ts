@@ -18,10 +18,12 @@ import { getUserSkills } from '../db/userSkills.ts';
 import { listExperiences } from '../db/experiences.ts';
 import { listEducations } from '../db/educations.ts';
 import { listProjects } from '../db/projects.ts';
+import { listVolunteerExperiences } from '../db/volunteer.ts';
 import { listCertifications } from '../db/profileExtensions.ts';
 import { listJobApplications } from '../db/jobApplications.ts';
-import { listLearningItems } from '../db/learning.ts';
+import { listLearningItems, listCourses } from '../db/learning.ts';
 import { listRoadmaps } from '../db/roadmap.ts';
+import { getPreferences } from '../db/preferences.ts';
 import { resolveRole } from '../../shared/careerRoles.ts';
 import type { TargetRole } from '../../shared/careerTypes.ts';
 
@@ -44,17 +46,32 @@ export interface AiCareerContext {
   targetRoleTitle: string | null;
   /** The catalogue entry for the target role, when it is one we know. */
   targetRole: TargetRole | null;
+  /** The catalogue slug of the target role. */
+  targetRoleId: string | null;
+  /** The catalogue slug of the target role's domain. */
+  targetRoleDomain: string | null;
+  /** The interface language the user has chosen. */
+  language: 'en' | 'ar';
   /** How far the user's rated skills cover the target role's requirements. */
   skillGaps: AiSkillGap[];
+  /** The user's own rated skills, including ones the role does not require. */
+  currentSkills: AiCurrentSkill[];
   strengths: string[];
   education: string[];
   experience: string[];
   projects: string[];
+  volunteering: string[];
   certifications: string[];
   roadmapSummary: string[];
   learningSummary: string[];
   applicationsCount: number;
   evidenceCount: number;
+}
+
+/** One of the user's own rated skills. */
+export interface AiCurrentSkill {
+  name: string;
+  level: number;
 }
 
 /**
@@ -71,20 +88,24 @@ export async function loadAiCareerContext(userId: string): Promise<AiCareerConte
     experiences,
     educations,
     projects,
+    volunteering,
     certifications,
     applications,
     learningItems,
     roadmaps,
+    preferences,
   ] = await Promise.all([
     getProfileDto(userId).catch(() => null),
     getUserSkills(userId).catch(() => []),
     listExperiences(userId).catch(() => []),
     listEducations(userId).catch(() => []),
     listProjects(userId).catch(() => []),
+    listVolunteerExperiences(userId).catch(() => []),
     listCertifications(userId).catch(() => []),
     listJobApplications(userId).catch(() => []),
     listLearningItems(userId).catch(() => []),
     listRoadmaps(userId).catch(() => []),
+    getPreferences(userId).catch(() => null),
   ]);
 
   const targetRoleTitle = profile?.targetRole ?? null;
@@ -126,11 +147,35 @@ export async function loadAiCareerContext(userId: string): Promise<AiCareerConte
     .slice(0, 6);
 
   const experience = experiences
-    .map((entry) => (entry.role ? `${entry.role}${entry.company ? ` at ${entry.company}` : ''}` : ''))
+    .map((entry) => {
+      const title = entry.role ?? '';
+      const company = entry.company ? ` at ${entry.company}` : '';
+      const dates = formatDateRange(entry.startDate, entry.endDate, entry.isCurrent);
+      return `${title}${company}${dates ? ` (${dates})` : ''}`.trim();
+    })
     .filter(Boolean)
     .slice(0, 8);
 
-  const projectTitles = projects.map((entry) => entry.title).filter(Boolean).slice(0, 8);
+  const projectTitles = projects
+    .map((entry) => {
+      const goal = entry.goal ? ` — ${entry.goal}` : '';
+      return `${entry.title}${goal}`;
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+
+  // Volunteer stints are real, recorded work. The model was previously never
+  // told about them, so it could not reference them when helping the user
+  // with their CV or their applications.
+  const volunteeringSummary = volunteering
+    .map((entry) => {
+      const dates = formatDateRange(entry.startDate, entry.endDate, entry.isCurrent);
+      const role = entry.role ? ` (${entry.role})` : '';
+      const detail = entry.description ? `: ${entry.description}` : '';
+      return `${entry.organization}${role}${dates ? ` ${dates}` : ''}${detail}`;
+    })
+    .filter(Boolean)
+    .slice(0, 6);
 
   const certificationNames = certifications
     .map((entry) => (entry.issuer ? `${entry.name} (${entry.issuer})` : entry.name))
@@ -155,27 +200,75 @@ export async function loadAiCareerContext(userId: string): Promise<AiCareerConte
     }
   }
 
+  // The course TITLE is what the model needs, not the course id. An id like
+  // "coursera-ml-specialization" tells the model nothing it can use.
+  const courseTitles = new Map<string, string>();
+  if (learningItems.some((item) => item.status !== 'dismissed')) {
+    const courses = await listCourses().catch(() => []);
+    for (const course of courses) courseTitles.set(course.id, course.title);
+  }
+
   const learningSummary = (learningItems ?? [])
     .filter((item) => item.status !== 'dismissed')
-    .map((item) => `${item.status}: ${item.courseId}`)
+    .map((item) => {
+      const title = courseTitles.get(item.courseId) ?? item.courseId;
+      const progress = item.progressPercent ? ` ${item.progressPercent}%` : '';
+      return `${item.status}: ${title}${progress}`;
+    })
     .slice(0, 8);
+
+  // The user's own rated skills, including the ones the target role does not
+  // require. Previously only role-required skills were sent, so a skill the
+  // user had that the role did not ask for was invisible to the model.
+  const currentSkills: AiCurrentSkill[] = Array.from(userLevels.values())
+    .map((entry) => ({ name: entry.name, level: entry.level }))
+    .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name))
+    .slice(0, 20);
+
+  const language: 'en' | 'ar' = preferences?.language === 'ar' ? 'ar' : 'en';
 
   return {
     careerState: profile?.userType ?? null,
     careerGoal: profile?.careerGoal ?? null,
     targetRoleTitle,
     targetRole,
+    targetRoleId: targetRole?.id ?? profile?.targetRoleId ?? null,
+    targetRoleDomain: targetRole?.domainId ?? profile?.targetRoleDomain ?? null,
+    language,
     skillGaps: skillGaps.slice(0, 8),
+    currentSkills,
     strengths: strengths.slice(0, 8),
     education,
     experience,
     projects: projectTitles,
+    volunteering: volunteeringSummary,
     certifications: certificationNames,
     roadmapSummary: roadmapSummary.slice(0, 14),
     learningSummary,
     applicationsCount: (applications ?? []).length,
     evidenceCount: 0,
   };
+}
+
+/** Formats a start/end date pair for display in the AI context. */
+function formatDateRange(
+  startDate: string | null,
+  endDate: string | null,
+  isCurrent: boolean
+): string {
+  const start = startDate ? formatMonthYear(startDate) : null;
+  const end = isCurrent ? 'Present' : endDate ? formatMonthYear(endDate) : null;
+  if (start && end) return `${start} - ${end}`;
+  if (start) return start;
+  if (end) return `Until ${end}`;
+  return '';
+}
+
+/** Formats an ISO date as "Mon YYYY". */
+function formatMonthYear(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 }
 
 /** Human-readable labels for the career-goal vocabulary. */
@@ -211,8 +304,14 @@ export function buildAiContextBlock(context: AiCareerContext): string {
   if (context.targetRoleTitle) {
     lines.push(`- Target role: ${context.targetRoleTitle}`);
   }
+  if (context.targetRoleId) {
+    lines.push(`- Target role id: ${context.targetRoleId}`);
+  }
   if (role) {
     lines.push(`- Target role domain: ${role.category}`);
+    if (context.targetRoleDomain) {
+      lines.push(`- Target role domain id: ${context.targetRoleDomain}`);
+    }
     lines.push(`- Target role level: ${role.level}`);
     lines.push(`- What the role actually requires: ${role.requiredSkills.map((s) => `${s.name} (level ${s.minLevel}/5)`).join('; ')}`);
     if (role.responsibilities.length) {
@@ -234,6 +333,11 @@ export function buildAiContextBlock(context: AiCareerContext): string {
       `- Skill gaps (current -> target): ${context.skillGaps.map((g) => `${g.name} (${g.current}->${g.target})`).join('; ')}`,
     );
   }
+  if (context.currentSkills.length) {
+    lines.push(
+      `- Skills the user has rated, in full: ${context.currentSkills.map((s) => `${s.name} (${s.level}/5)`).join('; ')}`,
+    );
+  }
   if (context.strengths.length) {
     lines.push(`- Strengths already met: ${context.strengths.join('; ')}`);
   }
@@ -246,6 +350,9 @@ export function buildAiContextBlock(context: AiCareerContext): string {
   if (context.projects.length) {
     lines.push(`- Projects: ${context.projects.join('; ')}`);
   }
+  if (context.volunteering.length) {
+    lines.push(`- Volunteer experience: ${context.volunteering.join('; ')}`);
+  }
   if (context.certifications.length) {
     lines.push(`- Certifications: ${context.certifications.join('; ')}`);
   }
@@ -256,6 +363,20 @@ export function buildAiContextBlock(context: AiCareerContext): string {
     lines.push(`- Learning in progress: ${context.learningSummary.join('; ')}`);
   }
   lines.push(`- Job applications tracked: ${context.applicationsCount}`);
+
+  // The user's interface language. Without this the model answers an Arabic
+  // interface in English whenever the question is typed in English.
+  lines.push(
+    context.language === 'ar'
+      ? '- The user is using the Arabic interface. Reply in Arabic (Modern Standard Arabic).'
+      : '- The user is using the English interface. Reply in English.',
+  );
+
+  // The single most important rule for every prompt built on this block.
+  lines.push(
+    '- Use ONLY the facts above. Never invent a company, job title, date, metric, skill, certificate, project or course that is not listed here.',
+    '- If you do not have the information to answer accurately, say what is missing instead of guessing.',
+  );
 
   return lines.join('\n');
 }

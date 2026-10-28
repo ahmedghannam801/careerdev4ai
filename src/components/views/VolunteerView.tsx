@@ -15,9 +15,14 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { VolunteerExperience } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { VolunteerOpportunities } from '../volunteer/VolunteerOpportunities';
 
 /**
  * The Volunteer page.
+ *
+ * The page has two halves. The opportunities hub shows the real
+ * volunteering programmes a user can apply to, ranked for them. The record
+ * below lets them capture a stint they have already done.
  *
  * A volunteer stint is its own domain: the organisation, the role taken on,
  * how long it lasted, the responsibilities, the achievements and the skills
@@ -41,10 +46,10 @@ function splitList(value: string): string[] {
     .filter(Boolean);
 }
 
-function formatPeriod(entry: VolunteerExperience): string {
-  if (!entry.startDate) return 'Dates not recorded';
+function formatPeriod(entry: VolunteerExperience, t: (key: string) => string): string {
+  if (!entry.startDate) return t('Dates not recorded');
   const start = entry.startDate;
-  if (entry.isCurrent || !entry.endDate) return `${start} — Present`;
+  if (entry.isCurrent || !entry.endDate) return `${start} — ${t('Present')}`;
   return `${start} — ${entry.endDate}`;
 }
 
@@ -79,9 +84,10 @@ const EMPTY_DRAFT: DraftState = {
 };
 
 export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
-  const { volunteerExperiences, projects, addVolunteerExperience, updateVolunteerExperience, deleteVolunteerExperience } =
+  const { volunteerExperiences, projects, addVolunteerExperience, updateVolunteerExperience, deleteVolunteerExperience, t } =
     useCareer();
 
+  const [tab, setTab] = useState<'opportunities' | 'record'>('opportunities');
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -167,7 +173,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
       };
 
       if (!payload.organization || !payload.role) {
-        setSubmitError('An organisation and a role are required.');
+        setSubmitError(t('An organisation and a role are required.'));
         return;
       }
 
@@ -181,7 +187,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
       setSubmitError(
         error instanceof Error
           ? error.message
-          : 'The volunteering record could not be saved. Please try again.'
+          : t('The volunteering record could not be saved. Please try again.')
       );
     } finally {
       setIsSubmitting(false);
@@ -193,7 +199,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
       await deleteVolunteerExperience(entry.id);
     } catch (error) {
       setSubmitError(
-        error instanceof Error ? error.message : 'The volunteering record could not be removed.'
+        error instanceof Error ? error.message : t('The volunteering record could not be removed.')
       );
     }
   };
@@ -203,14 +209,13 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">COMMUNITY IMPACT &amp; VOLUNTEERING</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('COMMUNITY IMPACT &amp; VOLUNTEERING')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5 flex items-center gap-2">
             <HeartHandshake className="w-5 h-5 text-[var(--color-primary-text)]" />
-            Volunteer Experience
+            {t('Volunteer Experience')}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1.5 max-w-2xl">
-            Record the organisations you volunteered for, what you were responsible for and the
-            skills it gave you — and link the projects that prove it.
+            {t('Record the organisations you volunteered for, what you were responsible for and the skills it gave you — and link the projects that prove it.')}
           </p>
         </div>
 
@@ -219,18 +224,49 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
           className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Volunteering</span>
+          <span>{t('Add Volunteering')}</span>
         </button>
       </div>
 
+      {/* The two halves of the page: what you can apply to, and what you
+          have already done. */}
+      <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
+        <button
+          type="button"
+          onClick={() => setTab('opportunities')}
+          className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+            tab === 'opportunities'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          {t('Opportunities')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('record')}
+          className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+            tab === 'record'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          {t('My volunteering')} ({volunteerExperiences.length})
+        </button>
+      </div>
+
+      {tab === 'opportunities' ? (
+        <VolunteerOpportunities onRecordStint={() => { setTab('record'); openAdd(); }} />
+      ) : (
+        <>
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Volunteering roles', value: volunteerExperiences.length },
-          { label: 'Organisations', value: new Set(volunteerExperiences.map((e) => e.organization)).size },
-          { label: 'Skills gained', value: totalSkills },
+          { label: t('Volunteering roles'), value: volunteerExperiences.length },
+          { label: t('Organisations'), value: new Set(volunteerExperiences.map((e) => e.organization)).size },
+          { label: t('Skills gained'), value: totalSkills },
           {
-            label: 'Linked projects',
+            label: t('Linked projects'),
             value: new Set(volunteerExperiences.flatMap((e) => e.projectIds)).size,
           },
         ].map((stat) => (
@@ -251,18 +287,17 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
         <div className="p-10 rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 text-center space-y-3">
           <HeartHandshake className="w-8 h-8 mx-auto text-[var(--text-muted)]" />
           <div className="text-sm font-semibold text-[var(--text-primary)]">
-            No volunteering recorded yet
+            {t('No volunteering recorded yet')}
           </div>
           <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            Add an organisation you volunteered for. Link your projects to it so the work you did
-            is visible as evidence.
+            {t('Add an organisation you volunteered for. Link your projects to it so the work you did is visible as evidence.')}
           </p>
           <button
             onClick={openAdd}
             className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold inline-flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Volunteering</span>
+            <span>{t('Add Volunteering')}</span>
           </button>
         </div>
       ) : (
@@ -282,7 +317,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                   <div className="text-[11px] text-[var(--text-muted)] mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="inline-flex items-center gap-1">
                       <CalendarDays className="w-3 h-3" />
-                      {formatPeriod(entry)}
+                      {formatPeriod(entry, t)}
                     </span>
                     {entry.location && (
                       <span className="inline-flex items-center gap-1">
@@ -296,14 +331,14 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                   <button
                     onClick={() => openEdit(entry)}
                     className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--color-primary-text)] hover:bg-[var(--surface-secondary)]"
-                    title="Edit"
+                    title={t('Edit')}
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(entry)}
                     className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--color-error)] hover:bg-[var(--surface-secondary)]"
-                    title="Remove"
+                    title={t('Remove')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -319,7 +354,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
               {entry.responsibilities.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold">
-                    Responsibilities
+                    {t('Responsibilities')}
                   </div>
                   <ul className="space-y-1">
                     {entry.responsibilities.map((item, i) => (
@@ -339,7 +374,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold flex items-center gap-1.5">
                     <Trophy className="w-3 h-3" />
-                    Achievements
+                    {t('Achievements')}
                   </div>
                   <ul className="space-y-1">
                     {entry.achievements.map((item, i) => (
@@ -359,7 +394,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold flex items-center gap-1.5">
                     <Sparkles className="w-3 h-3" />
-                    Skills gained
+                    {t('Skills gained')}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {entry.skills.map((skill) => (
@@ -378,7 +413,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5 pt-2 border-t border-[var(--border-subtle)]">
                   <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold flex items-center gap-1.5">
                     <Link2 className="w-3 h-3" />
-                    Evidenced by
+                    {t('Evidenced by')}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {entry.projectIds.map((projectId) => (
@@ -386,9 +421,9 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                         key={projectId}
                         onClick={() => onNavigate?.('projects')}
                         className="text-[11px] px-2 py-0.5 rounded bg-[var(--accent-surface)] text-[var(--color-primary-text)] hover:underline"
-                        title="Open the project"
+                        title={t('Open the project')}
                       >
-                        {projectTitle.get(projectId) ?? 'Project'}
+                        {projectTitle.get(projectId) ?? t('Project')}
                       </button>
                     ))}
                   </div>
@@ -398,6 +433,8 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
           ))}
         </Stagger>
       )}
+        </>
+      )}
 
       {/* Add / edit */}
       {draft && (
@@ -405,7 +442,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
           <div className="w-full max-w-2xl my-8 p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-5 shadow-xl">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                {draft.id ? 'Edit volunteering' : 'Add volunteering'}
+                {draft.id ? t('Edit volunteering') : t('Add volunteering')}
               </h2>
               <button
                 onClick={close}
@@ -419,25 +456,25 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block space-y-1.5">
                   <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                    Organisation *
+                    {t('Organisation *')}
                   </span>
                   <input
                     type="text"
                     value={draft.organization}
                     onChange={(e) => setDraft({ ...draft, organization: e.target.value })}
-                    placeholder="e.g. Red Cross, Habitat for Humanity"
+                    placeholder={t('e.g. Red Cross, Habitat for Humanity')}
                     className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </label>
                 <label className="block space-y-1.5">
                   <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                    Role *
+                    {t('Role *')}
                   </span>
                   <input
                     type="text"
                     value={draft.role}
                     onChange={(e) => setDraft({ ...draft, role: e.target.value })}
-                    placeholder="e.g. Peer Mentor, Field Volunteer"
+                    placeholder={t('e.g. Peer Mentor, Field Volunteer')}
                     className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </label>
@@ -445,13 +482,13 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
 
               <label className="block space-y-1.5">
                 <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                  Location
+                  {t('Location')}
                 </span>
                 <input
                   type="text"
                   value={draft.location}
                   onChange={(e) => setDraft({ ...draft, location: e.target.value })}
-                  placeholder="e.g. Cairo, Egypt · Remote"
+                  placeholder={t('e.g. Cairo, Egypt · Remote')}
                   className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </label>
@@ -459,7 +496,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                 <label className="block space-y-1.5">
                   <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                    Start date
+                    {t('Start date')}
                   </span>
                   <input
                     type="date"
@@ -470,7 +507,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                 </label>
                 <label className="block space-y-1.5">
                   <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                    End date
+                    {t('End date')}
                   </span>
                   <input
                     type="date"
@@ -493,58 +530,58 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                     }
                     className="w-4 h-4 rounded border-[var(--border-subtle)] accent-[var(--accent-primary)]"
                   />
-                  <span className="text-xs text-[var(--text-secondary)]">I still volunteer here</span>
+                  <span className="text-xs text-[var(--text-secondary)]">{t('I still volunteer here')}</span>
                 </label>
               </div>
 
               <label className="block space-y-1.5">
                 <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                  Summary
+                  {t('Summary')}
                 </span>
                 <textarea
                   value={draft.description}
                   onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                   rows={3}
-                  placeholder="What did the volunteering involve?"
+                  placeholder={t('What did the volunteering involve?')}
                   className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-y"
                 />
               </label>
 
               <label className="block space-y-1.5">
                 <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                  Responsibilities
+                  {t('Responsibilities')}
                 </span>
                 <textarea
                   value={draft.responsibilities}
                   onChange={(e) => setDraft({ ...draft, responsibilities: e.target.value })}
                   rows={3}
-                  placeholder="One per line, or separated by commas"
+                  placeholder={t('One per line, or separated by commas')}
                   className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-y"
                 />
               </label>
 
               <label className="block space-y-1.5">
                 <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                  Achievements
+                  {t('Achievements')}
                 </span>
                 <textarea
                   value={draft.achievements}
                   onChange={(e) => setDraft({ ...draft, achievements: e.target.value })}
                   rows={2}
-                  placeholder="e.g. Mentored 12 students through the programme"
+                  placeholder={t('e.g. Mentored 12 students through the programme')}
                   className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-y"
                 />
               </label>
 
               <label className="block space-y-1.5">
                 <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                  Skills gained
+                  {t('Skills gained')}
                 </span>
                 <textarea
                   value={draft.skills}
                   onChange={(e) => setDraft({ ...draft, skills: e.target.value })}
                   rows={2}
-                  placeholder="e.g. Communication, Facilitation, Project coordination"
+                  placeholder={t('e.g. Communication, Facilitation, Project coordination')}
                   className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] resize-y"
                 />
               </label>
@@ -553,14 +590,14 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="block text-xs font-semibold text-[var(--text-secondary)]">
-                    Related projects
+                    {t('Related projects')}
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowProjectPicker((prev) => !prev)}
                     className="text-[11px] text-[var(--color-primary-text)] hover:underline"
                   >
-                    {showProjectPicker ? 'Hide' : `Link projects (${draft.projectIds.length})`}
+                    {showProjectPicker ? t('Hide') : `${t('Link projects')} (${draft.projectIds.length})`}
                   </button>
                 </div>
 
@@ -568,7 +605,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                   <div className="space-y-1.5 max-h-48 overflow-y-auto p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30">
                     {projects.length === 0 && (
                       <div className="text-[11px] text-[var(--text-muted)] p-2 text-center">
-                        You have no projects yet. Create one on the Projects page first.
+                        {t('You have no projects yet. Create one on the Projects page first.')}
                       </div>
                     )}
                     {projects.map((project) => {
@@ -578,7 +615,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                           key={project.id}
                           type="button"
                           onClick={() => toggleProject(project.id)}
-                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-start transition-colors ${
                             linked
                               ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
                               : 'hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)]'
@@ -613,14 +650,14 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
                   onClick={close}
                   className="px-3.5 py-2 rounded-lg border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 >
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
                   className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-60"
                 >
-                  {isSubmitting ? 'Saving…' : draft.id ? 'Save changes' : 'Add volunteering'}
+                  {isSubmitting ? t('Saving…') : draft.id ? t('Save changes') : t('Add volunteering')}
                 </button>
               </div>
             </form>

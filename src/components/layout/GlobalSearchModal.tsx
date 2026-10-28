@@ -36,7 +36,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   onOpenCopilot 
 }) => {
   const [query, setQuery] = useState('');
-  const { skills, projects, jobs, learningCatalog, documents, setPrimaryTargetRole } = useCareer();
+  const { skills, projects, jobs, learningCatalog, documents, setPrimaryTargetRole, t} = useCareer();
   const reduced = useReducedMotion() ?? false;
 
   useScrollLock(isOpen);
@@ -76,13 +76,13 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
   const totalResults = results.roles.length + results.domains.length + results.skills.length + results.projects.length + results.jobs.length + results.learning.length + results.docs.length;
   const quickActions = [
-    { label: 'Add New Skill', icon: Award, view: 'skills' },
-    { label: 'Add Proof-of-Skill Project', icon: FolderGit2, view: 'projects' },
-    { label: 'Add Work Experience', icon: Briefcase, view: 'profile' },
-    { label: 'Add Certification', icon: ShieldCheck, view: 'profile' },
-    { label: 'Add Secondary Career Goal', icon: Target, view: 'my-career' },
-    { label: 'Track New Job Application', icon: Calendar, view: 'applications' },
-    { label: 'Open CV Studio', icon: FileText, view: 'cv-studio' },
+    { label: t('Add New Skill'), icon: Award, view: 'skills' },
+    { label: t('Add Proof-of-Skill Project'), icon: FolderGit2, view: 'projects' },
+    { label: t('Add Work Experience'), icon: Briefcase, view: 'profile' },
+    { label: t('Add Certification'), icon: ShieldCheck, view: 'profile' },
+    { label: t('Add Secondary Career Goal'), icon: Target, view: 'my-career' },
+    { label: t('Track New Job Application'), icon: Calendar, view: 'applications' },
+    { label: t('Open CV Studio'), icon: FileText, view: 'cv-studio' },
   ];
 
   /** Selecting a role makes it the user's target: it re-scopes the roadmap,
@@ -109,7 +109,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           <motion.div
             role="dialog"
             aria-modal="true"
-            aria-label="Search and commands"
+            aria-label={t('Search and commands')}
             className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl"
             variants={dialogVariants(reduced)}
             initial="hidden"
@@ -123,12 +123,12 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Type a command, search skills, projects, jobs, documents..."
+            placeholder={t('Type a command, search skills, projects, jobs, documents...')}
             className="w-full bg-transparent border-0 text-sm focus:outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"
             autoFocus
           />
           <span className="text-[10px] font-mono text-[var(--text-muted)] bg-[var(--surface-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]">
-            ESC
+            {t('ESC')}
           </span>
           <button 
             onClick={onClose}
@@ -144,8 +144,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             <div className="space-y-4">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2 flex items-center justify-between">
-                  <span>Quick Create Actions</span>
-                  <span className="text-[10px] font-normal text-[var(--text-muted)]">1-Click Fast Track</span>
+                  <span>{t('Quick Create Actions')}</span>
+                  <span className="text-[10px] font-normal text-[var(--text-muted)]">{t('1-Click Fast Track')}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {quickActions.map((qa, i) => {
@@ -157,7 +157,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                           onNavigate(qa.view);
                           onClose();
                         }}
-                        className="flex items-center justify-between p-2.5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40 hover:bg-[var(--surface-secondary)] text-left transition-colors text-xs text-[var(--text-primary)]"
+                        className="flex items-center justify-between p-2.5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40 hover:bg-[var(--surface-secondary)] text-start transition-colors text-xs text-[var(--text-primary)]"
                       >
                         <div className="flex items-center gap-2.5">
                           <div className="p-1.5 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]">
@@ -183,7 +183,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                   >
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4" />
-                      <span>Ask AI Copilot for Personalized Strategy</span>
+                      <span>{t('Ask AI Copilot for Personalized Strategy')}</span>
                     </div>
                     <ArrowRight className="w-4 h-4" />
                   </button>
@@ -192,20 +192,20 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             </div>
           ) : totalResults === 0 ? (
             <div className="text-center py-10 text-xs text-[var(--text-secondary)] space-y-1">
-              <p className="font-bold text-[var(--text-primary)]">No matching records found for "{query}".</p>
-              <p className="text-[var(--text-muted)]">Try a role ("financial analyst"), a domain ("marketing"), a skill, company, job title, or project name.</p>
+              <p className="font-bold text-[var(--text-primary)]">{t('No matching records found for')} "{query}".</p>
+              <p className="text-[var(--text-muted)]">{t('Try a role ("financial analyst"), a domain ("marketing"), a skill, company, job title, or project name.')}</p>
             </div>
           ) : (
             <div className="space-y-4 text-xs">
               {results.domains.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Career Domains</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">{t('Career Domains')}</div>
                   <div className="space-y-1">
                     {results.domains.map(({ domain }) => (
                       <button
                         key={domain.slug}
                         onClick={() => { onNavigate('roles'); onClose(); }}
-                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
+                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-start transition-colors"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <Layers className="w-3.5 h-3.5 text-[var(--color-primary-text)] shrink-0" />
@@ -221,14 +221,14 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
               {results.roles.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Career Roles</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">{t('Career Roles')}</div>
                   <div className="space-y-1">
                     {results.roles.map(({ role: r, matchedOn }) => (
                       <button
                         key={r.id}
                         onClick={() => { void chooseRole(r.id); }}
-                        title={matchedOn === 'skill' ? `Matched on skill: ${r.requiredSkills.find(s => s.name.toLowerCase().includes(query.toLowerCase()))?.name ?? ''}` : undefined}
-                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
+                        title={matchedOn === 'skill' ? `${t('Matched on skill:')} ${r.requiredSkills.find(s => s.name.toLowerCase().includes(query.toLowerCase()))?.name ?? ''}` : undefined}
+                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-start transition-colors"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <Briefcase className="w-3.5 h-3.5 text-[var(--color-primary-text)] shrink-0" />
@@ -244,20 +244,20 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
               {results.skills.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Skills</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">{t('Skills')}</div>
                   <div className="space-y-1">
                     {results.skills.map(s => (
                       <button
                         key={s.id}
                         onClick={() => { onNavigate('skills'); onClose(); }}
-                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
+                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-start transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <Award className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />
                           <span className="font-semibold text-[var(--text-primary)]">{s.name}</span>
                           <span className="text-[10px] text-[var(--text-muted)] font-mono">L{s.currentLevel} • {s.category}</span>
                         </div>
-                        <span className="text-[10px] font-mono text-[var(--color-primary-text)]">Skills Center →</span>
+                        <span className="text-[10px] font-mono text-[var(--color-primary-text)]">{t('Skills Center →')}</span>
                       </button>
                     ))}
                   </div>
@@ -266,13 +266,13 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
               {results.projects.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Projects</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">{t('Projects')}</div>
                   <div className="space-y-1">
                     {results.projects.map(p => (
                       <button
                         key={p.id}
                         onClick={() => { onNavigate('projects'); onClose(); }}
-                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
+                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-start transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <FolderGit2 className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />
@@ -287,18 +287,18 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
               {results.jobs.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Job Opportunities</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">{t('Job Opportunities')}</div>
                   <div className="space-y-1">
                     {results.jobs.map(j => (
                       <button
                         key={j.id}
                         onClick={() => { onNavigate('jobs'); onClose(); }}
-                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
+                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-start transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <Briefcase className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                           <span className="font-semibold text-[var(--text-primary)]">{j.title}</span>
-                          <span className="text-[10px] text-[var(--text-muted)]">at {j.company}</span>
+                          <span className="text-[10px] text-[var(--text-muted)]">{t('at')} {j.company}</span>
                         </div>
                         <ExternalLink className="w-3 h-3 text-[var(--text-muted)]" />
                       </button>
@@ -309,13 +309,13 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
               {results.docs.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Documents</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">{t('Documents')}</div>
                   <div className="space-y-1">
                     {results.docs.map(d => (
                       <button
                         key={d.id}
                         onClick={() => { onNavigate('documents'); onClose(); }}
-                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-left transition-colors"
+                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] text-start transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <FileText className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />

@@ -16,7 +16,7 @@ import { ActivityActionType } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
-  const { activities } = useCareer();
+  const { activities, t} = useCareer();
   const [filterType, setFilterType] = useState<string>('all');
 
   const getActionIcon = (type: ActivityActionType) => {
@@ -61,18 +61,18 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold mb-2">
             <Activity className="w-3.5 h-3.5" />
-            <span>Audit & Verification</span>
+            <span>{t('Audit & Verification')}</span>
           </div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
-            Recent Career Activity
+            {t('Recent Career Activity')}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            Verified log of meaningful milestones, application events, roadmap completions, and evidence uploads.
+            {t('Verified log of meaningful milestones, application events, roadmap completions, and evidence uploads.')}
           </p>
         </div>
 
         <div className="text-xs font-mono text-[var(--text-muted)] bg-[var(--surface-secondary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)]">
-          {activities.length} Logged Actions
+          {activities.length} {t('Logged Actions')}
         </div>
       </div>
 
@@ -80,14 +80,14 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs">
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-          <span className="text-[var(--text-secondary)] font-medium">Filter Category:</span>
+          <span className="text-[var(--text-secondary)] font-medium">{t('Filter Category:')}</span>
           {[
-            { id: 'all', label: 'All Activity' },
-            { id: 'roadmap', label: 'Roadmap & Tasks' },
-            { id: 'jobs', label: 'Job Applications' },
-            { id: 'interviews', label: 'Interviews' },
-            { id: 'skills', label: 'Skills & Evidence' },
-            { id: 'documents', label: 'CV & Documents' },
+            { id: 'all', label: t('All Activity') },
+            { id: 'roadmap', label: t('Roadmap & Tasks') },
+            { id: 'jobs', label: t('Job Applications') },
+            { id: 'interviews', label: t('Interviews') },
+            { id: 'skills', label: t('Skills & Evidence') },
+            { id: 'documents', label: t('CV & Documents') },
           ].map(tab => (
             <button
               key={tab.id}
@@ -104,7 +104,7 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
         </div>
 
         <span className="text-[11px] text-[var(--text-muted)] font-mono">
-          Showing {filteredActivities.length} items
+          {t('Showing')} {filteredActivities.length} {t('items')}
         </span>
       </div>
 
@@ -113,8 +113,8 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
         {filteredActivities.length === 0 ? (
           <div className="text-center py-12 text-xs text-[var(--text-muted)] space-y-2">
             <Activity className="w-8 h-8 text-[var(--text-muted)] mx-auto opacity-50" />
-            <p className="font-semibold text-[var(--text-primary)]">No activity matches this category.</p>
-            <p>Complete tasks, submit applications, or drill interview questions to record activity.</p>
+            <p className="font-semibold text-[var(--text-primary)]">{t('No activity matches this category.')}</p>
+            <p>{t('Complete tasks, submit applications, or drill interview questions to record activity.')}</p>
           </div>
         ) : (
           <Stagger inView gap={0.06} className="space-y-3">
@@ -156,7 +156,7 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
                       onClick={() => onNavigate(act.linkView!)}
                       className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--color-primary-text)] flex items-center gap-1 transition-colors shrink-0"
                     >
-                      <span>View</span>
+                      <span>{t('View')}</span>
                       <ArrowRight className="w-3 h-3" />
                     </button>
                   )}

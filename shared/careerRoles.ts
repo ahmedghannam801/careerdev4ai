@@ -25,6 +25,41 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
   ...PEOPLE_ROLES,
 ];
 
+/**
+ * The compact role definitions, keyed by their catalogue slug.
+ *
+ * The roadmap generator and the volunteer matcher need the raw definition
+ * (the named entry / intermediate / advanced paths and the role's own project
+ * ideas), which the expanded `TargetRole` contract does not carry.
+ */
+export const ROLE_DEFINITION_LIST: RoleDefinition[] = ROLE_DEFINITIONS;
+
+/** Looks up a role definition by its catalogue slug. */
+export function findRoleDefinitionById(
+  id: string | null | undefined
+): RoleDefinition | undefined {
+  if (!id) return undefined;
+  const key = id.trim().toLowerCase();
+  return ROLE_DEFINITIONS.find((role) => role.id.toLowerCase() === key);
+}
+
+/**
+ * Looks up a role definition by slug or by title.
+ *
+ * Profiles store the role title, so the title lookup is the path that
+ * actually resolves for existing users.
+ */
+export function resolveRoleDefinition(
+  reference: string | null | undefined
+): RoleDefinition | undefined {
+  if (!reference) return undefined;
+  const byId = findRoleDefinitionById(reference);
+  if (byId) return byId;
+  const byTitle = findRoleByTitle(reference);
+  if (!byTitle) return undefined;
+  return findRoleDefinitionById(byTitle.id);
+}
+
 /** Default proficiency expectations used when a role does not define its own. */
 const DEFAULT_PROFICIENCY: TargetRole['proficiencyExpectations'] = [
   { level: 'Entry', expectation: 'Supports delivery with supervision and learns the domain quickly.' },

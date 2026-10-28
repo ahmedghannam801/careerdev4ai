@@ -12,6 +12,15 @@ export type RoadmapTaskStatus =
   | 'skipped'
   | 'blocked';
 
+/** A learning resource attached to a roadmap step. */
+export interface RoadmapResourceDTO {
+  id: string;
+  title: string;
+  provider: string;
+  url: string;
+  durationHours: number | null;
+}
+
 export interface RoadmapTaskDTO {
   id: string;
   title: string;
@@ -25,6 +34,20 @@ export interface RoadmapTaskDTO {
   evidenceId: string | null;
   estimatedHours: number | null;
   sortOrder: number;
+  /** How hard this step is. */
+  difficulty: string | null;
+  /** Titles of the steps that must be finished first. */
+  prerequisites: string[];
+  /** Every skill this step moves the user on. */
+  skillNames: string[];
+  /** Projects that demonstrate this step. */
+  projectTitles: string[];
+  /** Recommended learning resources, with their links. */
+  resources: RoadmapResourceDTO[];
+  /** Urgency of the gap this step closes. */
+  priority: string | null;
+  /** Plain-language reason this step is in the plan. */
+  rationale: string | null;
 }
 
 export interface RoadmapMilestoneDTO {
@@ -41,6 +64,8 @@ export interface RoadmapPhaseDTO {
   phaseNumber: number;
   title: string;
   description: string | null;
+  /** The role-specific outcome this phase works towards. */
+  goal: string | null;
   isUnlocked: boolean;
   sortOrder: number;
   milestones: RoadmapMilestoneDTO[];
@@ -52,6 +77,14 @@ export interface RoadmapDTO {
   status: string;
   isEnrolled: boolean;
   targetRoleTitle: string | null;
+  /** Catalogue slug of the role this roadmap was generated for. */
+  targetRoleId: string | null;
+  /** Catalogue slug of the role's domain. */
+  domainId: string | null;
+  /** How ready the user is for the role, 0..100. */
+  readinessPct: number | null;
+  /** Counts and totals describing the generated plan. */
+  planSummary: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   phases: RoadmapPhaseDTO[];
@@ -181,6 +214,22 @@ export async function createRoadmap(input: {
     method: 'POST',
     body: JSON.stringify(input),
   });
+  return data.roadmap ?? null;
+}
+
+/**
+ * Regenerates the roadmap on the server from the user's current target role
+ * and their own skill ratings.
+ *
+ * The plan is built by the shared generator on the server, so the roadmap a
+ * user sees is the one the API and the AI context both read. Existing task
+ * progress is preserved by the server.
+ */
+export async function generatePersonalizedRoadmap(): Promise<RoadmapDTO | null> {
+  const data = await request<{ success: boolean; roadmap: RoadmapDTO | null }>(
+    '/api/roadmap/generate',
+    { method: 'POST', body: JSON.stringify({}) }
+  );
   return data.roadmap ?? null;
 }
 

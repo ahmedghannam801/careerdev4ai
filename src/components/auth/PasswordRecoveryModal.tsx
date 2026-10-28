@@ -14,7 +14,7 @@ import { useFocusTrap, useScrollLock } from '../../lib/overlay';
  * used.
  */
 export const PasswordRecoveryModal: React.FC = () => {
-  const { passwordRecovery, completePasswordReset, dismissPasswordRecovery, logout } = useCareer();
+  const { passwordRecovery, completePasswordReset, dismissPasswordRecovery, logout, t} = useCareer();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -100,10 +100,10 @@ export const PasswordRecoveryModal: React.FC = () => {
               id="password-recovery-title"
               className="text-sm font-bold text-[var(--text-primary)]"
             >
-              Choose a new password
+              {t('Choose a new password')}
             </h2>
             <p className="text-[11px] text-[var(--text-muted)]">
-              Your reset link was accepted. Set a new password to finish.
+              {t('Your reset link was accepted. Set a new password to finish.')}
             </p>
           </div>
         </div>
@@ -112,14 +112,14 @@ export const PasswordRecoveryModal: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-start gap-2 rounded-xl border border-[var(--color-success)]/25 bg-[var(--color-success)]/10 p-3 text-xs text-[var(--color-success)]">
               <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Your password has been updated. You are signed in.</span>
+              <span>{t('Your password has been updated. You are signed in.')}</span>
             </div>
             <button
               type="button"
               onClick={dismissPasswordRecovery}
               className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-bold hover:opacity-90"
             >
-              Continue to CareerPilot
+              {t('Continue to CareerPilot')}
             </button>
           </div>
         ) : (
@@ -129,7 +129,7 @@ export const PasswordRecoveryModal: React.FC = () => {
                 htmlFor="recovery-password"
                 className="text-[11px] font-semibold text-[var(--text-secondary)]"
               >
-                New password
+                {t('New password')}
               </label>
               <input
                 id="recovery-password"
@@ -140,7 +140,7 @@ export const PasswordRecoveryModal: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
-                placeholder="At least 8 characters"
+                placeholder={t('At least 8 characters')}
               />
             </div>
 
@@ -149,7 +149,7 @@ export const PasswordRecoveryModal: React.FC = () => {
                 htmlFor="recovery-confirm"
                 className="text-[11px] font-semibold text-[var(--text-secondary)]"
               >
-                Confirm new password
+                {t('Confirm new password')}
               </label>
               <input
                 id="recovery-confirm"
@@ -159,7 +159,7 @@ export const PasswordRecoveryModal: React.FC = () => {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
-                placeholder="Repeat the password"
+                placeholder={t('Repeat the password')}
               />
             </div>
 
@@ -187,7 +187,7 @@ export const PasswordRecoveryModal: React.FC = () => {
               onClick={handleCancel}
               className="w-full py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             >
-              Cancel and sign out
+              {t('Cancel and sign out')}
             </button>
           </form>
         )}

@@ -36,6 +36,29 @@ export interface RoadmapTaskDTO {
   evidenceId: string | null;
   estimatedHours: number | null;
   sortOrder: number;
+  /** How hard this step is: foundational, intermediate or advanced. */
+  difficulty: string | null;
+  /** Titles of the steps that must be finished before this one. */
+  prerequisites: string[];
+  /** Every skill this step moves the user on. */
+  skillNames: string[];
+  /** Projects that demonstrate this step. */
+  projectTitles: string[];
+  /** Recommended learning resources, with their links. */
+  resources: RoadmapResourceDTO[];
+  /** Urgency of the gap this step closes. */
+  priority: string | null;
+  /** Plain-language reason this step is in this user's plan. */
+  rationale: string | null;
+}
+
+/** A learning resource attached to a roadmap step. */
+export interface RoadmapResourceDTO {
+  id: string;
+  title: string;
+  provider: string;
+  url: string;
+  durationHours: number | null;
 }
 
 export interface RoadmapMilestoneDTO {
@@ -53,6 +76,8 @@ export interface RoadmapPhaseDTO {
   phaseNumber: number;
   title: string;
   description: string | null;
+  /** The role-specific outcome this phase works towards. */
+  goal: string | null;
   isUnlocked: boolean;
   sortOrder: number;
   milestones: RoadmapMilestoneDTO[];
@@ -64,6 +89,14 @@ export interface RoadmapDTO {
   status: string;
   isEnrolled: boolean;
   targetRoleTitle: string | null;
+  /** Catalogue slug of the role this roadmap was generated for. */
+  targetRoleId: string | null;
+  /** Catalogue slug of the role's domain. */
+  domainId: string | null;
+  /** How ready the user is for the role, 0..100. */
+  readinessPct: number | null;
+  /** Counts and totals describing the generated plan. */
+  planSummary: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   phases: RoadmapPhaseDTO[];
@@ -77,6 +110,10 @@ export interface CreateRoadmapInput {
   title: string;
   targetRoleTitle?: string;
   isEnrolled?: boolean;
+  targetRoleId?: string;
+  domainId?: string;
+  readinessPct?: number;
+  planSummary?: Record<string, unknown>;
 }
 
 export interface CreateRoadmapTaskInput {
@@ -90,6 +127,13 @@ export interface CreateRoadmapTaskInput {
   resourceTitle?: string;
   evidenceId?: string;
   estimatedHours?: number;
+  difficulty?: string;
+  prerequisites?: string[];
+  skillNames?: string[];
+  projectTitles?: string[];
+  resources?: RoadmapResourceDTO[];
+  priority?: string;
+  rationale?: string;
 }
 
 /**
@@ -102,6 +146,8 @@ export interface RoadmapTreePhaseInput {
   phaseNumber: number;
   title: string;
   description?: string;
+  /** The role-specific outcome this phase works towards. */
+  goal?: string;
   isUnlocked?: boolean;
   milestones: Array<{
     title: string;
@@ -116,6 +162,10 @@ interface RoadmapRow {
   status: string;
   is_enrolled: boolean;
   target_role_title: string | null;
+  target_role_id: string | null;
+  domain_id: string | null;
+  readiness_pct: number | null;
+  plan_summary: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -126,6 +176,7 @@ interface PhaseRow {
   phase_number: number;
   title: string;
   description: string | null;
+  goal: string | null;
   is_unlocked: boolean;
   sort_order: number;
 }
@@ -152,6 +203,35 @@ interface TaskRow {
   evidence_id: string | null;
   estimated_hours: number | null;
   sort_order: number;
+  difficulty: string | null;
+  prerequisites: string[] | null;
+  skill_names: string[] | null;
+  project_titles: string[] | null;
+  resources: RoadmapResourceDTO[] | null;
+  priority: string | null;
+  rationale: string | null;
+}
+
+/** Parses the `resources` jsonb column, tolerating an older shape. */
+function toResourceDTOs(value: unknown): RoadmapResourceDTO[] {
+  if (!Array.isArray(value)) return [];
+  const out: RoadmapResourceDTO[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue;
+    const record = entry as Record<string, unknown>;
+    const id = typeof record.id === 'string' ? record.id : null;
+    const title = typeof record.title === 'string' ? record.title : null;
+    if (!id || !title) continue;
+    out.push({
+      id,
+      title,
+      provider: typeof record.provider === 'string' ? record.provider : '',
+      url: typeof record.url === 'string' ? record.url : '',
+      durationHours:
+        typeof record.durationHours === 'number' ? record.durationHours : null,
+    });
+  }
+  return out;
 }
 
 function toTaskDTO(row: TaskRow): RoadmapTaskDTO {
@@ -168,6 +248,13 @@ function toTaskDTO(row: TaskRow): RoadmapTaskDTO {
     evidenceId: row.evidence_id,
     estimatedHours: row.estimated_hours,
     sortOrder: row.sort_order,
+    difficulty: row.difficulty,
+    prerequisites: row.prerequisites ?? [],
+    skillNames: row.skill_names ?? [],
+    projectTitles: row.project_titles ?? [],
+    resources: toResourceDTOs(row.resources),
+    priority: row.priority,
+    rationale: row.rationale,
   };
 }
 
@@ -191,6 +278,7 @@ function toPhaseDTO(
     phaseNumber: row.phase_number,
     title: row.title,
     description: row.description,
+    goal: row.goal,
     isUnlocked: row.is_unlocked,
     sortOrder: row.sort_order,
     milestones,
@@ -209,6 +297,10 @@ function toRoadmapDTO(
     status: row.status,
     isEnrolled: row.is_enrolled,
     targetRoleTitle: row.target_role_title,
+    targetRoleId: row.target_role_id,
+    domainId: row.domain_id,
+    readinessPct: row.readiness_pct,
+    planSummary: row.plan_summary ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     phases,
@@ -223,7 +315,7 @@ function toRoadmapDTO(
 export async function listRoadmaps(profileId: string): Promise<RoadmapDTO[]> {
   const { data: roadmapRows, error: roadmapError } = await getSupabaseServer()
     .from('roadmaps')
-    .select('id, title, status, is_enrolled, target_role_title, created_at, updated_at')
+    .select('id, title, status, is_enrolled, target_role_title, target_role_id, domain_id, readiness_pct, plan_summary, created_at, updated_at')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false });
   if (roadmapError) throw roadmapError;
@@ -233,7 +325,7 @@ export async function listRoadmaps(profileId: string): Promise<RoadmapDTO[]> {
   const roadmapIds = roadmaps.map((r) => r.id);
   const { data: phaseRows, error: phaseError } = await getSupabaseServer()
     .from('roadmap_phases')
-    .select('id, roadmap_id, phase_number, title, description, is_unlocked, sort_order')
+    .select('id, roadmap_id, phase_number, title, description, goal, is_unlocked, sort_order')
     .in('roadmap_id', roadmapIds)
     // Negative phase numbers are the staging representation used while a
     // replacement roadmap is being written. They are never part of the
@@ -259,7 +351,7 @@ export async function listRoadmaps(profileId: string): Promise<RoadmapDTO[]> {
     const { data: taskRows, error: taskError } = await getSupabaseServer()
       .from('roadmap_tasks')
       .select(
-        'id, milestone_id, title, description, status, skill_id, skill_name, deadline, resource_id, resource_title, evidence_id, estimated_hours, sort_order'
+        'id, milestone_id, title, description, status, skill_id, skill_name, deadline, resource_id, resource_title, evidence_id, estimated_hours, sort_order, difficulty, prerequisites, skill_names, project_titles, resources, priority, rationale'
       )
       .in('milestone_id', milestoneIds)
       .order('sort_order', { ascending: true });
@@ -309,8 +401,13 @@ export async function createRoadmap(
       status: 'active',
       is_enrolled: input.isEnrolled ?? false,
       target_role_title: input.targetRoleTitle ?? null,
+      target_role_id: input.targetRoleId ?? null,
+      domain_id: input.domainId ?? null,
+      readiness_pct: input.readinessPct ?? null,
+      plan_summary: input.planSummary ?? {},
+      generated_at: new Date().toISOString(),
     })
-    .select('id, title, status, is_enrolled, target_role_title, created_at, updated_at')
+    .select('id, title, status, is_enrolled, target_role_title, target_role_id, domain_id, readiness_pct, plan_summary, created_at, updated_at')
     .single();
   if (error) throw error;
   return toRoadmapDTO(data as RoadmapRow, []);
@@ -325,7 +422,13 @@ export async function createRoadmap(
 export async function addPhase(
   profileId: string,
   roadmapId: string,
-  input: { phaseNumber: number; title: string; description?: string; isUnlocked?: boolean }
+  input: {
+    phaseNumber: number;
+    title: string;
+    description?: string;
+    goal?: string;
+    isUnlocked?: boolean;
+  }
 ): Promise<RoadmapPhaseDTO | null> {
   const { data: roadmap } = await getSupabaseServer()
     .from('roadmaps')
@@ -348,10 +451,11 @@ export async function addPhase(
       phase_number: input.phaseNumber,
       title: input.title,
       description: input.description ?? null,
+      goal: input.goal ?? null,
       is_unlocked: input.isUnlocked ?? true,
       sort_order: sortOrder,
     })
-    .select('id, roadmap_id, phase_number, title, description, is_unlocked, sort_order')
+    .select('id, roadmap_id, phase_number, title, description, goal, is_unlocked, sort_order')
     .single();
   if (error) throw error;
   return toPhaseDTO(data as PhaseRow, []);
@@ -450,6 +554,7 @@ interface TreePhase {
   phaseNumber: number;
   title: string;
   description?: string;
+  goal?: string;
   isUnlocked?: boolean;
   milestones: Array<{
     title: string;
@@ -500,6 +605,7 @@ async function insertRoadmapTree(
     phase_number: staging ? -(index + 1) : numbers[index],
     title: phase.title,
     description: phase.description ?? null,
+    goal: phase.goal ?? null,
     is_unlocked: phase.isUnlocked ?? true,
     sort_order: staging ? STAGING_SORT_BASE + index : index,
   }));
@@ -581,6 +687,13 @@ async function insertRoadmapTree(
     evidence_id: string | null;
     estimated_hours: number | null;
     sort_order: number;
+    difficulty: string | null;
+    prerequisites: string[];
+    skill_names: string[];
+    project_titles: string[];
+    resources: RoadmapResourceDTO[];
+    priority: string | null;
+    rationale: string | null;
   }> = [];
 
   for (let pIdx = 0; pIdx < phases.length; pIdx += 1) {
@@ -611,6 +724,13 @@ async function insertRoadmapTree(
           evidence_id: tInput.evidenceId ?? null,
           estimated_hours: tInput.estimatedHours ?? null,
           sort_order: tIdx,
+          difficulty: tInput.difficulty ?? null,
+          prerequisites: tInput.prerequisites ?? [],
+          skill_names: tInput.skillNames ?? [],
+          project_titles: tInput.projectTitles ?? [],
+          resources: tInput.resources ?? [],
+          priority: tInput.priority ?? null,
+          rationale: tInput.rationale ?? null,
         });
       }
     }
@@ -654,6 +774,7 @@ function roadmapDtoToTree(roadmap: RoadmapDTO): TreePhase[] {
     phaseNumber: phase.phaseNumber,
     title: phase.title,
     description: phase.description ?? undefined,
+    goal: phase.goal ?? undefined,
     isUnlocked: phase.isUnlocked,
     milestones: phase.milestones.map((milestone) => ({
       title: milestone.title,
@@ -669,6 +790,13 @@ function roadmapDtoToTree(roadmap: RoadmapDTO): TreePhase[] {
         resourceTitle: task.resourceTitle ?? undefined,
         evidenceId: task.evidenceId ?? undefined,
         estimatedHours: task.estimatedHours ?? undefined,
+        difficulty: task.difficulty ?? undefined,
+        prerequisites: task.prerequisites,
+        skillNames: task.skillNames,
+        projectTitles: task.projectTitles,
+        resources: task.resources,
+        priority: task.priority ?? undefined,
+        rationale: task.rationale ?? undefined,
       })),
     })),
   }));
@@ -715,6 +843,10 @@ export async function createRoadmapWithTree(
   const previousMetadata = {
     title: existing.title,
     targetRoleTitle: existing.targetRoleTitle,
+    targetRoleId: existing.targetRoleId,
+    domainId: existing.domainId,
+    readinessPct: existing.readinessPct,
+    planSummary: existing.planSummary,
     isEnrolled: existing.isEnrolled,
   };
 
@@ -745,6 +877,7 @@ export async function createRoadmapWithTree(
         phase_number: numbers[index],
         title: phasesInput[index].title,
         description: phasesInput[index].description ?? null,
+        goal: phasesInput[index].goal ?? null,
         is_unlocked: phasesInput[index].isUnlocked ?? true,
         sort_order: index,
       }));
@@ -759,6 +892,11 @@ export async function createRoadmapWithTree(
       .update({
         title: input.title,
         target_role_title: input.targetRoleTitle ?? null,
+        target_role_id: input.targetRoleId ?? null,
+        domain_id: input.domainId ?? null,
+        readiness_pct: input.readinessPct ?? null,
+        plan_summary: input.planSummary ?? {},
+        generated_at: new Date().toISOString(),
         is_enrolled: input.isEnrolled ?? previousMetadata.isEnrolled,
       })
       .eq('id', existing.id)
@@ -791,6 +929,10 @@ export async function createRoadmapWithTree(
         .update({
           title: previousMetadata.title,
           target_role_title: previousMetadata.targetRoleTitle,
+          target_role_id: previousMetadata.targetRoleId,
+          domain_id: previousMetadata.domainId,
+          readiness_pct: previousMetadata.readinessPct,
+          plan_summary: previousMetadata.planSummary,
           is_enrolled: previousMetadata.isEnrolled,
         })
         .eq('id', existing.id)
@@ -814,7 +956,7 @@ export async function enrollInRoadmap(profileId: string): Promise<RoadmapDTO | n
     .update({ is_enrolled: true })
     .eq('profile_id', profileId)
     .eq('id', roadmap.id)
-    .select('id, title, status, is_enrolled, target_role_title, created_at, updated_at')
+    .select('id, title, status, is_enrolled, target_role_title, target_role_id, domain_id, readiness_pct, plan_summary, created_at, updated_at')
     .single();
   if (error) throw error;
   return toRoadmapDTO(data as RoadmapRow, []);

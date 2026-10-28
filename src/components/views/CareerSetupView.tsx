@@ -18,7 +18,7 @@ interface CareerSetupViewProps {
 }
 
 export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) => {
-  const { targetRole, savedRoles, setPrimaryTargetRole, saveRole, removeSavedRole, skills } = useCareer();
+  const { targetRole, savedRoles, setPrimaryTargetRole, saveRole, removeSavedRole, skills, t} = useCareer();
   const [selectedRole, setSelectedRole] = useState<TargetRole>(targetRole);
   const [compareRole, setCompareRole] = useState<TargetRole | null>(null);
 
@@ -42,9 +42,9 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">CAREER ARCHITECTURE & DECISION SUPPORT</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('CAREER ARCHITECTURE & DECISION SUPPORT')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Target Roles & Path Explorer
+            {t('Target Roles & Path Explorer')}
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -53,7 +53,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
               onClick={() => setCompareRole(null)}
               className="px-3.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             >
-              Exit Comparison
+              {t('Exit Comparison')}
             </button>
           ) : (
             <button
@@ -64,14 +64,14 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
               className="px-3.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-primary)] flex items-center gap-1.5 transition-colors"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
-              <span>Compare Two Roles</span>
+              <span>{t('Compare Two Roles')}</span>
             </button>
           )}
           <button
             onClick={() => onNavigate('analysis')}
             className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
-            <span>View Gap Analysis</span>
+            <span>{t('View Gap Analysis')}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -84,14 +84,14 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
             <div className="flex items-center gap-2">
               <ArrowLeftRight className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Role Comparison: {selectedRole.title} vs {compareRole.title}
+                {t('Role Comparison:')} {selectedRole.title} {t('vs')} {compareRole.title}
               </h2>
             </div>
             <button
               onClick={() => setCompareRole(null)}
               className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             >
-              Close Comparison
+              {t('Close Comparison')}
             </button>
           </div>
 
@@ -100,29 +100,29 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
             <div className="p-5 rounded-xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)] space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="text-[10px] font-mono uppercase text-[var(--color-primary-text)] font-bold">Role A</span>
+                  <span className="text-[10px] font-mono uppercase text-[var(--color-primary-text)] font-bold">{t('Role A')}</span>
                   <h3 className="text-base font-bold text-[var(--text-primary)]">{selectedRole.title}</h3>
                   <div className="text-xs text-[var(--text-muted)]">{selectedRole.category} · {selectedRole.level}</div>
                 </div>
-                <div className="text-right">
+                <div className="text-end">
                   <div className="text-2xl font-bold font-mono text-[var(--color-primary-text)]">
                     {computeRoleFit(selectedRole)}%
                   </div>
-                  <div className="text-[10px] text-[var(--text-muted)]">Candidate Fit</div>
+                  <div className="text-[10px] text-[var(--text-muted)]">{t('Candidate Fit')}</div>
                 </div>
               </div>
 
               <div className="space-y-1.5 text-xs text-[var(--text-secondary)]">
-                <div><strong>Salary:</strong> <span className="font-mono text-[var(--color-success-strong)]">{selectedRole.salaryRange}</span></div>
-                <div><strong>Experience:</strong> {selectedRole.experienceExpectation}</div>
+                <div><strong>{t('Salary:')}</strong> <span className="font-mono text-[var(--color-success-strong)]">{selectedRole.salaryRange}</span></div>
+                <div><strong>{t('Experience:')}</strong> {selectedRole.experienceExpectation}</div>
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-[var(--border-subtle)]">
-                <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">Required Skills</div>
+                <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">{t('Required Skills')}</div>
                 <div className="flex flex-wrap gap-1">
                   {selectedRole.requiredSkills.map((s, i) => (
                     <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-[var(--surface-main)] text-[var(--text-primary)]">
-                      {s.name} (Lvl {s.minLevel})
+                      {s.name} ({t('Lvl')} {s.minLevel})
                     </span>
                   ))}
                 </div>
@@ -133,7 +133,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                   onClick={() => setPrimaryTargetRole(selectedRole.id)}
                   className="w-full py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-colors"
                 >
-                  Switch Primary Target to {selectedRole.title}
+                  {t('Switch Primary Target to')} {selectedRole.title}
                 </button>
               )}
             </div>
@@ -142,7 +142,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
             <div className="p-5 rounded-xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)] space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="text-[10px] font-mono uppercase text-[var(--color-primary-text)] font-bold">Role B</span>
+                  <span className="text-[10px] font-mono uppercase text-[var(--color-primary-text)] font-bold">{t('Role B')}</span>
                   <select
                     value={compareRole.id}
                     onChange={(e) => {
@@ -157,25 +157,25 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                   </select>
                   <div className="text-xs text-[var(--text-muted)]">{compareRole.category} · {compareRole.level}</div>
                 </div>
-                <div className="text-right">
+                <div className="text-end">
                   <div className="text-2xl font-bold font-mono text-[var(--color-primary-text)]">
                     {computeRoleFit(compareRole)}%
                   </div>
-                  <div className="text-[10px] text-[var(--text-muted)]">Candidate Fit</div>
+                  <div className="text-[10px] text-[var(--text-muted)]">{t('Candidate Fit')}</div>
                 </div>
               </div>
 
               <div className="space-y-1.5 text-xs text-[var(--text-secondary)]">
-                <div><strong>Salary:</strong> <span className="font-mono text-[var(--color-success-strong)]">{compareRole.salaryRange}</span></div>
-                <div><strong>Experience:</strong> {compareRole.experienceExpectation}</div>
+                <div><strong>{t('Salary:')}</strong> <span className="font-mono text-[var(--color-success-strong)]">{compareRole.salaryRange}</span></div>
+                <div><strong>{t('Experience:')}</strong> {compareRole.experienceExpectation}</div>
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-[var(--border-subtle)]">
-                <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">Required Skills</div>
+                <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">{t('Required Skills')}</div>
                 <div className="flex flex-wrap gap-1">
                   {compareRole.requiredSkills.map((s, i) => (
                     <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-[var(--surface-main)] text-[var(--text-primary)]">
-                      {s.name} (Lvl {s.minLevel})
+                      {s.name} ({t('Lvl')} {s.minLevel})
                     </span>
                   ))}
                 </div>
@@ -186,7 +186,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                   onClick={() => setPrimaryTargetRole(compareRole.id)}
                   className="w-full py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-colors"
                 >
-                  Switch Primary Target to {compareRole.title}
+                  {t('Switch Primary Target to')} {compareRole.title}
                 </button>
               )}
             </div>
@@ -213,7 +213,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                   <StaggerItem
                     key={role.id}
                     onClick={() => setSelectedRole(role)}
-                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                    className={`p-4 rounded-xl border text-start cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                       isSelected
                         ? 'bg-[var(--accent-surface)]/40 border-[var(--accent-primary)] shadow-xs'
                         : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
@@ -225,7 +225,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                           <span className="font-bold text-sm text-[var(--text-primary)]">{role.title}</span>
                           {isCurrentTarget && (
                             <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[var(--accent-primary)] text-[var(--color-on-primary)]">
-                              Primary
+                              {t('Primary')}
                             </span>
                           )}
                         </div>
@@ -242,7 +242,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                           }
                         }}
                         className="text-[var(--text-muted)] hover:text-[var(--color-primary-text)] p-1 rounded"
-                        title={isSaved(role.id) ? 'Saved' : 'Save for comparison'}
+                        title={t(isSaved(role.id) ? 'Saved' : 'Save for comparison')}
                       >
                         {isSaved(role.id) ? (
                           <BookmarkCheck className="w-4 h-4 text-[var(--color-primary-text)]" />
@@ -258,7 +258,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
 
                     <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)]/70 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
                       <span className="font-mono text-[var(--color-success-strong)]">{role.salaryRange.split(' ')[0]}</span>
-                      <span className="hover:text-[var(--color-primary-text)] font-medium">Inspect Specification →</span>
+                      <span className="hover:text-[var(--color-primary-text)] font-medium">{t('Inspect Specification →')}</span>
                     </div>
                   </StaggerItem>
                 );
@@ -273,7 +273,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
             {/* Action Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
               <div>
-                <div className="text-xs text-[var(--text-muted)]">{selectedRole.category} · {selectedRole.level} Level</div>
+                <div className="text-xs text-[var(--text-muted)]">{selectedRole.category} · {selectedRole.level} {t('Level')}</div>
                 <h2 className="text-xl font-bold text-[var(--text-primary)] mt-0.5">{selectedRole.title}</h2>
               </div>
 
@@ -283,12 +283,12 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                     onClick={() => setPrimaryTargetRole(selectedRole.id)}
                     className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold transition-all shadow-xs"
                   >
-                    Set as Primary Target Role
+                    {t('Set as Primary Target Role')}
                   </button>
                 ) : (
                   <div className="px-3 py-1.5 rounded-lg bg-[var(--color-success-surface)] text-[var(--color-success-strong)] text-xs font-semibold flex items-center gap-1.5">
                     <Check className="w-3.5 h-3.5" />
-                    <span>Active Primary Target</span>
+                    <span>{t('Active Primary Target')}</span>
                   </div>
                 )}
               </div>
@@ -296,22 +296,22 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
 
             {/* Overview & Salary */}
             <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Role Overview</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t('Role Overview')}</div>
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{selectedRole.overview}</p>
               <div className="flex flex-wrap gap-4 pt-2 text-xs text-[var(--text-secondary)]">
                 <div>
-                  <span className="font-semibold text-[var(--text-primary)]">Salary Expectation:</span>{' '}
+                  <span className="font-semibold text-[var(--text-primary)]">{t('Salary Expectation:')}</span>{' '}
                   <span className="font-mono text-[var(--color-success-strong)]">{selectedRole.salaryRange}</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-[var(--text-primary)]">Experience Expected:</span> {selectedRole.experienceExpectation}
+                  <span className="font-semibold text-[var(--text-primary)]">{t('Experience Expected:')}</span> {selectedRole.experienceExpectation}
                 </div>
               </div>
             </div>
 
             {/* Core Responsibilities */}
             <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Core Responsibilities</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t('Core Responsibilities')}</div>
               <ul className="space-y-1.5 text-xs text-[var(--text-secondary)]">
                 {selectedRole.responsibilities.map((resp, i) => (
                   <li key={i} className="flex items-start gap-2">
@@ -324,12 +324,12 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
 
             {/* Required Skills & Proficiency Baselines */}
             <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Required Skills & Baselines</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t('Required Skills & Baselines')}</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {selectedRole.requiredSkills.map((sk, i) => (
                   <div key={i} className="p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] flex items-center justify-between text-xs">
                     <span className="font-medium text-[var(--text-primary)]">{sk.name}</span>
-                    <span className="font-mono text-[var(--text-secondary)]">Level {sk.minLevel}/5</span>
+                    <span className="font-mono text-[var(--text-secondary)]">{t('Level')} {sk.minLevel}/5</span>
                   </div>
                 ))}
               </div>
@@ -337,7 +337,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
 
             {/* Tools & Technologies */}
             <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Tools & Ecosystem</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t('Tools & Ecosystem')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {selectedRole.tools.map((tool, i) => (
                   <span key={i} className="text-xs px-2.5 py-1 rounded bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]">
@@ -351,13 +351,13 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
             <div className="pt-4 border-t border-[var(--border-subtle)] space-y-3">
               <div className="flex items-center gap-2">
                 <GitBranch className="w-4 h-4 text-[var(--color-primary-text)]" />
-                <h3 className="text-sm font-bold text-[var(--text-primary)]">Career Path Progression Horizon</h3>
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Career Path Progression Horizon')}</h3>
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 {selectedRole.careerProgression.map((stage, i) => (
                   <React.Fragment key={i}>
                     <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] text-center text-xs flex-1">
-                      <div className="font-mono text-[10px] text-[var(--text-muted)]">Level {i + 1}</div>
+                      <div className="font-mono text-[10px] text-[var(--text-muted)]">{t('Level')} {i + 1}</div>
                       <div className="font-semibold text-[var(--text-primary)] mt-0.5">{stage}</div>
                     </div>
                     {i < selectedRole.careerProgression.length - 1 && (

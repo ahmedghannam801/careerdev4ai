@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CareerPilot AI</string>
+    <string name="title_activity_main">CareerPilot AI</string>
+    <string name="package_name">com.careerpilot.ai</string>
+    <string name="custom_url_scheme">com.careerpilot.ai</string>
+</resources>

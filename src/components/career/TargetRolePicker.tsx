@@ -27,6 +27,7 @@ import {
 } from '../../../shared/targetRoleSelection';
 import { searchCareerCatalog } from '../../data/rolesData';
 import type { TargetRole } from '../../types/career';
+import { useCareer } from '../../context/CareerContext';
 
 /**
  * The hierarchical target-role picker.
@@ -94,6 +95,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
   searchInputId,
   className = '',
 }) => {
+  const { t } = useCareer();
   // The domain the picker opens on: the explicitly supplied one, otherwise
   // the domain of the specialisation that is already selected.
   const [domainId, setDomainId] = useState<CareerDomainId | null>(() => {
@@ -158,7 +160,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
         key={domain.slug}
         type="button"
         onClick={() => chooseDomain(isActive && !isSelectionDomain ? null : domain.slug)}
-        className={`p-3.5 rounded-xl border text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${
+        className={`p-3.5 rounded-xl border text-start transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${
           isActive
             ? 'bg-[var(--accent-surface)]/50 border-[var(--accent-primary)]'
             : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
@@ -177,12 +179,12 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
               </span>
               {isSelectionDomain && (
                 <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[var(--accent-primary)] text-[var(--color-on-primary)]">
-                  Current
+                  {t('Current')}
                 </span>
               )}
             </div>
             <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-              {count} specialisation{count === 1 ? '' : 's'}
+              {count} {t(count === 1 ? 'specialisation' : 'specialisations')}
             </div>
           </div>
         </div>
@@ -197,7 +199,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
         key={role.id}
         type="button"
         onClick={() => chooseSpecialisation(role)}
-        className={`w-full p-3.5 rounded-xl border text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${
+        className={`w-full p-3.5 rounded-xl border text-start transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${
           isSelected
             ? 'bg-[var(--accent-surface)]/50 border-[var(--accent-primary)]'
             : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
@@ -225,14 +227,14 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
     <div className={`space-y-4 ${className}`}>
       {/* Search across every domain */}
       <div className="relative">
-        <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-3" />
+        <Search className="w-4 h-4 text-[var(--text-muted)] absolute start-3 top-3" />
         <input
           id={searchInputId}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)]"
+          placeholder={t(searchPlaceholder)}
+          className="w-full ps-9 pe-3.5 py-2.5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)]"
         />
       </div>
 
@@ -240,13 +242,13 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
         /* SEARCH RESULTS — across every domain */
         <div className="space-y-2">
           <div className="text-[11px] text-[var(--text-muted)]">
-            {searchResults.length} specialisation{searchResults.length === 1 ? '' : 's'} matched
+            {searchResults.length} {t(searchResults.length === 1 ? 'specialisation' : 'specialisations')} {t('matched')}
             &ldquo;{query.trim()}&rdquo;
           </div>
-          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[420px] overflow-y-auto pe-1">
             {searchResults.length === 0 && (
               <div className="text-xs text-[var(--text-muted)] p-4 text-center">
-                No specialisation matched that search.
+                {t('No specialisation matched that search.')}
               </div>
             )}
             {searchResults.map((role) => (
@@ -254,7 +256,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
                 <button
                   type="button"
                   onClick={() => chooseSpecialisation(role)}
-                  className={`w-full p-3.5 rounded-xl border text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${
+                  className={`w-full p-3.5 rounded-xl border text-start transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm ${
                     selectedRoleId === role.id
                       ? 'bg-[var(--accent-surface)]/50 border-[var(--accent-primary)]'
                       : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
@@ -275,7 +277,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold">
-                1 · Career domain
+                {t('1 · Career domain')}
               </div>
               {activeDomain && (
                 <button
@@ -284,7 +286,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
                   className="text-[11px] text-[var(--color-primary-text)] hover:underline flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3 h-3" />
-                  All domains
+                  {t('All domains')}
                 </button>
               )}
             </div>
@@ -303,9 +305,9 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
           {activeDomain && (
             <div className="space-y-2 pt-1">
               <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold">
-                2 · Specialisation in {activeDomain.label}
+                {t('2 · Specialisation in')} {activeDomain.label}
               </div>
-              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pe-1">
                 {specialisations.map((role) =>
                   renderSpecialisation ? renderSpecialisation(role) : renderDefaultSpecialisation(role)
                 )}

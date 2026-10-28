@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
+import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
 
 /**
@@ -60,8 +61,7 @@ export const SettingsView: React.FC = () => {
     privacyPreferences, 
     updatePrivacyPreferences, 
     validateUsername, 
-    exportDataJson,
-  } = useCareer();
+    exportDataJson, t,} = useCareer();
 
   const [activeTab, setActiveTab] = useState<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface' | 'about'>('account');
 
@@ -122,7 +122,7 @@ export const SettingsView: React.FC = () => {
     if (!currentPassword || !newPassword) return;
     try {
       const token = await getAccessToken();
-      const res = await fetch('/api/account/change-password', {
+      const res = await fetch(apiUrl('/api/account/change-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +156,7 @@ export const SettingsView: React.FC = () => {
     }
     try {
       const token = await getAccessToken();
-      const res = await fetch('/api/account/change-email', {
+      const res = await fetch(apiUrl('/api/account/change-email'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,7 +187,7 @@ export const SettingsView: React.FC = () => {
     setDeleteError(null);
     try {
       const token = await getAccessToken();
-      const res = await fetch('/api/account/delete', {
+      const res = await fetch(apiUrl('/api/account/delete'), {
         method: 'POST',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
@@ -283,10 +283,10 @@ export const SettingsView: React.FC = () => {
       <div className="pb-3 border-b border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <div className="text-xs text-[var(--text-secondary)] font-semibold uppercase tracking-wider">
-            User Workspace & Controls
+            {t('User Workspace & Controls')}
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Account, Security & Preferences
+            {t('Account, Security & Preferences')}
           </h1>
         </div>
 
@@ -295,7 +295,7 @@ export const SettingsView: React.FC = () => {
           className="self-start sm:self-auto px-3.5 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 transition-colors shadow-2xs"
         >
           <Download className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-          <span>Export All Career Data</span>
+          <span>{t('Export All Career Data')}</span>
         </button>
       </div>
 
@@ -334,39 +334,39 @@ export const SettingsView: React.FC = () => {
         <div className="space-y-6">
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-5 shadow-xs">
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Account Overview
+              {t('Account Overview')}
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">User Name</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('User Name')}</span>
                 <p className="font-semibold text-[var(--text-primary)]">{profile.name}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Primary Email</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Primary Email')}</span>
                 <p className="font-semibold text-[var(--text-primary)]">{profile.email}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Account Status</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Account Status')}</span>
                 <p className="font-semibold text-[var(--color-success-strong)] flex items-center gap-1">
                   <span>● Active Authenticated</span>
                 </p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Member Since</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Member Since')}</span>
                 <p className="font-mono text-[var(--text-primary)]">{memberSince || 'Not available'}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Timezone</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Timezone')}</span>
                 <p className="font-semibold text-[var(--text-primary)]">{profile.timezone || 'UTC'}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Language Preference</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Language Preference')}</span>
                 <p className="font-semibold text-[var(--text-primary)]">{settings.language === 'ar' ? 'العربية' : 'English'}</p>
               </div>
             </div>
@@ -377,7 +377,7 @@ export const SettingsView: React.FC = () => {
                 className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5"
               >
                 <Mail className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-                <span>Change Email</span>
+                <span>{t('Change Email')}</span>
               </button>
 
               <button
@@ -385,7 +385,7 @@ export const SettingsView: React.FC = () => {
                 className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5"
               >
                 <Key className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-                <span>Change Password</span>
+                <span>{t('Change Password')}</span>
               </button>
             </div>
           </div>
@@ -395,7 +395,7 @@ export const SettingsView: React.FC = () => {
             <div>
               <h2 className="text-sm font-bold text-[var(--color-danger)] flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4" />
-                <span>Danger Zone — Delete Account</span>
+                <span>{t('Danger Zone — Delete Account')}</span>
               </h2>
               <p className="text-xs text-[var(--text-secondary)] mt-1">
                 Permanently deletes your account, personal career profile, active roadmap tasks, project evidence, CV studio versions, and application pipeline history. This action cannot be undone.
@@ -407,7 +407,7 @@ export const SettingsView: React.FC = () => {
               className="px-4 py-2 rounded-xl bg-[var(--color-danger)] hover:bg-[var(--color-danger-hover)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete Account & Career Graph</span>
+              <span>{t('Delete Account & Career Graph')}</span>
             </button>
             {deleteError && (
               <p role="alert" className="text-xs text-[var(--color-danger)]">
@@ -423,10 +423,10 @@ export const SettingsView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Security & Active Session
+              {t('Security & Active Session')}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Review the current authenticated session and how credentials are handled.
+              {t('Review the current authenticated session and how credentials are handled.')}
             </p>
           </div>
 
@@ -437,20 +437,20 @@ export const SettingsView: React.FC = () => {
                   <Laptop className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-[var(--text-primary)]">Current Active Session</div>
+                  <div className="text-xs font-bold text-[var(--text-primary)]">{t('Current Active Session')}</div>
                   <div className="text-[11px] text-[var(--text-muted)] font-mono">
                     Supabase session • {getClientLabel()}
                   </div>
                 </div>
               </div>
               <span className="text-[10px] font-bold text-[var(--color-success-strong)] font-mono bg-[var(--color-success-surface)] px-2 py-0.5 rounded-full">
-                Online Now
+                {t('Online Now')}
               </span>
             </div>
           </div>
 
           <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] space-y-2 text-xs">
-            <span className="font-bold text-[var(--text-primary)] block">Authentication Protocols</span>
+            <span className="font-bold text-[var(--text-primary)] block">{t('Authentication Protocols')}</span>
             <p className="text-[var(--text-secondary)] leading-relaxed">
               Credentials are handled by Supabase Auth; the application never stores a raw
               password. Deployments must be served over HTTPS so session tokens are encrypted
@@ -465,7 +465,7 @@ export const SettingsView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Privacy & Data Visibility
+              {t('Privacy & Data Visibility')}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               Control what is publicly visible and manage how your career data interacts with AI intelligence.
@@ -476,14 +476,14 @@ export const SettingsView: React.FC = () => {
             {/* Public profile toggle */}
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between gap-4">
               <div>
-                <span className="font-bold text-[var(--text-primary)] block">Public Career Profile</span>
+                <span className="font-bold text-[var(--text-primary)] block">{t('Public Career Profile')}</span>
                 <p className="text-[var(--text-secondary)] mt-0.5">
                   Share a read-only resume view at /#/profile/{profile.username || 'username'}.
                   Private notes, applications and interview sessions are never exposed.
                 </p>
                 {!profile.username && (
                   <p className="text-[11px] text-[var(--color-warning)] mt-1">
-                    Save a username below before enabling the public profile.
+                    {t('Save a username below before enabling the public profile.')}
                   </p>
                 )}
                 {publicError && (
@@ -497,14 +497,14 @@ export const SettingsView: React.FC = () => {
                 checked={profile.isPublic}
                 onChange={(e) => void handlePublicToggle(e.target.checked)}
                 disabled={publicSaving || !profile.username}
-                aria-label="Enable public career profile"
+                aria-label={t('Enable public career profile')}
                 className="w-4 h-4 accent-[var(--accent-primary)] rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
             {/* Public username configuration */}
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] space-y-2">
-              <span className="font-bold text-[var(--text-primary)] block">Professional Username Handle</span>
+              <span className="font-bold text-[var(--text-primary)] block">{t('Professional Username Handle')}</span>
               <div className="flex items-center gap-2 max-w-md">
                 <input
                   type="text"
@@ -517,7 +517,7 @@ export const SettingsView: React.FC = () => {
                       void handleSaveUsername();
                     }
                   }}
-                  aria-label="Professional username handle"
+                  aria-label={t('Professional username handle')}
                   className="flex-1 px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono"
                 />
                 <button
@@ -539,7 +539,7 @@ export const SettingsView: React.FC = () => {
                 </p>
               )}
               {usernameSaved && (
-                <p className="text-[11px] text-[var(--color-success-strong)]">Username saved.</p>
+                <p className="text-[11px] text-[var(--color-success-strong)]">{t('Username saved.')}</p>
               )}
               <p className="text-[11px] text-[var(--text-muted)]">
                 Use 3–30 lowercase letters, numbers, hyphens or underscores. The public profile link is
@@ -550,7 +550,7 @@ export const SettingsView: React.FC = () => {
             {/* AI Personalization */}
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)] block">Career Graph AI Grounding</span>
+                <span className="font-bold text-[var(--text-primary)] block">{t('Career Graph AI Grounding')}</span>
                 <p className="text-[var(--text-secondary)] mt-0.5">
                   Allows Gemini to analyze your roadmap gaps and project deliverables when you
                   start an AI action. When off, AI buttons that need this context are disabled.
@@ -572,7 +572,7 @@ export const SettingsView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              AI Copilot & Writing Assistant Controls
+              {t('AI Copilot & Writing Assistant Controls')}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               These preferences are stored in this browser and control which AI actions you can
@@ -583,8 +583,8 @@ export const SettingsView: React.FC = () => {
           <div className="space-y-4 text-xs">
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)] block">AI Recommendations</span>
-                <p className="text-[var(--text-secondary)]">Suggest next best actions on dashboard and identify missing skills.</p>
+                <span className="font-bold text-[var(--text-primary)] block">{t('AI Recommendations')}</span>
+                <p className="text-[var(--text-secondary)]">{t('Suggest next best actions on dashboard and identify missing skills.')}</p>
               </div>
               <input
                 type="checkbox"
@@ -596,8 +596,8 @@ export const SettingsView: React.FC = () => {
 
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)] block">AI Writing Assistance</span>
-                <p className="text-[var(--text-secondary)]">Enable Gemini assistance in CV bullet rewriting and cover letter drafting.</p>
+                <span className="font-bold text-[var(--text-primary)] block">{t('AI Writing Assistance')}</span>
+                <p className="text-[var(--text-secondary)]">{t('Enable Gemini assistance in CV bullet rewriting and cover letter drafting.')}</p>
               </div>
               <input
                 type="checkbox"
@@ -609,8 +609,8 @@ export const SettingsView: React.FC = () => {
 
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)] block">Proactive Suggestions</span>
-                <p className="text-[var(--text-secondary)]">Allow Copilot drawer to propose structured task additions when gaps are detected.</p>
+                <span className="font-bold text-[var(--text-primary)] block">{t('Proactive Suggestions')}</span>
+                <p className="text-[var(--text-secondary)]">{t('Allow Copilot drawer to propose structured task additions when gaps are detected.')}</p>
               </div>
               <input
                 type="checkbox"
@@ -621,7 +621,7 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] space-y-2">
-              <span className="font-bold text-[var(--text-primary)] block">Personalization Depth</span>
+              <span className="font-bold text-[var(--text-primary)] block">{t('Personalization Depth')}</span>
               <div className="grid grid-cols-3 gap-2">
                 {(['focused', 'balanced', 'comprehensive'] as const).map(lvl => (
                   <button
@@ -647,7 +647,7 @@ export const SettingsView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Notification Preferences
+              {t('Notification Preferences')}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               Choose which notification types appear in your Notifications drawer. These
@@ -659,8 +659,8 @@ export const SettingsView: React.FC = () => {
           <div className="space-y-3 text-xs">
             <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)]">In-app Notifications</span>
-                <p className="text-[var(--text-secondary)]">Master switch for the Notifications drawer.</p>
+                <span className="font-bold text-[var(--text-primary)]">{t('In-app Notifications')}</span>
+                <p className="text-[var(--text-secondary)]">{t('Master switch for the Notifications drawer.')}</p>
               </div>
               <input
                 type="checkbox"
@@ -672,8 +672,8 @@ export const SettingsView: React.FC = () => {
 
             <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)]">Interview Updates</span>
-                <p className="text-[var(--text-secondary)]">Show interview-related notifications in the drawer.</p>
+                <span className="font-bold text-[var(--text-primary)]">{t('Interview Updates')}</span>
+                <p className="text-[var(--text-secondary)]">{t('Show interview-related notifications in the drawer.')}</p>
               </div>
               <input
                 type="checkbox"
@@ -685,8 +685,8 @@ export const SettingsView: React.FC = () => {
 
             <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)]">Application Pipeline Updates</span>
-                <p className="text-[var(--text-secondary)]">Show application-stage notifications in the drawer.</p>
+                <span className="font-bold text-[var(--text-primary)]">{t('Application Pipeline Updates')}</span>
+                <p className="text-[var(--text-secondary)]">{t('Show application-stage notifications in the drawer.')}</p>
               </div>
               <input
                 type="checkbox"
@@ -698,8 +698,8 @@ export const SettingsView: React.FC = () => {
 
             <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
-                <span className="font-bold text-[var(--text-primary)]">Roadmap Updates</span>
-                <p className="text-[var(--text-secondary)]">Show roadmap and milestone notifications in the drawer.</p>
+                <span className="font-bold text-[var(--text-primary)]">{t('Roadmap Updates')}</span>
+                <p className="text-[var(--text-secondary)]">{t('Show roadmap and milestone notifications in the drawer.')}</p>
               </div>
               <input
                 type="checkbox"
@@ -717,10 +717,10 @@ export const SettingsView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Interface & Localization
+              {t('Interface & Localization')}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Customize application language, text direction (LTR / RTL), and display theme.
+              {t('Customize application language, text direction (LTR / RTL), and display theme.')}
             </p>
           </div>
 
@@ -728,7 +728,7 @@ export const SettingsView: React.FC = () => {
             <div className="space-y-2">
               <label className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-                <span>Language & Direction</span>
+                <span>{t('Language & Direction')}</span>
               </label>
               <div className="flex gap-2">
                 <button
@@ -739,7 +739,7 @@ export const SettingsView: React.FC = () => {
                       : 'bg-[var(--surface-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
                   }`}
                 >
-                  English (LTR)
+                  {t('English (LTR)')}
                 </button>
                 <button
                   onClick={() => updateSettings({ language: 'ar' })}
@@ -757,7 +757,7 @@ export const SettingsView: React.FC = () => {
             <div className="space-y-2">
               <label className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
                 {settings.theme === 'dark' ? <Moon className="w-3.5 h-3.5 text-[var(--color-primary-text)]" /> : <Sun className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />}
-                <span>Display Theme</span>
+                <span>{t('Display Theme')}</span>
               </label>
               <div className="flex gap-2">
                 <button
@@ -769,7 +769,7 @@ export const SettingsView: React.FC = () => {
                   }`}
                 >
                   <Sun className="w-3.5 h-3.5" />
-                  <span>Light</span>
+                  <span>{t('Light')}</span>
                 </button>
                 <button
                   onClick={() => updateSettings({ theme: 'dark' })}
@@ -780,7 +780,7 @@ export const SettingsView: React.FC = () => {
                   }`}
                 >
                   <Moon className="w-3.5 h-3.5" />
-                  <span>Dark</span>
+                  <span>{t('Dark')}</span>
                 </button>
               </div>
             </div>
@@ -796,7 +796,7 @@ export const SettingsView: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  CareerPilot AI
+                  {t('CareerPilot AI')}
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   Your Personal Career Operating System: goals, skills, roadmaps, learning, projects, evidence, CVs, job applications, and interview practice in one unified workspace.
@@ -812,20 +812,20 @@ export const SettingsView: React.FC = () => {
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
             <div className="border-b border-[var(--border-subtle)] pb-4">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                Developed by
+                {t('Developed by')}
               </div>
               <h3 className="text-xl font-bold text-[var(--text-primary)] mt-1">
-                Ahmed Ebrahim
+                {t('Ahmed Ebrahim')}
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1">
-                Software Engineer & Creator of CareerPilot AI
+                {t('Software Engineer & Creator of CareerPilot AI')}
               </p>
             </div>
 
             {/* Contact Information */}
             <div className="space-y-3">
               <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                Contact
+                {t('Contact')}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <a
@@ -837,7 +837,7 @@ export const SettingsView: React.FC = () => {
                       <Mail className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-[var(--text-primary)]">Email</div>
+                      <div className="font-semibold text-[var(--text-primary)]">{t('Email')}</div>
                       <div className="text-[11px] text-[var(--text-secondary)] truncate">
                         ahmedghannam801@gmail.com
                       </div>
@@ -855,7 +855,7 @@ export const SettingsView: React.FC = () => {
                       <Phone className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-[var(--text-primary)]">Phone</div>
+                      <div className="font-semibold text-[var(--text-primary)]">{t('Phone')}</div>
                       <div className="text-[11px] text-[var(--text-secondary)] truncate font-mono">
                         +201027053876
                       </div>
@@ -869,7 +869,7 @@ export const SettingsView: React.FC = () => {
             {/* Profiles */}
             <div className="space-y-3 pt-2">
               <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                Profiles
+                {t('Profiles')}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <a
@@ -883,7 +883,7 @@ export const SettingsView: React.FC = () => {
                       <Linkedin className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-[var(--text-primary)]">LinkedIn</div>
+                      <div className="font-semibold text-[var(--text-primary)]">{t('LinkedIn')}</div>
                       <div className="text-[11px] text-[var(--text-secondary)] truncate">
                         ahmed-ebrahim2
                       </div>
@@ -903,7 +903,7 @@ export const SettingsView: React.FC = () => {
                       <Github className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-[var(--text-primary)]">GitHub</div>
+                      <div className="font-semibold text-[var(--text-primary)]">{t('GitHub')}</div>
                       <div className="text-[11px] text-[var(--text-secondary)] truncate">
                         ahmedghannam801
                       </div>
@@ -921,26 +921,26 @@ export const SettingsView: React.FC = () => {
       {changePasswordOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Change Password</h3>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Change Password')}</h3>
             <form onSubmit={handleChangePassword} className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Current Password</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Current Password')}</label>
                 <input
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Enter current password"
+                  placeholder={t('Enter current password')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                   required
                 />
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">New Password</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('New Password')}</label>
                 <input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Minimum 8 characters"
+                  placeholder={t('Minimum 8 characters')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                   required
                 />
@@ -951,8 +951,8 @@ export const SettingsView: React.FC = () => {
                 </p>
               )}
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
-                <button type="button" onClick={() => setChangePasswordOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">Update Password</button>
+                <button type="button" onClick={() => setChangePasswordOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">{t('Cancel')}</button>
+                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">{t('Update Password')}</button>
               </div>
             </form>
           </div>
@@ -963,10 +963,10 @@ export const SettingsView: React.FC = () => {
       {changeEmailOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Change Account Email</h3>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Change Account Email')}</h3>
             <form onSubmit={handleChangeEmail} className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">New Email Address</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('New Email Address')}</label>
                 <input
                   type="email"
                   value={newEmail}
@@ -976,7 +976,7 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Current Password</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Current Password')}</label>
                 <input
                   type="password"
                   value={emailPassword}
@@ -992,8 +992,8 @@ export const SettingsView: React.FC = () => {
                 </p>
               )}
               <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
-                <button type="button" onClick={() => setChangeEmailOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">Update Email</button>
+                <button type="button" onClick={() => setChangeEmailOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">{t('Cancel')}</button>
+                <button type="submit" className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">{t('Update Email')}</button>
               </div>
             </form>
           </div>
@@ -1006,25 +1006,25 @@ export const SettingsView: React.FC = () => {
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--color-danger)]/30 shadow-2xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center gap-2 text-[var(--color-danger)]">
               <AlertTriangle className="w-5 h-5" />
-              <h3 className="text-base font-bold">Permanently Delete Account?</h3>
+              <h3 className="text-base font-bold">{t('Permanently Delete Account?')}</h3>
             </div>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
               This will irreversibly purge your profile, skills, roadmap milestones, project evidence, applications, and interview data from the persistent server database.
             </p>
             <div className="p-3 rounded-lg bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 text-xs text-[var(--color-danger)]">
-              To confirm, type <strong className="font-mono">DELETE</strong> below:
+              {t('To confirm, type')} <strong className="font-mono">{t('DELETE')}</strong> below:
             </div>
             <div>
               <input
                 type="text"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
-                placeholder="Type DELETE"
+                placeholder={t('Type DELETE')}
                 className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] font-mono"
               />
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
-              <button onClick={() => setDeleteAccountOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
+              <button onClick={() => setDeleteAccountOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">{t('Cancel')}</button>
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleteConfirmText !== 'DELETE' || isDeleting}

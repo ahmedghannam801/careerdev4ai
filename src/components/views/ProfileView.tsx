@@ -43,8 +43,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     suggestAiSummary,
     validateUsername,
     aiPreferences,
-    privacyPreferences,
-  } = useCareer();
+    privacyPreferences, t,} = useCareer();
 
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
@@ -517,7 +516,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       {/* Top Profile Header Card */}
       <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
         {/* Subtle accent backdrop */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--accent-primary)]/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+        <div className="absolute top-0 end-0 w-96 h-96 bg-[var(--accent-primary)]/5 rounded-full blur-3xl pointer-events-none -me-20 -mt-20" />
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
@@ -532,9 +531,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   setSelectedAvatarId(profile.avatarUrl || 'avatar-01');
                   setAvatarModalOpen(true);
                 }}
-                className="absolute -bottom-2 -right-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] shadow-xs transition-colors"
-                title="Choose CareerPilot Avatar"
-                aria-label="Choose CareerPilot Avatar"
+                className="absolute -bottom-2 -end-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] shadow-xs transition-colors"
+                title={t('Choose CareerPilot Avatar')}
+                aria-label={t('Choose CareerPilot Avatar')}
               >
                 <Smile className="w-3.5 h-3.5" />
               </button>
@@ -592,14 +591,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               className="flex-1 md:flex-none px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
             >
               <Eye className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-              <span>Preview</span>
+              <span>{t('Preview')}</span>
             </button>
 
             {profile.isPublic && (
               <button
                 onClick={handleCopyPublicLink}
                 className="flex-1 md:flex-none px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
-                title="Copy shareable link"
+                title={t('Copy shareable link')}
               >
                 {copiedLink ? <Check className="w-3.5 h-3.5 text-[var(--color-success-strong)]" /> : <Share2 className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
                 <span>{copiedLink ? 'Copied Link' : 'Share'}</span>
@@ -634,7 +633,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Edit Profile</span>
+              <span>{t('Edit Profile')}</span>
             </button>
           </div>
         </div>
@@ -644,7 +643,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                Profile Completeness
+                {t('Profile Completeness')}
               </span>
               <span className="text-sm font-bold text-[var(--text-primary)]">
                 {profileCompleteness.overallPercent}%
@@ -667,8 +666,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           {/* Missing items pill checklist with 1-click CTA */}
           {profileCompleteness.missingItems.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-[var(--text-muted)] font-medium mr-1">
-                Improve your profile:
+              <span className="text-xs text-[var(--text-muted)] font-medium me-1">
+                {t('Improve your profile:')}
               </span>
               {profileCompleteness.missingItems.map(item => (
                 <button
@@ -702,10 +701,10 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             </div>
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Career Identity Matrix
+                {t('Career Identity Matrix')}
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
-                The strategic synthesis of your identity, direction, proof, and market positioning.
+                {t('The strategic synthesis of your identity, direction, proof, and market positioning.')}
               </p>
             </div>
           </div>
@@ -713,7 +712,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             onClick={() => onNavigate('my-career')}
             className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline flex items-center gap-1"
           >
-            <span>Open My Career</span>
+            <span>{t('Open My Career')}</span>
             <ExternalLink className="w-3 h-3" />
           </button>
         </div>
@@ -721,7 +720,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-              Who You Are
+              {t('Who You Are')}
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
               {profile.careerIdentity?.whoYouAre || profile.careerState.replace('_', ' ')}
@@ -730,7 +729,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-              Where You're Going
+              {t('Where You\'re Going')}
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
               {profile.careerIdentity?.whereYoureGoing || profile.currentTitle}
@@ -739,7 +738,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-              Why (Career Goal)
+              {t('Why (Career Goal)')}
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
               {profile.careerIdentity?.why || profile.careerGoal.replace('_', ' ')}
@@ -748,7 +747,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-warning)]">
-              What You're Missing
+              {t('What You\'re Missing')}
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
               {profile.careerIdentity?.whatYoureMissing || 'Not set yet'}
@@ -757,7 +756,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-success-strong)]">
-              What You're Building
+              {t('What You\'re Building')}
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
               {profile.careerIdentity?.whatYoureBuilding || 'Not set yet'}
@@ -766,7 +765,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
           <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-accent-strong)]">
-              Where You're Applying
+              {t('Where You\'re Applying')}
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
               {profile.careerIdentity?.whereApplying ||
@@ -784,7 +783,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-[var(--color-primary-text)]" />
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Professional Summary
+              {t('Professional Summary')}
             </h2>
           </div>
           <button
@@ -795,7 +794,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 transition-colors"
           >
             <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-            <span>Refine / Suggest with AI</span>
+            <span>{t('Refine / Suggest with AI')}</span>
           </button>
         </div>
 
@@ -818,7 +817,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Experience</span>
+            <span>{t('Add Experience')}</span>
           </button>
         </div>
 
@@ -852,14 +851,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     <button
                       onClick={() => handleOpenEditExp(exp)}
                       className="p-1.5 rounded-md hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                      title="Edit entry"
+                      title={t('Edit entry')}
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDeleteExp(exp.id)}
                       className="p-1.5 rounded-md hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--color-danger)]"
-                      title="Delete entry"
+                      title={t('Delete entry')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -921,7 +920,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--color-primary-text)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
             >
               <Plus className="w-3 h-3" />
-              <span>Add</span>
+              <span>{t('Add')}</span>
             </button>
           </div>
 
@@ -954,7 +953,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 </div>
                 {edu.coursework && edu.coursework.length > 0 && (
                   <p className="text-[11px] text-[var(--text-secondary)]">
-                    <span className="font-medium text-[var(--text-primary)]">Coursework:</span> {edu.coursework.join(', ')}
+                    <span className="font-medium text-[var(--text-primary)]">{t('Coursework:')}</span> {edu.coursework.join(', ')}
                   </p>
                 )}
               </div>
@@ -987,7 +986,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--color-primary-text)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
             >
               <Plus className="w-3 h-3" />
-              <span>Add</span>
+              <span>{t('Add')}</span>
             </button>
           </div>
 
@@ -1024,7 +1023,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     rel="noopener noreferrer"
                     className="text-[11px] text-[var(--color-primary-text)] hover:underline flex items-center gap-1"
                   >
-                    <span>Verify Credential</span>
+                    <span>{t('Verify Credential')}</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
@@ -1050,7 +1049,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--color-primary-text)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
             >
               <Plus className="w-3 h-3" />
-              <span>Add</span>
+              <span>{t('Add')}</span>
             </button>
           </div>
 
@@ -1085,14 +1084,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="flex items-center gap-2">
               <LinkIcon className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Professional Links
+                {t('Professional Links')}
               </h2>
             </div>
             <button
               onClick={() => setEditBasicOpen(true)}
               className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
             >
-              Update Links
+              {t('Update Links')}
             </button>
           </div>
 
@@ -1104,13 +1103,13 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 rel="noopener noreferrer"
                 className="p-2.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] flex items-center justify-between text-[var(--text-primary)] transition-colors"
               >
-                <span className="font-medium">LinkedIn</span>
+                <span className="font-medium">{t('LinkedIn')}</span>
                 <span className="font-mono text-[11px] text-[var(--text-muted)] truncate max-w-[200px]">
                   {profile.links.linkedin.replace('https://', '')}
                 </span>
               </a>
             ) : (
-              <div className="p-2 text-xs text-[var(--text-muted)]">No LinkedIn link connected yet.</div>
+              <div className="p-2 text-xs text-[var(--text-muted)]">{t('No LinkedIn link connected yet.')}</div>
             )}
 
             {profile.links?.github && (
@@ -1120,7 +1119,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 rel="noopener noreferrer"
                 className="p-2.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] flex items-center justify-between text-[var(--text-primary)] transition-colors"
               >
-                <span className="font-medium">GitHub</span>
+                <span className="font-medium">{t('GitHub')}</span>
                 <span className="font-mono text-[11px] text-[var(--text-muted)] truncate max-w-[200px]">
                   {profile.links.github.replace('https://', '')}
                 </span>
@@ -1134,7 +1133,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 rel="noopener noreferrer"
                 className="p-2.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] flex items-center justify-between text-[var(--text-primary)] transition-colors"
               >
-                <span className="font-medium">Portfolio</span>
+                <span className="font-medium">{t('Portfolio')}</span>
                 <span className="font-mono text-[11px] text-[var(--text-muted)] truncate max-w-[200px]">
                   {profile.links.portfolio.replace('https://', '')}
                 </span>
@@ -1150,7 +1149,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <h3 className="text-base font-bold text-[var(--text-primary)]">
-                Edit Personal & Professional Identity
+                {t('Edit Personal & Professional Identity')}
               </h3>
               <button onClick={() => setEditBasicOpen(false)} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                 <X className="w-5 h-5" />
@@ -1160,7 +1159,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Full Name</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Full Name')}</label>
                   <input
                     type="text"
                     value={basicForm.name}
@@ -1169,7 +1168,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Preferred Name</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Preferred Name')}</label>
                   <input
                     type="text"
                     value={basicForm.preferredName}
@@ -1180,19 +1179,19 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               </div>
 
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Professional Headline</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Professional Headline')}</label>
                 <input
                   type="text"
                   value={basicForm.headline}
                   onChange={(e) => setBasicForm(prev => ({ ...prev, headline: e.target.value }))}
-                  placeholder="e.g. Frontend Engineer | React 19, TypeScript & Accessible Design Systems"
+                  placeholder={t('e.g. Frontend Engineer | React 19, TypeScript & Accessible Design Systems')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Email</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Email')}</label>
                   <input
                     type="email"
                     value={basicForm.email}
@@ -1201,7 +1200,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Phone</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Phone')}</label>
                   <input
                     type="text"
                     value={basicForm.phone}
@@ -1213,7 +1212,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Location / City</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Location / City')}</label>
                   <input
                     type="text"
                     value={basicForm.location}
@@ -1222,7 +1221,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Timezone</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Timezone')}</label>
                   <input
                     type="text"
                     value={basicForm.timezone}
@@ -1253,7 +1252,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
                 <div className="flex items-center justify-between pt-2">
                   <div>
-                    <div className="font-semibold text-[var(--text-primary)]">Public Profile Visibility</div>
+                    <div className="font-semibold text-[var(--text-primary)]">{t('Public Profile Visibility')}</div>
                     <div className="text-[11px] text-[var(--text-muted)]">
                       Allow employers and peers to view your public profile page. Private notes and applications are never exposed.
                     </div>
@@ -1269,10 +1268,10 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
               {/* Social Links */}
               <div className="space-y-3 pt-2">
-                <span className="font-semibold text-[var(--text-primary)] block">Professional Links</span>
+                <span className="font-semibold text-[var(--text-primary)] block">{t('Professional Links')}</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">LinkedIn URL</label>
+                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">{t('LinkedIn URL')}</label>
                     <input
                       type="url"
                       value={basicForm.linkedin}
@@ -1282,7 +1281,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">GitHub URL</label>
+                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">{t('GitHub URL')}</label>
                     <input
                       type="url"
                       value={basicForm.github}
@@ -1292,7 +1291,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">Portfolio Website</label>
+                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">{t('Portfolio Website')}</label>
                     <input
                       type="url"
                       value={basicForm.portfolio}
@@ -1302,7 +1301,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">Personal Blog / Site</label>
+                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">{t('Personal Blog / Site')}</label>
                     <input
                       type="url"
                       value={basicForm.personalWebsite}
@@ -1322,7 +1321,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 onClick={() => setEditBasicOpen(false)}
                 className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-secondary)]"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 onClick={handleSaveBasic}
@@ -1343,17 +1342,17 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div>
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  Choose Your CareerPilot Avatar
+                  {t('Choose Your CareerPilot Avatar')}
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  Select a curated illustrated avatar that represents your professional profile.
+                  {t('Select a curated illustrated avatar that represents your professional profile.')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setAvatarModalOpen(false)}
                 className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                aria-label="Close"
+                aria-label={t('Close')}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1372,7 +1371,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 onClick={() => setAvatarModalOpen(false)}
                 className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-secondary)]"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 type="button"
@@ -1395,7 +1394,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[var(--color-primary-text)]" />
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  AI Professional Summary Assistant
+                  {t('AI Professional Summary Assistant')}
                 </h3>
               </div>
               <button onClick={() => setEditSummaryOpen(false)} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
@@ -1410,7 +1409,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-[var(--text-primary)]">
-                  Summary Draft
+                  {t('Summary Draft')}
                 </label>
                 <button
                   onClick={handleGenerateSummary}
@@ -1438,7 +1437,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 rows={5}
                 value={aiSummaryDraft}
                 onChange={(e) => setAiSummaryDraft(e.target.value)}
-                placeholder="Click 'Generate New Draft' or edit your summary text..."
+                placeholder={t('Click \'Generate New Draft\' or edit your summary text...')}
                 className="w-full p-3 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed"
               />
             </div>
@@ -1450,7 +1449,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 onClick={() => setEditSummaryOpen(false)}
                 className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 onClick={handleConfirmSummary}
@@ -1480,22 +1479,22 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Job Title / Role</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Job Title / Role')}</label>
                   <input
                     type="text"
                     value={expForm.role}
                     onChange={(e) => setExpForm(prev => ({ ...prev, role: e.target.value }))}
-                    placeholder="e.g. Frontend Engineer"
+                    placeholder={t('e.g. Frontend Engineer')}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Company</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Company')}</label>
                   <input
                     type="text"
                     value={expForm.company}
                     onChange={(e) => setExpForm(prev => ({ ...prev, company: e.target.value }))}
-                    placeholder="e.g. Acme Corp"
+                    placeholder={t('e.g. Acme Corp')}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   />
                 </div>
@@ -1503,26 +1502,26 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Employment Type</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Employment Type')}</label>
                   <select
                     value={expForm.employmentType}
                     onChange={(e: any) => setExpForm(prev => ({ ...prev, employmentType: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   >
-                    <option value="Full-time">Full-time</option>
-                    <option value="Part-time">Part-time</option>
-                    <option value="Contract">Contract</option>
-                    <option value="Internship">Internship</option>
-                    <option value="Freelance">Freelance</option>
+                    <option value="Full-time">{t('Full-time')}</option>
+                    <option value="Part-time">{t('Part-time')}</option>
+                    <option value="Contract">{t('Contract')}</option>
+                    <option value="Internship">{t('Internship')}</option>
+                    <option value="Freelance">{t('Freelance')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Location</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Location')}</label>
                   <input
                     type="text"
                     value={expForm.location}
                     onChange={(e) => setExpForm(prev => ({ ...prev, location: e.target.value }))}
-                    placeholder="e.g. San Francisco / Remote"
+                    placeholder={t('e.g. San Francisco / Remote')}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   />
                 </div>
@@ -1530,7 +1529,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Start Date</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Start Date')}</label>
                   <input
                     type="text"
                     value={expForm.startDate}
@@ -1540,7 +1539,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">End Date</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('End Date')}</label>
                   <input
                     type="text"
                     disabled={expForm.isCurrent}
@@ -1561,43 +1560,43 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   className="rounded accent-[var(--accent-primary)] cursor-pointer"
                 />
                 <label htmlFor="isCurrent" className="text-xs text-[var(--text-primary)] cursor-pointer">
-                  I currently work here
+                  {t('I currently work here')}
                 </label>
               </div>
 
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Role Description</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Role Description')}</label>
                 <textarea
                   rows={2}
                   value={expForm.description}
                   onChange={(e) => setExpForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Summary of responsibilities and scope..."
+                  placeholder={t('Summary of responsibilities and scope...')}
                   className="w-full p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
                 <label className="font-semibold text-[var(--text-primary)] block mb-1">
-                  Key Achievements (one per line)
+                  {t('Key Achievements (one per line)')}
                 </label>
                 <textarea
                   rows={3}
                   value={expForm.achievements}
                   onChange={(e) => setExpForm(prev => ({ ...prev, achievements: e.target.value }))}
-                  placeholder="Spearheaded design system adoption across 3 squads...&#10;Reduced LCP from 3.2s to 1.1s..."
+                  placeholder={t('Spearheaded design system adoption across 3 squads...&#10;Reduced LCP from 3.2s to 1.1s...')}
                   className="w-full p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
                 <label className="font-semibold text-[var(--text-primary)] block mb-1">
-                  Skills Used (comma-separated)
+                  {t('Skills Used (comma-separated)')}
                 </label>
                 <input
                   type="text"
                   value={expForm.skillsUsed}
                   onChange={(e) => setExpForm(prev => ({ ...prev, skillsUsed: e.target.value }))}
-                  placeholder="React, TypeScript, Tailwind CSS, Playwright"
+                  placeholder={t('React, TypeScript, Tailwind CSS, Playwright')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
@@ -1610,7 +1609,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 onClick={() => setExpModalOpen(false)}
                 className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 onClick={handleSaveExp}
@@ -1632,7 +1631,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-[var(--color-primary-text)]" />
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  Executive Career Profile Preview
+                  {t('Executive Career Profile Preview')}
                 </h3>
               </div>
               <button onClick={() => setPreviewModalOpen(false)} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
@@ -1663,7 +1662,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               {/* Summary */}
               {profile.professionalSummary && (
                 <div className="space-y-1">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">About</h4>
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('About')}</h4>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                     {profile.professionalSummary}
                   </p>
@@ -1672,7 +1671,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
               {/* Core Competencies */}
               <div className="space-y-2">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Core Skills</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Core Skills')}</h4>
                 <div className="flex flex-wrap gap-1.5">
                   {skills.slice(0, 8).map(sk => (
                     <span key={sk.id} className="text-xs px-2.5 py-1 rounded-md bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-medium">
@@ -1684,7 +1683,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
               {/* Experience */}
               <div className="space-y-3">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Experience</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Experience')}</h4>
                 {profile.experiences.map(e => (
                   <div key={e.id} className="space-y-1 text-xs">
                     <div className="flex items-center justify-between font-bold text-[var(--text-primary)]">
@@ -1698,7 +1697,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
               {/* Projects */}
               <div className="space-y-2">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Featured Proof-of-Skill Projects</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Featured Proof-of-Skill Projects')}</h4>
                 {projects.slice(0, 2).map(p => (
                   <div key={p.id} className="p-3 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs space-y-1">
                     <div className="font-bold text-[var(--text-primary)]">{p.title}</div>
@@ -1713,7 +1712,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 onClick={() => setPreviewModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold"
               >
-                Close Preview
+                {t('Close Preview')}
               </button>
             </div>
           </div>
@@ -1729,7 +1728,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             </h3>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Institution / University</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Institution / University')}</label>
                 <input
                   type="text"
                   value={eduForm.institution}
@@ -1739,7 +1738,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Degree</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Degree')}</label>
                   <input
                     type="text"
                     value={eduForm.degree}
@@ -1749,19 +1748,19 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Field of Study</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Field of Study')}</label>
                   <input
                     type="text"
                     value={eduForm.field}
                     onChange={(e) => setEduForm(prev => ({ ...prev, field: e.target.value }))}
-                    placeholder="Computer Science"
+                    placeholder={t('Computer Science')}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Start Date</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Start Date')}</label>
                   <input
                     type="text"
                     value={eduForm.startDate}
@@ -1770,7 +1769,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Graduation Date</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Graduation Date')}</label>
                   <input
                     type="text"
                     value={eduForm.endDate}
@@ -1780,7 +1779,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 </div>
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">GPA (optional)</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('GPA (optional)')}</label>
                 <input
                   type="text"
                   value={eduForm.gpa}
@@ -1793,7 +1792,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             {renderSaveError()}
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setEduModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 onClick={handleSaveEdu}
@@ -1812,32 +1811,32 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-md p-6 space-y-4">
             <h3 className="text-base font-bold text-[var(--text-primary)]">
-              Add Professional Certification
+              {t('Add Professional Certification')}
             </h3>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Certificate Name</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Certificate Name')}</label>
                 <input
                   type="text"
                   value={certForm.name}
                   onChange={(e) => setCertForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Meta Front-End Developer Certificate"
+                  placeholder={t('e.g. Meta Front-End Developer Certificate')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Issuing Organization</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Issuing Organization')}</label>
                 <input
                   type="text"
                   value={certForm.provider}
                   onChange={(e) => setCertForm(prev => ({ ...prev, provider: e.target.value }))}
-                  placeholder="e.g. Meta / Coursera"
+                  placeholder={t('e.g. Meta / Coursera')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Issue Date</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Issue Date')}</label>
                   <input
                     type="text"
                     value={certForm.issueDate}
@@ -1847,18 +1846,18 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Credential ID</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Credential ID')}</label>
                   <input
                     type="text"
                     value={certForm.credentialId}
                     onChange={(e) => setCertForm(prev => ({ ...prev, credentialId: e.target.value }))}
-                    placeholder="CERT-12345"
+                    placeholder={t('CERT-12345')}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                   />
                 </div>
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Verification URL</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Verification URL')}</label>
                 <input
                   type="url"
                   value={certForm.credentialUrl}
@@ -1871,7 +1870,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             {renderSaveError()}
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
               <button onClick={() => setCertModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 onClick={handleSaveCert}
@@ -1889,36 +1888,36 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       {langModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-xs p-6 space-y-4">
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Add Language</h3>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Add Language')}</h3>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Language</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Language')}</label>
                 <input
                   type="text"
                   value={langForm.language}
                   onChange={(e) => setLangForm(prev => ({ ...prev, language: e.target.value }))}
-                  placeholder="e.g. French"
+                  placeholder={t('e.g. French')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Proficiency</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Proficiency')}</label>
                 <select
                   value={langForm.proficiency}
                   onChange={(e: any) => setLangForm(prev => ({ ...prev, proficiency: e.target.value }))}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 >
-                  <option value="Native">Native</option>
-                  <option value="Fluent">Fluent</option>
-                  <option value="Professional">Professional</option>
-                  <option value="Conversational">Conversational</option>
-                  <option value="Basic">Basic</option>
+                  <option value="Native">{t('Native')}</option>
+                  <option value="Fluent">{t('Fluent')}</option>
+                  <option value="Professional">{t('Professional')}</option>
+                  <option value="Conversational">{t('Conversational')}</option>
+                  <option value="Basic">{t('Basic')}</option>
                 </select>
               </div>
             </div>
             {renderSaveError()}
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
-              <button onClick={() => setLangModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
+              <button onClick={() => setLangModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">{t('Cancel')}</button>
               <button
                 onClick={handleSaveLang}
                 disabled={saving}

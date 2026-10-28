@@ -212,6 +212,18 @@ async function main() {
   }
 
   // Find the test files.
+  //
+  // `TEST_ONLY` runs a subset, by file name without the extension. It exists
+  // so a single suite can be re-run in isolation when a run fails for an
+  // environmental reason (a dropped connection to Supabase Auth, say) and
+  // the failure has to be distinguished from a real regression.
+  const only = (process.env.TEST_ONLY ?? '').trim();
+  const onlyNames = only
+    ? only
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean)
+    : [];
   const testFiles = [
     join(TESTS_DIR, 'auth.test.ts'),
     join(TESTS_DIR, 'domains.test.ts'),
@@ -230,11 +242,32 @@ async function main() {
     join(TESTS_DIR, 'cv-pipeline.test.ts'),
     join(TESTS_DIR, 'target-role.test.ts'),
     join(TESTS_DIR, 'volunteer.test.ts'),
+    // The personalisation engine, the grounding validator and the
+    // localisation catalogue. These are pure: they need no database, but
+    // they run in the same process as the rest of the suite so a regression
+    // in them is caught by `npm test` rather than only by a separate command.
+    join(TESTS_DIR, 'personalization.test.ts'),
+    join(TESTS_DIR, 'personalization-api.test.ts'),
+    join(TESTS_DIR, 'grounding.test.ts'),
+    join(TESTS_DIR, 'localization.test.ts'),
   ].filter((file) => existsSync(file));
 
-  if (testFiles.length === 0) {
-    fail('No test files were found in tests/.');
+  const selected = onlyNames.length
+    ? testFiles.filter((file) =>
+        onlyNames.some((name) => file.includes(`${name}.test.ts`))
+      )
+    : testFiles;
+
+  if (selected.length === 0) {
+    fail(
+      only
+        ? `No test file matched TEST_ONLY="${only}".`
+        : 'No test files were found in tests/.'
+    );
     return 1;
+  }
+  if (onlyNames.length) {
+    console.log(`[test] running only "${onlyNames.join(', ')}" (${selected.length} files)`);
   }
 
   // Pick free ports up front so the shared server and the restart server can
@@ -261,7 +294,7 @@ async function main() {
   }
 
   try {
-    const code = await runTestFiles(testFiles, {
+    const code = await runTestFiles(selected, {
       baseUrl: server.baseUrl,
       env: {
         ...env,

@@ -78,8 +78,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     milestones,
     addMilestone,
     careerBlockers,
-    learningItems,
-  } = useCareer();
+    learningItems, t,} = useCareer();
 
   const [addGoalModalOpen, setAddGoalModalOpen] = useState(false);
   const [goalForm, setGoalForm] = useState({
@@ -103,7 +102,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       id: `timeline-edu-${e.id}`,
       year: e.startDate.slice(0, 4) || '',
       date: e.startDate,
-      type: 'Education',
+      type: t('Education'),
       title: `${e.degree} in ${e.field}`,
       subtitle: e.institution,
       status: 'completed',
@@ -113,7 +112,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       id: `timeline-exp-${e.id}`,
       year: e.startDate.slice(0, 4) || '',
       date: e.startDate,
-      type: 'Experience',
+      type: t('Experience'),
       title: `${e.role} at ${e.company}`,
       subtitle: e.employmentType,
       status: e.isCurrent ? 'current' : 'completed',
@@ -123,7 +122,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       id: `timeline-cert-${c.id}`,
       year: c.issueDate.slice(0, 4) || '',
       date: c.issueDate,
-      type: 'Certification',
+      type: t('Certification'),
       title: c.name,
       subtitle: c.provider,
       status: 'completed',
@@ -133,7 +132,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       id: `timeline-proj-${p.id}`,
       year: p.createdAt.slice(0, 4) || '',
       date: p.createdAt,
-      type: 'Project',
+      type: t('Project'),
       title: p.title,
       subtitle: p.difficulty,
       status: p.status,
@@ -143,9 +142,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       id: `timeline-app-${a.id}`,
       year: a.appliedDate?.slice(0, 4) || '',
       date: a.appliedDate || a.lastUpdated,
-      type: 'Application',
+      type: t('Application'),
       title: `${a.role} at ${a.company}`,
-      subtitle: `Stage: ${a.stage.toUpperCase()}`,
+      subtitle: `${t('Stage:')} ${t(a.stage.toUpperCase())}`,
       status: a.stage,
       icon: Calendar
     }))
@@ -166,49 +165,49 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   // Asset Scorecard calculation
   const assetScorecard = [
     {
-      name: 'Profile Identity',
+      name: t('Profile Identity'),
       status: profile.professionalSummary && profile.headline ? 'Complete' : 'Needs Improvement',
-      desc: `${profile.experiences.length} experiences, ${profile.education.length} credentials`,
+      desc: `${profile.experiences.length} ${t('experiences')}, ${profile.education.length} ${t('credentials')}`,
       view: 'profile'
     },
     {
-      name: 'Skills Taxonomy',
+      name: t('Skills Taxonomy'),
       status: skills.length >= 8 ? 'Complete' : 'Needs Improvement',
-      desc: `${skills.filter(s => s.gap === 0).length} of ${skills.length} mastered`,
+      desc: `${skills.filter(s => s.gap === 0).length} ${t('of')} ${skills.length} ${t('mastered')}`,
       view: 'skills'
     },
     {
-      name: 'Evidence & Proof',
+      name: t('Evidence & Proof'),
       status: evidenceItems.length >= 2 ? 'Complete' : 'Needs Improvement',
-      desc: `${evidenceItems.length} verified artifacts linked`,
+      desc: `${evidenceItems.length} ${t('verified artifacts linked')}`,
       view: 'evidence'
     },
     {
-      name: 'Portfolio Projects',
+      name: t('Portfolio Projects'),
       status: projects.length >= 2 ? 'Complete' : 'Needs Improvement',
-      desc: `${projects.filter(p => p.status === 'completed').length} completed portfolio items`,
+      desc: `${projects.filter(p => p.status === 'completed').length} ${t('completed portfolio items')}`,
       view: 'projects'
     },
     {
-      name: 'Target CV Alignment',
+      name: t('Target CV Alignment'),
       status: latestCvAtsScore !== null ? 'Complete' : 'Needs Improvement',
       desc: latestCvAtsScore !== null
-        ? `ATS Match Score: ${latestCvAtsScore}% tailored for ${targetRole.title}`
+        ? `${t('ATS Match Score:')} ${latestCvAtsScore}% ${t('tailored for')} ${targetRole.title}`
         : latestCvAtsNeedsRefresh
-          ? `Saved ATS score was generated for ${latestCvVersion?.targetRoleTitle || 'another role'} — run a new audit for ${targetRole.title}`
-          : 'No ATS score yet — run an ATS audit in CV Studio',
+          ? `${t('Saved ATS score was generated for')} ${latestCvVersion?.targetRoleTitle || t('another role')} — ${t('run a new audit for')} ${targetRole.title}`
+          : t('No ATS score yet — run an ATS audit in CV Studio'),
       view: 'cv-studio'
     },
     {
-      name: 'Job Applications',
+      name: t('Job Applications'),
       status: applications.length >= 2 ? 'Complete' : 'Needs Improvement',
-      desc: `${applications.length} tracked active applications`,
+      desc: `${applications.length} ${t('tracked active applications')}`,
       view: 'applications'
     },
     {
-      name: 'Interview Readiness',
+      name: t('Interview Readiness'),
       status: interviewSessions.length >= 1 ? 'Complete' : 'Missing',
-      desc: `${interviewSessions.length} STAR mock simulations passed`,
+      desc: `${interviewSessions.length} ${t('STAR mock simulations passed')}`,
       view: 'interviews'
     }
   ];
@@ -216,18 +215,18 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   // Journey Map stages
   // The interview step shows the user's own in-flight interview, if any.
   const nextInterview = applications.find(a => ['interview', 'technical', 'final'].includes(a.stage));
-  const nextInterviewLabel = nextInterview ? nextInterview.company : 'No interview yet';
+  const nextInterviewLabel = nextInterview ? nextInterview.company : t('No interview yet');
   const interviewCount = applications.filter(a => ['interview', 'technical', 'final'].includes(a.stage)).length;
   const offerApplication = applications.find(a => a.stage === 'offer');
 
   // The primary goal is described entirely from the user's own state: the
   // role they selected, the goal they picked, and the work still open.
-  const goalLabel = CAREER_GOAL_LABELS[profile.careerGoal] ?? 'Advance your career';
+  const goalLabel = CAREER_GOAL_LABELS[profile.careerGoal] ?? t('Advance your career');
   const customGoal = profile.customGoalText?.trim() || '';
-  const primaryGoalTitle = customGoal || `Become a ${targetRole.title}`;
+  const primaryGoalTitle = customGoal || `${t('Become a')} ${targetRole.title}`;
   const primaryGoalDescription = customGoal
-    ? `Your stated goal: "${customGoal}" — working toward a ${targetRole.title} role.`
-    : `${goalLabel} — working toward a ${targetRole.title} role.`;
+    ? `${t('Your stated goal:')} "${customGoal}" — ${t('working toward a')} ${targetRole.title} ${t('role')}.`
+    : `${t(goalLabel)} — ${t('working toward a')} ${targetRole.title} ${t('role')}.`;
 
   // The next action is the first roadmap task the user has not finished.
   const openRoadmapTasks = roadmapPhases
@@ -289,14 +288,14 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   else activeStageKey = 'opportunity';
 
   const journeySteps = [
-    { key: 'direction', label: 'Direction', desc: targetRole.title || 'Target role & goals', active: activeStageKey === 'direction', done: isDirectionDone },
-    { key: 'skills', label: 'Skill Gaps', desc: `${analysis.criticalGaps.length} critical gaps`, active: activeStageKey === 'skills', done: isSkillsDone },
-    { key: 'roadmap', label: 'Roadmap', desc: roadmapPhases.length > 0 ? `${roadmapPhases.length} Phases Active` : 'Generate roadmap', active: activeStageKey === 'roadmap', done: isRoadmapDone },
-    { key: 'learning', label: 'Learning', desc: learningItems.length > 0 ? `${learningItems.length} Courses Active` : completedRoadmapTasksCount > 0 ? `${completedRoadmapTasksCount} Tasks Done` : 'Course recommendations', active: activeStageKey === 'learning', done: isLearningDone },
-    { key: 'projects', label: 'Projects', desc: `${projects.length} Projects`, active: activeStageKey === 'projects', done: isProjectsDone },
-    { key: 'evidence', label: 'Evidence', desc: `${evidenceItems.length} Artifacts`, active: activeStageKey === 'evidence', done: isEvidenceDone },
-    { key: 'cv', label: 'CV', desc: cvVersions.length > 0 ? `${cvVersions.length} Versions` : 'Tailor CV', active: activeStageKey === 'cv', done: isCvDone },
-    { key: 'opportunity', label: 'Opportunity', desc: offerApplication ? 'Offer Received' : nextInterview ? `Interview: ${nextInterviewLabel}` : applications.length > 0 ? `${applications.length} Apps (${interviewCount} Int)` : 'Job pipeline', active: activeStageKey === 'opportunity', done: isOpportunityDone },
+    { key: 'direction', label: t('Direction'), desc: targetRole.title || t('Target role & goals'), active: activeStageKey === 'direction', done: isDirectionDone },
+    { key: 'skills', label: t('Skill Gaps'), desc: `${analysis.criticalGaps.length} ${t('critical gaps')}`, active: activeStageKey === 'skills', done: isSkillsDone },
+    { key: 'roadmap', label: t('Roadmap'), desc: roadmapPhases.length > 0 ? `${roadmapPhases.length} ${t('Phases Active')}` : t('Generate roadmap'), active: activeStageKey === 'roadmap', done: isRoadmapDone },
+    { key: 'learning', label: t('Learning'), desc: learningItems.length > 0 ? `${learningItems.length} ${t('Courses Active')}` : completedRoadmapTasksCount > 0 ? `${completedRoadmapTasksCount} ${t('Tasks Done')}` : t('Course recommendations'), active: activeStageKey === 'learning', done: isLearningDone },
+    { key: 'projects', label: t('Projects'), desc: `${projects.length} ${t('Projects')}`, active: activeStageKey === 'projects', done: isProjectsDone },
+    { key: 'evidence', label: t('Evidence'), desc: `${evidenceItems.length} ${t('Artifacts')}`, active: activeStageKey === 'evidence', done: isEvidenceDone },
+    { key: 'cv', label: t('CV'), desc: cvVersions.length > 0 ? `${cvVersions.length} ${t('Versions')}` : t('Tailor CV'), active: activeStageKey === 'cv', done: isCvDone },
+    { key: 'opportunity', label: t('Opportunity'), desc: offerApplication ? t('Offer Received') : nextInterview ? `${t('Interview:')} ${nextInterviewLabel}` : applications.length > 0 ? `${applications.length} ${t('Apps')} (${interviewCount} ${t('Int')})` : t('Job pipeline'), active: activeStageKey === 'opportunity', done: isOpportunityDone },
   ];
 
   const handleSaveGoal = () => {
@@ -334,13 +333,13 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold">
               <Compass className="w-3.5 h-3.5" />
-              <span>Career Journey Command</span>
+              <span>{t('Career Journey Command')}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] tracking-tight">
-              Where Am I in My Career Journey?
+              {t('Where Am I in My Career Journey?')}
             </h1>
             <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-2xl">
-              You are currently transitioning from <strong className="text-[var(--text-primary)] capitalize">{profile.careerState.replace('_', ' ')}</strong> to a verified <strong className="text-[var(--color-primary-text)]">{targetRole.title}</strong>. Your current market match is at <strong className="text-[var(--color-success-strong)]">{analysis.matchPercentage}%</strong> with {interviewCount} active interview {interviewCount === 1 ? 'pipeline' : 'pipelines'}.
+              {t('You are currently transitioning from')} <strong className="text-[var(--text-primary)] capitalize">{t(profile.careerState.replace('_', ' '))}</strong> {t('to a verified')} <strong className="text-[var(--color-primary-text)]">{targetRole.title}</strong>. {t('Your current market match is at')} <strong className="text-[var(--color-success-strong)]">{analysis.matchPercentage}%</strong> {t('with')} {interviewCount} {t('active interview')} {t(interviewCount === 1 ? 'pipeline' : 'pipelines')}.
             </p>
           </div>
 
@@ -349,13 +348,13 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               onClick={() => onNavigate('analysis')}
               className="px-4 py-2.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] transition-colors shadow-2xs"
             >
-              Detailed Gap Analysis
+              {t('Detailed Gap Analysis')}
             </button>
             <button
               onClick={() => onNavigate('roadmap')}
               className="px-4 py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
             >
-              <span>View Active Roadmap</span>
+              <span>{t('View Active Roadmap')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -365,10 +364,10 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         <div className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-              Visual Career Journey Map
+              {t('Visual Career Journey Map')}
             </h3>
             <span className="text-xs font-mono font-bold text-[var(--color-primary-text)] bg-[var(--accent-surface)] px-2.5 py-0.5 rounded-full">
-              {Math.round((journeySteps.filter(s => s.done).length / journeySteps.length) * 100)}% Complete
+              {Math.round((journeySteps.filter(s => s.done).length / journeySteps.length) * 100)}% {t('Complete')}
             </span>
           </div>
 
@@ -415,15 +414,15 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             <AlertTriangle className="w-4 h-4 text-[var(--color-warning)]" />
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                What's Blocking You?
+                {t('What\'s Blocking You?')}
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
-                Proactive diagnostic engine identifying constraints impeding your career progress.
+                {t('Proactive diagnostic engine identifying constraints impeding your career progress.')}
               </p>
             </div>
           </div>
           <span className="text-xs font-mono text-[var(--color-warning)] font-semibold px-2 py-0.5 rounded bg-[var(--color-warning)]/10">
-            {careerBlockers.length} Active Blockers
+            {careerBlockers.length} {t('Active Blockers')}
           </span>
         </div>
 
@@ -436,7 +435,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--color-warning)]/20 text-[var(--color-warning)] font-mono">
-                    {blocker.severity} Priority
+                    {t(`${blocker.severity} Priority`)}
                   </span>
                   <h3 className="text-xs font-bold text-[var(--text-primary)]">
                     {blocker.title}
@@ -466,10 +465,10 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             <Target className="w-4 h-4 text-[var(--color-primary-text)]" />
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Career Goals Management
+                {t('Career Goals Management')}
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
-                Calibrate primary targets and secondary tactical goals with connected data progress.
+                {t('Calibrate primary targets and secondary tactical goals with connected data progress.')}
               </p>
             </div>
           </div>
@@ -478,7 +477,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Secondary Goal</span>
+            <span>{t('Add Secondary Goal')}</span>
           </button>
         </div>
 
@@ -487,7 +486,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
           <div className="flex items-start justify-between gap-4">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)] font-mono">
-                Primary Goal
+                {t('Primary Goal')}
               </span>
               <h3 className="text-base font-bold text-[var(--text-primary)]">
                 {primaryGoalTitle}
@@ -497,7 +496,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               </p>
             </div>
             <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--color-success-surface)] text-[var(--color-success-strong)] font-mono">
-              Role Match ({analysis.matchPercentage}%)
+              {t('Role Match')} ({analysis.matchPercentage}%)
             </span>
           </div>
 
@@ -510,10 +509,10 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
 
           <div className="flex flex-wrap items-center justify-between text-xs text-[var(--text-secondary)] pt-1">
             {nextDeadline && (
-              <span>Deadline: {formatGoalDate(nextDeadline)}</span>
+              <span>{t('Deadline:')} {formatGoalDate(nextDeadline)}</span>
             )}
             {nextRoadmapTask && (
-              <span className="text-[var(--text-primary)] font-medium">Next Action: {nextRoadmapTask.title}</span>
+              <span className="text-[var(--text-primary)] font-medium">{t('Next Action:')} {nextRoadmapTask.title}</span>
             )}
           </div>
         </div>
@@ -529,7 +528,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)] font-mono">
-                      {goal.priority} Priority
+                      {t(`${goal.priority} Priority`)}
                     </span>
                     <h4 className="text-xs font-bold text-[var(--text-primary)]">
                       {goal.title}
@@ -542,7 +541,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 <button
                   onClick={() => deleteSecondaryGoal(goal.id)}
                   className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)]"
-                  title="Remove goal"
+                  title={t('Remove goal')}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -550,7 +549,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
 
               <div className="space-y-1">
                 <div className="flex justify-between text-[11px] text-[var(--text-secondary)]">
-                  <span>Connected Progress</span>
+                  <span>{t('Connected Progress')}</span>
                   <span className="font-mono font-bold text-[var(--text-primary)]">{goal.progressPercent}%</span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-[var(--color-progress-track)] overflow-hidden">
@@ -563,7 +562,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
 
               {goal.deadline && (
                 <div className="text-[10px] text-[var(--text-muted)] font-mono">
-                  Deadline: {goal.deadline}
+                  {t('Deadline:')} {goal.deadline}
                 </div>
               )}
             </StaggerItem>
@@ -578,10 +577,10 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             <ShieldCheck className="w-4 h-4 text-[var(--color-success-strong)]" />
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Career Asset Scorecard
+                {t('Career Asset Scorecard')}
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
-                Evaluates every career instrument required to win tier-1 job offers.
+                {t('Evaluates every career instrument required to win tier-1 job offers.')}
               </p>
             </div>
           </div>
@@ -601,7 +600,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                     ? 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
                     : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
                 }`}>
-                  {asset.status}
+                  {t(asset.status)}
                 </span>
               </div>
               <p className="text-[11px] text-[var(--text-secondary)]">{asset.desc}</p>
@@ -618,13 +617,13 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             <div className="flex items-center gap-2">
               <Star className="w-4 h-4 text-[var(--color-accent-strong)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Milestones ({milestones.length})
+                {t('Milestones')} ({milestones.length})
               </h2>
             </div>
             <button
               onClick={() => setAddMilestoneModalOpen(true)}
               className="p-1 rounded-md hover:bg-[var(--surface-secondary)] text-[var(--color-primary-text)] font-bold text-xs"
-              title="Add Milestone"
+              title={t('Add Milestone')}
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -659,27 +658,27 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               <Clock className="w-4 h-4 text-[var(--color-primary-text)]" />
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  Career Timeline
+                  {t('Career Timeline')}
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  Chronological trail synthesized directly from verified career records.
+                  {t('Chronological trail synthesized directly from verified career records.')}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--border-subtle)]">
+          <div className="relative ps-6 space-y-6 before:absolute before:start-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--border-subtle)]">
             {timelineEvents.map((ev) => {
               return (
                 <div key={ev.id} className="relative group">
                   {/* Dot */}
-                  <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-[var(--surface-main)] border-2 border-[var(--accent-primary)] flex items-center justify-center">
+                  <div className="absolute -start-6 top-1 w-5 h-5 rounded-full bg-[var(--surface-main)] border-2 border-[var(--accent-primary)] flex items-center justify-center">
                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)]" />
                   </div>
 
                   <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] group-hover:border-[var(--accent-primary)]/40 transition-colors space-y-1">
                     <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
-                      <span>{ev.type} • {ev.date}</span>
+                      <span>{t(ev.type)} • {ev.date}</span>
                       <span className="font-semibold text-[var(--color-primary-text)] capitalize">{ev.status}</span>
                     </div>
                     <div className="text-xs font-bold text-[var(--text-primary)]">
@@ -700,43 +699,43 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       {addGoalModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Add Secondary Career Goal</h3>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Add Secondary Career Goal')}</h3>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Goal Title</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Goal Title')}</label>
                 <input
                   type="text"
                   value={goalForm.title}
                   onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="e.g. Master E2E testing with Playwright"
+                  placeholder={t('e.g. Master E2E testing with Playwright')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Description</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Description')}</label>
                 <textarea
                   rows={2}
                   value={goalForm.description}
                   onChange={(e) => setGoalForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Deliverable and milestones..."
+                  placeholder={t('Deliverable and milestones...')}
                   className="w-full p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Priority</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Priority')}</label>
                   <select
                     value={goalForm.priority}
                     onChange={(e: any) => setGoalForm(prev => ({ ...prev, priority: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                   >
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
+                    <option value="high">{t('High')}</option>
+                    <option value="medium">{t('Medium')}</option>
+                    <option value="low">{t('Low')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Deadline</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Deadline')}</label>
                   <input
                     type="date"
                     value={goalForm.deadline}
@@ -747,8 +746,8 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
-              <button onClick={() => setAddGoalModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveGoal} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">Save Goal</button>
+              <button onClick={() => setAddGoalModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">{t('Cancel')}</button>
+              <button onClick={handleSaveGoal} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">{t('Save Goal')}</button>
             </div>
           </div>
         </div>
@@ -758,38 +757,38 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       {addMilestoneModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Record Career Milestone</h3>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Record Career Milestone')}</h3>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Milestone Title</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Milestone Title')}</label>
                 <input
                   type="text"
                   value={milestoneForm.title}
                   onChange={(e) => setMilestoneForm(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="e.g. First Tech Lead Promotion"
+                  placeholder={t('e.g. First Tech Lead Promotion')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Category</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Category')}</label>
                   <select
                     value={milestoneForm.category}
                     onChange={(e: any) => setMilestoneForm(prev => ({ ...prev, category: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                   >
-                    <option value="role">New Role</option>
-                    <option value="promotion">Promotion</option>
-                    <option value="internship">Internship</option>
-                    <option value="certification">Certification</option>
-                    <option value="project">Project</option>
-                    <option value="application">Application</option>
-                    <option value="interview">Interview</option>
-                    <option value="offer">Job Offer</option>
+                    <option value="role">{t('New Role')}</option>
+                    <option value="promotion">{t('Promotion')}</option>
+                    <option value="internship">{t('Internship')}</option>
+                    <option value="certification">{t('Certification')}</option>
+                    <option value="project">{t('Project')}</option>
+                    <option value="application">{t('Application')}</option>
+                    <option value="interview">{t('Interview')}</option>
+                    <option value="offer">{t('Job Offer')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Date Achieved</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Date Achieved')}</label>
                   <input
                     type="date"
                     value={milestoneForm.dateAchieved}
@@ -799,19 +798,19 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 </div>
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Notes (optional)</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Notes (optional)')}</label>
                 <input
                   type="text"
                   value={milestoneForm.notes}
                   onChange={(e) => setMilestoneForm(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="e.g. Scored 100% on architecture review"
+                  placeholder={t('e.g. Scored 100% on architecture review')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
-              <button onClick={() => setAddMilestoneModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
-              <button onClick={handleSaveMilestone} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">Record</button>
+              <button onClick={() => setAddMilestoneModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">{t('Cancel')}</button>
+              <button onClick={handleSaveMilestone} className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]">{t('Record')}</button>
             </div>
           </div>
         </div>

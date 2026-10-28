@@ -12,6 +12,8 @@ import {
 import { Logo } from '../brand/Logo';
 import { SkeletonCard } from '../ui/Skeleton';
 import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
+import { apiUrl } from '../../lib/native';
+import { useCareer } from '../../context/CareerContext';
 
 interface PublicExperience {
   company: string;
@@ -85,6 +87,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
   username,
   onBack,
 }) => {
+  const { t } = useCareer();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -97,7 +100,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
     setNotFound(false);
     setError(false);
 
-    fetch(`/api/profile/public/${encodeURIComponent(username)}`)
+    fetch(apiUrl(`/api/profile/public/${encodeURIComponent(username)}`))
       .then(async (response) => {
         if (response.status === 404) {
           if (!cancelled) setNotFound(true);
@@ -132,7 +135,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
             className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline flex items-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to CareerPilot</span>
+            <span>{t('Back to CareerPilot')}</span>
           </button>
         </div>
       </header>
@@ -144,7 +147,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
             role="status"
             aria-live="polite"
           >
-            <span className="sr-only">Loading public profile…</span>
+            <span className="sr-only">{t('Loading public profile…')}</span>
             <SkeletonCard />
             <SkeletonCard />
           </div>
@@ -152,9 +155,9 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
 
         {!isLoading && notFound && (
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-8 space-y-2">
-            <h1 className="text-lg font-bold">Profile not available</h1>
+            <h1 className="text-lg font-bold">{t('Profile not available')}</h1>
             <p className="text-sm text-[var(--text-secondary)]">
-              This profile does not exist or its owner has not made it public.
+              {t('This profile does not exist or its owner has not made it public.')}
             </p>
           </div>
         )}
@@ -166,10 +169,10 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
           >
             <h1 className="text-lg font-bold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-[var(--color-danger)]" />
-              Could not load this profile
+              {t('Could not load this profile')}
             </h1>
             <p className="text-sm text-[var(--text-secondary)]">
-              The server could not be reached. Please try again.
+              {t('The server could not be reached. Please try again.')}
             </p>
           </div>
         )}
@@ -224,7 +227,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
               <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 space-y-4">
                 <h2 className="text-sm font-bold flex items-center gap-2">
                   <Briefcase className="w-4 h-4 text-[var(--color-primary-text)]" />
-                  Experience
+                  {t('Experience')}
                 </h2>
                 <div className="space-y-3">
                   {profile.experiences!.map((item, index) => (
@@ -247,7 +250,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
               <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 space-y-4">
                 <h2 className="text-sm font-bold flex items-center gap-2">
                   <GraduationCap className="w-4 h-4 text-[var(--color-primary-text)]" />
-                  Education
+                  {t('Education')}
                 </h2>
                 <div className="space-y-3">
                   {profile.education!.map((item, index) => (
@@ -268,7 +271,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
 
             {(profile.skills?.length ?? 0) > 0 && (
               <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 space-y-3">
-                <h2 className="text-sm font-bold">Skills</h2>
+                <h2 className="text-sm font-bold">{t('Skills')}</h2>
                 <div className="flex flex-wrap gap-1.5">
                   {profile.skills!
                     .filter((skill) => skill.name)
@@ -289,7 +292,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
               <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 space-y-4">
                 <h2 className="text-sm font-bold flex items-center gap-2">
                   <FolderGit2 className="w-4 h-4 text-[var(--color-primary-text)]" />
-                  Projects
+                  {t('Projects')}
                 </h2>
                 <div className="space-y-3">
                   {profile.projects!.map((project, index) => (
@@ -306,7 +309,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
                             rel="noopener noreferrer"
                             className="text-[var(--color-primary-text)] hover:underline"
                           >
-                            Repository
+                            {t('Repository')}
                           </a>
                         )}
                         {project.demoUrl && (
@@ -316,7 +319,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
                             rel="noopener noreferrer"
                             className="text-[var(--color-primary-text)] hover:underline"
                           >
-                            Live demo
+                            {t('Live demo')}
                           </a>
                         )}
                       </div>
@@ -330,7 +333,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
               <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 space-y-4">
                 <h2 className="text-sm font-bold flex items-center gap-2">
                   <Award className="w-4 h-4 text-[var(--color-primary-text)]" />
-                  Certifications
+                  {t('Certifications')}
                 </h2>
                 <div className="space-y-2">
                   {profile.certifications!.map((cert, index) => (
@@ -346,7 +349,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
                           rel="noopener noreferrer"
                           className="text-[var(--color-primary-text)] hover:underline"
                         >
-                          Verify credential
+                          {t('Verify credential')}
                         </a>
                       )}
                     </div>

@@ -4,8 +4,17 @@ import { useCareer } from '../../context/CareerContext';
 import { ProjectStatus } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
+/** The user-facing label of each project status. */
+const STATUS_LABELS: Record<string, string> = {
+  idea: 'Idea',
+  planned: 'Planned',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  published: 'Published',
+};
+
 export const ProjectsView: React.FC = () => {
-  const { projects, addProject, updateProject, deleteProject, volunteerExperiences } = useCareer();
+  const { projects, addProject, updateProject, deleteProject, volunteerExperiences, t } = useCareer();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -56,8 +65,8 @@ export const ProjectsView: React.FC = () => {
         description: description.trim(),
         difficulty,
         skills: skillsStr.split(',').map(s => s.trim()).filter(Boolean),
-        tasks: ['Scaffold repository structure', 'Implement core features', 'Add unit and e2e tests'],
-        deliverables: ['Production demo', 'Public GitHub repository'],
+        tasks: [t('Scaffold repository structure'), t('Implement core features'), t('Add unit and e2e tests')],
+        deliverables: [t('Production demo'), t('Public GitHub repository')],
         status: 'in_progress',
         repositoryUrl: repoUrl.trim() || undefined,
         demoUrl: demoUrl.trim() || undefined
@@ -73,7 +82,7 @@ export const ProjectsView: React.FC = () => {
       setSubmitError(
         error instanceof Error
           ? error.message
-          : 'The project could not be saved. Please try again.'
+          : t('The project could not be saved. Please try again.')
       );
     } finally {
       setIsSubmitting(false);
@@ -85,9 +94,9 @@ export const ProjectsView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">PORTFOLIO & EVIDENCE ARTIFACTS</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('PORTFOLIO & EVIDENCE ARTIFACTS')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Practical Proof-of-Skill Projects
+            {t('Practical Proof-of-Skill Projects')}
           </h1>
         </div>
 
@@ -96,7 +105,7 @@ export const ProjectsView: React.FC = () => {
           className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>New Project</span>
+          <span>{t('New Project')}</span>
         </button>
       </div>
 
@@ -112,7 +121,7 @@ export const ProjectsView: React.FC = () => {
                 : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            {st === 'all' ? `All Projects (${projects.length})` : st.replace('_', ' ')}
+            {st === 'all' ? `${t('All Projects')} (${projects.length})` : t(STATUS_LABELS[st] ?? st)}
           </button>
         ))}
       </div>
@@ -130,7 +139,7 @@ export const ProjectsView: React.FC = () => {
                   <div className="text-xs text-[var(--text-muted)] flex items-center gap-2">
                     <span>{project.difficulty}</span>
                     <span>·</span>
-                    <span className="capitalize">{project.status.replace('_', ' ')}</span>
+                    <span className="capitalize">{t(STATUS_LABELS[project.status] ?? project.status)}</span>
                   </div>
                   <h3 className="text-base font-bold text-[var(--text-primary)] mt-0.5">{project.title}</h3>
                 </div>
@@ -140,11 +149,11 @@ export const ProjectsView: React.FC = () => {
                   onChange={(e) => updateProject(project.id, { status: e.target.value as ProjectStatus })}
                   className="text-xs bg-[var(--surface-secondary)] border border-[var(--border-subtle)] rounded-lg px-2 py-1 text-[var(--text-primary)] font-medium focus:outline-none"
                 >
-                  <option value="idea">Idea</option>
-                  <option value="planned">Planned</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="published">Published</option>
+                  <option value="idea">{t('Idea')}</option>
+                  <option value="planned">{t('Planned')}</option>
+                  <option value="in_progress">{t('In Progress')}</option>
+                  <option value="completed">{t('Completed')}</option>
+                  <option value="published">{t('Published')}</option>
                 </select>
               </div>
 
@@ -163,7 +172,7 @@ export const ProjectsView: React.FC = () => {
 
               {/* Deliverables List */}
               <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1">
-                <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">Key Deliverables</div>
+                <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">{t('Key Deliverables')}</div>
                 <ul className="text-xs text-[var(--text-secondary)] space-y-1">
                   {project.deliverables.map((deliv, i) => (
                     <li key={i} className="flex items-center gap-1.5">
@@ -179,7 +188,7 @@ export const ProjectsView: React.FC = () => {
                 <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1">
                   <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase flex items-center gap-1.5">
                     <HeartHandshake className="w-3 h-3" />
-                    Volunteering
+                    {t('Volunteering')}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {(volunteeringByProject.get(project.id) ?? []).map((entry, i) => (
@@ -206,7 +215,7 @@ export const ProjectsView: React.FC = () => {
                     className="flex items-center gap-1 text-[var(--text-primary)] hover:text-[var(--color-primary-text)] font-medium"
                   >
                     <Github className="w-3.5 h-3.5" />
-                    <span>Repository</span>
+                    <span>{t('Repository')}</span>
                   </a>
                 )}
                 {project.demoUrl && (
@@ -217,7 +226,7 @@ export const ProjectsView: React.FC = () => {
                     className="flex items-center gap-1 text-[var(--color-primary-text)] hover:underline font-medium"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Live Demo</span>
+                    <span>{t('Live Demo')}</span>
                   </a>
                 )}
               </div>
@@ -226,7 +235,7 @@ export const ProjectsView: React.FC = () => {
                 onClick={() => deleteProject(project.id)}
                 className="text-xs text-[var(--text-muted)] hover:text-[var(--color-danger)] transition-colors"
               >
-                Delete
+                {t('Delete')}
               </button>
             </div>
           </StaggerItem>
@@ -238,7 +247,7 @@ export const ProjectsView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
           <div className="w-full max-w-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
-              <h3 className="text-base font-bold text-[var(--text-primary)]">Add Proof-of-Skill Project</h3>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Add Proof-of-Skill Project')}</h3>
               <button 
                 onClick={() => setShowAddModal(false)}
                 className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded"
@@ -257,44 +266,44 @@ export const ProjectsView: React.FC = () => {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Project Title</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Project Title')}</label>
                 <input
                   type="text"
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Distributed Task Queue or Accessible Design System"
+                  placeholder={t('e.g. Distributed Task Queue or Accessible Design System')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Goal / Executive Summary</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Goal / Executive Summary')}</label>
                 <textarea
                   required
                   rows={2}
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
-                  placeholder="What problem does this solve and what evidence does it provide?"
+                  placeholder={t('What problem does this solve and what evidence does it provide?')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Difficulty</label>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Difficulty')}</label>
                   <select
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value as any)}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
                   >
-                    <option value="Beginner">Beginner</option>
-                    <option value="Intermediate">Intermediate</option>
-                    <option value="Advanced">Advanced</option>
+                    <option value="Beginner">{t('Beginner')}</option>
+                    <option value="Intermediate">{t('Intermediate')}</option>
+                    <option value="Advanced">{t('Advanced')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Skills (comma separated)</label>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Skills (comma separated)')}</label>
                   <input
                     type="text"
                     value={skillsStr}
@@ -306,7 +315,7 @@ export const ProjectsView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">GitHub Repo URL</label>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('GitHub Repo URL')}</label>
                   <input
                     type="url"
                     value={repoUrl}
@@ -316,7 +325,7 @@ export const ProjectsView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Live Demo URL</label>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Live Demo URL')}</label>
                   <input
                     type="url"
                     value={demoUrl}
@@ -333,14 +342,14 @@ export const ProjectsView: React.FC = () => {
                   onClick={() => setShowAddModal(false)}
                   className="px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
                 >
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
                   className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? 'Creating…' : 'Create Project'}
+                  {isSubmitting ? t('Creating…') : t('Create Project')}
                 </button>
               </div>
             </form>

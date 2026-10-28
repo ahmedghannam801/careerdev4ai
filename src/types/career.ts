@@ -68,6 +68,15 @@ export interface CareerAnalysis {
 
 export type RoadmapTaskStatus = 'not_started' | 'in_progress' | 'completed' | 'skipped' | 'blocked';
 
+/** A learning resource attached to a roadmap step. */
+export interface RoadmapResource {
+  id: string;
+  title: string;
+  provider: string;
+  url: string;
+  durationHours: number | null;
+}
+
 export interface RoadmapTask {
   id: string;
   title: string;
@@ -80,6 +89,20 @@ export interface RoadmapTask {
   resourceTitle?: string;
   evidenceId?: string;
   estimatedHours: number;
+  /** How hard this step is: foundational, intermediate or advanced. */
+  difficulty?: string | null;
+  /** Titles of the steps that must be finished before this one. */
+  prerequisites?: string[];
+  /** Every skill this step moves the user on. */
+  skillNames?: string[];
+  /** Projects that demonstrate this step. */
+  projectTitles?: string[];
+  /** Recommended learning resources, with their links. */
+  resources?: RoadmapResource[];
+  /** Urgency of the gap this step closes. */
+  priority?: string | null;
+  /** Plain-language reason this step is in this user's plan. */
+  rationale?: string | null;
 }
 
 export interface RoadmapMilestone {
@@ -95,6 +118,8 @@ export interface RoadmapPhase {
   phaseNumber: number;
   title: string;
   description: string;
+  /** The role-specific outcome this phase works towards. */
+  goal?: string | null;
   milestones: RoadmapMilestone[];
   isUnlocked: boolean;
 }

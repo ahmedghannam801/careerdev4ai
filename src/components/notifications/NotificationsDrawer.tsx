@@ -11,7 +11,7 @@ interface NotificationsDrawerProps {
 }
 
 export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
-  const { notifications, visibleNotifications, markNotificationRead, clearNotifications } =
+  const { notifications, visibleNotifications, markNotificationRead, clearNotifications, t} =
     useCareer();
   const reduced = useReducedMotion() ?? false;
 
@@ -20,8 +20,8 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
       {isOpen && (
         <motion.div
           role="dialog"
-          aria-label="Notifications"
-          className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[380px]"
+          aria-label={t('Notifications')}
+          className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[380px]"
           variants={drawerVariants(reduced)}
           initial="hidden"
           animate="visible"
@@ -30,10 +30,10 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
       <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-[var(--color-primary-text)]" />
-          <span className="text-sm font-semibold text-[var(--text-primary)]">Notifications</span>
+          <span className="text-sm font-semibold text-[var(--text-primary)]">{t('Notifications')}</span>
           {visibleNotifications.filter(n => !n.read).length > 0 && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-medium">
-              {visibleNotifications.filter(n => !n.read).length} new
+              {visibleNotifications.filter(n => !n.read).length} {t('new')}
             </span>
           )}
         </div>
@@ -43,7 +43,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
               onClick={clearNotifications}
               className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2 py-1 rounded"
             >
-              Clear
+              {t('Clear')}
             </button>
           )}
           <button
@@ -62,11 +62,10 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
               <Bell className="h-5 w-5" />
             </span>
             <p className="text-sm font-semibold text-[var(--text-primary)]">
-              You are all caught up
+              {t('You are all caught up')}
             </p>
             <p className="max-w-[15rem] text-xs leading-relaxed text-[var(--text-muted)]">
-              Roadmap deadlines, interview stages and milestones will appear here as
-              they happen.
+              {t('Roadmap deadlines, interview stages and milestones will appear here as they happen.')}
             </p>
           </div>
         ) : (
@@ -97,7 +96,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                   <button
                     onClick={() => markNotificationRead(n.id)}
                     className="p-0.5 text-[var(--text-muted)] hover:text-[var(--color-primary-text)]"
-                    title="Mark read"
+                    title={t('Mark read')}
                   >
                     <Check className="w-3.5 h-3.5" />
                   </button>
@@ -111,7 +110,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                     onClick={() => { onNavigate(n.linkAction!); onClose(); }}
                     className="text-[var(--color-primary-text)] hover:underline font-medium"
                   >
-                    Take Action →
+                    {t('Take Action →')}
                   </button>
                 )}
               </div>

@@ -2,11 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Sparkles, CheckCircle2, AlertCircle, History, HelpCircle } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { getAccessToken } from '../../lib/supabase';
+import { apiUrl } from '../../lib/native';
 import { questionsForRole, QuestionItem } from '../../data/interviewBank';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const InterviewsView: React.FC = () => {
-  const { targetRole, interviewSessions, saveInterviewSession } = useCareer();
+  const { targetRole, interviewSessions, saveInterviewSession, t} = useCareer();
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'star' | 'technical' | 'behavioral'>('all');
 
   // The practice material follows the user's actual target role: the
@@ -38,7 +39,7 @@ export const InterviewsView: React.FC = () => {
 
     try {
       const token = await getAccessToken();
-      const res = await fetch('/api/mock-interview', {
+      const res = await fetch(apiUrl('/api/mock-interview'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,7 +71,7 @@ export const InterviewsView: React.FC = () => {
         const body = await res.json().catch(() => null);
         setEvaluationError(
           body?.error ??
-            'The interviewer is unavailable right now. No feedback was generated — please try again shortly.'
+            t('The interviewer is unavailable right now. No feedback was generated — please try again shortly.')
         );
       }
     } catch (e) {
@@ -79,7 +80,7 @@ export const InterviewsView: React.FC = () => {
       // be indistinguishable from real feedback. The candidate is told that
       // nothing was evaluated, and their answer is kept.
       setEvaluationError(
-        'The interviewer is unreachable right now, so your answer was not evaluated. Your answer is still saved below — please try again shortly.'
+        t('The interviewer is unreachable right now, so your answer was not evaluated. Your answer is still saved below — please try again shortly.')
       );
     } finally {
       setIsEvaluating(false);
@@ -91,14 +92,14 @@ export const InterviewsView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">INTERVIEW READINESS LAB</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('INTERVIEW READINESS LAB')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            STAR & Technical Mock Simulator
+            {t('STAR & Technical Mock Simulator')}
           </h1>
         </div>
 
         <div className="text-xs text-[var(--text-muted)]">
-          Target Role: <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>
+          {t('Target Role:')} <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>
         </div>
       </div>
 
@@ -117,12 +118,12 @@ export const InterviewsView: React.FC = () => {
                     : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                {cat.toUpperCase()}
+                {t(cat.toUpperCase())}
               </button>
             ))}
           </div>
 
-          <Stagger inView gap={0.06} className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
+          <Stagger inView gap={0.06} className="space-y-3 max-h-[650px] overflow-y-auto pe-1">
             {filteredQuestions.map((q) => {
               const isSelected = activeQuestion?.id === q.id;
 
@@ -135,15 +136,15 @@ export const InterviewsView: React.FC = () => {
                     setEvaluationResult(null);
                     setEvaluationError(null);
                   }}
-                  className={`p-4 rounded-xl border text-left cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                  className={`p-4 rounded-xl border text-start cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                     isSelected
                       ? 'bg-[var(--accent-surface)]/50 border-[var(--accent-primary)] shadow-xs'
                       : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
                   }`}
                 >
                   <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-1">
-                    <span className="font-mono font-bold uppercase text-[var(--color-primary-text)]">{q.category}</span>
-                    <span>{q.roleTarget === 'all' ? 'Universal' : targetRole.title}</span>
+                    <span className="font-mono font-bold uppercase text-[var(--color-primary-text)]">{t(q.category)}</span>
+                    <span>{t(q.roleTarget === 'all' ? 'Universal' : targetRole.title)}</span>
                   </div>
                   <h3 className="font-bold text-xs text-[var(--text-primary)] leading-snug">
                     {q.question}
@@ -158,13 +159,13 @@ export const InterviewsView: React.FC = () => {
         <div className="lg:col-span-7 space-y-6">
           {!activeQuestion ? (
             <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-              Choose a question from the bank to begin a practice drill.
+              {t('Choose a question from the bank to begin a practice drill.')}
             </div>
           ) : (
           <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
             <div className="space-y-1">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                Active Prompt · {activeQuestion.category.toUpperCase()}
+                {t('Active Prompt')} · {t(activeQuestion.category.toUpperCase())}
               </span>
               <h2 className="text-base font-bold text-[var(--text-primary)] leading-relaxed">
                 "{activeQuestion.question}"
@@ -175,26 +176,26 @@ export const InterviewsView: React.FC = () => {
             <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] text-xs space-y-1">
               <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
                 <HelpCircle className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-                <span>Recommended Framework & Strategy</span>
+                <span>{t('Recommended Framework & Strategy')}</span>
               </div>
               <p className="text-[var(--text-secondary)] leading-relaxed">
                 {activeQuestion.recommendedFramework}
               </p>
               <div className="pt-1.5 border-t border-[var(--border-subtle)]/70 text-[11px] text-[var(--text-muted)]">
-                <strong>Key Points to Hit:</strong> {activeQuestion.sampleKeyPoints.join(' · ')}
+                <strong>{t('Key Points to Hit:')}</strong> {activeQuestion.sampleKeyPoints.join(' · ')}
               </div>
             </div>
 
             {/* User Answer Textarea */}
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-[var(--text-secondary)]">
-                Draft your spoken or written response
+                {t('Draft your spoken or written response')}
               </label>
               <textarea
                 rows={5}
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
-                placeholder="Situation: Set the context... Task: What was expected... Action: Specific steps you took... Result: Outcome and metrics..."
+                placeholder={t('Situation: Set the context... Task: What was expected... Action: Specific steps you took... Result: Outcome and metrics...')}
                 className="w-full p-3.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed focus:outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
@@ -207,7 +208,7 @@ export const InterviewsView: React.FC = () => {
                 className="px-5 py-2.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-2 transition-all shadow-xs disabled:opacity-50"
               >
                 <Sparkles className={`w-4 h-4 ${isEvaluating ? 'animate-spin' : ''}`} />
-                <span>{isEvaluating ? 'Evaluating with AI...' : 'Submit Response for AI Scoring'}</span>
+                <span>{t(isEvaluating ? 'Evaluating with AI...' : 'Submit Response for AI Scoring')}</span>
               </button>
             </div>
           </div>
@@ -219,7 +220,7 @@ export const InterviewsView: React.FC = () => {
             <div className="p-4 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-strong)] space-y-1.5">
               <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
                 <AlertCircle className="w-4 h-4 text-[var(--color-primary-text)]" />
-                No feedback was generated
+                {t('No feedback was generated')}
               </div>
               <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{evaluationError}</p>
             </div>
@@ -230,10 +231,10 @@ export const InterviewsView: React.FC = () => {
             <Reveal delay={0.06} className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--accent-primary)]/40 space-y-5 shadow-xs">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">AI Mock Evaluation</span>
-                  <div className="text-sm font-bold text-[var(--text-primary)]">Response Score & Coaching Feedback</div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">{t('AI Mock Evaluation')}</span>
+                  <div className="text-sm font-bold text-[var(--text-primary)]">{t('Response Score & Coaching Feedback')}</div>
                 </div>
-                <div className="text-right">
+                <div className="text-end">
                   <div className="text-3xl font-extrabold font-mono text-[var(--color-primary-text)]">
                     {evaluationResult.score} / 10
                   </div>
@@ -245,7 +246,7 @@ export const InterviewsView: React.FC = () => {
                 <div className="space-y-1.5 p-3 rounded-lg bg-[var(--color-success-surface)] border border-[var(--color-success-strong)]/20">
                   <div className="font-bold text-[var(--color-success-strong)] flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Strengths</span>
+                    <span>{t('Strengths')}</span>
                   </div>
                   <ul className="space-y-1 text-[var(--text-secondary)]">
                     {evaluationResult.strengths?.map((s: string, i: number) => (
@@ -257,7 +258,7 @@ export const InterviewsView: React.FC = () => {
                 <div className="space-y-1.5 p-3 rounded-lg bg-[var(--color-warning)]/5 border border-[var(--color-warning)]/20">
                   <div className="font-bold text-[var(--color-warning)] flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>Areas for Polish</span>
+                    <span>{t('Areas for Polish')}</span>
                   </div>
                   <ul className="space-y-1 text-[var(--text-secondary)]">
                     {evaluationResult.improvements?.map((imp: string, i: number) => (
@@ -270,12 +271,12 @@ export const InterviewsView: React.FC = () => {
               {/* STAR Breakdown */}
               {evaluationResult.starEvaluation && (
                 <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] text-xs space-y-2">
-                  <div className="font-bold text-[var(--text-primary)]">STAR Framework Assessment</div>
+                  <div className="font-bold text-[var(--text-primary)]">{t('STAR Framework Assessment')}</div>
                   <div className="grid grid-cols-2 gap-3 text-[11px] text-[var(--text-secondary)]">
-                    <div><strong>Situation:</strong> {evaluationResult.starEvaluation.situation}</div>
-                    <div><strong>Task:</strong> {evaluationResult.starEvaluation.task}</div>
-                    <div><strong>Action:</strong> {evaluationResult.starEvaluation.action}</div>
-                    <div><strong>Result:</strong> {evaluationResult.starEvaluation.result}</div>
+                    <div><strong>{t('Situation:')}</strong> {evaluationResult.starEvaluation.situation}</div>
+                    <div><strong>{t('Task:')}</strong> {evaluationResult.starEvaluation.task}</div>
+                    <div><strong>{t('Action:')}</strong> {evaluationResult.starEvaluation.action}</div>
+                    <div><strong>{t('Result:')}</strong> {evaluationResult.starEvaluation.result}</div>
                   </div>
                 </div>
               )}
@@ -283,7 +284,7 @@ export const InterviewsView: React.FC = () => {
               {/* Suggested Answer */}
               {evaluationResult.suggestedAnswer && (
                 <div className="space-y-1 text-xs">
-                  <div className="font-bold text-[var(--color-primary-text)]">Executive Suggested Answer Model:</div>
+                  <div className="font-bold text-[var(--color-primary-text)]">{t('Executive Suggested Answer Model:')}</div>
                   <p className="text-[var(--text-secondary)] leading-relaxed italic bg-[var(--surface-secondary)]/40 p-3 rounded-lg border border-[var(--border-subtle)]">
                     "{evaluationResult.suggestedAnswer}"
                   </p>
@@ -297,15 +298,15 @@ export const InterviewsView: React.FC = () => {
             <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
               <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
                 <History className="w-4 h-4 text-[var(--color-primary-text)]" />
-                <span>Recorded Mock Sessions ({interviewSessions.length})</span>
+                <span>{t('Recorded Mock Sessions')} ({interviewSessions.length})</span>
               </div>
               <div className="space-y-3">
                 {interviewSessions.map((session) => (
                   <div key={session.id} className="p-3 rounded-lg bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[var(--text-primary)] line-clamp-1">{session.question}</span>
-                      <span className="font-mono font-bold text-[var(--color-primary-text)] shrink-0 ml-2">
-                        Score: {session.aiFeedback?.score || 8}/10
+                      <span className="font-mono font-bold text-[var(--color-primary-text)] shrink-0 ms-2">
+                        {t('Score:')} {session.aiFeedback?.score || 8}/10
                       </span>
                     </div>
                     <div className="text-[11px] text-[var(--text-muted)]">

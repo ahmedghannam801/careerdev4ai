@@ -21,7 +21,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
   onImportComplete,
   onStartFromScratch,
 }) => {
-  const { uploadCvFile, pasteCvText, importExtractedCvData } = useCareer();
+  const { uploadCvFile, pasteCvText, importExtractedCvData, t } = useCareer();
 
   const [activeTab, setActiveTab] = useState<'upload' | 'paste' | 'scratch'>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -67,12 +67,12 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
       const validExtensions = ['.pdf', '.docx', '.txt', '.json'];
       const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
       if (ext === '.doc') {
-        setExtractionError('Legacy .doc binary format is not supported. Please open your document in Microsoft Word, Google Docs, or LibreOffice and choose "Save As" .docx or "Export As" .pdf to upload.');
+        setExtractionError(t('Legacy .doc binary format is not supported. Please open your document in Microsoft Word, Google Docs, or LibreOffice and choose "Save As" .docx or "Export As" .pdf to upload.'));
         setSelectedFile(null);
         return;
       }
       if (!validExtensions.includes(ext)) {
-        setExtractionError('Unsupported file type. Please upload a .pdf, .docx, .txt, or .json file.');
+        setExtractionError(t('Unsupported file type. Please upload a .pdf, .docx, .txt, or .json file.'));
         setSelectedFile(null);
         return;
       }
@@ -89,13 +89,13 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
     try {
       if (activeTab === 'upload') {
         if (!selectedFile) {
-          setExtractionError('Please select a CV file to upload.');
+          setExtractionError(t('Please select a CV file to upload.'));
           setIsExtracting(false);
           return;
         }
         const res = await uploadCvFile(selectedFile);
         if (!res.success || !res.cv) {
-          throw new Error(res.error || 'Failed to extract CV information.');
+          throw new Error(res.error || t('Failed to extract CV information.'));
         }
         setExtractedData(res.cv);
         setExtraction(res.extraction ?? null);
@@ -103,13 +103,13 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
         setStep('review');
       } else if (activeTab === 'paste') {
         if (!pastedText.trim() || pastedText.trim().length < 20) {
-          setExtractionError('Please paste at least 20 characters of your CV text.');
+          setExtractionError(t('Please paste at least 20 characters of your CV text.'));
           setIsExtracting(false);
           return;
         }
         const res = await pasteCvText(pastedText.trim());
         if (!res.success || !res.cv) {
-          throw new Error(res.error || 'Failed to extract pasted CV information.');
+          throw new Error(res.error || t('Failed to extract pasted CV information.'));
         }
         setExtractedData(res.cv);
         setExtraction(res.extraction ?? null);
@@ -118,7 +118,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
       }
     } catch (err: any) {
       console.error('CV Extraction Error:', err);
-      setExtractionError(err.message || 'Unable to extract information from your CV. Please verify the content and try again.');
+      setExtractionError(err.message || t('Unable to extract information from your CV. Please verify the content and try again.'));
     } finally {
       setIsExtracting(false);
     }
@@ -127,7 +127,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
   const handleConfirmImport = async () => {
     if (!extractedData || isImporting) return;
     if (!Object.values(selectedSections).some(Boolean)) {
-      setExtractionError('Select at least one section to import.');
+      setExtractionError(t('Select at least one section to import.'));
       return;
     }
     setImportResult(null);
@@ -138,7 +138,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
       setImportResult(result);
       if (!result.success) {
         setExtractionError(
-          'Some selected information could not be imported. The rows that already succeeded are listed below; retrying only adds what is still missing.'
+          t('Some selected information could not be imported. The rows that already succeeded are listed below; retrying only adds what is still missing.')
         );
         return;
       }
@@ -150,7 +150,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
       console.error('CV Import Failed:', err);
       setExtractionError(
         err?.message ||
-          'The reviewed information could not be imported. Nothing was hidden: check the fields and try again.'
+          t('The reviewed information could not be imported. Nothing was hidden: check the fields and try again.')
       );
     } finally {
       setIsImporting(false);
@@ -188,7 +188,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
           : 'text-[var(--color-danger)] border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10';
     return (
       <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${tone}`}>
-        {score}% confidence
+        {score}% {t('confidence')}
       </span>
     );
   };
@@ -203,18 +203,18 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
         <div className="p-6 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-lg font-bold text-[var(--text-primary)]">
-              {step === 'input' ? 'Import Your Career CV' : 'Review Extracted Information'}
+              {step === 'input' ? t('Import Your Career CV') : t('Review Extracted Information')}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               {step === 'input'
-                ? 'Upload your resume or paste its text. We extract the document and show the evidence before anything is imported.'
-                : 'Select the information you want to import. Existing profile values and records are never overwritten.'}
+                ? t('Upload your resume or paste its text. We extract the document and show the evidence before anything is imported.')
+                : t('Select the information you want to import. Existing profile values and records are never overwritten.')}
             </p>
           </div>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]"
-            aria-label="Close"
+            aria-label={t('Close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -243,7 +243,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                   }`}
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  <span>Upload File</span>
+                  <span>{t('Upload File')}</span>
                 </button>
                 <button
                   type="button"
@@ -255,7 +255,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>Paste Text</span>
+                  <span>{t('Paste Text')}</span>
                 </button>
                 <button
                   type="button"
@@ -267,7 +267,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                   }`}
                 >
                   <ArrowRight className="w-3.5 h-3.5" />
-                  <span>Start Scratch</span>
+                  <span>{t('Start Scratch')}</span>
                 </button>
               </div>
 
@@ -289,12 +289,12 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       <Upload className="w-6 h-6" />
                     </div>
                     <div className="text-sm font-semibold text-[var(--text-primary)]">
-                      {selectedFile ? selectedFile.name : 'Click to select your CV from device'}
+                      {selectedFile ? selectedFile.name : t('Click to select your CV from device')}
                     </div>
                     <p className="text-xs text-[var(--text-secondary)] mt-1">
                       {selectedFile
-                        ? `${(selectedFile.size / 1024).toFixed(1)} KB — Ready for extraction`
-                        : 'Supported formats: PDF, DOCX, TXT, JSON (max 10MB)'}
+                        ? `${(selectedFile.size / 1024).toFixed(1)} KB — ${t('Ready for extraction')}`
+                        : t('Supported formats: PDF, DOCX, TXT, JSON (max 10MB)')}
                     </p>
                   </div>
                 </div>
@@ -304,18 +304,18 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
               {activeTab === 'paste' && (
                 <div className="space-y-3">
                   <label className="block text-xs font-semibold text-[var(--text-secondary)]">
-                    Paste Complete Resume / CV Content
+                    {t('Paste Complete Resume / CV Content')}
                   </label>
                   <textarea
                     rows={8}
                     value={pastedText}
                     onChange={(e) => setPastedText(e.target.value)}
-                    placeholder="Paste your work history, education, skills, and summary here..."
+                    placeholder={t('Paste your work history, education, skills, and summary here...')}
                     className="w-full p-3.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed focus:outline-hidden focus:border-[var(--accent-primary)] font-mono"
                   />
                   <div className="text-[11px] text-[var(--text-muted)] flex justify-between">
-                    <span>Parsed safely through the extraction pipeline</span>
-                    <span>{pastedText.length} characters</span>
+                    <span>{t('Parsed safely through the extraction pipeline')}</span>
+                    <span>{pastedText.length} {t('characters')}</span>
                   </div>
                 </div>
               )}
@@ -323,9 +323,9 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
               {/* Tab 3: Start From Scratch */}
               {activeTab === 'scratch' && (
                 <div className="p-6 rounded-2xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)] space-y-3 text-center">
-                  <h4 className="text-sm font-bold text-[var(--text-primary)]">Continue Without a CV</h4>
+                  <h4 className="text-sm font-bold text-[var(--text-primary)]">{t('Continue Without a CV')}</h4>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-md mx-auto">
-                    You can manually configure your profile, self-assess skills, and set your career target. You can always import or upload a CV later in CV Studio.
+                    {t('You can manually configure your profile, self-assess skills, and set your career target. You can always import or upload a CV later in CV Studio.')}
                   </p>
                   <button
                     type="button"
@@ -335,7 +335,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                     }}
                     className="mt-2 px-5 py-2 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)]"
                   >
-                    Proceed from Scratch
+                    {t('Proceed from Scratch')}
                   </button>
                 </div>
               )}
@@ -361,12 +361,12 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                     <div className="space-y-0.5">
                       <div className="font-semibold">
                         {result.failed > 0
-                          ? 'Some information was not imported'
-                          : 'Import completed'}
+                          ? t('Some information was not imported')
+                          : t('Import completed')}
                       </div>
                       <div className="opacity-90">
-                        {result.imported} added · {result.skipped} already existed ·{' '}
-                        {result.failed} failed
+                        {result.imported} {t('added')} · {result.skipped} {t('already existed')} ·{' '}
+                        {result.failed} {t('failed')}
                       </div>
                     </div>
                   </div>
@@ -377,7 +377,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                         .map((section) => (
                           <div key={section.section}>
                             <div className="font-semibold capitalize">{section.section}</div>
-                            <ul className="list-disc pl-4 space-y-0.5">
+                            <ul className="list-disc ps-4 space-y-0.5">
                               {section.errors.slice(0, 5).map((message, index) => (
                                 <li key={index}>{message}</li>
                               ))}
@@ -398,17 +398,17 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                     <div>
                       <div className="text-xs font-bold text-[var(--text-primary)]">
                         {quality === 'high'
-                          ? 'Document parsed successfully'
+                          ? t('Document parsed successfully')
                           : quality === 'medium'
-                            ? 'Document parsed — please review the fields'
-                            : 'Document parsed with limited confidence'}
+                            ? t('Document parsed — please review the fields')
+                            : t('Document parsed with limited confidence')}
                       </div>
                       <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
                         {extraction
-                          ? `${extraction.format.toUpperCase()} · ${extraction.pageCount} page${
-                              extraction.pageCount === 1 ? '' : 's'
-                            } · ${extraction.layout.replace('-', ' ')} · ${extraction.wordCount.toLocaleString()} words`
-                          : 'Choose which extracted sections to apply to your profile.'}
+                          ? `${extraction.format.toUpperCase()} · ${extraction.pageCount} ${
+                              extraction.pageCount === 1 ? t('page') : t('pages')
+                            } · ${extraction.layout.replace('-', ' ')} · ${extraction.wordCount.toLocaleString()} ${t('words')}`
+                          : t('Choose which extracted sections to apply to your profile.')}
                       </div>
                     </div>
                   </div>
@@ -423,29 +423,28 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                               : 'text-[var(--color-danger)] border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10'
                         }`}
                       >
-                        {quality} quality
+                        {t(quality)} {t('quality')}
                       </span>
                     )}
                     {overallConfidence !== null && (
                       <span className="text-[10px] font-mono text-[var(--text-muted)]">
-                        {overallConfidence}% overall confidence
+                        {overallConfidence}% {t('overall confidence')}
                       </span>
                     )}
                   </div>
                 </div>
 
                 <p className="text-[11px] text-[var(--text-secondary)]">
-                  Review what was found, untick anything you do not want, then confirm. Existing
-                  profile values and records are never overwritten.
+                  {t('Review what was found, untick anything you do not want, then confirm. Existing profile values and records are never overwritten.')}
                 </p>
 
                 {extraction && extraction.warnings.length > 0 && (
                   <div className="rounded-lg border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 p-2.5">
                     <div className="text-[11px] font-semibold text-[var(--color-warning)] flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5" />
-                      <span>Before you import</span>
+                      <span>{t('Before you import')}</span>
                     </div>
-                    <ul className="list-disc pl-4 mt-1 space-y-0.5 text-[11px] text-[var(--text-secondary)]">
+                    <ul className="list-disc ps-4 mt-1 space-y-0.5 text-[11px] text-[var(--text-secondary)]">
                       {extraction.warnings.map((warning, index) => (
                         <li key={index}>{warning}</li>
                       ))}
@@ -457,9 +456,9 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                   <details className="text-[11px]">
                     <summary className="cursor-pointer font-semibold text-[var(--color-primary-text)] flex items-center gap-1.5">
                       <Info className="w-3.5 h-3.5" />
-                      <span>Why these fields? ({extraction.evidence.length} evidence snippets)</span>
+                      <span>{t('Why these fields?')} ({extraction.evidence.length} {t('evidence snippets')})</span>
                     </summary>
-                    <div className="mt-2 max-h-40 overflow-y-auto space-y-1 pr-1">
+                    <div className="mt-2 max-h-40 overflow-y-auto space-y-1 pe-1">
                       {extraction.evidence.slice(0, 12).map((item, index) => (
                         <div key={index} className="text-[var(--text-secondary)]">
                           <span className="font-mono text-[var(--text-muted)]">
@@ -476,8 +475,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
 
               {result && result.failed > 0 && (
                 <p className="text-[11px] text-[var(--text-secondary)]">
-                  Retry only creates the records that are still missing. Rows that already
-                  succeeded are skipped, so nothing is duplicated.
+                  {t('Retry only creates the records that are still missing. Rows that already succeeded are skipped, so nothing is duplicated.')}
                 </p>
               )}
 
@@ -491,7 +489,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       onChange={(e) => { e.stopPropagation(); toggleSection('personal'); }}
                       className="rounded accent-[var(--accent-primary)] cursor-pointer"
                     />
-                    <span className="text-xs font-bold text-[var(--text-primary)]">Personal Details</span>
+                    <span className="text-xs font-bold text-[var(--text-primary)]">{t('Personal Details')}</span>
                     {confidenceBadge(sectionConfidence('personal'))}
                   </div>
                   {expandedSections.personal ? <ChevronUp className="w-4 h-4 text-[var(--text-muted)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />}
@@ -499,27 +497,27 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                 {expandedSections.personal && extractedData && (
                   <div className="p-4 space-y-2 text-xs border-t border-[var(--border-subtle)] bg-[var(--surface-main)]">
                     <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div><span className="text-[var(--text-muted)]">Name:</span> <strong className="text-[var(--text-primary)]">{extractedData.fullName || 'Not specified'}</strong></div>
-                      <div><span className="text-[var(--text-muted)]">Title:</span> <strong className="text-[var(--text-primary)]">{extractedData.title || 'Not specified'}</strong></div>
-                      <div><span className="text-[var(--text-muted)]">Location:</span> <strong className="text-[var(--text-primary)]">{extractedData.location || 'Not specified'}</strong></div>
-                      <div><span className="text-[var(--text-muted)]">Email:</span> <strong className="text-[var(--text-primary)]">{extractedData.email || 'Not specified'}</strong></div>
-                      <div><span className="text-[var(--text-muted)]">Phone:</span> <strong className="text-[var(--text-primary)]">{extractedData.phone || 'Not specified'}</strong></div>
+                      <div><span className="text-[var(--text-muted)]">{t('Name:')}</span> <strong className="text-[var(--text-primary)]">{extractedData.fullName || t('Not specified')}</strong></div>
+                      <div><span className="text-[var(--text-muted)]">{t('Title:')}</span> <strong className="text-[var(--text-primary)]">{extractedData.title || t('Not specified')}</strong></div>
+                      <div><span className="text-[var(--text-muted)]">{t('Location:')}</span> <strong className="text-[var(--text-primary)]">{extractedData.location || t('Not specified')}</strong></div>
+                      <div><span className="text-[var(--text-muted)]">{t('Email:')}</span> <strong className="text-[var(--text-primary)]">{extractedData.email || t('Not specified')}</strong></div>
+                      <div><span className="text-[var(--text-muted)]">{t('Phone:')}</span> <strong className="text-[var(--text-primary)]">{extractedData.phone || t('Not specified')}</strong></div>
                     </div>
                     {(extractedData.linkedin || extractedData.github || extractedData.website) && (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {extractedData.linkedin && (
                           <a href={extractedData.linkedin} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--color-primary-text)] inline-flex items-center gap-1">
-                            LinkedIn <ExternalLink className="w-2.5 h-2.5" />
+                            {t('LinkedIn')} <ExternalLink className="w-2.5 h-2.5" />
                           </a>
                         )}
                         {extractedData.github && (
                           <a href={extractedData.github} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--color-primary-text)] inline-flex items-center gap-1">
-                            GitHub <ExternalLink className="w-2.5 h-2.5" />
+                            {t('GitHub')} <ExternalLink className="w-2.5 h-2.5" />
                           </a>
                         )}
                         {extractedData.website && (
                           <a href={extractedData.website} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--color-primary-text)] inline-flex items-center gap-1">
-                            Website <ExternalLink className="w-2.5 h-2.5" />
+                            {t('Website')} <ExternalLink className="w-2.5 h-2.5" />
                           </a>
                         )}
                       </div>
@@ -527,7 +525,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                     {extractedData.summary && (
                       <div className="pt-1 border-t border-[var(--border-subtle)] space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Summary</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t('Summary')}</span>
                           {confidenceBadge(sectionConfidence('summary'))}
                         </div>
                         <p className="text-[11px] text-[var(--text-secondary)] italic">
@@ -550,7 +548,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       className="rounded accent-[var(--accent-primary)] cursor-pointer"
                     />
                     <span className="text-xs font-bold text-[var(--text-primary)]">
-                      Work Experience ({extractedData?.experiences?.length || 0})
+                      {t('Work Experience')} ({extractedData?.experiences?.length || 0})
                     </span>
                     {confidenceBadge(sectionConfidence('experience'))}
                   </div>
@@ -582,7 +580,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       className="rounded accent-[var(--accent-primary)] cursor-pointer"
                     />
                     <span className="text-xs font-bold text-[var(--text-primary)]">
-                      Education ({extractedData?.education?.length || 0})
+                      {t('Education')} ({extractedData?.education?.length || 0})
                     </span>
                     {confidenceBadge(sectionConfidence('education'))}
                   </div>
@@ -614,7 +612,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                       className="rounded accent-[var(--accent-primary)] cursor-pointer"
                     />
                     <span className="text-xs font-bold text-[var(--text-primary)]">
-                      Skills ({extractedData?.skillsList?.length || 0})
+                      {t('Skills')} ({extractedData?.skillsList?.length || 0})
                     </span>
                     {confidenceBadge(sectionConfidence('skills'))}
                   </div>
@@ -643,7 +641,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                         className="rounded accent-[var(--accent-primary)] cursor-pointer"
                       />
                       <span className="text-xs font-bold text-[var(--text-primary)]">
-                        Projects ({extractedData.projects.length})
+                        {t('Projects')} ({extractedData.projects.length})
                       </span>
                       {confidenceBadge(sectionConfidence('projects'))}
                     </div>
@@ -674,7 +672,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                         className="rounded accent-[var(--accent-primary)] cursor-pointer"
                       />
                       <span className="text-xs font-bold text-[var(--text-primary)]">
-                        Certifications ({extractedData.certifications.length})
+                        {t('Certifications')} ({extractedData.certifications.length})
                       </span>
                       {confidenceBadge(sectionConfidence('certifications'))}
                     </div>
@@ -713,7 +711,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                 onClick={onClose}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               {activeTab !== 'scratch' && (
                 <button
@@ -723,7 +721,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                   className="px-5 py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-2 disabled:opacity-50 transition-colors shadow-xs"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>{isExtracting ? 'Extracting text and structure…' : 'Extract CV Information'}</span>
+                  <span>{isExtracting ? t('Extracting text and structure…') : t('Extract CV Information')}</span>
                 </button>
               )}
             </>
@@ -735,7 +733,7 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                 disabled={isImporting}
                 className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-50"
               >
-                Back to Upload
+                {t('Back to Upload')}
               </button>
               <button
                 type="button"
@@ -746,10 +744,10 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
                 <Check className="w-4 h-4" />
                 <span>
                   {isImporting
-                    ? 'Importing Data…'
+                    ? t('Importing Data…')
                     : result && result.failed > 0
-                      ? 'Retry Failed Items'
-                      : 'Import Selected Information'}
+                      ? t('Retry Failed Items')
+                      : t('Import Selected Information')}
                 </span>
               </button>
             </>

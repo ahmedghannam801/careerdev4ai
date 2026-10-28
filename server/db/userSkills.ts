@@ -75,12 +75,29 @@ export async function resolveSkillId(name: string, category?: string): Promise<s
   const trimmed = name.trim();
   if (!trimmed) return null;
 
+  // The lookup is case-insensitive. The catalogue is global, so "Arabic" and
+  // "arabic" are the same skill: without this, two users who typed the same
+  // skill differently would each create their own row, the skill list would
+  // show the skill twice, and the gap engine would count it twice.
+  //
+  // Two details matter here. The LIKE metacharacters have to be escaped, or
+  // a skill called "C++" would match any name containing a "C"; and the result
+  // is read as a list rather than with maybeSingle(), because the catalogue
+  // still holds one legacy pair of rows that differ only in case and would
+  // make a single-row read fail.
+  const escaped = trimmed.replace(/([%_\\])/g, '\\$1');
   const { data: found } = await getSupabaseServer()
     .from('skills')
-    .select('id')
-    .eq('name', trimmed)
-    .maybeSingle();
-  if (found?.id) return found.id as string;
+    .select('id, name')
+    .ilike('name', escaped)
+    .limit(4);
+  const candidates = found ?? [];
+  if (candidates.length > 0) {
+    // Prefer the row whose casing matches what the caller typed.
+    const exact = candidates.find((row) => row.name === trimmed);
+    const chosen = exact ?? candidates[0];
+    if (chosen?.id) return chosen.id as string;
+  }
 
   const { data: created, error } = await getSupabaseServer()
     .from('skills')
@@ -93,9 +110,9 @@ export async function resolveSkillId(name: string, category?: string): Promise<s
     const { data: raced } = await getSupabaseServer()
       .from('skills')
       .select('id')
-      .eq('name', trimmed)
-      .maybeSingle();
-    if (raced?.id) return raced.id as string;
+      .ilike('name', escaped)
+      .limit(1);
+    if (raced?.[0]?.id) return raced[0].id as string;
     throw error;
   }
   return created?.id ?? null;

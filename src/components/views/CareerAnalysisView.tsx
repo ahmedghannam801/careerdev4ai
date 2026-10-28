@@ -25,8 +25,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
     refreshAiAnalysis,
     isAnalyzing,
     aiPreferences,
-    privacyPreferences,
-  } = useCareer();
+    privacyPreferences, t,} = useCareer();
   const aiAnalysisEnabled =
     aiPreferences.recommendationsEnabled && privacyPreferences.shareAnalyticsWithAi;
 
@@ -35,9 +34,9 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">GRAPH REASONING ENGINE</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('GRAPH REASONING ENGINE')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Career Analysis: Current State vs Target State
+            {t('Career Analysis: Current State vs Target State')}
           </h1>
         </div>
 
@@ -48,18 +47,18 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
             title={
               aiAnalysisEnabled
                 ? undefined
-                : 'Enable AI Recommendations and Career Graph AI Grounding in Settings.'
+                : t('Enable AI Recommendations and Career Graph AI Grounding in Settings.')
             }
             className="px-3.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-primary)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
-            <span>{isAnalyzing ? 'Re-evaluating with AI...' : 'Run Deep AI Gap Analysis'}</span>
+            <span>{t(isAnalyzing ? 'Re-evaluating with AI...' : 'Run Deep AI Gap Analysis')}</span>
           </button>
           <button
             onClick={() => onNavigate('plan')}
             className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
-            <span>Generate Personal Plan</span>
+            <span>{t('Generate Personal Plan')}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -70,34 +69,34 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           {/* Current State Column */}
           <div className="md:col-span-5 space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Current State</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t('Current State')}</div>
             <div className="text-xl font-bold text-[var(--text-primary)]">{profile.name}</div>
             <div className="text-xs text-[var(--text-secondary)]">
-              {profile.currentTitle} · {profile.careerState.replace('_', ' ')}
+              {profile.currentTitle} · {t(profile.careerState.replace('_', ' '))}
             </div>
             <div className="text-xs text-[var(--text-muted)] pt-1">
-              {skills.length} tracked skills · {skills.filter(s => s.evidenceIds.length > 0).length} verified with evidence
+              {skills.length} {t('tracked skills')} · {skills.filter(s => s.evidenceIds.length > 0).length} {t('verified with evidence')}
             </div>
           </div>
 
           {/* Central Match Indicator */}
           <div className="md:col-span-2 text-center py-4 border-y md:border-y-0 md:border-x border-[var(--border-subtle)] space-y-1">
-            <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">Readiness Match</div>
+            <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">{t('Readiness Match')}</div>
             <div className="text-4xl font-extrabold font-mono tabular-nums text-[var(--color-primary-text)]">
               {analysis.matchPercentage}%
             </div>
-            <div className="text-[10px] text-[var(--text-muted)]">Relative to Role Benchmarks</div>
+            <div className="text-[10px] text-[var(--text-muted)]">{t('Relative to Role Benchmarks')}</div>
           </div>
 
           {/* Target State Column */}
-          <div className="md:col-span-5 space-y-2 md:text-right">
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">Target State</div>
+          <div className="md:col-span-5 space-y-2 md:text-end">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">{t('Target State')}</div>
             <div className="text-xl font-bold text-[var(--text-primary)]">{targetRole.title}</div>
             <div className="text-xs text-[var(--text-secondary)]">
-              {targetRole.category} · {targetRole.level} Level
+              {targetRole.category} · {targetRole.level} {t('Level')}
             </div>
             <div className="text-xs text-[var(--text-muted)] pt-1">
-              Salary Expectation: <span className="font-mono text-[var(--color-success-strong)]">{targetRole.salaryRange.split(' ')[0]}</span>
+              {t('Salary Expectation:')} <span className="font-mono text-[var(--color-success-strong)]">{targetRole.salaryRange.split(' ')[0]}</span>
             </div>
           </div>
         </div>
@@ -106,7 +105,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
         <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
           <AlertTriangle className="w-3.5 h-3.5 text-[var(--color-warning)] shrink-0" />
           <span>
-            Career readiness reflects algorithmic alignment with industry skill requirements. It is a developmental guidance metric and not a guarantee of employment.
+            {t('Career readiness reflects algorithmic alignment with industry skill requirements. It is a developmental guidance metric and not a guarantee of employment.')}
           </span>
         </div>
       </div>
@@ -119,7 +118,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
           <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[var(--color-success-strong)]" />
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Demonstrated Strengths</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Demonstrated Strengths')}</h3>
             </div>
             <div className="space-y-2.5">
               {analysis.strengths.map((st, i) => (
@@ -135,7 +134,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
           <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[var(--color-warning)]" />
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Critical Skill Gaps</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Critical Skill Gaps')}</h3>
             </div>
             <div className="space-y-2.5">
               {analysis.criticalGaps.map((gap, i) => (
@@ -143,7 +142,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
                   <div className="flex items-center justify-between font-semibold text-[var(--text-primary)]">
                     <span>{gap.skill}</span>
                     <span className="font-mono text-[var(--color-warning)]">
-                      Lvl {gap.current} → Lvl {gap.target}
+                      {t('Lvl')} {gap.current} → {t('Lvl')} {gap.target}
                     </span>
                   </div>
                   <div className="text-[var(--text-secondary)] leading-relaxed">{gap.reason}</div>
@@ -159,11 +158,11 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
           <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-[var(--color-danger)]" />
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Missing Experience & Career Risks</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Missing Experience & Career Risks')}</h3>
             </div>
             <div className="space-y-3 text-xs">
               <div>
-                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">Missing Experience</div>
+                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">{t('Missing Experience')}</div>
                 <ul className="space-y-1.5 text-[var(--text-secondary)]">
                   {analysis.missingExperience.map((exp, i) => (
                     <li key={i} className="flex items-start gap-2">
@@ -175,7 +174,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
               </div>
 
               <div className="pt-2 border-t border-[var(--border-subtle)]">
-                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">Marketplace Risks</div>
+                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">{t('Marketplace Risks')}</div>
                 <ul className="space-y-1.5 text-[var(--text-secondary)]">
                   {analysis.careerRisks.map((risk, i) => (
                     <li key={i} className="flex items-start gap-2">
@@ -192,14 +191,14 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
           <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-[var(--color-primary-text)]" />
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Recommended Bridging Artifacts</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Recommended Bridging Artifacts')}</h3>
             </div>
 
             <div className="space-y-3">
               <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary-text)]">
                   <FolderGit2 className="w-3.5 h-3.5" />
-                  <span>Prescribed Project Deliverables</span>
+                  <span>{t('Prescribed Project Deliverables')}</span>
                 </div>
                 <ul className="text-xs text-[var(--text-secondary)] space-y-1">
                   {analysis.recommendedProjects.map((proj, i) => (
@@ -210,14 +209,14 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
                   onClick={() => onNavigate('projects')}
                   className="mt-1 text-xs text-[var(--color-primary-text)] hover:underline font-medium block"
                 >
-                  Create Prescribed Project →
+                  {t('Create Prescribed Project →')}
                 </button>
               </div>
 
               <div className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-success-strong)]">
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>Recommended Curricula</span>
+                  <span>{t('Recommended Curricula')}</span>
                 </div>
                 <ul className="text-xs text-[var(--text-secondary)] space-y-1">
                   {analysis.recommendedLearning.map((learn, i) => (
@@ -228,7 +227,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
                   onClick={() => onNavigate('learning')}
                   className="mt-1 text-xs text-[var(--color-primary-text)] hover:underline font-medium block"
                 >
-                  Browse Curated Courses →
+                  {t('Browse Curated Courses →')}
                 </button>
               </div>
             </div>

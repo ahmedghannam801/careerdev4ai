@@ -110,7 +110,29 @@ import {
 import { rankCourses, type LearningFormat, type LearningStatus } from './server/learning/recommendation.ts';
 import { enrichRecommendationsWithAi } from './server/learning/ai.ts';
 import { buildLearningContext } from './server/learning/context.ts';
+import {
+  buildPersonalizedPlan,
+  generateAndPersistRoadmap,
+  getOrRefreshRoadmap,
+  getSkillGapSummary,
+  RoadmapGenerationError,
+} from './server/roadmap/service.ts';
+import {
+  listVolunteerOpportunities,
+  saveVolunteerOpportunity,
+  unsaveVolunteerOpportunity,
+} from './server/db/volunteerOpportunities.ts';
+import { buildCvFromProfile } from './server/cv/buildCv.ts';
+import {
+  listDismissedGuides,
+  dismissGuide,
+} from './server/db/guides.ts';
 import { loadAiCareerContext, buildAiContextBlock } from './server/ai/careerContext.ts';
+import {
+  groundingRules,
+  stripUngroundedSentences,
+} from './server/ai/grounding.ts';
+import { buildGroundingProfileForUser } from './server/ai/groundingProfile.ts';
 import {
   consumeDailyAiBudget,
   isQuotaError,
@@ -1323,6 +1345,7 @@ JSON Schema:
 }
 Parsed CV:
 ${JSON.stringify(parsedCV)}
+${groundingRules()}
 Return only valid JSON.`;
 
     let atsAnalysis: any = null;
@@ -1580,6 +1603,7 @@ Current persona: "${persona}".
 Skills: ${JSON.stringify(userSkills)}.
 Required for role: ${JSON.stringify(requiredSkills)}.
 Analyse the candidate for this role in this domain. Do not assume a technical or software role; judge the candidate against the requirements of the role that was given.
+${groundingRules()}
 
 Return valid JSON schema:
 {
@@ -1645,6 +1669,7 @@ app.post('/api/optimize-cv', requireAuth, aiRateLimit, async (req: Request, res:
     const { cvText, targetRoleTitle, targetRoleSkills } = req.body;
     const prompt = `Evaluate CV for role "${targetRoleTitle}". Required: ${JSON.stringify(targetRoleSkills || [])}.
 CV: ${cvText}
+${groundingRules()}
 Return JSON schema:
 {
   "overallScore": number (integer 0-100),
@@ -1679,6 +1704,29 @@ Return JSON schema:
             'CV analysis returned an invalid response. No ATS analysis was accepted; please try again shortly.',
         });
       }
+
+      // The model may only suggest rewrites of what the candidate already
+      // has. Any suggestion that introduces a company, a metric or a link
+      // that is not in their record is removed rather than shown, and the
+      // user is told that it happened.
+      const grounding = await buildGroundingProfileForUser(req.authUser!.id);
+      const removed: string[] = [];
+      for (const improvement of payload.actionableImprovements ?? []) {
+        if (typeof improvement?.suggestedText !== 'string') continue;
+        const result = stripUngroundedSentences(improvement.suggestedText, grounding);
+        if (result.removed.length > 0) {
+          removed.push(...result.removed.map((claim) => claim.claim));
+          improvement.suggestedText = result.text;
+        }
+      }
+      if (removed.length > 0) {
+        payload.groundingNotes = {
+          removedSuggestions: removed,
+          message:
+            'Some suggested wording mentioned details that are not in your profile and was removed. Add the detail to your profile first if you want it suggested.',
+        };
+      }
+
       return res.json(payload);
     } catch (e) {
       // An invented ATS score and invented "improvements" would be actively
@@ -1711,6 +1759,7 @@ app.post('/api/mock-interview', requireAuth, aiRateLimit, async (req: Request, r
     const prompt = `Evaluate interview answer for "${safeRoleTitle}". Type: ${safeType}.
 Question: "${safeQuestion}"
 Answer: "${safeAnswer}"
+${groundingRules()}
 Return JSON schema:
 {
   "score": number,
@@ -1790,7 +1839,7 @@ Key Achievements: ${safeAchievements}
 Requirements:
 - First-person or punchy executive third-person tone.
 - Emphasize business impact and mastery of the skills the role actually requires.
-- Do not invent non-existent companies or fabricated awards.
+${groundingRules()}
 - Return JSON: { "suggestedSummary": string }`;
 
     // No model on this server means no summary can be produced. This is
@@ -1817,6 +1866,22 @@ Requirements:
           error:
             'Summary generation returned an invalid response. No summary was accepted; please try again shortly.',
         });
+      }
+
+      // A summary is the one part of a CV a hiring manager reads first, so a
+      // fabricated employer or metric here is the most damaging kind of
+      // invention. The sentence is removed rather than shown.
+      if (typeof payload.suggestedSummary === 'string') {
+        const grounding = await buildGroundingProfileForUser(req.authUser!.id);
+        const result = stripUngroundedSentences(payload.suggestedSummary, grounding);
+        if (result.removed.length > 0) {
+          payload.suggestedSummary = result.text;
+          payload.groundingNotes = {
+            removedSuggestions: result.removed.map((claim) => claim.claim),
+            message:
+              'Part of the summary mentioned details that are not in your profile and was removed. Add the detail to your profile first if you want it used.',
+          };
+        }
       }
       return res.json(payload);
     } catch (e) {
@@ -1859,9 +1924,10 @@ Candidate Relevant Background:
 - Key Projects: ${JSON.stringify(safeProjects)}
 
 Rules:
-1. Ground every claim strictly in candidate's provided experiences and projects. DO NOT invent false metrics or companies.
+1. Ground every claim strictly in candidate's provided experiences and projects.
 2. Structure: Strong hook expressing excitement for ${safeCompany}, high-relevance achievement showcase directly matching the job, and proactive closing.
 3. Keep it under 350 words.
+${groundingRules()}
 4. Return JSON: { "coverLetter": string, "keyHighlights": [string] }`;
 
     // No model on this server means no cover letter can be produced. This is
@@ -1888,6 +1954,22 @@ Rules:
           error:
             'Cover letter generation returned an invalid response. No cover letter was accepted; please try again shortly.',
         });
+      }
+
+      // A cover letter is written to be sent to an employer, so a claim the
+      // candidate cannot stand behind is removed before the user ever sees
+      // it, and they are told it happened.
+      if (typeof payload.coverLetter === 'string') {
+        const grounding = await buildGroundingProfileForUser(req.authUser!.id);
+        const result = stripUngroundedSentences(payload.coverLetter, grounding);
+        if (result.removed.length > 0) {
+          payload.coverLetter = result.text;
+          payload.groundingNotes = {
+            removedSuggestions: result.removed.map((claim) => claim.claim),
+            message:
+              'Part of the letter mentioned details that are not in your profile and was removed. Add the detail to your profile first if you want it used.',
+          };
+        }
       }
       return res.json(payload);
     } catch (e) {
@@ -3011,6 +3093,97 @@ app.get('/api/projects/:id/volunteer', requireAuth, async (req: Request, res: Re
   }
 });
 
+// ---- Volunteer opportunities ----
+//
+// The catalogue of real volunteering programmes a user can apply to, ranked
+// for the signed-in user. The ranking never hides a row: the full catalogue
+// is always returned, with the reason for the order shown alongside.
+app.get('/api/volunteer/opportunities', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const opportunities = await listVolunteerOpportunities(req.authUser!.id);
+    const category = str(req.query?.category, 60);
+    const filtered = category
+      ? opportunities.filter((opportunity) => opportunity.category === category)
+      : opportunities;
+    return res.json({
+      success: true,
+      opportunities: filtered,
+      total: opportunities.length,
+      categories: Array.from(new Set(opportunities.map((item) => item.category))).sort(),
+    });
+  } catch (error) {
+    console.error('Failed to load volunteer opportunities:', error);
+    return res.status(500).json({ error: 'Failed to load volunteer opportunities' });
+  }
+});
+
+app.post('/api/volunteer/opportunities/:id/save', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const opportunityId = str(req.params.id, 120);
+    if (!opportunityId) return res.status(400).json({ error: 'Invalid opportunity id' });
+    await saveVolunteerOpportunity(req.authUser!.id, opportunityId);
+    return res.json({ success: true, saved: true });
+  } catch (error) {
+    console.error('Failed to save the volunteer opportunity:', error);
+    return res.status(500).json({ error: 'Failed to save the opportunity' });
+  }
+});
+
+app.delete('/api/volunteer/opportunities/:id/save', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const opportunityId = str(req.params.id, 120);
+    if (!opportunityId) return res.status(400).json({ error: 'Invalid opportunity id' });
+    await unsaveVolunteerOpportunity(req.authUser!.id, opportunityId);
+    return res.json({ success: true, saved: false });
+  } catch (error) {
+    console.error('Failed to remove the saved volunteer opportunity:', error);
+    return res.status(500).json({ error: 'Failed to remove the opportunity' });
+  }
+});
+
+// ---- Guided tour state ----
+//
+// Which first-use hints the user has already dismissed. The client uses this
+// to show a tour once, not on every visit.
+app.get('/api/guides', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const dismissed = await listDismissedGuides(req.authUser!.id);
+    return res.json({ success: true, dismissed });
+  } catch (error) {
+    console.error('Failed to load guide state:', error);
+    return res.status(500).json({ error: 'Failed to load guide state' });
+  }
+});
+
+app.post('/api/guides/:key/dismiss', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const key = str(req.params.key, 60);
+    if (!key) return res.status(400).json({ error: 'Invalid guide key' });
+    const dismissal = await dismissGuide(req.authUser!.id, key);
+    return res.json({ success: true, dismissal });
+  } catch (error) {
+    console.error('Failed to dismiss the guide:', error);
+    return res.status(500).json({ error: 'Failed to dismiss the guide' });
+  }
+});
+
+// ---- CV built from real profile data ----
+//
+// Assembles a CV from the user's own records. It never invents a company, a
+// date, a skill, a certificate or a metric; the `missing` list reports what
+// the user still needs to supply.
+app.get('/api/cv/build', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const cv = await buildCvFromProfile(req.authUser!.id, {
+      email: req.authUser?.email ?? null,
+    });
+    return res.json({ success: true, cv });
+  } catch (error) {
+    console.error('Failed to build the CV:', error);
+    return res.status(500).json({ error: 'Failed to build the CV' });
+  }
+});
+
 // ---- Volunteer experience ----
 //
 // A volunteer stint is its own domain: it has an organisation, a role, a
@@ -3789,6 +3962,88 @@ app.post('/api/roadmap', requireAuth, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to create roadmap:', error);
     return res.status(500).json({ error: 'Failed to create roadmap' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Personalised roadmap.
+//
+// The plan is generated on the server from the user's target role and their
+// own skill ratings, then persisted so progress survives a reload. The
+// generator lives in shared/roadmapGenerator.ts; this route only does I/O.
+// ---------------------------------------------------------------------------
+app.get('/api/roadmap/personalized', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const result = await getOrRefreshRoadmap(req.authUser!.id);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Choose a target role to generate a roadmap',
+        code: 'no_target_role',
+      });
+    }
+    return res.json({
+      success: true,
+      roadmap: result.roadmap,
+      plan: result.plan,
+      regenerated: result.regenerated,
+    });
+  } catch (error) {
+    console.error('Failed to build the personalised roadmap:', error);
+    return res.status(500).json({ error: 'Failed to build the roadmap' });
+  }
+});
+
+app.post('/api/roadmap/generate', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const result = await generateAndPersistRoadmap(req.authUser!.id, {
+      isEnrolled: typeof req.body?.isEnrolled === 'boolean' ? req.body.isEnrolled : undefined,
+    });
+    return res.json({
+      success: true,
+      roadmap: result.roadmap,
+      plan: result.plan,
+    });
+  } catch (error) {
+    if (error instanceof RoadmapGenerationError) {
+      const status = error.code === 'no_target_role' ? 400 : 422;
+      return res.status(status).json({ success: false, error: error.message, code: error.code });
+    }
+    console.error('Failed to regenerate the roadmap:', error);
+    return res.status(500).json({ error: 'Failed to regenerate the roadmap' });
+  }
+});
+
+// The skill gap picture for the user's target role, with priorities.
+app.get('/api/skill-gaps', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const result = await getSkillGapSummary(req.authUser!.id);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Choose a target role to see your skill gaps',
+        code: 'no_target_role',
+      });
+    }
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Failed to compute skill gaps:', error);
+    return res.status(500).json({ error: 'Failed to compute skill gaps' });
+  }
+});
+
+// A preview of the plan without writing anything, so the UI can show what
+// would change before the user commits to it.
+app.get('/api/roadmap/preview', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const plan = await buildPersonalizedPlan(req.authUser!.id);
+    return res.json({ success: true, plan });
+  } catch (error) {
+    if (error instanceof RoadmapGenerationError) {
+      return res.status(400).json({ success: false, error: error.message, code: error.code });
+    }
+    console.error('Failed to preview the roadmap:', error);
+    return res.status(500).json({ error: 'Failed to preview the roadmap' });
   }
 });
 

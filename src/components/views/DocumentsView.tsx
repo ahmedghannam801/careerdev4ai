@@ -28,8 +28,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
     generateAiCoverLetter, 
     applications,
     aiPreferences,
-    privacyPreferences
-  } = useCareer();
+    privacyPreferences, t} = useCareer();
 
   // AI requests are opt-in for writing and for sharing the career graph with
   // the provider. Both Settings controls must be on before the button runs.
@@ -137,10 +136,10 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold mb-2">
             <FileText className="w-3.5 h-3.5" />
-            <span>Document Hub</span>
+            <span>{t('Document Hub')}</span>
           </div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
-            My Documents & Workspaces
+            {t('My Documents & Workspaces')}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
             Centralized management for your CV versions, tailored cover letters, certifications, and portfolio assets.
@@ -153,7 +152,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            <span>Open CV Studio</span>
+            <span>{t('Open CV Studio')}</span>
           </button>
         </div>
       </div>
@@ -204,7 +203,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs">
             <div className="flex items-center gap-2">
               <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-              <span className="text-[var(--text-secondary)] font-medium">Filter by Type:</span>
+              <span className="text-[var(--text-secondary)] font-medium">{t('Filter by Type:')}</span>
               {(['all', 'cv', 'cover_letter', 'certificate', 'portfolio'] as const).map(type => (
                 <button
                   key={type}
@@ -253,7 +252,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                       <button
                         onClick={() => deleteDocument(doc.id)}
                         className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)] rounded"
-                        title="Delete document"
+                        title={t('Delete document')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -304,7 +303,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
             <div>
               <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                Target Role CV Versions
+                {t('Target Role CV Versions')}
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
                 Maintain distinct, tailored versions for specific roles without overwriting your master profile.
@@ -314,7 +313,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
               onClick={() => onNavigate('cv-studio')}
               className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5"
             >
-              <span>Open CV Studio</span>
+              <span>{t('Open CV Studio')}</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -335,7 +334,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                     </span>
                   </div>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Target Role: <strong className="text-[var(--text-primary)]">{version.targetRoleTitle}</strong> • Created {version.createdAt}
+                    {t('Target Role:')} <strong className="text-[var(--text-primary)]">{version.targetRoleTitle}</strong> • Created {version.createdAt}
                   </p>
                 </div>
 
@@ -348,7 +347,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                     }}
                     className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-primary)]"
                   >
-                    Rename
+                    {t('Rename')}
                   </button>
 
                   <button
@@ -356,21 +355,21 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                     className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-primary)] flex items-center gap-1"
                   >
                     <Copy className="w-3 h-3 text-[var(--text-muted)]" />
-                    <span>Duplicate</span>
+                    <span>{t('Duplicate')}</span>
                   </button>
 
                   <button
                     onClick={() => onNavigate('cv-studio')}
                     className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold text-xs hover:bg-[var(--accent-primary)] hover:text-[var(--color-on-primary)] transition-colors"
                   >
-                    Edit in CV Studio
+                    {t('Edit in CV Studio')}
                   </button>
 
                   {cvVersions.length > 1 && (
                     <button
                       onClick={() => deleteCVVersion(version.id)}
                       className="p-1.5 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--color-danger)]"
-                      title="Delete version"
+                      title={t('Delete version')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -390,7 +389,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             <div className="pb-3 border-b border-[var(--border-subtle)]">
               <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[var(--color-primary-text)]" />
-                <span>AI Cover Letter Generator</span>
+                <span>{t('AI Cover Letter Generator')}</span>
               </h2>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 Generate compelling, tailored cover letters grounded strictly in your verified experiences and metrics.
@@ -399,62 +398,62 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Target Company</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Target Company')}</label>
                 <input
                   type="text"
                   value={clForm.company}
                   onChange={(e) => setClForm(prev => ({ ...prev, company: e.target.value }))}
-                  placeholder="e.g. Acme Corp"
+                  placeholder={t('e.g. Acme Corp')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">Target Job Title</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Target Job Title')}</label>
                 <input
                   type="text"
                   value={clForm.jobTitle}
                   onChange={(e) => setClForm(prev => ({ ...prev, jobTitle: e.target.value }))}
-                  placeholder="e.g. Frontend Engineer (React / TypeScript)"
+                  placeholder={t('e.g. Frontend Engineer (React / TypeScript)')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
                 <label className="font-semibold text-[var(--text-primary)] block mb-1">
-                  Job Description / Key Requirements
+                  {t('Job Description / Key Requirements')}
                 </label>
                 <textarea
                   rows={4}
                   value={clForm.jobDescription}
                   onChange={(e) => setClForm(prev => ({ ...prev, jobDescription: e.target.value }))}
-                  placeholder="Paste job description keywords or priorities..."
+                  placeholder={t('Paste job description keywords or priorities...')}
                   className="w-full p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] leading-relaxed"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Tone & Voice</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Tone & Voice')}</label>
                   <select
                     value={clForm.tone}
                     onChange={(e) => setClForm(prev => ({ ...prev, tone: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   >
-                    <option value="Professional & Confident">Professional & Confident</option>
-                    <option value="Technical & Data-Driven">Technical & Data-Driven</option>
-                    <option value="Conversational & Authentic">Conversational & Authentic</option>
+                    <option value="Professional & Confident">{t('Professional & Confident')}</option>
+                    <option value="Technical & Data-Driven">{t('Technical & Data-Driven')}</option>
+                    <option value="Conversational & Authentic">{t('Conversational & Authentic')}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">Link to Application (Optional)</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Link to Application (Optional)')}</label>
                   <select
                     value={selectedAppForCl}
                     onChange={(e) => setSelectedAppForCl(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   >
-                    <option value="">None (Standalone)</option>
+                    <option value="">{t('None (Standalone)')}</option>
                     {applications.map(a => (
                       <option key={a.id} value={a.id}>{a.company} — {a.role}</option>
                     ))}
@@ -491,10 +490,10 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  Live Preview & Approval
+                  {t('Live Preview & Approval')}
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  Review and approve synthesized content. Never submitted without confirmation.
+                  {t('Review and approve synthesized content. Never submitted without confirmation.')}
                 </p>
               </div>
 
@@ -511,7 +510,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                     onClick={handleSaveActiveCoverLetter}
                     className="px-3 py-1 rounded-md bg-[var(--color-success-strong)] hover:bg-[var(--color-success-hover)] text-[var(--color-on-primary)] font-semibold text-xs transition-colors"
                   >
-                    Approve & Save
+                    {t('Approve & Save')}
                   </button>
                 </div>
               )}
@@ -531,7 +530,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                 {clHighlights.length > 0 && (
                   <div className="p-3 rounded-xl bg-[var(--accent-surface)]/40 border border-[var(--accent-primary)]/20 space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                      Strategic Highlights Grounded in Your Background
+                      {t('Strategic Highlights Grounded in Your Background')}
                     </span>
                     <ul className="text-xs text-[var(--text-secondary)] space-y-1">
                       {clHighlights.map((hl, idx) => (
@@ -554,7 +553,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             ) : (
               <div className="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-[var(--border-subtle)] rounded-xl text-[var(--text-muted)] space-y-2">
                 <FileCode className="w-8 h-8 text-[var(--text-muted)]" />
-                <p className="text-xs font-medium">No draft generated yet.</p>
+                <p className="text-xs font-medium">{t('No draft generated yet.')}</p>
                 <p className="text-[11px] text-[var(--text-muted)] max-w-xs">
                   Fill in the target company and job details on the left, then click Generate to create a tailored letter.
                 </p>
@@ -572,7 +571,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
       {renameModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h3 className="text-base font-bold text-[var(--text-primary)]">Rename CV Version</h3>
+            <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Rename CV Version')}</h3>
             <div>
               <input
                 type="text"
@@ -582,7 +581,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
               />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
-              <button onClick={() => setRenameModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">Cancel</button>
+              <button onClick={() => setRenameModalOpen(false)} className="px-3 py-1.5 text-xs text-[var(--text-secondary)]">{t('Cancel')}</button>
               <button
                 onClick={() => {
                   if (renamingId && newCvName.trim()) {
@@ -592,7 +591,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                 }}
                 className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold"
               >
-                Save
+                {t('Save')}
               </button>
             </div>
           </div>

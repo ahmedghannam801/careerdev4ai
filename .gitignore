@@ -1,12 +1,14 @@
 node_modules/
 build/
 dist/
+dist-android/
 coverage/
 .DS_Store
 *.log
 .env*
 !.env.example
 !.env.test.example
+!.env.android
 .env.test
 
 .careerpilot_state.json
@@ -19,6 +21,9 @@ local_db/
 # Local Cloudflare/Wrangler state and scratch QA artifacts (never shipped).
 .wrangler/
 .tmp-qa/
+
+# Local Android build toolchain (JDK and Android SDK downloaded for the build).
+.tools/
 
 # Local Supabase CLI state (project ref, pooler URL — machine specific)
 supabase/.temp/

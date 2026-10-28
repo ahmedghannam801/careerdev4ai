@@ -98,6 +98,11 @@ so the API and the browser app share one origin.
 | `npm test` | Run the integration test suite |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run preview` | Preview the Vite build |
+| `npm run build:android` | Build the native bundle into `dist-android/` |
+| `npm run android:assets` | Regenerate the launcher icons and launch screens |
+| `npm run android:sync` | Build the native bundle and sync it into `android/` |
+| `npm run android:open` | Open the Android project in Android Studio |
+| `npm run android:apk` | Build the debug APK |
 
 ## Deploy to Cloudflare Pages
 
@@ -165,6 +170,10 @@ Supabase Auth must also be configured (Authentication → URL Configuration):
   `http://localhost:3000/**` for local development
 - **Providers**: enable Google, LinkedIn (OIDC), and GitHub.
 
+The Android application adds one more redirect URL, the deep link the OAuth
+provider returns to: `com.careerpilot.ai://auth/callback`. See
+[Android application](#android-application).
+
 ### GitHub OAuth
 
 The app starts GitHub sign-in with the existing Supabase browser client and
@@ -222,6 +231,58 @@ through the host's secret manager.
 The document-level Content-Security-Policy and HSTS live in
 `public/_headers`; the API adds its own baseline headers in `app.ts`.
 
+## Android application
+
+The same application ships as a native Android app built with Capacitor. The
+bundle, the branding, the routes and the backend are the ones that already
+exist: the WebView serves the same React application, and the native layer
+only adds what a phone needs — the hardware back button, the system bars, the
+keyboard, the OAuth hand-off and the launcher icon.
+
+| Path | Purpose |
+| --- | --- |
+| `android/` | the Capacitor Android project |
+| `capacitor.config.ts` | the native configuration: application id, web directory, plugins |
+| `.env.android` | the production configuration the native build is pinned to |
+| `src/lib/native.ts` | the handful of helpers that differ between the web and the native build |
+| `src/lib/nativeBridge.ts` | the native shell: back button, external links, OAuth deep link |
+| `scripts/generate-android-assets.mjs` | builds the launcher icons and launch screens from the brand artwork |
+
+### Build
+
+The Android build needs **JDK 21** and the **Android SDK** (compile SDK 36,
+build-tools 36). Nothing else changes:
+
+```bash
+npm ci
+npm run android:sync     # builds dist-android/ and copies it into android/
+npm run android:open     # opens the project in Android Studio
+```
+
+`npm run android:apk` produces the debug APK at
+`android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### How the native build differs from the web build
+
+- **A separate bundle.** `dist-android/` is built with `vite build --mode
+  android`, so the Cloudflare Pages bundle in `dist/` — including its Worker —
+  is never touched by the native build. `.env.android` pins the native build to
+  the production origin and to the production Supabase project.
+- **API calls.** The WebView is served from `https://localhost`, so a call to
+  the application's own API is a cross-origin request. `CapacitorHttp` performs
+  those requests with the native HTTP stack, which is not subject to the
+  browser's CORS rules. The server, its CORS allow-list and the Cloudflare
+  configuration are exactly as they were.
+- **OAuth.** Google and LinkedIn refuse embedded user agents, so on Android
+  the provider page is opened in the system browser and the result returns
+  through the deep link `com.careerpilot.ai://auth/callback`, which the
+  application exchanges for a session exactly as the web build does. That
+  address has to be listed in Supabase → Authentication → URL Configuration →
+  Redirect URLs. The web sign-in is untouched.
+- **Links and the back button.** A link with `target="_blank"` is opened in the
+  system browser, and the hardware back button closes an open dialog, walks
+  the application's own history and minimizes the app at the very end.
+
 ## AI behaviour
 
 AI routes require `GEMINI_API_KEY`. If the key is missing or the model call
@@ -236,6 +297,58 @@ recommendations still work without AI, and say so in the UI.
 own `cp-test-*` identities and rows. It never truncates tables, but the
 service-role key gives full access, so use a project that is safe to hold test
 data — never production credentials.
+
+## Personalisation architecture
+
+The product personalises from one thing: the career the user selected and the
+skills they actually have. The logic that turns those two facts into advice
+lives in `shared/`, so the browser and the API run exactly the same code, and
+so it can be tested without a database.
+
+```text
+shared/careerDomains.ts     The 15 career domains
+shared/careerRoles.ts       The 81 roles, with their skills, paths and projects
+shared/targetRoleSelection.ts  Domain + specialisation validation
+shared/skillGap.ts          THE skill gap engine. One answer to "what is
+                            missing", with Critical/High/Medium/Low/Sufficient
+                            priorities and a readiness figure.
+shared/roadmapGenerator.ts  THE roadmap generator. Pure: role + skill levels in,
+                            a fully attributed plan out.
+
+server/roadmap/service.ts   Loads the user's real data, generates the plan and
+                            persists it. Existing progress is preserved.
+server/db/volunteerOpportunities.ts  Ranks the volunteering catalogue for the
+                            signed-in user by open skill gap, then role, then
+                            domain.
+server/cv/buildCv.ts        Assembles a CV from the user's own records. It
+                            never invents, and it reports what is missing.
+server/ai/grounding.ts      Checks model output against the user's real record.
+server/ai/groundingProfile.ts  Builds that record from the database.
+```
+
+`src/` consumes the same result. The React tree never assembles a plan.
+
+### API surface
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/roadmap/personalized` | The plan, generated on the server if it is missing or stale |
+| `POST /api/roadmap/generate` | Regenerate from the current role and skill ratings |
+| `GET /api/roadmap/preview` | The plan without writing anything |
+| `GET /api/skill-gaps` | The gap list with priorities and a readiness figure |
+| `GET /api/volunteer/opportunities` | The real volunteering catalogue, ranked for the user |
+| `POST`/`DELETE /api/volunteer/opportunities/:id/save` | Save or unsave an opportunity |
+| `GET /api/cv/build` | A CV assembled from the user's own records |
+| `GET /api/guides`, `POST /api/guides/:key/dismiss` | Which guided tours the user has seen |
+
+### Localisation
+
+`src/translations/sourceStrings.ts` holds the Arabic catalogue, keyed by the
+English source string, split one file per area of the product. The `t()`
+function in the career context resolves a key against the legacy keyed
+catalogue first and then against this one, falling back to the English
+source. `tests/localization.test.ts` fails the build if any string routed
+through `t()` has no Arabic entry.
 
 ## Project layout
 
@@ -253,8 +366,12 @@ src/components/brand/     The shared <Logo> component (icon | full)
 src/context/              Application state, auth session, hydration
 src/components/views/     Authenticated product views
 src/lib/                  API clients and Supabase browser client
+src/lib/native.ts         Web and native differences (API base URL, deep link)
+src/lib/nativeBridge.ts   The native shell: back button, external links, OAuth deep link
 supabase/migrations/      PostgreSQL schema, RLS policies, catalog seed
 tests/                    Integration tests
+android/                  The Capacitor Android project
+capacitor.config.ts       The native configuration
 ```
 
 ## Release scope and external dependencies

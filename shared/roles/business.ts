@@ -75,9 +75,9 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     aliases: ['consultant', 'strategy consultant', 'management consulting', 'advisory consultant'],
     responsibilities: [
       'Structure ambiguous problems into testable hypotheses',
-      'Gather and analyse primary data â€” interviews, data, benchmarks â€” quickly',
+      'Gather and analyse primary data — interviews, data, benchmarks — quickly',
       'Synthesise findings into prioritised, quantified recommendations',
-      'Build the clientâ€™s capability so the change sticks after you leave',
+      'Build the client’s capability so the change sticks after you leave',
       'Deliver executive presentations that make the decision obvious',
     ],
     coreSkills: [
@@ -132,7 +132,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     domainId: 'business',
     level: 'Mid',
     summary:
-      'Runs the day-to-day engine of a business â€” process, capacity, cost and service levels â€” and improves them systematically.',
+      'Runs the day-to-day engine of a business — process, capacity, cost and service levels — and improves them systematically.',
     aliases: ['operations lead', 'ops manager', 'service delivery manager', 'general manager', 'plant manager'],
     responsibilities: [
       'Own service levels, throughput and cost for an operational area',
@@ -339,8 +339,8 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     ],
     tools: ['QuickBooks', 'Wave', 'Xero', 'Shopify', 'Stripe', 'Notion', 'Google Workspace', 'Canva'],
     experienceExpectation:
-      'No fixed requirement â€” typically built through freelance work, contracting or a first business',
-    salaryRange: 'Varies widely â€” typically $0 - $200,000+ / year',
+      'No fixed requirement — typically built through freelance work, contracting or a first business',
+    salaryRange: 'Varies widely — typically $0 - $200,000+ / year',
     projects: [
       'A launched business with paying customers and measurable unit economics',
       'A freelance practice with a defined niche and repeat clients',
@@ -621,7 +621,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     domainId: 'finance',
     level: 'Entry-Mid',
     summary:
-      'Turns financial data into forward-looking analysis â€” budgets, forecasts and models that tell leaders what happens next.',
+      'Turns financial data into forward-looking analysis — budgets, forecasts and models that tell leaders what happens next.',
     aliases: ['fa', 'financial analyst', 'fp&a analyst', 'finance analyst', 'commercial analyst', 'financial planning analyst'],
     responsibilities: [
       'Build and maintain budgets, forecasts and rolling financial models',
@@ -668,7 +668,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     relatedRoles: ['accountant', 'investment-analyst', 'business-analyst', 'treasury-analyst'],
     entryPath: ['Build a forecast for a real business, even a small one', 'Complete a financial modelling course and reproduce a published model'],
     intermediatePath: ['Own the forecast for a business area', 'Become the trusted source of the numbers for a leadership team'],
-    advancedPath: ['Own the group planning model', 'Shape planning practice and the finance teamâ€™s operating rhythm'],
+    advancedPath: ['Own the group planning model', 'Shape planning practice and the finance team’s operating rhythm'],
     proficiencyExpectations: [
       { level: 'Entry', expectation: 'Builds accurate reports and models with support.' },
       { level: 'Mid', expectation: 'Owns forecasting for an area and explains variances.' },
@@ -744,7 +744,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     domainId: 'finance',
     level: 'Mid',
     summary:
-      'Helps individuals and organisations plan for financial goals â€” investments, retirement, tax and protection â€” with clear, honest advice.',
+      'Helps individuals and organisations plan for financial goals — investments, retirement, tax and protection — with clear, honest advice.',
     aliases: ['wealth advisor', 'financial adviser', 'investment advisor', 'retirement planner', 'wealth manager'],
     responsibilities: [
       'Assess client financial position, goals, risk tolerance and dependencies',
@@ -784,13 +784,13 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
       'A client whose plan you had to challenge',
       'Explaining market risk to someone without a finance background',
       'Behaviour under loss and what you would do differently',
-      'A conflict between the clientâ€™s preference and their stated goal',
+      'A conflict between the client’s preference and their stated goal',
     ],
     progression: ['Financial Planning Associate', 'Financial Planner', 'Senior Financial Planner', 'Wealth Advisor', 'Principal / Firm Partner'],
     relatedRoles: ['investment-analyst', 'accountant', 'financial-analyst', 'tax-advisor'],
     entryPath: ['Complete a financial planning qualification and build a client plan for a real person', 'Work in a bank or wealth firm and support advisers'],
     intermediatePath: ['Own a book of client plans and the reviews', 'Build a niche around a client segment'],
-    advancedPath: ['Lead a team of planners and the practice', 'Set advice strategy and the firmâ€™s growth plan'],
+    advancedPath: ['Lead a team of planners and the practice', 'Set advice strategy and the firm’s growth plan'],
     proficiencyExpectations: [
       { level: 'Entry', expectation: 'Supports plan preparation and client administration.' },
       { level: 'Mid', expectation: 'Owns client plans and delivers reviews independently.' },
@@ -851,7 +851,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     relatedRoles: ['financial-analyst', 'treasury-analyst', 'financial-planner'],
     entryPath: ['Build and defend a stock pitch as part of a university programme', 'Work in corporate finance or research as an analyst'],
     intermediatePath: ['Own coverage of a sector and publish research', 'Build models used by portfolio managers'],
-    advancedPath: ['Manage a portfolio and its risk', 'Lead the research process and the teamâ€™s standard of proof'],
+    advancedPath: ['Manage a portfolio and its risk', 'Lead the research process and the team’s standard of proof'],
     proficiencyExpectations: [
       { level: 'Entry', expectation: 'Builds accurate models and supports the research process.' },
       { level: 'Mid', expectation: 'Owns coverage and publishes defensible research.' },
@@ -894,7 +894,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     projects: [
       'Restructuring that produced a defensible, documented tax outcome',
       'Compliance cleanup resolving years of filing backlog',
-      'Advisory engagement that changed a clientâ€™s effective tax rate',
+      'Advisory engagement that changed a client’s effective tax rate',
     ],
     evidence: [
       'A computation or memo with assumptions clearly stated',
@@ -905,7 +905,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     interviewTopics: [
       'A tax position you were willing to defend publicly',
       'A change in law that affected clients you advise',
-      'Finding the error in a clientâ€™s prior filing',
+      'Finding the error in a client’s prior filing',
       'Balancing commercial advice with compliance risk',
     ],
     progression: ['Tax Associate', 'Tax Advisor', 'Senior Advisor', 'Tax Manager', 'Tax Director / Partner'],
@@ -993,7 +993,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     responsibilities: [
       'Prospect, qualify and progress opportunities through the pipeline',
       'Run discovery that establishes need, authority and timeline',
-      'Present, demo and propose solutions that fit the customerâ€™s actual problem',
+      'Present, demo and propose solutions that fit the customer’s actual problem',
       'Manage the pipeline accurately and forecast with confidence',
       'Look after existing accounts and grow them after the sale',
     ],
@@ -1032,7 +1032,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     ],
     progression: ['Sales Development Rep', 'Sales Representative', 'Senior Account Executive', 'Account Executive', 'Regional Sales Director'],
     relatedRoles: ['account-executive', 'business-development-manager', 'customer-success-manager', 'marketing-manager'],
-    entryPath: ['Sell something â€” even inbound or phone â€” and track your own numbers', 'Complete a sales certification and work a real pipeline'],
+    entryPath: ['Sell something — even inbound or phone — and track your own numbers', 'Complete a sales certification and work a real pipeline'],
     intermediatePath: ['Own a territory and hit quota consistently', 'Coach newer reps on discovery and pipeline discipline'],
     advancedPath: ['Own a strategic territory or named account group', 'Lead the sales team and the forecast process'],
     proficiencyExpectations: [
@@ -1110,7 +1110,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     domainId: 'sales',
     level: 'Entry-Mid',
     summary:
-      'Makes the revenue engine measurable and efficient â€” the data, tooling, process and reporting that sales teams run on.',
+      'Makes the revenue engine measurable and efficient — the data, tooling, process and reporting that sales teams run on.',
     aliases: ['sales ops', 'revops', 'revenue operations analyst', 'sales operations specialist'],
     responsibilities: [
       'Own CRM data quality, structure and reporting standards',
@@ -1175,7 +1175,7 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     aliases: ['csm', 'account manager', 'customer manager', 'renewals manager', 'success manager'],
     responsibilities: [
       'Own onboarding so new customers reach first value quickly',
-      'Build success plans tied to the customerâ€™s actual business goals',
+      'Build success plans tied to the customer’s actual business goals',
       'Run regular business reviews and surface risk before it becomes churn',
       'Drive adoption of the product and the practices that make it stick',
       'Identify and execute expansion opportunities within existing accounts',
@@ -1209,8 +1209,8 @@ export const BUSINESS_ROLES: RoleDefinition[] = [
     certifications: ['Gainsight NXT Admin Certification', 'Success Academy Certified Customer Success Manager', 'ChurnZero Customer Success Certification'],
     interviewTopics: [
       'An account you saved from churn and what you actually did',
-      'A customer asking for a refund â€” how you handled it',
-      'Balancing the customerâ€™s requests with the value they need',
+      'A customer asking for a refund — how you handled it',
+      'Balancing the customer’s requests with the value they need',
       'Reading account health signals early',
     ],
     progression: ['Customer Success Manager', 'Senior CSM', 'CSM Team Lead', 'Head of Customer Success', 'VP Customer Experience'],

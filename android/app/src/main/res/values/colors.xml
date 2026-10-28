@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+        The application's own colours. They mirror the brand tokens in
+        `src/index.css` so the native shell and the WebView belong to the same
+        product.
+    -->
+    <color name="careerpilot_background">#F5F0E8</color>
+
+</resources>

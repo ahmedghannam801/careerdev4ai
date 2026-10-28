@@ -11,7 +11,7 @@ interface CopilotDrawerProps {
 }
 
 export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
-  const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, profile, t } = useCareer();
+  const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, profile, t} = useCareer();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion() ?? false;
@@ -34,8 +34,8 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       {isOpen && (
         <motion.div
           role="dialog"
-          aria-label="CareerPilot Copilot"
-          className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[440px]"
+          aria-label={t('CareerPilot Copilot')}
+          className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[440px]"
           variants={drawerVariants(reduced)}
           initial="hidden"
           animate="visible"
@@ -48,8 +48,8 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-[var(--text-primary)]">CareerPilot Copilot</div>
-            <div className="text-xs text-[var(--text-secondary)]">Advisor for {targetRole.title}</div>
+            <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerPilot Copilot')}</div>
+            <div className="text-xs text-[var(--text-secondary)]">{t('Advisor for')} {targetRole.title}</div>
           </div>
         </div>
         <button
@@ -65,13 +65,13 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
         <div className="flex items-center gap-1.5 truncate">
           <span className="font-medium text-[var(--text-primary)]">{profile.name}</span>
           <span>·</span>
-          <span>{analysis.matchPercentage}% Readiness</span>
+          <span>{analysis.matchPercentage}% {t('Readiness')}</span>
         </div>
         <button 
           onClick={() => { onNavigate('analysis'); onClose(); }}
           className="text-[var(--color-primary-text)] hover:underline flex items-center gap-1 text-xs shrink-0"
         >
-          View Analysis
+          {t('View Analysis')}
           <ArrowRight className="w-3 h-3" />
         </button>
       </div>
@@ -109,13 +109,13 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
                 <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] space-y-1.5">
                   <div className="text-[11px] font-semibold text-[var(--text-muted)] flex items-center gap-1">
                     <Lightbulb className="w-3 h-3" />
-                    Quick Actions:
+                    {t('Quick Actions:')}
                   </div>
                   {msg.suggestions.map((sug, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSend(sug)}
-                      className="block w-full text-left text-xs text-[var(--color-primary-text)] hover:bg-[var(--accent-surface)] p-1.5 rounded transition-colors"
+                      className="block w-full text-start text-xs text-[var(--color-primary-text)] hover:bg-[var(--accent-surface)] p-1.5 rounded transition-colors"
                     >
                       → {sug}
                     </button>
@@ -137,7 +137,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
               <Bot className="w-4 h-4" />
             </div>
             <span className="flex items-center gap-2">
-              <span aria-live="polite">CareerPilot is analyzing your graph</span>
+              <span aria-live="polite">{t('CareerPilot is analyzing your graph')}</span>
               <span className="flex items-center gap-0.5" aria-hidden="true">
                 {[0, 1, 2].map((dot) => (
                   <motion.span
@@ -166,19 +166,19 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           onClick={() => handleSend(t('copilotPrompt1'))}
           className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
         >
-          Today's Next Step
+          {t('Today\'s Next Step')}
         </button>
         <button
           onClick={() => handleSend(t('copilotPrompt3'))}
           className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
         >
-          Recommend Project
+          {t('Recommend Project')}
         </button>
         <button
           onClick={() => handleSend(t('copilotPrompt4'))}
           className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
         >
-          CV Audit
+          {t('CV Audit')}
         </button>
       </div>
 

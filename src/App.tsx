@@ -11,6 +11,8 @@ import { PasswordRecoveryModal } from './components/auth/PasswordRecoveryModal';
 import { LandingView } from './components/views/LandingView';
 import { Logo } from './components/brand/Logo';
 import { Skeleton } from './components/ui/Skeleton';
+import { GuidedTour, GUIDES, type GuideDefinition, type GuideKey } from './components/onboarding/GuidedTour';
+import { fetchDismissedGuides } from './lib/personalizationApi';
 
 /**
  * The authenticated experience is loaded on demand.
@@ -66,9 +68,10 @@ const readPublicProfileUsername = (): string | null => {
  * rather than a spinner.
  */
 function ViewFallback() {
+  const { t } = useCareer();
   return (
     <div className="space-y-4" role="status" aria-live="polite">
-      <span className="sr-only">Loading…</span>
+      <span className="sr-only">{t('Loading…')}</span>
       <Skeleton className="h-8 w-64" widthClassName="w-64" />
       <Skeleton className="h-40 w-full" widthClassName="w-full" />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -89,8 +92,7 @@ function AppRoutes() {
     hydrationError,
     isHydrated,
     setAuthModalOpen,
-    setCopilotOpen,
-  } = useCareer();
+    setCopilotOpen, t,} = useCareer();
   const [currentView, setCurrentView] = useState<string>(() => {
     // Check hash for direct view or public profile
     const hash = window.location.hash.replace('#/', '');
@@ -178,7 +180,7 @@ function AppRoutes() {
       <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Logo variant="icon" className="h-9 w-9" alt="" />
-          <div className="text-xs text-[var(--text-muted)]">Restoring your session…</div>
+          <div className="text-xs text-[var(--text-muted)]">{t('Restoring your session…')}</div>
         </div>
       </div>
     );
@@ -296,17 +298,93 @@ function AppRoutes() {
               onClick={() => window.location.reload()}
               className="rounded-lg border border-[var(--color-warning)]/30 px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-warning)]/10"
             >
-              Retry
+              {t('Retry')}
             </button>
           </div>
         )}
         <Suspense fallback={<ViewFallback />}>
           {renderView()}
         </Suspense>
-      </AppShell>      {/* B.4 finding C-2: the AuthModal existed and was fully functional but
+      </AppShell>
+      {/* The first-use tour. It is mounted outside the shell so it can sit
+          over the whole application, and it remembers that it has been
+          seen on the server. */}
+      <GuidedTourHost currentView={currentView} />
+      {/* B.4 finding C-2: the AuthModal existed and was fully functional but
           was never mounted, so there was no way to sign in or sign up. */}
       <AuthModal />
     </>
+  );
+}
+
+/**
+ * Shows the guided tour for the screen the user is on, once.
+ *
+ * The dismissal is stored on the server, so a tour does not reappear on the
+ * next device, and a tour that has already been seen is never shown again.
+ */
+function GuidedTourHost({ currentView }: { currentView: string }) {
+  const { settings, t } = useCareer();
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [activeGuide, setActiveGuide] = useState<GuideDefinition | null>(null);
+
+  // Which screen each tour belongs to.
+  const VIEW_TO_GUIDE: Record<string, GuideKey> = {
+    dashboard: 'dashboard',
+    roadmap: 'roadmap',
+    learning: 'learning',
+    projects: 'projects',
+    volunteer: 'volunteer',
+    'cv-studio': 'cv',
+    skills: 'skills',
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDismissedGuides()
+      .then((keys) => {
+        if (!cancelled) setDismissed(keys);
+      })
+      .catch(() => {
+        // A failure here only means the tour may be offered again.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const guideKey = VIEW_TO_GUIDE[currentView];
+    if (!guideKey) {
+      setActiveGuide(null);
+      return;
+    }
+    if (dismissed.includes(guideKey)) {
+      setActiveGuide(null);
+      return;
+    }
+    const definition = GUIDES.find((guide) => guide.key === guideKey) ?? null;
+    setActiveGuide(definition);
+  }, [currentView, dismissed]);
+
+  const close = () => {
+    setActiveGuide(null);
+    setDismissed((current) => [...new Set([...current, activeGuide?.key ?? ''])]);
+  };
+
+  return (
+    <GuidedTour
+      guide={activeGuide}
+      onClose={close}
+      language={settings.language}
+      labels={{
+        next: t('Next'),
+        back: t('Back'),
+        done: t('Done'),
+        close: t('Close'),
+        step: t('Step'),
+      }}
+    />
   );
 }
 

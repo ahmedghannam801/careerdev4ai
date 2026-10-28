@@ -18,8 +18,7 @@ export const ApplicationsView: React.FC = () => {
     deleteApplication, 
     addApplication,
     cvVersions,
-    logActivity
-  } = useCareer();
+    logActivity, t} = useCareer();
 
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -101,7 +100,7 @@ export const ApplicationsView: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
           <div className="text-xs text-[var(--text-secondary)] font-semibold uppercase tracking-wider">
-            OPPORTUNITY PIPELINE
+            {t('OPPORTUNITY PIPELINE')}
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
             Job Application Tracker ({applications.length})
@@ -122,7 +121,7 @@ export const ApplicationsView: React.FC = () => {
                   : 'text-[var(--text-secondary)]'
               }`}
             >
-              Pipeline Board
+              {t('Pipeline Board')}
             </button>
             <button
               onClick={() => setViewMode('list')}
@@ -132,7 +131,7 @@ export const ApplicationsView: React.FC = () => {
                   : 'text-[var(--text-secondary)]'
               }`}
             >
-              List View
+              {t('List View')}
             </button>
           </div>
 
@@ -141,7 +140,7 @@ export const ApplicationsView: React.FC = () => {
             className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Application</span>
+            <span>{t('Add Application')}</span>
           </button>
         </div>
       </div>
@@ -171,7 +170,7 @@ export const ApplicationsView: React.FC = () => {
                 <div className="space-y-2.5 flex-1">
                   {stageApps.length === 0 ? (
                     <div className="h-24 flex items-center justify-center text-[11px] text-[var(--text-muted)] italic">
-                      Empty
+                      {t('Empty')}
                     </div>
                   ) : (
                     stageApps.map((app) => (
@@ -205,7 +204,7 @@ export const ApplicationsView: React.FC = () => {
                           <button
                             onClick={() => deleteApplication(app.id)}
                             className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)] rounded"
-                            title="Delete application"
+                            title={t('Delete application')}
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -225,11 +224,11 @@ export const ApplicationsView: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-[var(--text-muted)] uppercase tracking-wider text-[10px]">
-                  <th className="pb-3 font-semibold">Role & Company</th>
-                  <th className="pb-3 font-semibold">Stage</th>
-                  <th className="pb-3 font-semibold">Location / Mode</th>
-                  <th className="pb-3 font-semibold">Next Action</th>
-                  <th className="pb-3 font-semibold text-right">Actions</th>
+                  <th className="pb-3 font-semibold">{t('Role & Company')}</th>
+                  <th className="pb-3 font-semibold">{t('Stage')}</th>
+                  <th className="pb-3 font-semibold">{t('Location / Mode')}</th>
+                  <th className="pb-3 font-semibold">{t('Next Action')}</th>
+                  <th className="pb-3 font-semibold text-right">{t('Actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -261,7 +260,7 @@ export const ApplicationsView: React.FC = () => {
                         onClick={() => deleteApplication(app.id)}
                         className="text-xs text-[var(--text-muted)] hover:text-[var(--color-danger)] px-2 py-1"
                       >
-                        Delete
+                        {t('Delete')}
                       </button>
                     </td>
                   </tr>
@@ -296,31 +295,31 @@ export const ApplicationsView: React.FC = () => {
             <div className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)]">
                 <div>
-                  <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] block">Pipeline Stage</span>
+                  <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] block">{t('Pipeline Stage')}</span>
                   <span className="font-bold text-[var(--text-primary)] capitalize">{selectedApp.stage}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] block">Applied Date</span>
+                  <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] block">{t('Applied Date')}</span>
                   <span className="font-mono text-[var(--text-primary)]">{selectedApp.appliedDate || 'Oct 15, 2026'}</span>
                 </div>
               </div>
 
               <div>
                 <label className="font-semibold text-[var(--text-primary)] block mb-1">
-                  Next Follow-up Action
+                  {t('Next Follow-up Action')}
                 </label>
                 <input
                   type="text"
                   value={editNextAction}
                   onChange={(e) => setEditNextAction(e.target.value)}
-                  placeholder="e.g. Round 2 Technical Interview with Lead Architect"
+                  placeholder={t('e.g. Round 2 Technical Interview with Lead Architect')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
                 <label className="font-semibold text-[var(--text-primary)] block mb-1">
-                  Follow-up / Interview Deadline Date
+                  {t('Follow-up / Interview Deadline Date')}
                 </label>
                 <input
                   type="date"
@@ -332,13 +331,13 @@ export const ApplicationsView: React.FC = () => {
 
               <div>
                 <label className="font-semibold text-[var(--text-primary)] block mb-1">
-                  Private Application Notes (Salary, Recruiter details, Technical interview questions)
+                  {t('Private Application Notes (Salary, Recruiter details, Technical interview questions)')}
                 </label>
                 <textarea
                   rows={4}
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="Private notes remain completely confidential and are never shared publicly..."
+                  placeholder={t('Private notes remain completely confidential and are never shared publicly...')}
                   className="w-full p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] leading-relaxed"
                 />
               </div>
@@ -346,7 +345,7 @@ export const ApplicationsView: React.FC = () => {
               {/* Linked Documents Showcase */}
               <div className="p-3 rounded-xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)] space-y-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
-                  Linked Application Documents
+                  {t('Linked Application Documents')}
                 </span>
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between text-xs p-1.5 bg-[var(--surface-main)] rounded border border-[var(--border-subtle)]">
@@ -361,7 +360,7 @@ export const ApplicationsView: React.FC = () => {
                       <FolderClosed className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />
                       <span>{selectedApp.company} - Tailored Cover Letter.pdf</span>
                     </span>
-                    <span className="text-[10px] font-mono text-[var(--text-muted)]">Verified</span>
+                    <span className="text-[10px] font-mono text-[var(--text-muted)]">{t('Verified')}</span>
                   </div>
                 </div>
               </div>
@@ -372,13 +371,13 @@ export const ApplicationsView: React.FC = () => {
                 onClick={() => setSelectedApp(null)}
                 className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
               >
-                Close
+                {t('Close')}
               </button>
               <button
                 onClick={handleSaveAppDetails}
                 className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold"
               >
-                Save Notes & Reminder
+                {t('Save Notes & Reminder')}
               </button>
             </div>
           </div>
@@ -390,7 +389,7 @@ export const ApplicationsView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
           <div className="w-full max-w-md bg-[var(--surface-main)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
-              <h3 className="text-base font-bold text-[var(--text-primary)]">Track New Application</h3>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Track New Application')}</h3>
               <button 
                 onClick={() => setShowAddModal(false)}
                 className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded"
@@ -401,32 +400,32 @@ export const ApplicationsView: React.FC = () => {
 
             <form onSubmit={handleAddSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-[var(--text-secondary)] mb-1">Company Name</label>
+                <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Company Name')}</label>
                 <input
                   type="text"
                   required
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
-                  placeholder="e.g. Stripe, Linear, Vercel"
+                  placeholder={t('e.g. Stripe, Linear, Vercel')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-[var(--text-secondary)] mb-1">Target Role Title</label>
+                <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Target Role Title')}</label>
                 <input
                   type="text"
                   required
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  placeholder="e.g. Frontend Engineer"
+                  placeholder={t('e.g. Frontend Engineer')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-[var(--text-secondary)] mb-1">Pipeline Stage</label>
+                  <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Pipeline Stage')}</label>
                   <select
                     value={stage}
                     onChange={(e) => setStage(e.target.value as ApplicationStage)}
@@ -438,37 +437,37 @@ export const ApplicationsView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-[var(--text-secondary)] mb-1">Work Mode</label>
+                  <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Work Mode')}</label>
                   <select
                     value={workMode}
                     onChange={(e) => setWorkMode(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   >
-                    <option value="Remote">Remote</option>
-                    <option value="Hybrid">Hybrid</option>
-                    <option value="On-site">On-site</option>
+                    <option value="Remote">{t('Remote')}</option>
+                    <option value="Hybrid">{t('Hybrid')}</option>
+                    <option value="On-site">{t('On-site')}</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-[var(--text-secondary)] mb-1">Follow-up Action / Interview Details</label>
+                <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Follow-up Action / Interview Details')}</label>
                 <input
                   type="text"
                   value={nextAction}
                   onChange={(e) => setNextAction(e.target.value)}
-                  placeholder="e.g. Technical round scheduled for Oct 22"
+                  placeholder={t('e.g. Technical round scheduled for Oct 22')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-[var(--text-secondary)] mb-1">Private Notes</label>
+                <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Private Notes')}</label>
                 <textarea
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Details, recruiter name, compensation discussed..."
+                  placeholder={t('Details, recruiter name, compensation discussed...')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                 />
               </div>
@@ -479,13 +478,13 @@ export const ApplicationsView: React.FC = () => {
                   onClick={() => setShowAddModal(false)}
                   className="px-4 py-2 rounded-lg border border-[var(--border-subtle)] font-medium text-[var(--text-secondary)]"
                 >
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] font-semibold hover:bg-[var(--accent-secondary)]"
                 >
-                  Save to Pipeline
+                  {t('Save to Pipeline')}
                 </button>
               </div>
             </form>

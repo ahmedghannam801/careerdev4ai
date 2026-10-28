@@ -400,7 +400,7 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
             aria-checked={isSelected}
             aria-label={`${avatar.name} avatar: ${avatar.description}`}
             onClick={() => onSelect(avatar.id)}
-            className={`group relative p-2 rounded-2xl border transition-all duration-200 text-left focus:outline-hidden focus:ring-2 focus:ring-[var(--accent-primary)] ${
+            className={`group relative p-2 rounded-2xl border transition-all duration-200 text-start focus:outline-hidden focus:ring-2 focus:ring-[var(--accent-primary)] ${
               isSelected
                 ? 'border-[var(--accent-primary)] bg-[var(--accent-surface)] shadow-xs scale-102 ring-1 ring-[var(--accent-primary)]'
                 : 'border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--border-strong)] hover:shadow-xs'
@@ -409,7 +409,7 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
             <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-1.5">
               <CareerPilotAvatarSvg id={avatar.id} className="w-full h-full object-cover" />
               {isSelected && (
-                <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--accent-primary)] text-white flex items-center justify-center shadow-xs">
+                <div className="absolute top-1 end-1 w-5 h-5 rounded-full bg-[var(--accent-primary)] text-white flex items-center justify-center shadow-xs">
                   <Check className="w-3 h-3 stroke-[3]" />
                 </div>
               )}

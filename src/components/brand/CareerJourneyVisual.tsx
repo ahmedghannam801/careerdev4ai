@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Check, Sparkles, Target } from 'lucide-react';
 import { useMotionVariants, MOTION_EASE } from '../../lib/motion';
+import { useCareer } from '../../context/CareerContext';
 
 /**
  * CareerPilot AI — the landing-page journey visual.
@@ -47,6 +48,7 @@ export interface CareerJourneyVisualProps {
 
 export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({ userState }) => {
   const { reduced, stagger, staggerItem, entrance } = useMotionVariants();
+  const { t } = useCareer();
 
   // Public/neutral mode when no authenticated userState is provided
   const isPublic = !userState;
@@ -73,7 +75,7 @@ export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({ userSt
         <div>
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
             <Target className="w-3.5 h-3.5" />
-            <span>Your Career Journey</span>
+            <span>{t('Your Career Journey')}</span>
           </div>
           <p className="mt-1 text-xs text-[var(--text-secondary)]">
             {isPublic
@@ -97,7 +99,7 @@ export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({ userSt
       <motion.ol
         variants={stagger}
         className="relative mt-4 space-y-0"
-        aria-label="The CareerPilot journey"
+        aria-label={t('The CareerPilot journey')}
       >
         {/* Progress rail: the connecting line behind the nodes. */}
         <svg
@@ -209,7 +211,7 @@ export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({ userSt
               {/* Only show "You are here" when authenticated and active */}
               {isActive && (
                 <span className="mt-1 shrink-0 rounded-full bg-[var(--color-accent-surface)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-primary-text)]">
-                  You are here
+                  {t('You are here')}
                 </span>
               )}
             </motion.li>

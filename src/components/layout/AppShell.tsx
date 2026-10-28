@@ -53,7 +53,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
   const unreadCount = visibleNotifications.filter(n => !n.read).length;
 
-  const displayName = currentUser?.name || profile.name || 'Signed in';
+  const displayName = currentUser?.name || profile.name || t('Signed in');
 
   // Global Ctrl/Cmd + K keyboard shortcut
   useEffect(() => {
@@ -82,9 +82,9 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
   ];
 
   const secondaryNavItems = [
-    { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'documents', label: 'My Documents', icon: FolderClosed },
-    { id: 'activity', label: 'Recent Activity', icon: Activity },
+    { id: 'profile', label: t('My Profile'), icon: User },
+    { id: 'documents', label: t('My Documents'), icon: FolderClosed },
+    { id: 'activity', label: t('Recent Activity'), icon: Activity },
     { id: 'progress', label: t('navProgress'), icon: TrendingUp },
     { id: 'settings', label: t('navSettings'), icon: Settings },
   ];
@@ -102,12 +102,12 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         <div className="p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
           <button 
             onClick={() => handleNavClick('dashboard')}
-            className="flex items-center gap-2.5 text-left group"
+            className="flex items-center gap-2.5 text-start group"
           >
             <Logo variant="icon" className="h-8 w-8" alt="" />
             <div>
               <div className="font-bold text-sm tracking-tight text-[var(--text-primary)]">
-                CareerPilot AI
+                {t('CareerPilot AI')}
               </div>
               <div className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[140px]">
                 {targetRole.title}
@@ -121,7 +121,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
           {/* Main Career Navigation */}
           <div className="space-y-1">
             <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
-              Career Engine
+              {t('Career Engine')}
             </div>
             {primaryNavItems.map((item) => {
               const Icon = item.icon;
@@ -147,7 +147,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
           {/* Personal Workspace Navigation */}
           <div className="space-y-1 pt-2 border-t border-[var(--border-subtle)]">
             <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
-              Workspace & Identity
+              {t('Workspace & Identity')}
             </div>
             {secondaryNavItems.map((item) => {
               const Icon = item.icon;
@@ -184,7 +184,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
           {/* User mini profile card in sidebar */}
           <button
             onClick={() => handleNavClick('profile')}
-            className="w-full p-2 rounded-xl hover:bg-[var(--surface-secondary)] flex items-center justify-between text-left transition-colors group"
+            className="w-full p-2 rounded-xl hover:bg-[var(--surface-secondary)] flex items-center justify-between text-start transition-colors group"
           >
             <div className="flex items-center gap-2 min-w-0">
               <CareerPilotAvatar
@@ -215,7 +215,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <button
               onClick={() => setMobileMenuOpen(true)}
               className="p-1.5 md:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-md"
-              title="Open Navigation"
+              title={t('Open Navigation')}
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -226,7 +226,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 onClick={() => onNavigate('dashboard')} 
                 className="hover:text-[var(--text-primary)] font-medium"
               >
-                CareerPilot
+                {t('CareerPilot')}
               </button>
               <span className="text-[var(--text-muted)]">/</span>
               <span className="font-semibold text-[var(--text-primary)] capitalize">
@@ -240,10 +240,10 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <button
               onClick={() => setSearchModalOpen(true)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] text-xs transition-colors"
-              title="Search and Command Palette (Ctrl/Cmd + K)"
+              title={t('Search and Command Palette (Ctrl/Cmd + K)')}
             >
               <Search className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Search / Actions...</span>
+              <span className="hidden sm:inline">{t('Search / Actions...')}</span>
               <span className="hidden sm:inline font-mono text-[10px] bg-[var(--surface-main)] px-1 rounded border border-[var(--border-subtle)]">⌘K</span>
             </button>
 
@@ -251,7 +251,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <button
               onClick={() => updateSettings({ language: settings.language === 'en' ? 'ar' : 'en' })}
               className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] text-xs font-semibold"
-              title="Toggle English / Arabic (RTL)"
+              title={t('Toggle English / Arabic (RTL)')}
             >
               {settings.language === 'en' ? 'عربي' : 'EN'}
             </button>
@@ -260,7 +260,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <button
               onClick={() => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
               className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]"
-              title="Toggle Theme"
+              title={t('Toggle Theme')}
             >
               {settings.theme === 'dark' ? <Sun className="w-4 h-4 text-[var(--color-accent)]" /> : <Moon className="w-4 h-4" />}
             </button>
@@ -269,19 +269,19 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <button
               onClick={() => setNotificationsOpen(true)}
               className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] relative"
-              title="Notifications"
+              title={t('Notifications')}
             >
               <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse" />
+                <span className="absolute -top-1 -end-1 w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse" />
               )}
             </button>
 
             {/* Profile Avatar Button */}
             <button
               onClick={() => onNavigate('profile')}
-              className="flex items-center gap-2 pl-2 border-l border-[var(--border-subtle)] group"
-              title="View My Profile"
+              className="flex items-center gap-2 ps-2 border-l border-[var(--border-subtle)] group"
+              title={t('View My Profile')}
             >
               <CareerPilotAvatar
                 avatarId={profile.avatarUrl}
@@ -297,8 +297,8 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               <button
                 onClick={() => setUserMenuOpen(prev => !prev)}
                 className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
-                title="Account menu"
-                aria-label="Account menu"
+                title={t('Account menu')}
+                aria-label={t('Account menu')}
                 aria-expanded={userMenuOpen}
               >
                 <MoreHorizontal className="w-4 h-4" />
@@ -310,36 +310,36 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                     onClick={() => setUserMenuOpen(false)}
                     aria-hidden="true"
                   />
-                  <div className="absolute right-0 top-full mt-2 z-50 w-60 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
+                  <div className="absolute end-0 top-full mt-2 z-50 w-60 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
                     <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
                       <div className="text-xs font-bold text-[var(--text-primary)] truncate">
                         {currentUser?.email || displayName}
                       </div>
                       <div className="text-[10px] text-[var(--text-muted)] truncate">
-                        @{profile.username || 'no username set'}
+                        @{profile.username || t('no username set')}
                       </div>
                     </div>
                     <button
                       onClick={() => { setUserMenuOpen(false); onNavigate('profile'); }}
-                      className="w-full px-4 py-2.5 text-left text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
+                      className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
                     >
                       <User className="w-3.5 h-3.5" />
-                      <span>My Profile</span>
+                      <span>{t('My Profile')}</span>
                     </button>
                     <button
                       onClick={() => { setUserMenuOpen(false); onNavigate('settings'); }}
-                      className="w-full px-4 py-2.5 text-left text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
+                      className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
                     >
                       <Settings className="w-3.5 h-3.5" />
-                      <span>Settings</span>
+                      <span>{t('Settings')}</span>
                     </button>
                     <button
                       onClick={() => { setUserMenuOpen(false); logout(); }}
-                      className="w-full px-4 py-2.5 text-left text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 flex items-center gap-2 border-t border-[var(--border-subtle)]"
+                      className="w-full px-4 py-2.5 text-start text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 flex items-center gap-2 border-t border-[var(--border-subtle)]"
                       data-testid="logout-button"
                     >
                       <LogOut className="w-3.5 h-3.5" />
-                      <span>Sign out</span>
+                      <span>{t('Sign out')}</span>
                     </button>
                   </div>
                 </>
@@ -358,14 +358,14 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
           <div className="flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-2">
             <span>© 2026 CareerPilot AI</span>
             <span>
-              Developed by{' '}
+              {t('Developed by')}{' '}
               <a
                 href="https://www.linkedin.com/in/ahmed-ebrahim2"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline transition-colors"
               >
-                Ahmed Ebrahim
+                {t('Ahmed Ebrahim')}
               </a>
             </span>
           </div>
@@ -387,7 +387,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             />
             <motion.div
               role="dialog"
-              aria-label="Navigation"
+              aria-label={t('Navigation')}
               className="relative flex h-full w-72 flex-col justify-between border-r border-[var(--border-subtle)] bg-[var(--surface-main)] p-4"
               variants={drawerLeftVariants(reduced)}
               initial="hidden"
@@ -398,7 +398,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                 <div className="flex items-center gap-2">
                   <Logo variant="icon" className="h-7 w-7" alt="" />
-                  <span className="font-bold text-sm text-[var(--text-primary)]">CareerPilot AI</span>
+                  <span className="font-bold text-sm text-[var(--text-primary)]">{t('CareerPilot AI')}</span>
                 </div>
                 <button 
                   onClick={() => setMobileMenuOpen(false)}
@@ -409,7 +409,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               </div>
 
               <div className="space-y-1 overflow-y-auto max-h-[70vh]">
-                <div className="px-2 text-[10px] font-bold uppercase text-[var(--text-muted)] mb-1">Career</div>
+                <div className="px-2 text-[10px] font-bold uppercase text-[var(--text-muted)] mb-1">{t('Career')}</div>
                 {primaryNavItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentView === item.id;
@@ -429,7 +429,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                   );
                 })}
 
-                <div className="px-2 text-[10px] font-bold uppercase text-[var(--text-muted)] mt-3 mb-1">Workspace</div>
+                <div className="px-2 text-[10px] font-bold uppercase text-[var(--text-muted)] mt-3 mb-1">{t('Workspace')}</div>
                 {secondaryNavItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentView === item.id;
@@ -464,7 +464,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 className="w-full py-2.5 rounded-xl border border-[var(--color-danger)]/30 text-[var(--color-danger)] text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Sign out</span>
+                <span>{t('Sign out')}</span>
               </button>
             </div>
           </motion.div>
@@ -475,11 +475,11 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       {/* Mobile Bottom Navigation Bar */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--surface-main)]/95 backdrop-blur-md border-t border-[var(--border-subtle)] px-2 py-1.5 flex items-center justify-around text-[10px]">
         {[
-          { id: 'dashboard', label: 'Home', icon: Home },
-          { id: 'my-career', label: 'Career', icon: Compass },
-          { id: 'roadmap', label: 'Roadmap', icon: Layers },
-          { id: 'jobs', label: 'Jobs', icon: Briefcase },
-          { id: 'profile', label: 'Profile', icon: User },
+          { id: 'dashboard', label: t('Home'), icon: Home },
+          { id: 'my-career', label: t('Career'), icon: Compass },
+          { id: 'roadmap', label: t('Roadmap'), icon: Layers },
+          { id: 'jobs', label: t('Jobs'), icon: Briefcase },
+          { id: 'profile', label: t('Profile'), icon: User },
         ].map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -501,7 +501,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
           className="flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
         >
           <MoreHorizontal className="w-4 h-4" />
-          <span>More</span>
+          <span>{t('More')}</span>
         </button>
       </div>
 

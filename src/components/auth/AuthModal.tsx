@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { X, Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Browser } from '@capacitor/browser';
 import { useCareer } from '../../context/CareerContext';
 import { getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
+import { isNative, OAUTH_DEEP_LINK } from '../../lib/native';
+import { onNativeOAuthResult } from '../../lib/nativeBridge';
 import { Logo } from '../brand/Logo';
 import { backdropVariants, dialogVariants } from '../../lib/motion';
 import { useDismissOnEscape, useFocusTrap, useScrollLock } from '../../lib/overlay';
@@ -17,15 +20,25 @@ type OAuthProvider = 'google' | 'linkedin_oidc' | 'github';
  */
 const GITHUB_OAUTH_CALLBACK_PATH = '/auth/callback';
 
+/**
+ * Where a password-reset link goes on Android.
+ *
+ * The native application cannot receive a reset link: the link opens a page
+ * that exchanges the recovery token, and that page is the production web
+ * application, which already handles it. The address is listed in Supabase's
+ * allow-list, so the link always lands somewhere that works.
+ */
+const NATIVE_PASSWORD_RESET_REDIRECT = 'https://careerpilot4ai.pages.dev/';
+
 export const AuthModal: React.FC = () => {
   const {
     authModalOpen,
     setAuthModalOpen,
     authRedirectError,
     clearAuthRedirectError,
+    currentUser,
     login,
-    register,
-  } = useCareer();
+    register, t,} = useCareer();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -46,6 +59,26 @@ export const AuthModal: React.FC = () => {
   useScrollLock(authModalOpen);
   useFocusTrap(authModalOpen, panelRef);
 
+  // On Android the application is not reloaded when the provider returns: the
+  // sign-in completes through a deep link, so the dialog closes itself as soon
+  // as the session arrives. On the web the page is reloaded instead and this
+  // never runs.
+  useEffect(() => {
+    if (!isNative) return;
+    if (currentUser) close();
+  }, [currentUser]);
+
+  // A native sign-in that the provider refuses reports back through the deep
+  // link; the message is shown in this dialog.
+  useEffect(() => {
+    if (!isNative) return;
+    return onNativeOAuthResult((result) => {
+      if (!result.error) return;
+      setOauthProvider(null);
+      setError(result.error);
+    });
+  }, []);
+
   const switchMode = (next: 'login' | 'register' | 'forgot') => {
     setMode(next);
     setError(null);
@@ -54,11 +87,16 @@ export const AuthModal: React.FC = () => {
   };
 
   /**
-   * Starts the Supabase OAuth flow. Google and LinkedIn return to this origin;
-   * GitHub returns to `/auth/callback`. `detectSessionInUrl` in the Supabase
-   * client exchanges the code and the existing auth listener signs the user in.
-   * The return URL must be listed in Supabase → Authentication → URL
-   * Configuration.
+   * Starts the Supabase OAuth flow.
+   *
+   * On the web Google and LinkedIn return to this origin and GitHub returns
+   * to `/auth/callback`. `detectSessionInUrl` in the Supabase client exchanges
+   * the code and the existing auth listener signs the user in. The return URL
+   * must be listed in Supabase → Authentication → URL Configuration.
+   *
+   * On Android the provider page cannot run inside a WebView, so it is opened
+   * in the system browser and the result comes back through the deep link the
+   * native bridge listens on.
    */
   const handleOAuth = async (provider: OAuthProvider) => {
     setError(null);
@@ -72,6 +110,20 @@ export const AuthModal: React.FC = () => {
 
     setOauthProvider(provider);
     try {
+      if (isNative) {
+        const { data, error: oauthError } = await getBrowserSupabase().auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: OAUTH_DEEP_LINK, skipBrowserRedirect: true },
+        });
+        if (oauthError || !data?.url) {
+          setOauthProvider(null);
+          setError(oauthError?.message || 'Could not start sign-in');
+          return;
+        }
+        await Browser.open({ url: data.url });
+        return;
+      }
+
       const redirectTo =
         provider === 'github'
           ? `${window.location.origin}${GITHUB_OAUTH_CALLBACK_PATH}`
@@ -134,7 +186,7 @@ export const AuthModal: React.FC = () => {
     } else if (mode === 'forgot') {
       try {
         const { error } = await getBrowserSupabase().auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin,
+          redirectTo: isNative ? NATIVE_PASSWORD_RESET_REDIRECT : window.location.origin,
         });
         if (error) {
           setLoading(false);
@@ -167,7 +219,7 @@ export const AuthModal: React.FC = () => {
             ref={panelRef}
             role="dialog"
             aria-modal="true"
-            aria-label="CareerPilot AI sign in"
+            aria-label={t('CareerPilot AI sign in')}
             className="relative w-full max-w-md space-y-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 shadow-2xl sm:p-8"
             variants={dialogVariants(reduced)}
             initial="hidden"
@@ -177,8 +229,8 @@ export const AuthModal: React.FC = () => {
           {/* Close button */}
           <button
             onClick={close}
-            aria-label="Close modal"
-            className="absolute top-4 right-4 sm:top-5 sm:right-5 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
+            aria-label={t('Close modal')}
+            className="absolute top-4 end-4 sm:top-5 sm:end-5 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -190,7 +242,7 @@ export const AuthModal: React.FC = () => {
               <h3 className="font-bold text-base text-[var(--text-primary)]">
                 {mode === 'login' ? 'Sign in to CareerPilot' : mode === 'register' ? 'Create Your Account' : 'Reset Password'}
               </h3>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">Secure career state sync</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">{t('Secure career state sync')}</p>
             </div>
           </div>
 
@@ -248,32 +300,32 @@ export const AuthModal: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             {mode === 'register' && (
               <div>
-                <label className="block font-semibold text-[var(--text-secondary)] mb-1">Full Name</label>
+                <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Full Name')}</label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
+                  <User className="w-4 h-4 text-[var(--text-muted)] absolute start-3 top-2.5" />
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Alex Morgan"
-                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                    placeholder={t('e.g. Alex Morgan')}
+                    className="w-full ps-9 pe-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block font-semibold text-[var(--text-secondary)] mb-1">Email Address</label>
+              <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Email Address')}</label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
+                <Mail className="w-4 h-4 text-[var(--text-muted)] absolute start-3 top-2.5" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                  className="w-full ps-9 pe-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
             </div>
@@ -281,26 +333,26 @@ export const AuthModal: React.FC = () => {
             {mode !== 'forgot' && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="font-semibold text-[var(--text-secondary)]">Password</label>
+                  <label className="font-semibold text-[var(--text-secondary)]">{t('Password')}</label>
                   {mode === 'login' && (
                     <button
                       type="button"
                       onClick={() => switchMode('forgot')}
                       className="text-[11px] text-[var(--color-primary-text)] hover:underline"
                     >
-                      Forgot password?
+                      {t('Forgot password?')}
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
+                  <Lock className="w-4 h-4 text-[var(--text-muted)] absolute start-3 top-2.5" />
                   <input
                     type="password"
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                    className="w-full ps-9 pe-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
               </div>
@@ -325,7 +377,7 @@ export const AuthModal: React.FC = () => {
                   onClick={() => switchMode('register')}
                   className="text-[var(--color-primary-text)] font-semibold hover:underline"
                 >
-                  Sign up free
+                  {t('Sign up free')}
                 </button>
               </p>
             ) : (
@@ -336,19 +388,19 @@ export const AuthModal: React.FC = () => {
                   onClick={() => switchMode('login')}
                   className="text-[var(--color-primary-text)] font-semibold hover:underline"
                 >
-                  Sign in
+                  {t('Sign in')}
                 </button>
               </p>
             )}
             <div className="mt-2.5 pt-2 border-t border-[var(--border-subtle)]/40 text-[11px] text-[var(--text-muted)]">
-              <span>Developed by </span>
+              <span>{t('Developed by')} </span>
               <a
                 href="https://www.linkedin.com/in/ahmed-ebrahim2"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline transition-colors"
               >
-                Ahmed Ebrahim
+                {t('Ahmed Ebrahim')}
               </a>
             </div>
           </div>
