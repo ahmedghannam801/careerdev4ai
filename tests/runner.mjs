@@ -254,6 +254,15 @@ async function main() {
     // platform's records. Pure, like the two above: no database needed.
     join(TESTS_DIR, 'cv-studio.test.ts'),
     join(TESTS_DIR, 'cv-preview.test.ts'),
+    // The document the CV studio shows is a projection of the platform's
+    // records, so a change to a record reaches the CV on its own. Pure.
+    join(TESTS_DIR, 'cv-projection.test.ts'),
+    // The dates a career record carries: history is accepted, contradictions
+    // are not. Pure.
+    join(TESTS_DIR, 'historical-dates.test.ts'),
+    // The URL is the state of the application, so a refresh reopens the same
+    // page. Pure.
+    join(TESTS_DIR, 'routing.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

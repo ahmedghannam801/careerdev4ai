@@ -7,6 +7,9 @@ import {
   FolderClosed
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { APPLICATION_VIEW_MODES } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
+import { todayIsoDate } from '../../../shared/dateRange';
 import { ApplicationStage, JobApplication } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
@@ -20,7 +23,7 @@ export const ApplicationsView: React.FC = () => {
     cvVersions,
     logActivity, t} = useCareer();
 
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [viewMode, setViewMode] = useRouteParam<'kanban' | 'list'>('view', APPLICATION_VIEW_MODES, 'kanban');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedApp, setSelectedApp] = useState<JobApplication | null>(null);
 
@@ -32,6 +35,9 @@ export const ApplicationsView: React.FC = () => {
   const [stage, setStage] = useState<ApplicationStage>('applied');
   const [nextAction, setNextAction] = useState('Awaiting recruiter response');
   const [nextActionDate, setNextActionDate] = useState('');
+  // When the application was made. An application is often added after the
+  // fact, so the date is editable rather than fixed to today.
+  const [appliedDate, setAppliedDate] = useState(todayIsoDate());
   const [salaryDiscussed] = useState('$145,000');
   const [notes, setNotes] = useState('');
 
@@ -60,7 +66,7 @@ export const ApplicationsView: React.FC = () => {
       location: location.trim(),
       workMode,
       stage,
-      appliedDate: new Date().toISOString().split('T')[0],
+      appliedDate: appliedDate || todayIsoDate(),
       nextAction: nextAction.trim() || undefined,
       nextActionDate: nextActionDate || undefined,
       salaryDiscussed: salaryDiscussed || undefined,
@@ -78,6 +84,7 @@ export const ApplicationsView: React.FC = () => {
     setRole('');
     setNotes('');
     setNextActionDate('');
+    setAppliedDate(todayIsoDate());
     setShowAddModal(false);
   };
 
@@ -448,6 +455,16 @@ export const ApplicationsView: React.FC = () => {
                     <option value="On-site">{t('On-site')}</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[var(--text-secondary)] mb-1">{t('Applied Date')}</label>
+                <input
+                  type="date"
+                  value={appliedDate}
+                  onChange={(e) => setAppliedDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
               </div>
 
               <div>

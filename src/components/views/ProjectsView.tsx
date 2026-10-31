@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, ExternalLink, Github, X, HeartHandshake } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { PROJECT_STATUS_FILTERS } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { ProjectStatus } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
@@ -15,7 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export const ProjectsView: React.FC = () => {
   const { projects, addProject, updateProject, deleteProject, volunteerExperiences, t } = useCareer();
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useRouteParam<string>('status', PROJECT_STATUS_FILTERS, 'all');
   const [showAddModal, setShowAddModal] = useState(false);
 
   // New project state

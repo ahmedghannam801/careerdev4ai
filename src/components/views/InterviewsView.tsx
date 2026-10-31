@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sparkles, CheckCircle2, AlertCircle, History, HelpCircle } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { INTERVIEW_CATEGORIES } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { getAccessToken } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import { questionsForRole, QuestionItem } from '../../data/interviewBank';
@@ -8,7 +10,7 @@ import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const InterviewsView: React.FC = () => {
   const { targetRole, interviewSessions, saveInterviewSession, t} = useCareer();
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'star' | 'technical' | 'behavioral'>('all');
+  const [selectedCategory, setSelectedCategory] = useRouteParam<'all' | 'star' | 'technical' | 'behavioral'>('category', INTERVIEW_CATEGORIES, 'all');
 
   // The practice material follows the user's actual target role: the
   // universal questions plus the role's own interview topics from the

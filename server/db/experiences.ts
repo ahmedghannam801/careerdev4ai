@@ -22,7 +22,12 @@
 // returned separately — the same lossy flattening the aggregate endpoint
 // produced, kept here so the existing frontend contract is unchanged.
 import { getSupabaseServer } from './supabase';
-import { normalizeDateRange, normalizeDateValue } from './dates';
+import {
+  DateValidationError,
+  normalizeDateRange,
+  normalizeDateValue,
+  validateDateRange,
+} from './dates';
 
 export interface ExperienceDTO {
   id: string;
@@ -128,6 +133,10 @@ export async function createExperience(
   input: CreateExperienceInput
 ): Promise<ExperienceDTO> {
   const dates = normalizeDateRange(input.startDate, input.endDate, input.isCurrent);
+  // A role that ended before it started is a contradiction. A role that ran
+  // from 2019 to 2021 is not.
+  const problem = validateDateRange(dates.startDate, dates.endDate, dates.isCurrent);
+  if (problem) throw new DateValidationError(problem);
   const { data, error } = await getSupabaseServer()
     .from('experiences')
     .insert({
@@ -168,6 +177,27 @@ export async function updateExperience(
   }
   if (updates.description !== undefined || updates.achievements !== undefined) {
     patch.description = experienceDescription(updates.description, updates.achievements);
+  }
+
+  // The chronology is checked against the record as it will be after the
+  // change, not against the patch alone: moving only the start date can make
+  // a record contradictory.
+  if (updates.startDate !== undefined || updates.endDate !== undefined || updates.isCurrent !== undefined) {
+    const { data: current, error: readError } = await getSupabaseServer()
+      .from('experiences')
+      .select('start_date, end_date, is_current')
+      .eq('user_id', userId)
+      .eq('id', experienceId)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (current) {
+      const row = current as { start_date: string | null; end_date: string | null; is_current: boolean };
+      const startDate = patch.start_date !== undefined ? patch.start_date : row.start_date;
+      const endDate = patch.end_date !== undefined ? patch.end_date : row.end_date;
+      const isCurrent = patch.is_current !== undefined ? patch.is_current : row.is_current;
+      const problem = validateDateRange(startDate, endDate, isCurrent);
+      if (problem) throw new DateValidationError(problem);
+    }
   }
 
   const { data, error } = await getSupabaseServer()

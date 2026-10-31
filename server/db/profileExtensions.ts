@@ -10,7 +10,11 @@
 // Ownership: profile_id = auth.users.id; the id is always the verified
 // Supabase user id, never a client-supplied value.
 import { getSupabaseServer } from './supabase';
-import { normalizeDateValue } from './dates';
+import {
+  DateValidationError,
+  normalizeDateValue,
+  validateIssueDates,
+} from './dates';
 
 // ---- certifications ----
 
@@ -73,6 +77,10 @@ export async function createCertification(
   profileId: string,
   input: CreateCertificationInput
 ): Promise<CertificationDTO> {
+  // A certificate that expires before it was issued is a contradiction. A
+  // certificate issued years ago is not — that is the ordinary case.
+  const issueProblem = validateIssueDates(input.issueDate, input.expiryDate);
+  if (issueProblem) throw new DateValidationError(issueProblem);
   const { data, error } = await getSupabaseServer()
     .from('profile_certifications')
     .insert({
@@ -112,6 +120,25 @@ export async function updateCertification(
     if (patch[key] === undefined) delete patch[key];
   }
   if (Object.keys(patch).length === 0) return null;
+
+  // The issue and expiry dates are checked against the record as it will be
+  // after the change, not against the patch alone.
+  if (updates.issueDate !== undefined || updates.expiryDate !== undefined) {
+    const { data: current, error: readError } = await getSupabaseServer()
+      .from('profile_certifications')
+      .select('issue_date, expiry_date')
+      .eq('profile_id', profileId)
+      .eq('id', certificationId)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (current) {
+      const row = current as { issue_date: string | null; expiry_date: string | null };
+      const issueDate = patch.issue_date !== undefined ? patch.issue_date : row.issue_date;
+      const expiryDate = patch.expiry_date !== undefined ? patch.expiry_date : row.expiry_date;
+      const issueProblem = validateIssueDates(issueDate, expiryDate);
+      if (issueProblem) throw new DateValidationError(issueProblem);
+    }
+  }
 
   const { data, error } = await getSupabaseServer()
     .from('profile_certifications')

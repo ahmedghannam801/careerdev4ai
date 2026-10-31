@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Activity, 
   CheckCircle2, 
@@ -12,12 +12,14 @@ import {
   Clock
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { ACTIVITY_FILTERS } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { ActivityActionType } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { activities, t} = useCareer();
-  const [filterType, setFilterType] = useState<string>('all');
+  const [filterType, setFilterType] = useRouteParam<string>('type', ACTIVITY_FILTERS, 'all');
 
   const getActionIcon = (type: ActivityActionType) => {
     switch (type) {

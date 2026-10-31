@@ -359,6 +359,14 @@ export interface CVProfile {
   skillsList: string[];
   certifications: string[];
   certificationDetails?: Array<{
+    /**
+     * The id of the certificate record, when it has one.
+     *
+     * It is what lets the platform tell a certificate the candidate has
+     * deleted from a certificate that came from an imported CV and has not
+     * been imported into the profile yet.
+     */
+    id?: string;
     name: string;
     issuer: string;
     issueDate: string;
@@ -376,6 +384,15 @@ export interface CVProfile {
   volunteering?: CVVolunteering[];
   /** The completed courses shown on this CV. */
   courses?: CVCourse[];
+  /**
+   * The skills the candidate took off this CV.
+   *
+   * The skills shown on a CV are the skills the candidate owns — the platform
+   * never puts a target-role requirement on a CV as if the candidate had it.
+   * Taking a skill off is a decision about this CV only, so it is recorded
+   * here rather than in the candidate's own skill list.
+   */
+  hiddenSkills?: string[];
 }
 
 export interface ATSAnalysis {

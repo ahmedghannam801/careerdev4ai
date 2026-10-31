@@ -110,27 +110,50 @@ function toItem(row: LearningItemRow): LearningItem {
   };
 }
 
+/**
+ * Reads every row of a catalogue table.
+ *
+ * PostgREST caps a single response at 1000 rows, so an unpaginated read
+ * silently truncates the mapping tables once the catalogue grows past that
+ * limit: the API would then serve courses with missing skills and roles.
+ */
+async function readAllRows<T>(table: string, columns: string): Promise<T[]> {
+  const supabase = getSupabaseServer();
+  const pageSize = 1000;
+  const rows: T[] = [];
+  for (let page = 0; page < 50; page++) {
+    const from = page * pageSize;
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as T[];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+  return rows;
+}
+
 /** Reads the whole catalogue with its skill and role mappings. */
 export async function listCourses(): Promise<LearningCourse[]> {
   const supabase = getSupabaseServer();
-  const [coursesResult, skillsResult, rolesResult] = await Promise.all([
+  const [coursesResult, skillRows, roleRows] = await Promise.all([
     supabase.from('courses').select('*').order('title', { ascending: true }),
-    supabase.from('course_skills').select('course_id, skill_name, importance'),
-    supabase.from('course_roles').select('course_id, role_slug, relevance_score'),
+    readAllRows<CourseSkillRow>('course_skills', 'course_id, skill_name, importance'),
+    readAllRows<CourseRoleRow>('course_roles', 'course_id, role_slug, relevance_score'),
   ]);
   if (coursesResult.error) throw coursesResult.error;
-  if (skillsResult.error) throw skillsResult.error;
-  if (rolesResult.error) throw rolesResult.error;
 
   const skillsByCourse = new Map<string, CourseSkill[]>();
-  for (const row of (skillsResult.data ?? []) as CourseSkillRow[]) {
+  for (const row of skillRows) {
     const list = skillsByCourse.get(row.course_id) ?? [];
     list.push({ name: row.skill_name, importance: row.importance });
     skillsByCourse.set(row.course_id, list);
   }
 
   const rolesByCourse = new Map<string, CourseRole[]>();
-  for (const row of (rolesResult.data ?? []) as CourseRoleRow[]) {
+  for (const row of roleRows) {
     const list = rolesByCourse.get(row.course_id) ?? [];
     list.push({ roleSlug: row.role_slug, relevanceScore: row.relevance_score });
     rolesByCourse.set(row.course_id, list);

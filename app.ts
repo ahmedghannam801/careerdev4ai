@@ -68,6 +68,7 @@ import {
   updateExperience,
   deleteExperience,
 } from './server/db/experiences.ts';
+import { DateValidationError, parseDate } from './shared/dateRange.ts';
 import {
   listEducations,
   getEducation,
@@ -107,7 +108,7 @@ import {
   updateLearningItem,
   deleteLearningItem,
 } from './server/db/learning.ts';
-import { rankCourses, type LearningFormat, type LearningStatus } from './server/learning/recommendation.ts';
+import { rankCourses, selectNextStep, type LearningFormat, type LearningStatus } from './server/learning/recommendation.ts';
 import { enrichRecommendationsWithAi } from './server/learning/ai.ts';
 import { buildLearningContext } from './server/learning/context.ts';
 import {
@@ -862,6 +863,9 @@ app.post('/api/experiences', requireAuth, async (req: Request, res: Response) =>
     });
     return res.status(201).json({ success: true, experience });
   } catch (error) {
+    if (error instanceof DateValidationError) {
+      return res.status(400).json({ error: error.message, field: error.field });
+    }
     console.error('Failed to create experience:', error);
     return res.status(500).json({ error: 'Failed to create experience' });
   }
@@ -887,6 +891,9 @@ app.patch('/api/experiences/:id', requireAuth, async (req: Request, res: Respons
     if (!experience) return res.status(404).json({ error: 'Experience not found' });
     return res.json({ success: true, experience });
   } catch (error) {
+    if (error instanceof DateValidationError) {
+      return res.status(400).json({ error: error.message, field: error.field });
+    }
     console.error('Failed to update experience:', error);
     return res.status(500).json({ error: 'Failed to update experience' });
   }
@@ -949,6 +956,9 @@ app.post('/api/educations', requireAuth, async (req: Request, res: Response) => 
     });
     return res.status(201).json({ success: true, education });
   } catch (error) {
+    if (error instanceof DateValidationError) {
+      return res.status(400).json({ error: error.message, field: error.field });
+    }
     console.error('Failed to create education:', error);
     return res.status(500).json({ error: 'Failed to create education' });
   }
@@ -974,6 +984,9 @@ app.patch('/api/educations/:id', requireAuth, async (req: Request, res: Response
     if (!education) return res.status(404).json({ error: 'Education not found' });
     return res.json({ success: true, education });
   } catch (error) {
+    if (error instanceof DateValidationError) {
+      return res.status(400).json({ error: error.message, field: error.field });
+    }
     console.error('Failed to update education:', error);
     return res.status(500).json({ error: 'Failed to update education' });
   }
@@ -3551,11 +3564,11 @@ app.post('/api/certifications', requireAuth, async (req: Request, res: Response)
     const name = str(body.name, 200);
     if (!name) return res.status(400).json({ error: 'Name is required' });
     const issueDate = str(body.issueDate, 40);
-    if (issueDate && Number.isNaN(new Date(issueDate).getTime())) {
+    if (issueDate && !parseDate(issueDate).date && !parseDate(issueDate).isCurrent) {
       return res.status(400).json({ error: 'Invalid issueDate' });
     }
     const expiryDate = str(body.expiryDate, 40);
-    if (expiryDate && Number.isNaN(new Date(expiryDate).getTime())) {
+    if (expiryDate && !parseDate(expiryDate).date && !parseDate(expiryDate).isCurrent) {
       return res.status(400).json({ error: 'Invalid expiryDate' });
     }
     const certificationUrl = parseHttpUrl(body.url, 500);
@@ -3572,6 +3585,9 @@ app.post('/api/certifications', requireAuth, async (req: Request, res: Response)
     });
     return res.status(201).json({ success: true, certification });
   } catch (error) {
+    if (error instanceof DateValidationError) {
+      return res.status(400).json({ error: error.message, field: error.field });
+    }
     console.error('Failed to create certification:', error);
     return res.status(500).json({ error: 'Failed to create certification' });
   }
@@ -3600,6 +3616,9 @@ app.patch('/api/certifications/:id', requireAuth, async (req: Request, res: Resp
     if (!certification) return res.status(404).json({ error: 'Certification not found' });
     return res.json({ success: true, certification });
   } catch (error) {
+    if (error instanceof DateValidationError) {
+      return res.status(400).json({ error: error.message, field: error.field });
+    }
     console.error('Failed to update certification:', error);
     return res.status(500).json({ error: 'Failed to update certification' });
   }
@@ -4759,6 +4778,7 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
     if (body.ai === false) {
       result = {
         recommendations: deterministic,
+        ...selectNextStep(deterministic, built.context),
         aiUsed: false,
         aiFallbackReason: null,
         generatedAt: new Date().toISOString(),

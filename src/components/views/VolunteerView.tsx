@@ -13,6 +13,8 @@ import {
   Check,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { VOLUNTEER_TABS } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { VolunteerExperience } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { VolunteerOpportunities } from '../volunteer/VolunteerOpportunities';
@@ -87,7 +89,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
   const { volunteerExperiences, projects, addVolunteerExperience, updateVolunteerExperience, deleteVolunteerExperience, t } =
     useCareer();
 
-  const [tab, setTab] = useState<'opportunities' | 'record'>('opportunities');
+  const [tab, setTab] = useRouteParam<'opportunities' | 'record'>('tab', VOLUNTEER_TABS, 'opportunities');
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

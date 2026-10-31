@@ -13,6 +13,7 @@ import { Logo } from './components/brand/Logo';
 import { Skeleton } from './components/ui/Skeleton';
 import { GuidedTour, GUIDES, type GuideDefinition, type GuideKey } from './components/onboarding/GuidedTour';
 import { fetchDismissedGuides } from './lib/personalizationApi';
+import { buildRouteHash, isKnownRoute, parseRouteHash, resolveRouteId } from './lib/routing';
 
 /**
  * The authenticated experience is loaded on demand.
@@ -49,16 +50,8 @@ const ActivityView = lazy(() => import('./components/views/ActivityView').then((
  * Extracts the username from `#/profile/<username>`. A plain `#/profile` is
  * the signed-in user's own profile and therefore not a public link.
  */
-const readPublicProfileUsername = (): string | null => {
-  const hash = window.location.hash.replace(/^#\/?/, '');
-  const match = hash.match(/^profile\/([^/?#]+)/);
-  if (!match) return null;
-  try {
-    return decodeURIComponent(match[1]);
-  } catch {
-    return match[1];
-  }
-};
+const readPublicProfileUsername = (): string | null =>
+  parseRouteHash(window.location.hash).publicUsername;
 
 /**
  * The placeholder shown while a view chunk is being fetched.
@@ -94,11 +87,12 @@ function AppRoutes() {
     setAuthModalOpen,
     setCopilotOpen, t,} = useCareer();
   const [currentView, setCurrentView] = useState<string>(() => {
-    // Check hash for direct view or public profile
-    const hash = window.location.hash.replace('#/', '');
-    if (hash === 'profile') return 'profile';
-    if (hash === 'my-career') return 'my-career';
-    if (hash === 'documents') return 'documents';
+    // A deep link has to survive a refresh, so the hash is resolved against
+    // the known routes on the very first render — before the session has
+    // even been restored. A hash that names nothing falls back to the
+    // landing page until hydration says otherwise.
+    const resolved = resolveRouteId(window.location.hash, '');
+    if (resolved) return resolved;
     return profile.onboardingCompleted ? 'dashboard' : 'landing';
   });
   const [publicUsername, setPublicUsername] = useState<string | null>(
@@ -108,14 +102,14 @@ function AppRoutes() {
   const navigateTo = (view: string) => {
     setCurrentView(view);
     setActiveView(view);
-    window.location.hash = `#/${view}`;
+    window.location.hash = buildRouteHash(view);
   };
 
   // Sync hash changes
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#/', '');
-      const publicName = readPublicProfileUsername();
+      const parsed = parseRouteHash(window.location.hash);
+      const publicName = parsed.publicUsername;
       setPublicUsername(publicName);
 
       if (publicName) {
@@ -124,9 +118,22 @@ function AppRoutes() {
         return;
       }
 
-      if (hash && hash !== currentView) {
-        setCurrentView(hash);
-        setActiveView(hash);
+      // A hash the application does not recognise falls back to the
+      // dashboard, and the URL is corrected so it says what is on screen.
+      if (!isKnownRoute(parsed.route)) {
+        if (parsed.route) {
+          window.history.replaceState(null, '', buildRouteHash('dashboard'));
+        }
+        if (currentView !== 'dashboard') {
+          setCurrentView('dashboard');
+          setActiveView('dashboard');
+        }
+        return;
+      }
+
+      if (parsed.route !== currentView) {
+        setCurrentView(parsed.route);
+        setActiveView(parsed.route);
       }
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -147,7 +154,7 @@ function AppRoutes() {
       if (currentView === 'landing') {
         setCurrentView('dashboard');
         setActiveView('dashboard');
-        window.location.hash = '#/dashboard';
+        window.location.hash = buildRouteHash('dashboard');
       }
       return;
     }
@@ -155,11 +162,11 @@ function AppRoutes() {
     if (!profile.onboardingCompleted) {
       setCurrentView('onboarding');
       setActiveView('onboarding');
-      window.location.hash = '#/onboarding';
+      window.location.hash = buildRouteHash('onboarding');
     } else if (currentView === 'landing') {
       setCurrentView('dashboard');
       setActiveView('dashboard');
-      window.location.hash = '#/dashboard';
+      window.location.hash = buildRouteHash('dashboard');
     }
   }, [currentUser, isHydrated, profile.onboardingCompleted, currentView, setActiveView]);
 
@@ -194,7 +201,7 @@ function AppRoutes() {
         <PublicProfileView
           username={publicUsername}
           onBack={() => {
-            window.location.hash = '';
+            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
             setPublicUsername(null);
             const nextView = currentUser ? 'dashboard' : 'landing';
             setCurrentView(nextView);

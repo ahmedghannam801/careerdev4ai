@@ -13,6 +13,8 @@ import { CvSectionEditor } from '../cv/CvSectionEditor';
 import { Reveal } from '../motion/Motion';
 import { CVImportModal } from '../cv/CVImportModal';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
+import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 
 export const CVStudioView: React.FC = () => {
   const {
@@ -29,7 +31,7 @@ export const CVStudioView: React.FC = () => {
     aiPreferences,
     privacyPreferences,
     profile,
-    skills,
+    ownedSkills,
     projects,
     volunteerExperiences,
     learningItems,
@@ -37,7 +39,9 @@ export const CVStudioView: React.FC = () => {
     t } = useCareer();
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
-  const [activeTab, setActiveTab] = useState<'editor' | 'ats' | 'versions' | 'built'>('editor');
+  // The open tab is part of the page, so it lives in the URL: a refresh, a
+  // shared link and the Back button all land on the same tab.
+  const [activeTab, setActiveTab] = useRouteParam<CvStudioTab>('tab', CV_STUDIO_TABS, 'editor');
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionName, setVersionName] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -81,8 +85,9 @@ export const CVStudioView: React.FC = () => {
   };
 
   // The skills the candidate has actually rated. The assistant is told to
-  // choose from these and from nothing else.
-  const ratedSkills = skills.map((skill) => skill.name);
+  // choose from these and from nothing else: a skill the candidate has not
+  // claimed is not theirs to put on a CV.
+  const ratedSkills = ownedSkills.map((skill) => skill.name);
   const handlePrint = () => {
     window.print();
   };

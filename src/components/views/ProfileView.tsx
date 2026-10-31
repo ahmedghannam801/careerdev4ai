@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Mail, 
   Phone, 
@@ -30,6 +30,8 @@ import {
   UserLanguageEntry 
 } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { PROFILE_SECTIONS } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar, AvatarSelector } from '../ui/CareerPilotAvatars';
 
 export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
@@ -47,6 +49,18 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
 
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
+
+  // The profile is one long page, so the section the reader is on is part of
+  // the URL: a refresh lands on the same part of the profile, and a link can
+  // point at it.
+  const [section] = useRouteParam<string>('section', PROFILE_SECTIONS, 'top');
+
+  useEffect(() => {
+    if (section === 'top') return;
+    const element = document.getElementById(`profile-${section}`);
+    if (!element) return;
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [section]);
 
   // Modals state
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
@@ -778,7 +792,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       </div>
 
       {/* Professional Summary Section */}
-      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-3">
+      <div id="profile-summary" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-[var(--color-primary-text)]" />
@@ -804,7 +818,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       </div>
 
       {/* Experience Section */}
-      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+      <div id="profile-experience" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-[var(--color-primary-text)]" />
@@ -907,7 +921,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       {/* Education & Certifications Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Education */}
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+        <div id="profile-education" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
               <GraduationCap className="w-4 h-4 text-[var(--color-primary-text)]" />
@@ -962,7 +976,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         </div>
 
         {/* Certifications */}
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+        <div id="profile-certifications" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
               <Award className="w-4 h-4 text-[var(--color-primary-text)]" />
@@ -1036,7 +1050,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       {/* Languages & Professional Links Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Languages */}
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+        <div id="profile-languages" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
               <Languages className="w-4 h-4 text-[var(--color-primary-text)]" />
@@ -1079,7 +1093,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         </div>
 
         {/* Links */}
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+        <div id="profile-links" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
               <LinkIcon className="w-4 h-4 text-[var(--color-primary-text)]" />

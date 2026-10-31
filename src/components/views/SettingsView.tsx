@@ -21,6 +21,8 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { SETTINGS_TABS } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
@@ -63,7 +65,7 @@ export const SettingsView: React.FC = () => {
     validateUsername, 
     exportDataJson, t,} = useCareer();
 
-  const [activeTab, setActiveTab] = useState<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface' | 'about'>('account');
+  const [activeTab, setActiveTab] = useRouteParam<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface' | 'about'>('tab', SETTINGS_TABS, 'account');
 
   // Change Password state
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);

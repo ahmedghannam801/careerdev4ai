@@ -13,6 +13,8 @@ import {
   FileCode
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { DOCUMENT_TABS, DOCUMENT_TYPE_FILTERS } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
@@ -35,8 +37,8 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
 
-  const [activeTab, setActiveTab] = useState<'documents' | 'cv-versions' | 'cover-letters'>('documents');
-  const [docTypeFilter, setDocTypeFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useRouteParam<'documents' | 'cv-versions' | 'cover-letters'>('tab', DOCUMENT_TABS, 'documents');
+  const [docTypeFilter, setDocTypeFilter] = useRouteParam<string>('type', DOCUMENT_TYPE_FILTERS, 'all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Rename CV Modal

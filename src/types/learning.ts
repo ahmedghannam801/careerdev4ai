@@ -76,6 +76,14 @@ export interface ScoreBreakdown {
   budget: number;
   saved: number;
   focus: number;
+  /** 0-100 relevance gate applied to the total. */
+  relevance: number;
+  /** 0-100 match against the target role's own skills. */
+  roleSkill: number;
+  /** 0-100 whether the category belongs to the role's domain. */
+  domain: number;
+  /** 0-100 presentation/metadata fit (capped to 15 points of influence). */
+  genericFit: number;
   total: number;
 }
 
@@ -95,6 +103,8 @@ export interface LearningRecommendation {
   gapsAddressed: AddressedGap[];
   roleRelevance: number;
   breakdown: ScoreBreakdown;
+  /** True when a role/gap/roadmap/focus signal drives the score. */
+  strongSignal: boolean;
   aiExplanation?: string;
   aiSkillGap?: string;
   aiRoadmapLink?: string;
@@ -114,6 +124,10 @@ export interface RecommendationContextSummary {
 
 export interface RecommendationResult {
   recommendations: LearningRecommendation[];
+  /** Null when nothing clears the strong-signal bar. */
+  nextStep?: LearningRecommendation | null;
+  mode?: 'next_step' | 'exploration';
+  explorationReason?: string | null;
   aiUsed: boolean;
   aiFallbackReason: string | null;
   generatedAt: string;

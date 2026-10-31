@@ -55,7 +55,8 @@ import { translate } from '../translations/sourceStrings';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
 import { apiUrl } from '../lib/native';
 import { planPersonalImport } from '../../shared/cvImport';
-import { buildCvDocument } from '../../shared/cvDocument';
+import { mergeCanonicalCvDocument } from '../../shared/cvProjection';
+import type { CvSourceData } from '../../shared/cvDocument';
 import {
   isAtsAnalysisForRole,
   parseAtsAnalysisFailure,
@@ -110,6 +111,7 @@ import {
   postSavedRole,
   deleteSavedRole,
   fetchJobApplications,
+  fetchProfileLinks,
   postJobApplication,
   patchJobApplication,
   deleteJobApplication,
@@ -124,6 +126,7 @@ import {
   type JobApplicationDTO,
   type InterviewSessionDTO,
   type VolunteerExperienceDTO,
+  type ProfileLinkDTO,
 } from '../lib/coreApi';
 import {
   fetchRoadmap,
@@ -336,6 +339,15 @@ interface CareerContextType {
 
   // Skills
   skills: UserSkill[];
+  /**
+   * The skills the candidate actually owns.
+   *
+   * `skills` is the CATALOGUE — every skill the target role wants, with the
+   * candidate's level where they have one and level 1 where they do not.
+   * This is the list of the skills the candidate has really rated or added,
+   * and it is what a CV may show.
+   */
+  ownedSkills: Array<{ name: string; level: number }>;
   updateSkillLevel: (skillId: string, currentLevel: number) => void;
   addCustomSkill: (skill: Omit<UserSkill, 'id' | 'gap' | 'lastUpdated'>) => void;
   removeSkill: (skillId: string) => void;
@@ -1135,6 +1147,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           learningCatalogList,
           learningItemList,
           learningRecommendationResult,
+          profileLinkList,
         ] = await Promise.all([
           fetchRoadmap(),
           fetchProfile(),
@@ -1166,6 +1179,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             generatedAt: new Date().toISOString(),
             context: undefined,
           })),
+          // A missing link list must not block the hydration: the CV shows the
+          // links it has, and the studio can still add more.
+          fetchProfileLinks().catch(() => []),
         ]);
         if (cancelled) return;
         // The roadmap tables and the profile tables are the source of truth for
@@ -1279,6 +1295,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           levels[name] = row.proficiency;
         }
         setSkillLevels(levels);
+
+        // The professional links are their own records. The CV shows them, so
+        // they have to be in the projection.
+        setProfileLinks(profileLinkList ?? []);
 
         // The notifications are real rows, not the two hard-coded entries
         // the drawer used to show.
@@ -1455,6 +1475,43 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return merged;
   }, [targetRole, skillLevels, customSkills]);
 
+  // The skills the candidate actually owns.
+  //
+  // The list above is the CATALOGUE: every skill the target role wants, with
+  // the candidate's own level where they have one and level 1 where they do
+  // not. A CV is not that list. Putting a requirement on a CV would claim
+  // the candidate has a skill they never said they had, so the CV is built
+  // from the rows in public.user_skills — the skills the candidate has
+  // actually rated or added.
+  const ownedSkills = useMemo(() => {
+    // The name each skill is shown under. The catalogue spells it the way the
+    // platform does, and a skill the candidate added carries its own.
+    const displayNames = new Map<string, string>();
+    for (const skill of skills) {
+      displayNames.set(skill.name.toLowerCase(), skill.name);
+    }
+    for (const row of userSkillRows) {
+      const name = (row.skill?.name ?? '').trim();
+      if (name) displayNames.set(name.toLowerCase(), name);
+    }
+    for (const custom of customSkills) {
+      const name = custom.name.trim();
+      if (name) displayNames.set(name.toLowerCase(), name);
+    }
+
+    // `skillLevels` is the set of skills the candidate has actually rated.
+    // It is updated the moment a level is set or a skill is added, so a skill
+    // reaches the CV as soon as it is claimed rather than at the next
+    // refresh.
+    const byName = new Map<string, { name: string; level: number }>();
+    for (const [key, level] of Object.entries(skillLevels)) {
+      const name = displayNames.get(key);
+      if (!name) continue;
+      byName.set(key, { name, level });
+    }
+    return [...byName.values()];
+  }, [skills, skillLevels, userSkillRows, customSkills]);
+
   // Roadmap
   //
   // The roadmap is NOT cached in localStorage (B.3.9, finding M-5). The
@@ -1505,7 +1562,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // B.4 finding C-5: the CV carried a fabricated candidate (Sarah Jenkins,
   // Meridian Tech Labs, a Meta certificate). It now starts empty and is
   // filled from the persisted CV / CV version rows.
+  //
+  // The document is not a second copy of the career data. It is a projection
+  // of the records below: see `cvSource` and `mergeCanonicalCvDocument`.
   const [activeCV, setActiveCV] = useState<CVProfile>(emptyCVProfile);
+
+  // The professional links, as the profile owns them. The CV shows them, but
+  // the order and the enabled flag belong to the CV alone.
+  const [profileLinks, setProfileLinks] = useState<ProfileLinkDTO[]>([]);
 
   // CVs and CV versions — PostgreSQL is the source of truth (B.3.7).
   const [cvVersions, setCvVersions] = useState<CVVersion[]>([]);
@@ -2246,6 +2310,123 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // up to date. It is a CACHE, never a source of truth, and it is only
   // written for an authenticated session whose hydration has completed.
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // The CV document is a projection of the records, not a second copy of
+  // them.
+  //
+  // `cvSource` is everything the platform knows about the user, in the shape
+  // the projection reads. It is rebuilt whenever any of those records change,
+  // which is what makes "add a project, and the CV shows it" true without
+  // anybody pressing a button.
+  const cvSource = useMemo<CvSourceData>(() => {
+    const completedCourseItems = learningItems.filter((item) => item.status === 'completed');
+    return {
+      profile: {
+        fullName: profile.name,
+        email: profile.email,
+        phone: profile.phone ?? '',
+        location: profile.location,
+        title: profile.headline || profile.currentTitle || '',
+        summary: profile.professionalSummary ?? profile.bio ?? '',
+      },
+      experiences: profile.experiences.map((entry) => ({
+        id: entry.id,
+        role: entry.role,
+        company: entry.company,
+        location: entry.location,
+        startDate: entry.startDate,
+        endDate: entry.endDate,
+        isCurrent: entry.isCurrent,
+        description: entry.description,
+        bullets: entry.achievements,
+      })),
+      education: profile.education.map((entry) => ({
+        id: entry.id,
+        institution: entry.institution,
+        degree: entry.degree,
+        field: entry.field,
+        startDate: entry.startDate,
+        endDate: entry.endDate,
+        isCurrent: entry.current,
+        description: entry.coursework?.join(', ') ?? '',
+      })),
+      projects: projects.map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        role: entry.goal ?? '',
+        link: entry.repositoryUrl ?? undefined,
+        technologies: entry.skills,
+        bullets: entry.deliverables,
+        description: entry.description,
+      })),
+      volunteering: volunteerExperiences.map((entry) => ({
+        id: entry.id,
+        organization: entry.organization,
+        role: entry.role,
+        location: entry.location,
+        startDate: entry.startDate,
+        endDate: entry.endDate,
+        isCurrent: entry.isCurrent,
+        description: entry.description,
+        achievements: entry.achievements,
+        responsibilities: entry.responsibilities,
+      })),
+      certifications: profile.certifications.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        issuer: entry.provider,
+        issueDate: entry.issueDate,
+        description: '',
+      })),
+      courses: completedCourseItems
+        .map((item) => {
+          const course = learningCatalog.find((entry) => entry.id === item.courseId);
+          return course
+            ? {
+                id: item.id,
+                title: course.title,
+                provider: course.provider,
+                description: item.notes ?? '',
+              }
+            : null;
+        })
+        .filter(
+          (entry): entry is { id: string; title: string; provider: string; description: string } =>
+            entry !== null
+        ),
+      skills: ownedSkills,
+      links: profileLinks.map((link) => ({
+        id: link.id,
+        kind: link.kind,
+        label: link.label,
+        url: link.url,
+      })),
+    };
+  }, [
+    profile,
+    projects,
+    volunteerExperiences,
+    learningItems,
+    learningCatalog,
+    ownedSkills,
+    profileLinks,
+  ]);
+
+  // Keep the document in step with the records.
+  //
+  // This is the whole of the synchronisation: when a record is created,
+  // changed or deleted, the records change, the source is rebuilt, and the
+  // document is projected again. There is no polling and no second copy of
+  // the data to keep in step — the candidate's own wording survives, because
+  // the projection reads it from the document it is replacing.
+  //
+  // The projection waits for the hydration to finish. Before it has, the
+  // records are empty, and projecting them would wipe a document that was
+  // restored from a saved version.
+  useEffect(() => {
+    if (!isHydrated) return;
+    setActiveCV((previous) => mergeCanonicalCvDocument(cvSource, previous));
+  }, [isHydrated, cvSource]);
 
   useEffect(() => {
     // Never cache a pre-hydration value: it would be the demo seed.
@@ -3646,107 +3827,105 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
+  /**
+   * The CV header is written to the profile, and the field is edited a
+   * character at a time. The write is therefore held back until the typing
+   * pauses, so a name is one request rather than one per keystroke.
+   */
+  const cvProfileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cvProfilePending = useRef<Partial<UserProfile>>({});
+
+  const flushCvProfile = useCallback(() => {
+    cvProfileTimer.current = null;
+    const pending = cvProfilePending.current;
+    cvProfilePending.current = {};
+    if (Object.keys(pending).length === 0) return;
+    // The document already shows the change. If the profile write fails, the
+    // next projection puts the old value back rather than leaving the
+    // document claiming something the server never accepted.
+    void updateProfile(pending).catch((error) => {
+      console.error('Failed to persist the CV header:', error);
+    });
+  }, [updateProfile]);
+
+  const queueCvProfileUpdate = useCallback(
+    (updates: Partial<UserProfile>) => {
+      cvProfilePending.current = { ...cvProfilePending.current, ...updates };
+      if (cvProfileTimer.current) clearTimeout(cvProfileTimer.current);
+      cvProfileTimer.current = setTimeout(flushCvProfile, 700);
+    },
+    [flushCvProfile]
+  );
+
+  // A pending header edit is not lost because the studio was closed.
+  useEffect(
+    () => () => {
+      if (cvProfileTimer.current) {
+        clearTimeout(cvProfileTimer.current);
+        flushCvProfile();
+      }
+    },
+    [flushCvProfile]
+  );
+
+  /**
+   * The editor writes to the document.
+   *
+   * The header is a fact about the candidate, so it is written to the PROFILE
+   * rather than to the document: the profile is where the name, the headline,
+   * the phone number, the location and the address live, and the document
+   * reads them back out through the projection. The change is applied to the
+   * document straight away so the field does not lag behind the keyboard, and
+   * the profile is updated underneath it.
+   *
+   * Everything else the editor writes — the summary, the bullets, the order
+   * of the links, the skills taken off this CV — is the candidate's wording
+   * for this document, and stays in the document.
+   */
   const updateCV = (updates: Partial<CVProfile>) => {
-    setActiveCV(prev => ({ ...prev, ...updates }));
+    const profileUpdates: Partial<UserProfile> = {};
+    if (updates.fullName !== undefined) profileUpdates.name = updates.fullName;
+    if (updates.title !== undefined) profileUpdates.headline = updates.title;
+    if (updates.phone !== undefined) profileUpdates.phone = updates.phone;
+    if (updates.location !== undefined) profileUpdates.location = updates.location;
+    if (updates.email !== undefined) profileUpdates.email = updates.email;
+
+    setActiveCV((previous) => {
+      const next: CVProfile = { ...previous, ...updates };
+      // A skill taken off this CV is remembered here, so the projection does
+      // not put it back. Taking a skill off a CV is a decision about this CV
+      // only — it does not mean the candidate does not have the skill.
+      if (updates.skillsList !== undefined) {
+        const kept = new Set(updates.skillsList);
+        const removed = previous.skillsList.filter((name) => !kept.has(name));
+        if (removed.length > 0) {
+          next.hiddenSkills = [...new Set([...(previous.hiddenSkills ?? []), ...removed])];
+        }
+      }
+      return next;
+    });
+
+    if (Object.keys(profileUpdates).length > 0) {
+      queueCvProfileUpdate(profileUpdates);
+    }
   };
 
   /**
    * Fills the editor from the records the platform already holds.
    *
-   * The editor used to start empty unless the candidate had imported a CV by
-   * hand, even though their experience, education, projects, volunteering,
-   * completed courses, certificates and rated skills were all on file. This
-   * maps those records onto the document.
+   * The document is a projection of the records, so it is already filled from
+   * them. This button remains for the one thing a projection cannot do on its
+   * own: bring back the skills the candidate took off this particular CV, and
+   * put every record the platform holds back in front of them.
    *
-   * The merge is one-directional: anything the candidate has already written
-   * is kept, and only the gaps are filled. Their words are never replaced by
-   * the platform's.
+   * The merge is one-directional in the other sense too: anything the
+   * candidate has already written is kept, and only the gaps are filled. Their
+   * words are never replaced by the platform's.
    */
   const loadCVFromMyData = () => {
-    const completedCourseItems = learningItems.filter((item) => item.status === 'completed');
-    const courses = completedCourseItems
-      .map((item) => {
-        const course = learningCatalog.find((entry) => entry.id === item.courseId);
-        return course
-          ? {
-              id: item.id,
-              title: course.title,
-              provider: course.provider,
-              description: item.notes ?? '',
-            }
-          : null;
-      })
-      .filter((entry): entry is { id: string; title: string; provider: string; description: string } =>
-        entry !== null
-      );
-
-    const document = buildCvDocument(
-      {
-        profile: {
-          fullName: profile.name,
-          email: profile.email,
-          phone: profile.phone ?? '',
-          location: profile.location,
-          title: profile.headline ?? profile.currentTitle ?? '',
-          summary: '',
-        },
-        experiences: profile.experiences.map((entry) => ({
-          id: entry.id,
-          role: entry.role,
-          company: entry.company,
-          location: entry.location,
-          startDate: entry.startDate,
-          endDate: entry.endDate,
-          isCurrent: entry.isCurrent,
-          description: entry.description,
-          bullets: entry.achievements,
-        })),
-        education: profile.education.map((entry) => ({
-          id: entry.id,
-          institution: entry.institution,
-          degree: entry.degree,
-          field: entry.field,
-          startDate: entry.startDate,
-          endDate: entry.endDate,
-          isCurrent: entry.current,
-          description: entry.coursework?.join(', ') ?? '',
-        })),
-        projects: projects.map((entry) => ({
-          id: entry.id,
-          title: entry.title,
-          role: entry.goal ?? '',
-          link: entry.repositoryUrl ?? undefined,
-          technologies: entry.skills,
-          bullets: entry.deliverables,
-          description: entry.description,
-        })),
-        volunteering: volunteerExperiences.map((entry) => ({
-          id: entry.id,
-          organization: entry.organization,
-          role: entry.role,
-          location: entry.location,
-          startDate: entry.startDate,
-          endDate: entry.endDate,
-          isCurrent: entry.isCurrent,
-          description: entry.description,
-          achievements: entry.achievements,
-          responsibilities: entry.responsibilities,
-        })),
-        certifications: profile.certifications.map((entry) => ({
-          id: entry.id,
-          name: entry.name,
-          issuer: entry.provider,
-          issueDate: entry.issueDate,
-          description: '',
-        })),
-        courses,
-        skills: skills.map((skill) => ({ name: skill.name, level: skill.currentLevel })),
-        links: [],
-      },
-      activeCV
+    setActiveCV((previous) =>
+      mergeCanonicalCvDocument(cvSource, { ...previous, hiddenSkills: [] })
     );
-
-    setActiveCV((prev) => ({ ...prev, ...document }));
   };
 
   const saveCVVersion = async (name: string) => {
@@ -4802,6 +4981,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         deleteCoverLetter,
         generateAiCoverLetter,
         skills,
+        ownedSkills,
         updateSkillLevel,
         addCustomSkill,
         removeSkill,

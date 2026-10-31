@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Plus, ShieldCheck, ExternalLink, X } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { EVIDENCE_TYPES } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { EvidenceType } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const EvidenceView: React.FC = () => {
   const { evidenceItems, addEvidence, deleteEvidence, t} = useCareer();
-  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedType, setSelectedType] = useRouteParam<string>('type', EVIDENCE_TYPES, 'all');
   const [showAddModal, setShowAddModal] = useState(false);
 
   // New evidence form state

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, CheckCircle2, X, Target } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { SKILL_CATEGORIES } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { SkillCategory, SkillSource } from '../../types/career';
 import { Reveal } from '../motion/Motion';
 import {
@@ -21,7 +23,7 @@ const PRIORITY_CLASS: Record<string, string> = {
 
 export const SkillsCenterView: React.FC = () => {
   const { skills, updateSkillLevel, addCustomSkill, removeSkill, targetRole, t} = useCareer();
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useRouteParam<string>('category', SKILL_CATEGORIES, 'all');
   const [showAddModal, setShowAddModal] = useState(false);
 
   // New skill form state

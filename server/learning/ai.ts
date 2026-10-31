@@ -12,6 +12,7 @@
 // Any failure returns the deterministic result unchanged. Recommendation
 // quality never depends on the model being available.
 
+import { selectNextStep } from './recommendation.ts';
 import type {
   LearningContext,
   LearningRecommendation,
@@ -237,8 +238,12 @@ export async function enrichRecommendationsWithAi(
   options: AiEnrichmentOptions
 ): Promise<RecommendationResult> {
   const generatedAt = new Date().toISOString();
+  const decision = selectNextStep(deterministic, context);
   const fallback = (reason: string): RecommendationResult => ({
     recommendations: deterministic,
+    nextStep: decision.nextStep,
+    mode: decision.mode,
+    explorationReason: decision.explorationReason,
     aiUsed: false,
     aiFallbackReason: reason,
     generatedAt,
@@ -291,6 +296,13 @@ export async function enrichRecommendationsWithAi(
 
     return {
       recommendations,
+      nextStep:
+        decision.nextStep === null
+          ? null
+          : recommendations.find((entry) => entry.course.id === decision.nextStep!.course.id) ??
+            decision.nextStep,
+      mode: decision.mode,
+      explorationReason: decision.explorationReason,
       aiUsed: true,
       aiFallbackReason:
         validation.rejected > 0

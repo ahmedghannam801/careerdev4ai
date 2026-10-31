@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Calendar, BookOpen, ExternalLink, RefreshCw, Target, Clock, GitBranch, FolderGit2, Info } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { ROADMAP_STATUS_FILTERS } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { RoadmapTaskStatus } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
@@ -32,7 +34,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
     regeneratePersonalizedRoadmap,
     t,
   } = useCareer();
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useRouteParam<string>('status', ROADMAP_STATUS_FILTERS, 'all');
   const [isUpdating, setIsUpdating] = useState(false);
 
   const coursesForSkill = (skillName: string | null) => {

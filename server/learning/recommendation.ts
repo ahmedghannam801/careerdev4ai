@@ -4,11 +4,29 @@
 // catalogue, the user's role, skills, roadmap and learning state, and returns
 // ranked candidates with an explicit score breakdown. It never calls an LLM.
 // The AI layer receives only these already-ranked candidates.
+//
+// Relevance-gated scoring
+// -----------------------
+// Generic course metadata (a beginner level, English, a short duration, the
+// preferred format and a free price) must never be enough to promote a course.
+// The total is therefore gated by role relevance:
+//
+//   total = 100 × relevance × (0.85 + 0.15 × genericFit)
+//
+// `relevance` is driven by the user's real gaps, the target role, the role's
+// own skills, the roadmap and an explicit focus skill. `genericFit` can only
+// move the total by 15 points, so it cannot overpower relevance. A course with
+// no role/gap/roadmap signal lands below 50 and can never be labelled the
+// next best step.
 
 import {
   GOAL_LEARNING_CATEGORIES,
   categoryServesDomain,
 } from '../../shared/learningCategories.ts';
+import {
+  createSkillLookup,
+  skillMatchConfidence,
+} from '../../shared/skillMatching.ts';
 
 export type Availability =
   | 'free'
@@ -127,6 +145,14 @@ export interface ScoreBreakdown {
   budget: number;
   saved: number;
   focus: number;
+  /** 0-100. The relevance gate applied to the total. */
+  relevance: number;
+  /** 0-100. How well the course's skills match the role's own skills. */
+  roleSkill: number;
+  /** 0-100. Whether the course category belongs to the role's domain. */
+  domain: number;
+  /** 0-100. Presentation/metadata fit. Capped to a 15-point influence. */
+  genericFit: number;
   total: number;
 }
 
@@ -146,18 +172,27 @@ export interface LearningRecommendation {
   gapsAddressed: AddressedGap[];
   roleRelevance: number;
   breakdown: ScoreBreakdown;
+  /** True when a role/gap/roadmap/focus signal — not metadata — drives the score. */
+  strongSignal: boolean;
   aiExplanation?: string;
   aiSkillGap?: string;
   aiRoadmapLink?: string;
 }
 
+export type RecommendationMode = 'next_step' | 'exploration';
+
 export interface RecommendationResult {
   recommendations: LearningRecommendation[];
+  /** Null when no candidate clears the strong-signal bar. */
+  nextStep: LearningRecommendation | null;
+  mode: RecommendationMode;
+  explorationReason: string | null;
   aiUsed: boolean;
   aiFallbackReason: string | null;
   generatedAt: string;
 }
 
+/** The display weights, retained for the per-factor breakdown. */
 const WEIGHTS = {
   gap: 35,
   role: 22,
@@ -173,11 +208,11 @@ const WEIGHTS = {
 } as const;
 
 /**
- * The catalogue categories that suit a career goal.
- *
- * The list lives in the shared module so the catalogue seed and the
- * recommender cannot drift apart.
+ * The minimum score and relevance for a course to be presented as the single
+ * "next best step". Anything below this is exploration, not a directive.
  */
+export const NEXT_STEP_MIN_SCORE = 50;
+export const NEXT_STEP_MIN_RELEVANCE = 0.5;
 
 function round(value: number, digits = 1): number {
   const factor = 10 ** digits;
@@ -367,23 +402,32 @@ export function scoreCourse(
   if (!isAllowedByBudget(course, context.budget)) return null;
 
   const gapMap = buildGapMap(context);
+  const gapLookup = createSkillLookup(gapMap.keys());
+
   const targetSlug = context.targetRole?.slug ?? null;
   const roleMatch = targetSlug
     ? course.roles.find((role) => role.roleSlug === targetSlug)
     : undefined;
   const roleRelevance = roleMatch ? roleMatch.relevanceScore / 100 : 0;
 
-  const matchedSkills = course.skills
-    .map((skill) => skill.name)
-    .filter((name) => gapMap.has(name));
+  // A course can name the same capability differently from the role catalogue.
+  // Resolve each course skill to at most one gap and keep its strongest
+  // contribution, so five phrasings of "SQL" cannot inflate the gap score.
+  const matchedGaps = new Map<string, number>();
+  for (const skill of course.skills) {
+    const hit = gapLookup.find(skill.name, 0.8);
+    if (!hit) continue;
+    matchedGaps.set(hit.name, Math.max(matchedGaps.get(hit.name) ?? 0, skill.importance * hit.confidence));
+  }
+  const matchedSkills = [...matchedGaps.keys()];
 
   const gapsAddressed: AddressedGap[] = [];
   let gapRaw = 0;
-  for (const skill of course.skills) {
-    const gap = gapMap.get(skill.name);
+  for (const [name, importance] of matchedGaps) {
+    const gap = gapMap.get(name);
     if (!gap) continue;
     const gapNorm = clamp01(gap.gap / 4);
-    const importanceNorm = clamp01(skill.importance / 5);
+    const importanceNorm = clamp01(importance / 5);
     gapRaw += gapNorm * importanceNorm;
     if (gap.gap > 0) {
       gapsAddressed.push({
@@ -396,30 +440,102 @@ export function scoreCourse(
   }
   const gapScore = clamp01(gapRaw / 2.4);
 
-  const roadmapSkillMatches = course.skills
-    .map((skill) => skill.name)
-    .filter((name) => context.roadmapSkills.includes(name));
+  // How strongly the course's own skills are the target role's skills. This is
+  // the signal that a generic category can never fake: HTML/CSS has no motion
+  // role skill, so it earns nothing here for a Motion & Video Designer.
+  const roleSkillLevels = new Map<string, { required: boolean; minLevel: number }>();
+  if (context.targetRole) {
+    for (const skill of context.targetRole.requiredSkills) {
+      roleSkillLevels.set(skill.name, { required: true, minLevel: skill.minLevel });
+    }
+    for (const skill of context.targetRole.preferredSkills) {
+      if (!roleSkillLevels.has(skill.name)) {
+        roleSkillLevels.set(skill.name, { required: false, minLevel: skill.minLevel });
+      }
+    }
+  }
+  const roleSkillLookup = createSkillLookup(roleSkillLevels.keys());
+  const roleMatches = new Map<string, number>();
+  for (const skill of course.skills) {
+    const hit = roleSkillLookup.find(skill.name, 0.8);
+    if (!hit) continue;
+    const roleSkill = roleSkillLevels.get(hit.name);
+    if (!roleSkill) continue;
+    const contribution =
+      (roleSkill.minLevel / 5) *
+      (skill.importance / 5) *
+      (roleSkill.required ? 1 : 0.7) *
+      hit.confidence;
+    roleMatches.set(hit.name, Math.max(roleMatches.get(hit.name) ?? 0, contribution));
+  }
+  const roleSkillRaw = [...roleMatches.values()].reduce((sum, value) => sum + value, 0);
+  const roleSkillScore = clamp01(roleSkillRaw / 1.5);
+
+  const roadmapLookup = createSkillLookup(context.roadmapSkills);
+  const roadmapSkillMatches = [
+    ...new Set(
+      course.skills
+        .map((skill) => roadmapLookup.find(skill.name, 0.8)?.name)
+        .filter((name): name is string => Boolean(name))
+    ),
+  ];
   const roadmapCourseMatch = context.roadmapCourseIds.includes(course.id);
   const roadmapScore = roadmapCourseMatch ? 1 : clamp01(roadmapSkillMatches.length / 2);
 
-  const focusMatch =
+  const focusScore =
     context.focusSkill &&
     course.skills.some(
-      (skill) => skill.name.toLowerCase() === context.focusSkill!.toLowerCase()
-    );
-  const focusScore = focusMatch ? 1 : 0;
+      (skill) => skillMatchConfidence(skill.name, context.focusSkill!) >= 0.8
+    )
+      ? 1
+      : 0;
 
   const languageScore = course.language.toLowerCase().startsWith(context.language) ? 1 : 0.3;
   const formatScore =
     context.preferredFormat === 'any' || course.format === context.preferredFormat ? 1 : 0.45;
   const savedScore = context.savedCourseIds.includes(course.id) ? 1 : 0;
   const budgetScore = budgetFit(course, context.budget);
+  const goalScore = goalFit(course, context.careerGoal, context.targetRole);
+  const domainScore = categoryServesDomain(course.category, context.targetRole?.domainId) ? 1 : 0;
+
+  const genericFit = clamp01(
+    levelFit(course.level, context.experienceLevel) * 0.45 +
+      languageScore * 0.15 +
+      formatScore * 0.1 +
+      timeFit(course, context.weeklyHours) * 0.2 +
+      budgetScore * 0.1
+  );
+
+  // Direct signals. Goal/domain are deliberately weak: they describe the
+  // discipline, not this user's next requirement.
+  const directRelevance = Math.max(
+    roleRelevance,
+    roleSkillScore * 0.95,
+    gapScore * 0.8,
+    roadmapScore * 0.85,
+    focusScore,
+    savedScore * 0.5
+  );
+  const weakRelevance = Math.max(goalScore * 0.4, domainScore * 0.35);
+  const relevance = clamp01(Math.max(directRelevance, weakRelevance));
+
+  const total = round(
+    100 * relevance * (0.85 + 0.15 * genericFit)
+  );
+
+  const strongSignal = Boolean(
+    roleRelevance >= 0.7 ||
+      (roleSkillScore >= 0.45 && (gapScore > 0 || roleRelevance > 0)) ||
+      (gapScore >= 0.35 && relevance >= 0.5) ||
+      (roadmapScore >= 0.5 && relevance >= 0.5) ||
+      (focusScore > 0 && relevance >= 0.6)
+  );
 
   const breakdown: ScoreBreakdown = {
     gap: round(WEIGHTS.gap * gapScore),
     role: round(WEIGHTS.role * roleRelevance),
     roadmap: round(WEIGHTS.roadmap * roadmapScore),
-    goal: round(WEIGHTS.goal * goalFit(course, context.careerGoal, context.targetRole)),
+    goal: round(WEIGHTS.goal * goalScore),
     level: round(WEIGHTS.level * levelFit(course.level, context.experienceLevel)),
     language: round(WEIGHTS.language * languageScore),
     format: round(WEIGHTS.format * formatScore),
@@ -427,21 +543,12 @@ export function scoreCourse(
     budget: round(WEIGHTS.budget * budgetScore),
     saved: round(WEIGHTS.saved * savedScore),
     focus: round(focusScore * WEIGHTS.focus),
-    total: 0,
+    relevance: round(relevance * 100),
+    roleSkill: round(roleSkillScore * 100),
+    domain: round(domainScore * 100),
+    genericFit: round(genericFit * 100),
+    total,
   };
-  breakdown.total = round(
-    breakdown.gap +
-      breakdown.role +
-      breakdown.roadmap +
-      breakdown.goal +
-      breakdown.level +
-      breakdown.language +
-      breakdown.format +
-      breakdown.time +
-      breakdown.budget +
-      breakdown.saved +
-      breakdown.focus
-  );
 
   const sortedGaps = [...gapsAddressed].sort((a, b) => b.gap - a.gap);
   const reason = formatReason(
@@ -461,6 +568,7 @@ export function scoreCourse(
     gapsAddressed: sortedGaps,
     roleRelevance: round(roleRelevance, 3),
     breakdown,
+    strongSignal,
   };
 }
 
@@ -486,4 +594,41 @@ export function rankCourses(
     return a.course.title.localeCompare(b.course.title);
   });
   return ranked.slice(0, limit);
+}
+
+/** True when a recommendation is strong enough to be called the next step. */
+export function isStrongNextStep(recommendation: LearningRecommendation): boolean {
+  return (
+    recommendation.score >= NEXT_STEP_MIN_SCORE &&
+    recommendation.breakdown.relevance >= NEXT_STEP_MIN_RELEVANCE * 100 &&
+    recommendation.strongSignal
+  );
+}
+
+export interface NextStepDecision {
+  nextStep: LearningRecommendation | null;
+  mode: RecommendationMode;
+  explorationReason: string | null;
+}
+
+/**
+ * Selects at most one next step. When nothing clears the bar, the caller gets
+ * an explicit exploration state and a reason — never a weak course presented
+ * as a directive.
+ */
+export function selectNextStep(
+  recommendations: LearningRecommendation[],
+  context: Pick<LearningContext, 'targetRole'>
+): NextStepDecision {
+  const candidate = recommendations.find(isStrongNextStep) ?? null;
+  if (candidate) {
+    return { nextStep: candidate, mode: 'next_step', explorationReason: null };
+  }
+
+  const roleTitle = context.targetRole?.title;
+  const explorationReason = roleTitle
+    ? `No catalogue course is strongly aligned with ${roleTitle} right now. The options below are broader exploration, not a recommended next step.`
+    : 'Choose a target role first so courses can be ranked against real requirements.';
+
+  return { nextStep: null, mode: 'exploration', explorationReason };
 }

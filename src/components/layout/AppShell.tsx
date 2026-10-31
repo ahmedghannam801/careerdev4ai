@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { 
   Home, 
@@ -33,6 +33,7 @@ import { CopilotDrawer } from '../copilot/CopilotDrawer';
 import { NotificationsDrawer } from '../notifications/NotificationsDrawer';
 import { Logo } from '../brand/Logo';
 import { backdropVariants, drawerLeftVariants } from '../../lib/motion';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
 
 interface AppShellProps {
@@ -50,6 +51,25 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
   // trigger, so a signed-in user could never sign out.
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const reduced = useReducedMotion() ?? false;
+
+  // The copilot is a panel over the page, but the URL names it: a refresh
+  // reopens it on the page it was opened over, rather than on a bare
+  // dashboard.
+  const [copilotParam, setCopilotParam] = useRouteParam<'1' | ''>('copilot', ['1'], '');
+
+  useEffect(() => {
+    if (copilotParam === '1' && !copilotOpen) setCopilotOpen(true);
+  }, [copilotParam, copilotOpen, setCopilotOpen]);
+
+  const openCopilot = useCallback(() => {
+    setCopilotOpen(true);
+    setCopilotParam('1');
+  }, [setCopilotOpen, setCopilotParam]);
+
+  const closeCopilot = useCallback(() => {
+    setCopilotOpen(false);
+    setCopilotParam('');
+  }, [setCopilotOpen, setCopilotParam]);
 
   const unreadCount = visibleNotifications.filter(n => !n.read).length;
 
@@ -174,7 +194,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         {/* Sidebar Footer: Copilot Quick Launch & Profile Widget */}
         <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-2">
           <button
-            onClick={() => setCopilotOpen(true)}
+            onClick={openCopilot}
             className="w-full py-2.5 px-3 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -453,7 +473,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
             <div className="space-y-2">
               <button
-                onClick={() => { setCopilotOpen(true); setMobileMenuOpen(false); }}
+                onClick={() => { openCopilot(); setMobileMenuOpen(false); }}
                 className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
@@ -510,12 +530,12 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         isOpen={searchModalOpen}
         onClose={() => setSearchModalOpen(false)}
         onNavigate={onNavigate}
-        onOpenCopilot={() => setCopilotOpen(true)}
+        onOpenCopilot={openCopilot}
       />
 
       <CopilotDrawer
         isOpen={copilotOpen}
-        onClose={() => setCopilotOpen(false)}
+        onClose={closeCopilot}
         onNavigate={onNavigate}
       />
 

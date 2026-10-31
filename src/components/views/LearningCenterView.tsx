@@ -28,6 +28,13 @@ import type {
 } from '../../types/learning';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
+import {
+  LEARNING_AVAILABILITY,
+  LEARNING_FORMATS,
+  LEARNING_LEVELS,
+  LEARNING_TABS,
+} from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 
 type HubTab = 'recommended' | 'saved' | 'in_progress' | 'completed' | 'catalog';
 
@@ -334,11 +341,28 @@ export const LearningCenterView: React.FC = () => {
     removeLearningCourse,
     targetRole, t} = useCareer();
 
-  const [tab, setTab] = useState<HubTab>('recommended');
-  const [category, setCategory] = useState('all');
-  const [level, setLevel] = useState('all');
-  const [availability, setAvailability] = useState('all');
-  const [format, setFormat] = useState('all');
+  // The categories the catalogue actually offers. They are read before the
+  // filter state below, because the filter is validated against them.
+  const categories = useMemo(
+    () => [...new Set(learningCatalog.map((course) => course.category))].sort(),
+    [learningCatalog]
+  );
+
+  // The open tab and the filters are part of the page the user is looking at,
+  // so they live in the URL and survive a refresh.
+  const [tab, setTab] = useRouteParam<HubTab>('tab', LEARNING_TABS, 'recommended');
+  const [category, setCategory] = useRouteParam<string>(
+    'category',
+    ['all', ...categories],
+    'all'
+  );
+  const [level, setLevel] = useRouteParam<string>('level', LEARNING_LEVELS, 'all');
+  const [availability, setAvailability] = useRouteParam<string>(
+    'availability',
+    LEARNING_AVAILABILITY,
+    'all'
+  );
+  const [format, setFormat] = useRouteParam<string>('format', LEARNING_FORMATS, 'all');
   const [search, setSearch] = useState('');
   const [weeklyHours, setWeeklyHours] = useState(learningRecommendationMeta.weeklyHours);
   const [budget, setBudget] = useState<'free_only' | 'low' | 'any'>(learningRecommendationMeta.budget);
@@ -386,11 +410,6 @@ export const LearningCenterView: React.FC = () => {
     }
     return map;
   }, [learningRecommendations]);
-
-  const categories = useMemo(
-    () => [...new Set(learningCatalog.map((course) => course.category))].sort(),
-    [learningCatalog]
-  );
 
   const searchMatches = (course: LearningCourse) => {
     if (!search.trim()) return true;
