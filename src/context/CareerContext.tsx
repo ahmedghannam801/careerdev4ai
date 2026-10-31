@@ -1123,6 +1123,27 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const hydrate = async () => {
       setHydrationError(false);
       try {
+        // The theme and the interface language belong to the account, and the
+        // direction of the page follows the language. They are applied as
+        // soon as they arrive rather than after the whole batch below, which
+        // includes the learning catalogue and the recommendation ranking. An
+        // Arabic reader was shown a left-to-right layout, with Arabic text in
+        // it, for as long as the slowest of those requests took.
+        const preferencesPromise = fetchPreferences();
+        preferencesPromise
+          .then((record) => {
+            if (cancelled || !record) return;
+            setSettings((prev) => ({
+              ...prev,
+              theme: (record.theme as UserSettings['theme']) ?? prev.theme,
+              language: (record.language as UserSettings['language']) ?? prev.language,
+            }));
+          })
+          .catch(() => {
+            // The hydration below reports a failed hydration; this early
+            // application only makes sure the page is not left pointing the
+            // wrong way.
+          });
         const [
           roadmapRecord,
           profileRecord,
@@ -1167,7 +1188,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           fetchEducations(),
           fetchUserSkills(),
           fetchNotifications(),
-          fetchPreferences(),
+          preferencesPromise,
           fetchBookmarks(),
           // A learning-catalogue failure must never block the B.4 hydration.
           fetchLearningCatalog().catch(() => []),
