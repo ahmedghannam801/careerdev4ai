@@ -297,6 +297,31 @@
 
 @layer components {
   /* ------------------------------------------------------------------
+   * A page section that must be allowed to shrink inside a flex column.
+   * -----------------------------------------------------------------
+   * Without this a wide table or a long word inside a flex child sets the
+   * width of the whole page, and the page then scrolls sideways on a phone.
+   */
+  .app-page {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* ------------------------------------------------------------------
+   * Horizontally scrollable table region with a keyboard/touch hint.
+   * -----------------------------------------------------------------
+   * A table wider than the screen is allowed to scroll inside its own
+   * region rather than pushing the whole page sideways.
+   */
+  .table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ------------------------------------------------------------------
    * Skeleton loading placeholder
    * -----------------------------------------------------------------
    * A calm, branded shimmer used instead of an abrupt blank area while a

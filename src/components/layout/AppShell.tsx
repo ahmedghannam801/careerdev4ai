@@ -32,7 +32,7 @@ import { GlobalSearchModal } from './GlobalSearchModal';
 import { CopilotDrawer } from '../copilot/CopilotDrawer';
 import { NotificationsDrawer } from '../notifications/NotificationsDrawer';
 import { Logo } from '../brand/Logo';
-import { backdropVariants, drawerLeftVariants } from '../../lib/motion';
+import { backdropVariants, drawerLeftVariants, drawerVariants } from '../../lib/motion';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
 
@@ -108,11 +108,45 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
     { id: 'progress', label: t('navProgress'), icon: TrendingUp },
     { id: 'settings', label: t('navSettings'), icon: Settings },
   ];
-
   const handleNavClick = (viewId: string) => {
     onNavigate(viewId);
     setMobileMenuOpen(false);
   };
+
+  // The breadcrumb shows the name of the current page rather than its route
+  // id, so a phone shows a word that fits instead of "cv-studio".
+  const currentViewLabel =
+    [...primaryNavItems, ...secondaryNavItems].find((item) => item.id === currentView)?.label ??
+    currentView
+      .split('-')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+
+  // The language and the theme are one control each, used both in the header
+  // and in the mobile drawer, so a phone is not asked to fit them in a bar
+  // that is 320 pixels wide.
+  const languageToggle = (
+    <button
+      type="button"
+      onClick={() => updateSettings({ language: settings.language === 'en' ? 'ar' : 'en' })}
+      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+      title={t('Toggle English / Arabic (RTL)')}
+    >
+      {settings.language === 'en' ? 'عربي' : 'EN'}
+    </button>
+  );
+
+  const themeToggle = (
+    <button
+      type="button"
+      onClick={() => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+      title={t('Toggle Theme')}
+      aria-label={t('Toggle Theme')}
+    >
+      {settings.theme === 'dark' ? <Sun className="w-4 h-4 text-[var(--color-accent)]" /> : <Moon className="w-4 h-4" />}
+    </button>
+  );
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex flex-col md:flex-row">
@@ -228,79 +262,77 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       </aside>
 
       {/* Main Content Area & Top Bar */}
-      <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-[calc(4.75rem+env(safe-area-inset-bottom))] md:pb-0">
         {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 bg-[var(--surface-main)]/90 backdrop-blur-md border-b border-[var(--border-subtle)] px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 bg-[var(--surface-main)]/90 backdrop-blur-md border-b border-[var(--border-subtle)] px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="p-1.5 md:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-md"
+              className="md:hidden inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
               title={t('Open Navigation')}
+              aria-label={t('Open Navigation')}
             >
               <Menu className="w-5 h-5" />
             </button>
 
             {/* Quick Breadcrumb Trail */}
-            <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5 truncate">
+            <div className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--text-secondary)]">
               <button 
                 onClick={() => onNavigate('dashboard')} 
-                className="hover:text-[var(--text-primary)] font-medium"
+                className="hidden shrink-0 font-medium hover:text-[var(--text-primary)] sm:inline"
               >
                 {t('CareerPilot')}
               </button>
-              <span className="text-[var(--text-muted)]">/</span>
-              <span className="font-semibold text-[var(--text-primary)] capitalize">
-                {currentView.replace('-', ' ')}
+              <span className="hidden shrink-0 text-[var(--text-muted)] sm:inline">/</span>
+              <span className="truncate font-semibold text-[var(--text-primary)]">
+                {currentViewLabel}
               </span>
             </div>
           </div>
 
           {/* Top Actions: Search / Command, Language, Theme, Notifications, Profile */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => setSearchModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] text-xs transition-colors"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] sm:hidden"
+              title={t('Search and Command Palette (Ctrl/Cmd + K)')}
+              aria-label={t('Search and Command Palette (Ctrl/Cmd + K)')}
+            >
+              <Search className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setSearchModalOpen(true)}
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] text-xs transition-colors"
               title={t('Search and Command Palette (Ctrl/Cmd + K)')}
             >
               <Search className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{t('Search / Actions...')}</span>
-              <span className="hidden sm:inline font-mono text-[10px] bg-[var(--surface-main)] px-1 rounded border border-[var(--border-subtle)]">⌘K</span>
+              <span className="hidden lg:inline">{t('Search / Actions...')}</span>
+              <span className="hidden lg:inline font-mono text-[10px] bg-[var(--surface-main)] px-1 rounded border border-[var(--border-subtle)]">⌘K</span>
             </button>
 
-            {/* Language Switcher */}
-            <button
-              onClick={() => updateSettings({ language: settings.language === 'en' ? 'ar' : 'en' })}
-              className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] text-xs font-semibold"
-              title={t('Toggle English / Arabic (RTL)')}
-            >
-              {settings.language === 'en' ? 'عربي' : 'EN'}
-            </button>
-
-            {/* Theme Switcher */}
-            <button
-              onClick={() => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
-              className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]"
-              title={t('Toggle Theme')}
-            >
-              {settings.theme === 'dark' ? <Sun className="w-4 h-4 text-[var(--color-accent)]" /> : <Moon className="w-4 h-4" />}
-            </button>
+            {/* Language & theme stay in the header from tablet width; phones use the drawer. */}
+            <div className="hidden items-center gap-2 md:flex">
+              {languageToggle}
+              {themeToggle}
+            </div>
 
             {/* Notifications */}
             <button
               onClick={() => setNotificationsOpen(true)}
-              className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] relative"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] relative"
               title={t('Notifications')}
+              aria-label={t('Notifications')}
             >
               <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -end-1 w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse" />
+                <span className="absolute top-2 end-2 w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse" />
               )}
             </button>
 
             {/* Profile Avatar Button */}
             <button
               onClick={() => onNavigate('profile')}
-              className="flex items-center gap-2 ps-2 border-l border-[var(--border-subtle)] group"
+              className="hidden sm:flex items-center gap-2 ps-2 border-s border-[var(--border-subtle)] group"
               title={t('View My Profile')}
             >
               <CareerPilotAvatar
@@ -316,7 +348,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(prev => !prev)}
-                className="p-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
                 title={t('Account menu')}
                 aria-label={t('Account menu')}
                 aria-expanded={userMenuOpen}
@@ -330,7 +362,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                     onClick={() => setUserMenuOpen(false)}
                     aria-hidden="true"
                   />
-                  <div className="absolute end-0 top-full mt-2 z-50 w-60 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
+                  <div className="absolute end-0 top-full z-50 mt-2 w-60 max-w-[calc(100vw-1.5rem)] rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
                     <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
                       <div className="text-xs font-bold text-[var(--text-primary)] truncate">
                         {currentUser?.email || displayName}
@@ -369,7 +401,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         </header>
 
         {/* View Content Viewport */}
-        <main className="flex-1 p-4 sm:p-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 w-full min-w-0 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>
 
@@ -407,28 +439,29 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             />
             <motion.div
               role="dialog"
+              aria-modal="true"
               aria-label={t('Navigation')}
-              className="relative flex h-full w-72 flex-col justify-between border-r border-[var(--border-subtle)] bg-[var(--surface-main)] p-4"
-              variants={drawerLeftVariants(reduced)}
+              className="relative flex h-full w-[86vw] max-w-xs flex-col border-e border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl"
+              variants={settings.language === 'ar' ? drawerVariants(reduced) : drawerLeftVariants(reduced)}
               initial="hidden"
               animate="visible"
               exit="exit"
             >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
-                <div className="flex items-center gap-2">
-                  <Logo variant="icon" className="h-7 w-7" alt="" />
-                  <span className="font-bold text-sm text-[var(--text-primary)]">{t('CareerPilot AI')}</span>
-                </div>
-                <button 
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <Logo variant="icon" className="h-7 w-7" alt="" />
+                <span className="font-bold text-sm text-[var(--text-primary)]">{t('CareerPilot AI')}</span>
               </div>
+              <button 
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+                aria-label={t('Close Navigation')}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="space-y-1 overflow-y-auto max-h-[70vh]">
+              <div className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
                 <div className="px-2 text-[10px] font-bold uppercase text-[var(--text-muted)] mb-1">{t('Career')}</div>
                 {primaryNavItems.map((item) => {
                   const Icon = item.icon;
@@ -437,13 +470,14 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                     <button
                       key={item.id}
                       onClick={() => handleNavClick(item.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
                       }`}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className="w-4 h-4 shrink-0" />
                       <span>{item.label}</span>
                     </button>
                   );
@@ -457,31 +491,40 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                     <button
                       key={item.id}
                       onClick={() => handleNavClick(item.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
                       }`}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className="w-4 h-4 shrink-0" />
                       <span>{item.label}</span>
                     </button>
                   );
                 })}
               </div>
-            </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 border-t border-[var(--border-subtle)] px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <div className="flex items-center justify-between gap-2 pb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  {t('Display')}
+                </span>
+                <div className="flex items-center gap-2">
+                  {languageToggle}
+                  {themeToggle}
+                </div>
+              </div>
               <button
                 onClick={() => { openCopilot(); setMobileMenuOpen(false); }}
-                className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2"
+                className="w-full min-h-11 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>{t('askCopilot')}</span>
               </button>
               <button
                 onClick={() => { setMobileMenuOpen(false); logout(); }}
-                className="w-full py-2.5 rounded-xl border border-[var(--color-danger)]/30 text-[var(--color-danger)] text-xs font-semibold flex items-center justify-center gap-2"
+                className="w-full min-h-11 rounded-xl border border-[var(--color-danger)]/30 text-[var(--color-danger)] text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
                 <span>{t('Sign out')}</span>
@@ -493,7 +536,10 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
     </AnimatePresence>
 
       {/* Mobile Bottom Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--surface-main)]/95 backdrop-blur-md border-t border-[var(--border-subtle)] px-2 py-1.5 flex items-center justify-around text-[10px]">
+      <nav
+        aria-label={t('Primary')}
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--surface-main)]/95 backdrop-blur-md border-t border-[var(--border-subtle)] px-1 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] flex items-stretch justify-around text-[10px]"
+      >
         {[
           { id: 'dashboard', label: t('Home'), icon: Home },
           { id: 'my-career', label: t('Career'), icon: Compass },
@@ -507,7 +553,8 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg ${
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 ${
                 isActive ? 'text-[var(--color-primary-text)] font-bold' : 'text-[var(--text-muted)]'
               }`}
             >
@@ -518,12 +565,13 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         })}
         <button
           onClick={() => setMobileMenuOpen(true)}
-          className="flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          className="flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          aria-label={t('Open all navigation')}
         >
           <MoreHorizontal className="w-4 h-4" />
           <span>{t('More')}</span>
         </button>
-      </div>
+      </nav>
 
       {/* Global Modals & Drawers */}
       <GlobalSearchModal
