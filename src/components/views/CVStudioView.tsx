@@ -180,7 +180,7 @@ export const CVStudioView: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
         <button
           onClick={() => setActiveTab('editor')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${

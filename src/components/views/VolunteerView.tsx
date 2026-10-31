@@ -232,7 +232,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
 
       {/* The two halves of the page: what you can apply to, and what you
           have already done. */}
-      <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
         <button
           type="button"
           onClick={() => setTab('opportunities')}
