@@ -5,6 +5,7 @@ import { PROJECT_STATUS_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { ProjectStatus } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { ProjectAiPanel } from '../projects/ProjectAiPanel';
 
 /** The user-facing label of each project status. */
 const STATUS_LABELS: Record<string, string> = {
@@ -110,6 +111,11 @@ export const ProjectsView: React.FC = () => {
           <span>{t('New Project')}</span>
         </button>
       </div>
+
+      {/* The AI advisor: what to build next, and what is wrong with what is
+          already there. It sits above the list so it is the first thing the
+          candidate sees when they arrive to build something. */}
+      <ProjectAiPanel />
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">

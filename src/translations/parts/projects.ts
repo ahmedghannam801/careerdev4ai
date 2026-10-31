@@ -84,4 +84,44 @@ export const projectsAr: Record<string, string> = {
   'Published': 'منشور',
   'Creating…': 'جارٍ الإنشاء…',
   'Create Project': 'إنشاء مشروع',
+
+  // ---- The AI project advisor ----
+  'AI Project Advisor': 'مستشار المشاريع الذكي',
+  'Projects could not be recommended right now.': 'تعذّر اقتراح المشاريع الآن.',
+  'Your projects could not be analysed right now.': 'تعذّر تحليل مشاريعك الآن.',
+  'Recommendations are built from your target role, your skills, the gaps you still have, your roadmap, what you have already been studying and the projects you already have.':
+    'تُبنى التوصيات من دورك المستهدف ومهاراتك والفجوات التي ما زالت قائمة وخارطة طريقك وما بدأت دراسته والمشاريع التي تملكها بالفعل.',
+  'Job Description (optional)': 'وصف الوظيفة (اختياري)',
+  'Paste the job description you are aiming at, and the recommendations will be aimed at it…':
+    'الصق وصف الوظيفة التي تستهدفها، وستُوجَّه التوصيات نحوه…',
+  'This job description will be read and used for the recommendations.':
+    'سيُقرأ وصف الوظيفة هذا ويُستخدم في التوصيات.',
+  'Leave this empty to be recommended against your target role alone.':
+    'اتركه فارغًا لتُقترح المشاريع بناءً على دورك المستهدف وحده.',
+  'Finding projects…': 'جارٍ البحث عن مشاريع…',
+  'Recommend projects for me': 'اقترح مشاريع لي',
+  'Checking your projects…': 'جارٍ فحص مشاريعك…',
+  'Check my existing projects': 'افحص مشاريعي الحالية',
+  'Add a project first and it can be checked.': 'أضف مشروعًا أولًا ليتم فحصه.',
+  'Recommended Projects For You': 'مشاريع مقترحة لك',
+  'No project could be recommended from your records yet. Set your target role and rate your skills to get recommendations.':
+    'لم يُقترح أي مشروع من سجلاتك بعد. حدّد دورك المستهدف وقيّم مهاراتك للحصول على توصيات.',
+  'Closes': 'يغلق فجوة في',
+  'Written by AI': 'مكتوب بالذكاء الاصطناعي',
+  'Added to your projects': 'أُضيف إلى مشاريعك',
+  'Start this project': 'ابدأ هذا المشروع',
+  'Why This Fits You': 'لماذا يناسبك',
+  'Skills To Develop': 'المهارات المطلوب تطويرها',
+  'Tools & Technologies': 'الأدوات والتقنيات',
+  'Expected Outcome': 'النتيجة المتوقعة',
+  'Step-By-Step Implementation': 'التنفيذ خطوة بخطوة',
+  'Resources': 'المصادر',
+  'How To Present It On Your CV': 'كيف تعرضه في سيرتك الذاتية',
+  'Your Existing Projects': 'مشاريعك الحالية',
+  'There are no projects to check yet.': 'لا توجد مشاريع لفحصها بعد.',
+  'Strength as evidence': 'القوة كدليل',
+  'Nothing is missing from this project. It has a description, deliverables, technologies and a place in your target role.':
+    'لا شيء ناقص في هذا المشروع. لديه وصف ومخرجات وتقنيات ومكان في دورك المستهدف.',
+  'Do this:': 'افعل هذا:',
+  'Role Skills This Project Does Not Yet Show': 'مهارات الدور التي لا يُظهرها هذا المشروع بعد',
 };

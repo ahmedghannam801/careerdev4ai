@@ -135,6 +135,20 @@ import {
   isCvAssistTone,
 } from './shared/cvAiAssist.ts';
 import {
+  analyzeJobDescription,
+  buildJobDescriptionMatch,
+  generateAtsCvContent,
+  MAX_JOB_DESCRIPTION_CHARS,
+  type ClientCvDocument,
+  type JobDescriptionAiClient,
+} from './server/cv/jobDescription.ts';
+import {
+  recommendProjects,
+  buildProjectRecommendationContext,
+} from './server/projects/recommendation.ts';
+import { analyzeProjects } from './server/projects/analysis.ts';
+import type { JobDescriptionAnalysis } from './shared/jobDescription.ts';
+import {
   listDismissedGuides,
   dismissGuide,
 } from './server/db/guides.ts';
@@ -1147,16 +1161,20 @@ function modelUnavailable(res: Response): Response {
 }
 
 /**
- * Consumes one unit of the daily AI budget for this caller.
+ * Consumes units of the daily AI budget for this caller.
  *
  * Returns null when the request may proceed, or the 429 response to send
  * when the daily allowance is used up. The response carries a machine-readable
  * `code`, so a client can tell "your own daily allowance is spent" apart from
  * "the provider's quota is spent" — two different problems with two different
  * remedies.
+ *
+ * `count` is how many units the route's model calls cost. A route that makes
+ * two calls spends two units, so the allowance reflects the requests that
+ * actually reach the provider.
  */
-function consumeAiBudget(res: Response, userId?: string | null): Response | null {
-  const budget = consumeDailyAiBudget(userId);
+function consumeAiBudget(res: Response, userId?: string | null, count = 1): Response | null {
+  const budget = consumeDailyAiBudget(userId, { count });
   if (budget.allowed) return null;
   res.setHeader('Retry-After', String(budget.retryAfterSeconds));
   return res.status(429).json({
@@ -1169,14 +1187,17 @@ function consumeAiBudget(res: Response, userId?: string | null): Response | null
 }
 
 /**
- * Consumes one unit of the daily AI budget WITHOUT answering the request.
+ * Consumes units of the daily AI budget WITHOUT answering the request.
  *
  * Used by the routes that have a working non-AI fallback (the CV upload
  * falls back to a deterministic parser): when the allowance is spent the
  * model is skipped and the route continues, so the user still gets a result.
+ *
+ * `count` is how many units the route's model calls cost, so a route that
+ * makes two calls spends two units.
  */
-function tryConsumeAiBudget(userId?: string | null): boolean {
-  return consumeDailyAiBudget(userId).allowed;
+function tryConsumeAiBudget(userId?: string | null, count = 1): boolean {
+  return consumeDailyAiBudget(userId, { count }).allowed;
 }
 /**
  * Reports an AI failure honestly.
@@ -2093,6 +2114,285 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, async (req: Request, res
   } catch (error) {
     console.error('CV assist error:', error);
     return res.status(500).json({ error: 'Failed to write this CV section' });
+  }
+});
+
+// ============================================================
+// The job description flow.
+//
+// A job description is read, compared against the candidate's own record,
+// and a CV is written for it. Two rules run through all of it.
+//
+// The job description is the employer's text, not the candidate's. It says
+// what the job needs; the candidate's records say what they have. The two
+// are compared, never merged, so a requirement the candidate cannot support
+// is reported as missing rather than written onto their CV.
+//
+// The ATS score is measured, not asserted. It is computed by the shared
+// engine from the candidate's real skills and real text, so it cannot be a
+// model's opinion of how well the candidate matches.
+//
+// The model is optional on the analysis route: without it the
+// deterministic reader still produces an analysis and a score, and the CV
+// studio keeps working. On the generation route the model is required,
+// because there is nothing to fall back to — and when it fails, the
+// candidate's document is left exactly as it was.
+// ============================================================
+
+/**
+ * Reads the job description out of a request body.
+ *
+ * A short paste is refused: an advertisement of a few words carries no
+ * requirements, and a score computed against it would be meaningless.
+ */
+function readJobDescription(body: unknown): { ok: true; text: string } | { ok: false } {
+  const text = str((body as { jobDescription?: unknown })?.jobDescription, MAX_JOB_DESCRIPTION_CHARS);
+  if (!text || text.trim().length < 20) return { ok: false };
+  return { ok: true, text: text.trim() };
+}
+
+/**
+ * Reads an optional job description for the project routes.
+ *
+ * The project routes accept the pasted description so the recommendations can
+ * be aimed at it. It is analysed on the server and the analysis is checked
+ * against the pasted text, so the client cannot hand the engine a
+ * description of a role that was never read.
+ */
+async function readOptionalJobDescription(
+  body: unknown,
+  options: { ai: JobDescriptionAiClient | null; model: string; language: 'en' | 'ar' }
+): Promise<JobDescriptionAnalysis | null> {
+  const read = readJobDescription(body);
+  if (!read.ok) return null;
+  const { analysis } = await analyzeJobDescription(read.text, options);
+  return analysis;
+}
+
+// Reads a job description and reports what it asks for.
+app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const read = readJobDescription(body);
+    if (!read.ok) {
+      return res.status(400).json({
+        error: 'Paste the job description to analyse. At least a full sentence is needed.',
+      });
+    }
+
+    const language = body.language === 'ar' ? 'ar' : 'en';
+
+    // The model's reading of the advertisement is an improvement, not a
+    // requirement. When it is unavailable the deterministic reader still
+    // produces an analysis and a score, so the studio keeps working.
+    //
+    // The allowance is only spent when there is a real call to make, so a
+    // server with no model configured never burns a candidate's daily budget.
+    const hasModel = Boolean(process.env.GEMINI_API_KEY);
+    const aiBudget = hasModel ? tryConsumeAiBudget(req.authUser!.id) : false;
+    const client: JobDescriptionAiClient | null = hasModel && aiBudget ? ai : null;
+
+    const { analysis, aiUsed, fallbackReason } = await analyzeJobDescription(read.text, {
+      ai: client,
+      model: getGeminiModel(),
+      language,
+    });
+
+    // A model that failed before it served the request did not spend the
+    // allowance either.
+    if (fallbackReason === 'model_error') {
+      refundDailyAiBudget(req.authUser!.id);
+    }
+
+    const match = await buildJobDescriptionMatch(req.authUser!.id, analysis, { language });
+
+    return res.json({
+      success: true,
+      analysis,
+      match,
+      aiUsed,
+      aiFallbackReason: fallbackReason,
+    });
+  } catch (error) {
+    console.error('Job description analysis error:', error);
+    return res.status(500).json({ error: 'Failed to analyse the job description' });
+  }
+});
+
+// Writes the CV for a job description.
+//
+// This route makes two model calls — one to read the advertisement and one to
+// write the CV — so it costs two units of the daily allowance. The candidate's
+// document is only touched by the client, after the content has been checked,
+// so a failure here leaves their CV exactly as it was.
+app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const read = readJobDescription(body);
+    if (!read.ok) {
+      return res.status(400).json({
+        error: 'Paste the job description to write a CV for. At least a full sentence is needed.',
+      });
+    }
+
+    const language = body.language === 'ar' ? 'ar' : 'en';
+
+    // The candidate's current document. It is used as the candidate's own
+    // writing, so the model improves it rather than replacing it. The ids in
+    // it are never trusted: the records are resolved from the database.
+    const document = (body.cv ?? null) as ClientCvDocument | null;
+
+    if (!process.env.GEMINI_API_KEY) {
+      return modelUnavailable(res);
+    }
+
+    const blocked = consumeAiBudget(res, req.authUser!.id, 2);
+    if (blocked) return blocked;
+
+    try {
+      const { analysis } = await analyzeJobDescription(read.text, {
+        ai,
+        model: getGeminiModel(),
+        language,
+      });
+      const match = await buildJobDescriptionMatch(req.authUser!.id, analysis, { language });
+
+      const outcome = await generateAtsCvContent({
+        userId: req.authUser!.id,
+        analysis,
+        match,
+        document,
+        ai,
+        model: getGeminiModel(),
+        language,
+      });
+
+      if (!outcome.ok) {
+        return res.status(503).json({
+          error:
+            'The CV for this job description could not be written. Nothing was changed; please try again shortly.',
+          code: 'invalid_response',
+        });
+      }
+
+      return res.json({
+        success: true,
+        analysis,
+        match,
+        cv: outcome.content,
+      });
+    } catch (error) {
+      // Nothing is written on a failed call, so the candidate's CV is
+      // untouched and the studio keeps working.
+      return respondAiFailure(
+        res,
+        error,
+        'The CV for this job description could not be written. Nothing was changed; please try again shortly.',
+        req.authUser!.id
+      );
+    }
+  } catch (error) {
+    console.error('Job description CV error:', error);
+    return res.status(500).json({ error: 'Failed to write the CV for this job description' });
+  }
+});
+
+// Recommends the projects that would help this candidate most.
+//
+// The deterministic recommendation is always produced: it comes from the
+// candidate's own record and the role catalogue's curated portfolio work. The
+// model only rewrites the plans, and a plan it fails to produce keeps the
+// deterministic one.
+app.post('/api/projects/recommendations', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const language = body.language === 'ar' ? 'ar' : 'en';
+
+    const limitRaw = body.limit === undefined || body.limit === null ? undefined : Number(body.limit);
+    const limit =
+      limitRaw === undefined || !Number.isFinite(limitRaw)
+        ? undefined
+        : Math.max(1, Math.min(6, Math.floor(limitRaw)));
+
+    // Reading an optional pasted job description costs one unit, and writing
+    // the plans costs another.
+    const hasModel = Boolean(process.env.GEMINI_API_KEY);
+    const hasJobDescription = readJobDescription(body).ok;
+    const aiBudget = hasModel
+      ? tryConsumeAiBudget(req.authUser!.id, hasJobDescription ? 2 : 1)
+      : false;
+    const client: JobDescriptionAiClient | null = hasModel && aiBudget ? ai : null;
+
+    const jobDescription = await readOptionalJobDescription(body, {
+      ai: client,
+      model: getGeminiModel(),
+      language,
+    });
+
+    const result = await recommendProjects({
+      userId: req.authUser!.id,
+      jobDescription,
+      ai: client,
+      model: getGeminiModel(),
+      language,
+      limit,
+    });
+
+    return res.json({
+      success: true,
+      plans: result.plans,
+      aiUsed: result.aiUsed,
+      aiFallbackReason: result.aiFallbackReason,
+      context: {
+        targetRoleTitle: result.context.targetRoleTitle,
+        careerLevel: result.context.careerLevel,
+        openSkillGaps: result.context.openSkillGaps,
+        coveredSkills: result.context.coveredSkills,
+        roadmapSkills: result.context.roadmapSkills,
+        learningInProgress: result.context.learningInProgress,
+        completedCourses: result.context.completedCourses,
+        existingProjectCount: result.context.existingProjects.length,
+        jobDescriptionTitle: result.context.jobDescriptionTitle,
+      },
+    });
+  } catch (error) {
+    console.error('Project recommendation error:', error);
+    return res.status(500).json({ error: 'Failed to recommend projects' });
+  }
+});
+
+// Checks the projects the candidate already has.
+//
+// The problems are read out of the records. The model only improves the
+// wording of the suggestions, and it never decides that a problem exists.
+app.post('/api/projects/analyze', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const language = body.language === 'ar' ? 'ar' : 'en';
+
+    const hasModel = Boolean(process.env.GEMINI_API_KEY);
+    const aiBudget = hasModel ? tryConsumeAiBudget(req.authUser!.id) : false;
+    const client: JobDescriptionAiClient | null = hasModel && aiBudget ? ai : null;
+
+    const context = await buildProjectRecommendationContext(req.authUser!.id);
+
+    const result = await analyzeProjects({
+      userId: req.authUser!.id,
+      context,
+      ai: client,
+      model: getGeminiModel(),
+      language,
+    });
+
+    return res.json({
+      success: true,
+      reports: result.reports,
+      aiUsed: result.aiUsed,
+      aiFallbackReason: result.aiFallbackReason,
+    });
+  } catch (error) {
+    console.error('Project analysis error:', error);
+    return res.status(500).json({ error: 'Failed to analyse your projects' });
   }
 });
 

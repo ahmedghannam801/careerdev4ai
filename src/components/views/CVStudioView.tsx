@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { BuiltCvPanel } from '../cv/BuiltCvPanel';
+import { JobDescriptionPanel, type JobDescriptionPanelState } from '../cv/JobDescriptionPanel';
 import { CvPreview } from '../cv/CvPreview';
 import { CvSectionEditor } from '../cv/CvSectionEditor';
 import { Reveal } from '../motion/Motion';
@@ -45,6 +46,20 @@ export const CVStudioView: React.FC = () => {
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionName, setVersionName] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
+
+  // The job description and its analysis live here rather than inside the
+  // panel, so a trip to the editor tab does not throw away the advertisement
+  // the candidate pasted or the result they already read.
+  const [jobDescriptionState, setJobDescriptionState] = useState<JobDescriptionPanelState>({
+    jobDescription: '',
+    analysis: null,
+    match: null,
+    generated: null,
+    isAnalyzing: false,
+    isGenerating: false,
+    error: null,
+    applied: false,
+  });
 
   const latestVersion = cvVersions[0];
   const latestAnalysis = latestVersion?.atsAnalysis;
@@ -192,6 +207,16 @@ export const CVStudioView: React.FC = () => {
           {t('Document Editor & Preview')}
         </button>
         <button
+          onClick={() => setActiveTab('job')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            activeTab === 'job'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          {t('Job Description')}
+        </button>
+        <button
           onClick={() => setActiveTab('ats')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
             activeTab === 'ats'
@@ -228,6 +253,11 @@ export const CVStudioView: React.FC = () => {
 
       {/* TAB 0: THE CV ASSEMBLED FROM THE USER'S OWN RECORDS */}
       {activeTab === 'built' && <BuiltCvPanel />}
+
+      {/* TAB 1: THE JOB DESCRIPTION */}
+      {activeTab === 'job' && (
+        <JobDescriptionPanel state={jobDescriptionState} setState={setJobDescriptionState} />
+      )}
 
       {/* TAB 1: DOCUMENT EDITOR */}
       {activeTab === 'editor' && (

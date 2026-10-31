@@ -106,10 +106,19 @@ export interface AiBudgetOptions {
   userLimit?: number;
   /** Per-project allowance. Defaults to AI_PROJECT_DAILY_LIMIT. */
   projectLimit?: number;
+  /**
+   * How many units this call costs.
+   *
+   * A route that makes more than one model call spends more than one unit: the
+   * allowance has to reflect the requests that actually reach the provider, or
+   * one route would be able to make far more calls than its allowance says it
+   * can. Defaults to 1.
+   */
+  count?: number;
 }
 
 /**
- * Consumes one unit of the daily AI budget.
+ * Consumes units of the daily AI budget.
  *
  * Both allowances are checked before either is incremented, so a request that
  * is rejected does not count against the allowance that rejected it.
@@ -123,13 +132,14 @@ export function consumeDailyAiBudget(
 ): AiBudgetDecision {
   const userLimit = Number(options.userLimit ?? AI_DAILY_LIMIT);
   const projectLimit = Number(options.projectLimit ?? AI_PROJECT_DAILY_LIMIT);
+  const count = Math.max(1, Math.floor(Number(options.count ?? 1)) || 1);
   const now = Date.now();
 
   const userKey = userId ? `user:${userId}` : null;
   const userBucket = userKey ? bucketFor(userKey, now) : null;
   const projectBucket = bucketFor('project', now);
 
-  if (userBucket && userLimit > 0 && userBucket.count + 1 > userLimit) {
+  if (userBucket && userLimit > 0 && userBucket.count + count > userLimit) {
     return {
       allowed: false,
       retryAfterSeconds: Math.max(1, Math.ceil((userBucket.resetAt - now) / 1000)),
@@ -139,7 +149,7 @@ export function consumeDailyAiBudget(
     };
   }
 
-  if (projectLimit > 0 && projectBucket.count + 1 > projectLimit) {
+  if (projectLimit > 0 && projectBucket.count + count > projectLimit) {
     return {
       allowed: false,
       retryAfterSeconds: Math.max(1, Math.ceil((projectBucket.resetAt - now) / 1000)),
@@ -149,8 +159,8 @@ export function consumeDailyAiBudget(
     };
   }
 
-  if (userBucket) userBucket.count += 1;
-  projectBucket.count += 1;
+  if (userBucket) userBucket.count += count;
+  projectBucket.count += count;
 
   return {
     allowed: true,
@@ -162,7 +172,7 @@ export function consumeDailyAiBudget(
 }
 
 /**
- * Gives one unit back to the daily budget.
+ * Gives units back to the daily budget.
  *
  * Used when the provider rejected the call with a quota error: the provider
  * did not serve that request, so it must not count against the application's
@@ -170,12 +180,17 @@ export function consumeDailyAiBudget(
  * budget as well, and the app would keep saying "try again tomorrow" for a
  * reason that has nothing to do with the app's own limit.
  */
-export function refundDailyAiBudget(userId?: string | null): void {
+export function refundDailyAiBudget(userId?: string | null, count = 1): void {
+  const units = Math.max(1, Math.floor(Number(count)) || 1);
   const projectBucket = dailyBuckets.get('project');
-  if (projectBucket && projectBucket.count > 0) projectBucket.count -= 1;
+  if (projectBucket && projectBucket.count > 0) {
+    projectBucket.count = Math.max(0, projectBucket.count - units);
+  }
   if (userId) {
     const userBucket = dailyBuckets.get(`user:${userId}`);
-    if (userBucket && userBucket.count > 0) userBucket.count -= 1;
+    if (userBucket && userBucket.count > 0) {
+      userBucket.count = Math.max(0, userBucket.count - units);
+    }
   }
 }
 

@@ -254,4 +254,37 @@ export const cvAr: Record<string, string> = {
   'Write the certification line': 'اكتب سطر الشهادة',
   'Write the course line': 'اكتب سطر الدورة',
   'Write the skills line': 'اكتب سطر المهارات',
+
+  // ---- The job description flow in the CV studio ----
+  'Job Description': 'وصف الوظيفة',
+  'Paste the job description you are applying for. It is compared against your own records, and a CV is written for that specific job.':
+    'الصق وصف الوظيفة التي تتقدم لها. سيُقارن بسجلاتك، وتُكتب سيرتك الذاتية لهذه الوظيفة تحديدًا.',
+  'Paste the full job description here — the title, the requirements, the tools and the responsibilities…':
+    'الصق وصف الوظيفة كاملًا هنا — المسمى والمتطلبات والأدوات والمسؤوليات…',
+  'Analyse this job description': 'حلّل وصف الوظيفة هذا',
+  'Analysing the job description…': 'جارٍ تحليل وصف الوظيفة…',
+  'Write my CV for this job': 'اكتب سيرتي الذاتية لهذه الوظيفة',
+  'Writing your CV…': 'جارٍ كتابة سيرتك الذاتية…',
+  'Paste at least a full sentence to continue.': 'الصق جملة كاملة على الأقل للمتابعة.',
+  'Nothing is written to your CV until you choose to apply it, and nothing is invented: a requirement your records do not support is reported as missing instead.':
+    'لا يُكتب شيء في سيرتك الذاتية حتى تختار تطبيقه، ولا يُختلق شيء: أي متطلب لا تدعمه سجلاتك يُبلَّغ عنه كمتطلب ناقص.',
+  'The job description could not be analysed right now.': 'تعذّر تحليل وصف الوظيفة الآن.',
+  'The CV for this job description could not be written.': 'تعذّر كتابة سيرتك الذاتية لوصف الوظيفة هذا.',
+  'ATS Match For This Job': 'مطابقة ATS لهذه الوظيفة',
+  'Your CV against this job description': 'سيرتك الذاتية أمام وصف الوظيفة هذا',
+  'Your Record Covers': 'سجلاتك تغطي',
+  'None of the requirements are confirmed by your records yet.': 'لا يوجد متطلب مؤكد في سجلاتك بعد.',
+  'Not In Your Record Yet': 'غير موجود في سجلاتك بعد',
+  'Your records already cover everything this job asks for.': 'سجلاتك تغطي بالفعل كل ما تطلبه هذه الوظيفة.',
+  'What This Job Asks For': 'ما تطلبه هذه الوظيفة',
+  'Your CV For This Job': 'سيرتك الذاتية لهذه الوظيفة',
+  'Apply to my CV': 'طبّقها على سيرتي الذاتية',
+  'Applied to your CV. Open the editor tab to change any of it — every word is still yours.':
+    'تم التطبيق على سيرتك الذاتية. افتح تبويب المحرّر لتعديل أي جزء — كل كلمة ما زالت لك.',
+  'Some lines were removed because they mentioned things that are not in your records:':
+    'حُذفت بعض الأسطر لأنها ذكّرت أمورًا ليست في سجلاتك:',
+  'Headline': 'العنوان',
+  'Rewritten Experience Bullets': 'نقاط الخبرة المُعاد صياغتها',
+  'Rewritten Project Bullets': 'نقاط المشاريع المُعاد صياغتها',
+  "Skills In The Job's Order": 'المهارات بترتيب الوظيفة',
 };

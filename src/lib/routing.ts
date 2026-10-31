@@ -167,7 +167,7 @@ export function resolveRouteId(hash: string, fallback: string): string {
  */
 
 /** The tabs of the CV studio. */
-export const CV_STUDIO_TABS = ['editor', 'ats', 'versions', 'built'] as const;
+export const CV_STUDIO_TABS = ['editor', 'job', 'ats', 'versions', 'built'] as const;
 export type CvStudioTab = (typeof CV_STUDIO_TABS)[number];
 
 /** The tabs of the learning hub. */

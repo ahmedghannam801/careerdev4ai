@@ -260,6 +260,13 @@ async function main() {
     // The dates a career record carries: history is accepted, contradictions
     // are not. Pure.
     join(TESTS_DIR, 'historical-dates.test.ts'),
+    // The job description flow: what the advertisement asks for, how it is
+    // compared with the candidate's record, and what is written onto their
+    // document. Pure.
+    join(TESTS_DIR, 'job-description.test.ts'),
+    // The project advisor: what it recommends and what it finds wrong with
+    // the projects the candidate already has. Pure.
+    join(TESTS_DIR, 'project-recommendation.test.ts'),
     // The URL is the state of the application, so a refresh reopens the same
     // page. Pure.
     join(TESTS_DIR, 'routing.test.ts'),
