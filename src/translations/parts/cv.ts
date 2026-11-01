@@ -12,8 +12,8 @@ export const cvAr: Record<string, string> = {
   'Your CV could not be assembled right now': 'تعذّر تجهيز سيرتك الذاتية الآن',
   'What this CV is built from': 'ما بُنيت منه هذه السيرة',
   'Still needed to complete this CV': 'ما زال ناقصًا لإكمال هذه السيرة',
-  'Nothing here is filled in for you. CareerPilot will not invent a job, a date, a metric or a certificate you do not have.':
-    'لا يُملأ أي شيء نيابةً عنك. لن يختلق CareerPilot وظيفة أو تاريخًا أو رقمًا أو شهادة لا تملكها.',
+  'Nothing here is filled in for you. CareerDev4AI will not invent a job, a date, a metric or a certificate you do not have.':
+    'لا يُملأ أي شيء نيابةً عنك. لن يختلق CareerDev4AI وظيفة أو تاريخًا أو رقمًا أو شهادة لا تملكها.',
   'Summary': 'الملخّص',
   'Experience': 'الخبرة',
   'Education': 'التعليم',

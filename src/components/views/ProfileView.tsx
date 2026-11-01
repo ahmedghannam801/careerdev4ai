@@ -120,7 +120,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     issueDate: '',
     expiryDate: '',
     credentialId: '',
-    credentialUrl: ''
+    credentialUrl: '',
+    description: '',
+    skills: ''
   });
 
   // Form states for Language modal
@@ -429,6 +431,12 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     setSaveError(null);
     setSaving(true);
     try {
+      // The skills are typed as a comma-separated list because that is how a
+      // person thinks about them; the record stores them as a list.
+      const skillNames = certForm.skills
+        .split(',')
+        .map((skill) => skill.trim())
+        .filter(Boolean);
       if (editingCert) {
         const updated = profile.certifications.map(c => c.id === editingCert.id ? {
           ...c,
@@ -437,7 +445,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           issueDate: certForm.issueDate,
           expiryDate: certForm.expiryDate,
           credentialId: certForm.credentialId,
-          credentialUrl: certForm.credentialUrl
+          credentialUrl: certForm.credentialUrl,
+          description: certForm.description,
+          skills: skillNames
         } : c);
         await updateProfile({ certifications: updated });
       } else {
@@ -448,7 +458,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           issueDate: certForm.issueDate,
           expiryDate: certForm.expiryDate,
           credentialId: certForm.credentialId,
-          credentialUrl: certForm.credentialUrl
+          credentialUrl: certForm.credentialUrl,
+          description: certForm.description,
+          skills: skillNames
         };
         await updateProfile({ certifications: [...profile.certifications, newCert] });
       }
@@ -546,8 +558,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   setAvatarModalOpen(true);
                 }}
                 className="absolute -bottom-2 -end-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] shadow-xs transition-colors"
-                title={t('Choose CareerPilot Avatar')}
-                aria-label={t('Choose CareerPilot Avatar')}
+                title={t('Choose CareerDev4AI Avatar')}
+                aria-label={t('Choose CareerDev4AI Avatar')}
               >
                 <Smile className="w-3.5 h-3.5" />
               </button>
@@ -599,7 +611,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
             <button
               onClick={() => setPreviewModalOpen(true)}
               className="flex-1 md:flex-none px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
@@ -993,7 +1005,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   issueDate: '',
                   expiryDate: '',
                   credentialId: '',
-                  credentialUrl: ''
+                  credentialUrl: '',
+                  description: '',
+                  skills: ''
                 });
                 setCertModalOpen(true);
               }}
@@ -1020,7 +1034,31 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => handleDeleteCert(cert.id)} className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)]">
+                    <button
+                      onClick={() => {
+                        setEditingCert(cert);
+                        setCertForm({
+                          name: cert.name,
+                          provider: cert.provider,
+                          issueDate: cert.issueDate,
+                          expiryDate: cert.expiryDate ?? '',
+                          credentialId: cert.credentialId ?? '',
+                          credentialUrl: cert.credentialUrl ?? '',
+                          description: cert.description ?? '',
+                          skills: (cert.skills ?? []).join(', ')
+                        });
+                        setCertModalOpen(true);
+                      }}
+                      aria-label={t('Edit')}
+                      className="p-1 text-[var(--text-muted)] hover:text-[var(--color-primary-text)]"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCert(cert.id)}
+                      aria-label={t('Delete')}
+                      className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)]"
+                    >
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -1028,6 +1066,23 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 {cert.credentialId && (
                   <div className="text-[10px] font-mono text-[var(--text-muted)]">
                     ID: {cert.credentialId}
+                  </div>
+                )}
+                {cert.description && (
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed break-words">
+                    {cert.description}
+                  </p>
+                )}
+                {cert.skills && cert.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {cert.skills.map((skill) => (
+                      <span
+                        key={skill}
+                        className="px-1.5 py-0.5 rounded-md bg-[var(--surface-secondary)] text-[10px] font-medium text-[var(--text-secondary)] border border-[var(--border-subtle)]"
+                      >
+                        {skill}
+                      </span>
+                    ))}
                   </div>
                 )}
                 {cert.credentialUrl && (
@@ -1356,7 +1411,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div>
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  {t('Choose Your CareerPilot Avatar')}
+                  {t('Choose Your CareerDev4AI Avatar')}
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   {t('Select a curated illustrated avatar that represents your professional profile.')}
@@ -1825,7 +1880,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-md p-6 space-y-4">
             <h3 className="text-base font-bold text-[var(--text-primary)]">
-              {t('Add Professional Certification')}
+              {editingCert ? t('Edit Professional Certification') : t('Add Professional Certification')}
             </h3>
             <div className="space-y-3 text-xs">
               <div>
@@ -1848,7 +1903,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Issue Date')}</label>
                   <input
@@ -1860,6 +1915,18 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Expiry Date')}</label>
+                  <input
+                    type="text"
+                    value={certForm.expiryDate}
+                    onChange={(e) => setCertForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                    placeholder={t('Leave blank if it never expires')}
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
                   <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Credential ID')}</label>
                   <input
                     type="text"
@@ -1869,16 +1936,39 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                   />
                 </div>
+                <div>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Verification URL')}</label>
+                  <input
+                    type="url"
+                    value={certForm.credentialUrl}
+                    onChange={(e) => setCertForm(prev => ({ ...prev, credentialUrl: e.target.value }))}
+                    placeholder="https://coursera.org/verify/..."
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
+                  />
+                </div>
               </div>
               <div>
-                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Verification URL')}</label>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Description')}</label>
+                <textarea
+                  value={certForm.description}
+                  onChange={(e) => setCertForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder={t('What this certificate covered and what you proved')}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] resize-y"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Skills & Tools Gained')}</label>
                 <input
-                  type="url"
-                  value={certForm.credentialUrl}
-                  onChange={(e) => setCertForm(prev => ({ ...prev, credentialUrl: e.target.value }))}
-                  placeholder="https://coursera.org/verify/..."
+                  type="text"
+                  value={certForm.skills}
+                  onChange={(e) => setCertForm(prev => ({ ...prev, skills: e.target.value }))}
+                  placeholder={t('e.g. Power BI, Excel, SQL, Python')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                 />
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                  {t('Separate them with commas. These count towards your skill gaps.')}
+                </p>
               </div>
             </div>
             {renderSaveError()}

@@ -9,6 +9,7 @@ import {
   Clock,
   ExternalLink,
   Filter,
+  Languages,
   PlayCircle,
   RefreshCw,
   Search,
@@ -31,6 +32,7 @@ import { EmptyState } from '../ui/EmptyState';
 import {
   LEARNING_AVAILABILITY,
   LEARNING_FORMATS,
+  LEARNING_LANGUAGES,
   LEARNING_LEVELS,
   LEARNING_TABS,
 } from '../../lib/routing';
@@ -131,6 +133,8 @@ const CourseCard: React.FC<CourseCardProps> = ({
             <span>{t(FORMAT_LABELS[course.format])}</span>
             <span aria-hidden>•</span>
             <span>{t(course.level)}</span>
+            <span aria-hidden>•</span>
+            <span>{course.language === 'Arabic' ? t('Arabic') : t('English')}</span>
           </div>
           <h3 className="mt-1 text-base font-semibold text-[var(--text-primary)] leading-snug">
             {course.title}
@@ -146,6 +150,9 @@ const CourseCard: React.FC<CourseCardProps> = ({
       <div className="mt-3 flex flex-wrap gap-2">
         <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${AVAILABILITY_STYLES[course.availability]}`}>
           {t(AVAILABILITY_LABELS[course.availability])}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
+          <Languages size={11} /> {course.language === 'Arabic' ? t('Arabic') : t('English')}
         </span>
         {course.durationHours !== null && (
           <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
@@ -363,6 +370,7 @@ export const LearningCenterView: React.FC = () => {
     'all'
   );
   const [format, setFormat] = useRouteParam<string>('format', LEARNING_FORMATS, 'all');
+  const [language, setLanguage] = useRouteParam<string>('language', LEARNING_LANGUAGES, 'all');
   const [search, setSearch] = useState('');
   const [weeklyHours, setWeeklyHours] = useState(learningRecommendationMeta.weeklyHours);
   const [budget, setBudget] = useState<'free_only' | 'low' | 'any'>(learningRecommendationMeta.budget);
@@ -426,6 +434,7 @@ export const LearningCenterView: React.FC = () => {
     if (level !== 'all' && course.level !== level) return false;
     if (availability !== 'all' && course.availability !== availability) return false;
     if (format !== 'all' && course.format !== format) return false;
+    if (language !== 'all' && course.language !== language) return false;
     return searchMatches(course);
   };
 
@@ -703,6 +712,16 @@ export const LearningCenterView: React.FC = () => {
               {t(label)}
             </option>
           ))}
+        </select>
+        <select
+          value={language}
+          onChange={(event) => setLanguage(event.target.value)}
+          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
+          aria-label={t('Language')}
+        >
+          <option value="all">{t('All languages')}</option>
+          <option value="Arabic">{t('Arabic')}</option>
+          <option value="English">{t('English')}</option>
         </select>
       </div>
 

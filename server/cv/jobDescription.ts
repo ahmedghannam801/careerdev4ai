@@ -314,7 +314,7 @@ export function buildAtsCvPrompt(input: {
     '- Any other requirement from the job description is NOT supported by the candidate\'s records. Do not write it, do not imply it, and do not work around it.'
   );
   parts.push('');
-  parts.push("The candidate's own record, read from their CareerPilot account:");
+  parts.push("The candidate's own record, read from their CareerDev4AI account:");
   parts.push(input.careerContextBlock);
   if (input.experienceBlock) {
     parts.push('');

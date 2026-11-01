@@ -232,42 +232,42 @@ export const CVImportModal: React.FC<CVImportModalProps> = ({
           {step === 'input' ? (
             <div className="space-y-6">
               {/* Tab Navigation */}
-              <div className="grid grid-cols-3 gap-2 p-1 bg-[var(--surface-secondary)] rounded-xl border border-[var(--border-subtle)]">
+              <div className="flex gap-2 p-1 bg-[var(--surface-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-x-auto">
                 <button
                   type="button"
                   onClick={() => { setActiveTab('upload'); setExtractionError(null); }}
-                  className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`flex-1 min-w-[5.5rem] py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'upload'
                       ? 'bg-[var(--surface-main)] text-[var(--color-primary-text)] shadow-xs'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{t('Upload File')}</span>
+                  <Upload className="w-3.5 h-3.5 shrink-0" />
+                  <span className="whitespace-nowrap">{t('Upload File')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => { setActiveTab('paste'); setExtractionError(null); }}
-                  className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`flex-1 min-w-[5.5rem] py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'paste'
                       ? 'bg-[var(--surface-main)] text-[var(--color-primary-text)] shadow-xs'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>{t('Paste Text')}</span>
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <span className="whitespace-nowrap">{t('Paste Text')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => { setActiveTab('scratch'); setExtractionError(null); }}
-                  className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`flex-1 min-w-[5.5rem] py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
                     activeTab === 'scratch'
                       ? 'bg-[var(--surface-main)] text-[var(--color-primary-text)] shadow-xs'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
-                  <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
-                  <span>{t('Start Scratch')}</span>
+                  <ArrowRight className="w-3.5 h-3.5 shrink-0 rtl:rotate-180" />
+                  <span className="whitespace-nowrap">{t('Start Scratch')}</span>
                 </button>
               </div>
 

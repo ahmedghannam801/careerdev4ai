@@ -1,6 +1,6 @@
-# CareerPilot AI
+# CareerDev4AI
 
-CareerPilot AI is a personal career operating system: goals, skills, roadmap,
+CareerDev4AI is a personal career operating system: goals, skills, roadmap,
 learning, projects, evidence, CVs, job applications, and interview practice in
 one workspace. State is stored in PostgreSQL (Supabase) and scoped to the
 signed-in Supabase Auth user.
@@ -106,9 +106,14 @@ so the API and the browser app share one origin.
 
 ## Deploy to Cloudflare Pages
 
-The production target is Cloudflare Pages, project `careerpilot4ai`:
+The production target is Cloudflare Pages, project `careerdev4ai`:
 
-<https://careerpilot4ai.pages.dev>
+<https://careerdev4ai.pages.dev>
+
+The previous project, `careerpilot4ai` (<https://careerpilot4ai.pages.dev>), is
+kept as a separate legacy deployment. It is intentionally not referenced by
+`wrangler.jsonc` or the npm scripts, so deploying `careerdev4ai` cannot modify
+it.
 
 `npm run build` produces two things in `dist/`:
 
@@ -127,22 +132,22 @@ implementation.
 ```bash
 npm ci
 npm run build
-npx wrangler pages deploy dist --project-name careerpilot4ai --branch main
+npx wrangler pages deploy dist --project-name careerdev4ai --branch main
 ```
 
 `--branch main` is what targets the **Production** environment
-(`careerpilot4ai.pages.dev`). Pages maps the production branch to Production and
+(`careerdev4ai.pages.dev`). Pages maps the production branch to Production and
 every other branch to a Preview environment, and Wrangler derives the branch from
 the current Git branch when `--branch` is omitted. Without the explicit flag, a
 deploy from any other branch silently publishes a preview URL and leaves
-`careerpilot4ai.pages.dev` on the old build.
+`careerdev4ai.pages.dev` on the old build.
 
 Use the npm scripts, which encode the same targets:
 
 | Script | Target |
 | --- | --- |
-| `npm run cf:deploy` | Production (`--branch main`) — updates `careerpilot4ai.pages.dev` |
-| `npm run cf:preview` | Preview (`--branch preview`) — alias `preview.careerpilot4ai.pages.dev` |
+| `npm run cf:deploy` | Production (`--branch main`) — updates `careerdev4ai.pages.dev` |
+| `npm run cf:preview` | Preview (`--branch preview`) — alias `preview.careerdev4ai.pages.dev` |
 | `npm run cf:dev` | Local Pages runtime on `http://localhost:8788` |
 | `npm run cf:deployments` | List deployments for the project |
 
@@ -164,10 +169,11 @@ Configure these in the Pages project (Settings → Environment variables) for
 
 Supabase Auth must also be configured (Authentication → URL Configuration):
 
-- **Site URL**: `https://careerpilot4ai.pages.dev`
-- **Redirect URLs**: `https://careerpilot4ai.pages.dev/**`,
-  `https://*.careerpilot4ai.pages.dev/**` for previews, and
-  `http://localhost:3000/**` for local development
+- **Site URL**: `https://careerdev4ai.pages.dev`
+- **Redirect URLs**: `https://careerdev4ai.pages.dev/**`,
+  `https://*.careerdev4ai.pages.dev/**` for previews, and
+  `http://localhost:3000/**` for local development. Keep the legacy
+  `https://careerpilot4ai.pages.dev/**` entry while the old deployment is live.
 - **Providers**: enable Google, LinkedIn (OIDC), and GitHub.
 
 The Android application adds one more redirect URL, the deep link the OAuth
@@ -190,7 +196,7 @@ client secret or GitHub credential belongs in this repository or in any
    Supabase dashboard only.
 3. Add the production callback to Supabase → Authentication → URL
    Configuration → Redirect URLs:
-   `https://careerpilot4ai.pages.dev/auth/callback`. Add
+   `https://careerdev4ai.pages.dev/auth/callback`. Add
    `http://localhost:3000/auth/callback` for local development. An existing
    `<origin>/**` entry already covers the path.
 4. After the first GitHub sign-in, the existing `careerpilot_handle_new_user`
@@ -198,9 +204,9 @@ client secret or GitHub credential belongs in this repository or in any
    runs exactly as it does for email/password and the other providers.
 
 > `wrangler.jsonc` and the deployment commands above use the Pages project name
-> `careerpilot4ai`. If that is the live origin, use
-> `https://careerpilot4ai.pages.dev/auth/callback` instead and keep the Supabase
-> Site URL and Redirect URLs aligned with the origin actually deployed.
+> `careerdev4ai`. Keep the Supabase Site URL and Redirect URLs aligned with the
+> origin actually deployed. The legacy `careerpilot4ai` origin stays listed only
+> while that separate deployment is still serving.
 
 Verify the production build locally before deploying:
 

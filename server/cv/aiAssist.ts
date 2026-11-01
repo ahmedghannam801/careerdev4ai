@@ -244,7 +244,7 @@ export function buildCvAssistPrompt(input: {
   }
 
   parts.push('');
-  parts.push("The candidate's own record, read from their CareerPilot account:");
+  parts.push("The candidate's own record, read from their CareerDev4AI account:");
   parts.push(input.careerContextBlock);
 
   if (input.sourceBlock) {

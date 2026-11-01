@@ -1,5 +1,5 @@
 /**
- * The CareerPilot AI API, as a framework-level Express application.
+ * The CareerDev4AI API, as a framework-level Express application.
  *
  * The module builds the app and registers every route; it deliberately does
  * NOT open a port, load `.env`, or serve static assets. Those are entry-point
@@ -1531,19 +1531,37 @@ app.post('/api/copilot', requireAuth, aiRateLimit, async (req: Request, res: Res
       return modelUnavailable(res);
     }
 
-    const systemInstruction = `You are CareerPilot Copilot, an AI career advisor that works across every career domain — technology, engineering, data, design, product, business, operations, finance, marketing, sales, people and HR, healthcare, education, and legal.
-You are given the user's real career state below, read from their CareerPilot account.
+    const systemInstruction = `You are CareerDev4AI Copilot, an AI career advisor that works across every career domain — technology, engineering, data, design, product, business, operations, finance, marketing, sales, people and HR, healthcare, education, and legal.
+You are given the user's real career state below, read from their CareerDev4AI account.
 The user is currently looking at the "${activeView}" screen of the app.
 
 ${contextBlock}
 
-Rules:
-1. Provide concise, highly actionable career strategy grounded in the state above.
-2. If the user asks you to change something, propose a concrete, structured change to their roadmap or skills.
-3. Never assume the user is in a technical role. Use their actual target role and domain.
-4. Support Arabic if requested or if the prompt is in Arabic.
-5. Give 3 short, relevant follow-up suggestions.
-6. If you do not have the information to answer accurately, say what is missing instead of guessing.`;
+Answering rules:
+1. Answer the user's actual question first, in one or two sentences. Then add only the detail that helps them act.
+2. Match the answer length to the question. A simple question gets a short answer; a plan request can use a numbered sequence.
+3. Write in Arabic when the question is in Arabic. Use correct Arabic terminology and keep industry-standard technical names in English (SQL, React, CV, ATS). Never mix languages without a reason.
+4. Do not use markdown headers (#), bold asterisks (**), horizontal rules (---), tables, or nested bullets. The interface renders plain text with simple lists only.
+5. Use a short list only when listing steps or options. At most one level of bullets.
+6. When you recommend a learning resource, name it, say why it fits this user, and give the direct link if the state below contains one. Never invent a URL.
+7. Ground every claim in the state above. If the information needed is missing, say exactly what is missing instead of guessing.
+8. Never assume the user is in a technical role. Use their real target role and domain.
+9. End with at most two short follow-up questions or actions, and only when they are genuinely useful.`;
+
+    // Arabic prompts get Arabic suggestions; an English prompt gets English
+    // ones. The suggestions are navigational prompts, not answers.
+    const promptIsArabic = /[\u0600-\u06FF]/.test(userPrompt);
+    const suggestions = promptIsArabic
+      ? [
+          'ما الخطوة التالية في خطتي؟',
+          'اقترح مشروعًا يقوّي مهاراتي',
+          'راجع نقاط الضعف في سيرتي الذاتية',
+        ]
+      : [
+          'What should I prioritize today?',
+          'Suggest a project that closes my biggest gap',
+          'Review the weak points in my CV',
+        ];
 
     const blocked = consumeAiBudget(res, req.authUser!.id);
     if (blocked) return blocked;
@@ -1595,11 +1613,7 @@ Rules:
 
       return res.json({
         text: replyText,
-        suggestions: [
-          'What should I prioritize today?',
-          'Audit my CV bullet points',
-          'Give me an interview question for my target role',
-        ],
+        suggestions,
         proposedAction,
       });
     } catch (aiErr: any) {
@@ -3882,6 +3896,10 @@ app.post('/api/certifications', requireAuth, async (req: Request, res: Response)
       expiryDate: expiryDate ?? undefined,
       url: certificationUrl.value,
       credentialId: str(body.credentialId, 200) ?? undefined,
+      description: str(body.description, 2000) ?? undefined,
+      skillNames: Array.isArray(body.skillNames)
+        ? body.skillNames.filter((v: unknown): v is string => typeof v === 'string').slice(0, 30)
+        : undefined,
     });
     return res.status(201).json({ success: true, certification });
   } catch (error) {

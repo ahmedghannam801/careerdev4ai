@@ -29,6 +29,7 @@ import { resolveRoleDefinition } from '../../shared/careerRoles.ts';
 import { computeSkillGaps, summarizeSkillGaps, toRoleSkillRequirements } from '../../shared/skillGap.ts';
 import { getProfileDto } from '../db/profile.ts';
 import { getUserSkills } from '../db/userSkills.ts';
+import { getEvidenceSkillLevels } from '../db/skillEvidence.ts';
 import { listCourses } from '../db/learning.ts';
 import { listProjects } from '../db/projects.ts';
 import {
@@ -294,8 +295,14 @@ export async function getSkillGapSummary(profileId: string): Promise<{
     .map((row) => ({ name: row.skill?.name ?? '', level: row.proficiency ?? 1 }))
     .filter((skill) => Boolean(skill.name));
 
+  // The evidence the candidate's own records hold. A project they built, a
+  // course they finished, an evidence item they filed or a certificate they
+  // earned raises the level of the skill it covers, so the gap closes when
+  // the work is done even if the rating was never updated.
+  const evidenceLevels = await getEvidenceSkillLevels(profileId).catch(() => undefined);
+
   const requirements = toRoleSkillRequirements(role);
-  const gaps = computeSkillGaps(requirements, ratedSkills);
+  const gaps = computeSkillGaps(requirements, ratedSkills, evidenceLevels);
 
   return {
     roleId: role.id,

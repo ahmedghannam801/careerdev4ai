@@ -66,6 +66,23 @@ export interface SkillGap {
   priority: SkillGapPriority;
   /** Sortable urgency score. Higher means "address this first". */
   weight: number;
+  /**
+   * True when a real record — a project, a finished course, a verified piece
+   * of evidence or a certificate — shows the user has this skill.
+   *
+   * A skill that is only claimed is not verified. The platform reports the
+   * difference rather than hiding it, so a candidate can see which of their
+   * skills are backed by proof.
+   */
+  verified: boolean;
+  /**
+   * The level the user's own records support.
+   *
+   * It is the level the gap was measured against, and it can be higher than
+   * the level the user rated the skill at: doing the work counts even when
+   * the rating was never updated.
+   */
+  verifiedLevel: number;
 }
 
 export interface SkillGapSummary {
@@ -161,9 +178,33 @@ export function priorityForGap(
  * The old behaviour started unrated skills at 1, which quietly hid the
  * largest possible gap behind an optimistic default.
  */
+/**
+ * The extra signal the platform has about a skill.
+ *
+ * The key is the lower-cased skill name. The value is the level the user's
+ * own records support.
+ */
+export type EvidenceSkillLevels = ReadonlyMap<string, number>;
+
+/**
+ * Computes the gap between what the role wants and what the user has.
+ *
+ * The user's own ratings are the baseline. The evidence the platform holds —
+ * the projects they built, the courses they finished, the evidence they
+ * filed, the certificates they earned — can raise that level, because doing
+ * the work counts even when the rating was never updated. Evidence never
+ * lowers a rating: the platform does not tell a candidate they are worse at
+ * something than they said they were.
+ *
+ * The optional `evidenceLevels` argument is what the server passes when it
+ * can read the user's records. Without it the engine behaves exactly as it
+ * did before, so a caller that has no records to offer is not treated as
+ * having records that show nothing.
+ */
 export function computeSkillGaps(
   requirements: RoleSkillRequirements,
   userSkills: RatedSkill[],
+  evidenceLevels?: EvidenceSkillLevels,
 ): SkillGap[] {
   const levels = new Map<string, { name: string; level: number }>();
   for (const skill of userSkills) {
@@ -184,7 +225,11 @@ export function computeSkillGaps(
   const push = (skill: RoleSkill, required: boolean) => {
     const key = normalizeSkillName(skill.name);
     const rated = levels.get(key);
-    const currentLevel = rated?.level ?? 0;
+    const claimedLevel = rated?.level ?? 0;
+    const evidenceLevel = evidenceLevels?.get(key) ?? 0;
+    // The effective level is the stronger of what the user claimed and what
+    // their records show.
+    const currentLevel = Math.max(claimedLevel, evidenceLevel);
     const requiredLevel = clampLevel(skill.minLevel);
     const gap = Math.max(0, requiredLevel - currentLevel);
     const priority = priorityForGap(gap, required);
@@ -200,6 +245,8 @@ export function computeSkillGaps(
         PRIORITY_RANK[priority] * 10 +
         gap * 2 +
         (required ? 1 : 0),
+      verified: evidenceLevel > 0,
+      verifiedLevel: evidenceLevel > 0 ? evidenceLevel : claimedLevel,
     });
   };
 

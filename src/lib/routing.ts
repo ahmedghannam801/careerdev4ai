@@ -205,6 +205,9 @@ export const LEARNING_FORMATS = [
   'playlist',
 ] as const;
 
+/** The language filter of the learning hub. */
+export const LEARNING_LANGUAGES = ['all', 'Arabic', 'English'] as const;
+
 /** The status filter of the roadmap. */
 export const ROADMAP_STATUS_FILTERS = [
   'all',

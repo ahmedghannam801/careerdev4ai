@@ -154,6 +154,16 @@ const genericCourse = makeCourse('generic-course', {
   skills: [{ name: 'Excel / Spreadsheets Modeling', importance: 3 }],
   roles: [{ roleSlug: 'product-manager', relevanceScore: 20 }],
 });
+/**
+ * A course that only has a weak explicit role tag. It passes the relevance
+ * gate (so saved/focus can rank it) but carries no skill-gap signal, which
+ * makes it the right fixture for testing ranking-only preferences.
+ */
+const weakRoleCourse = makeCourse('weak-role-course', {
+  title: 'Frontend Communication',
+  skills: [{ name: 'Communication', importance: 2 }],
+  roles: [{ roleSlug: 'frontend-engineer', relevanceScore: 20 }],
+});
 const paidCourse = makeCourse('paid-course', {
   title: 'Paid React Certificate',
   availability: 'paid',
@@ -260,22 +270,33 @@ describe('B.5 deterministic recommendation engine', () => {
     assert.equal(recommendation.gapsAddressed[0].skill, 'React');
 
     const saved = scoreCourse(
-      genericCourse,
-      baseContext({ savedCourseIds: [genericCourse.id] })
+      weakRoleCourse,
+      baseContext({ savedCourseIds: [weakRoleCourse.id] })
     );
-    assert.ok(saved);
+    assert.ok(saved, 'a course with an explicit role tag must pass the gate');
     assert.equal(saved.breakdown.saved, 4);
 
     const focused = scoreCourse(
-      genericCourse,
-      baseContext({ focusSkill: 'Excel / Spreadsheets Modeling' })
+      weakRoleCourse,
+      baseContext({ focusSkill: 'Communication' })
     );
-    assert.ok(focused);
+    assert.ok(focused, 'focus is a ranking signal on an already-eligible course');
     assert.equal(focused.breakdown.focus, 10);
     assert.ok(saved.score < focused.score);
+
+    // Neither a saved flag nor a focus skill may make an unrelated course
+    // eligible on its own.
+    assert.equal(
+      scoreCourse(genericCourse, baseContext({ savedCourseIds: [genericCourse.id] })),
+      null
+    );
+    assert.equal(
+      scoreCourse(genericCourse, baseContext({ focusSkill: 'Excel / Spreadsheets Modeling' })),
+      null
+    );
   });
 
-  test('ranks relevant courses ahead of unrelated ones and excludes paid in free-only mode', () => {
+  test('ranks relevant courses and rejects unrelated catalogue matches', () => {
     const ranked = rankCourses(
       [genericCourse, paidCourse, reactCourse, tsCourse],
       baseContext(),
@@ -283,7 +304,13 @@ describe('B.5 deterministic recommendation engine', () => {
     );
     const ids = ranked.map((entry) => entry.course.id);
     assert.equal(ids.includes('paid-course'), false, 'free-only must exclude paid courses');
-    assert.ok(ids.indexOf('react-course') < ids.indexOf('generic-course'));
+    assert.equal(
+      ids.includes('generic-course'),
+      false,
+      'a course tagged only to another role must not appear'
+    );
+    assert.ok(ids.includes('react-course'));
+    assert.ok(ids.includes('ts-course'));
 
     const paidAllowed = rankCourses(
       [paidCourse, reactCourse],

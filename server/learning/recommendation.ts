@@ -9,15 +9,21 @@
 // -----------------------
 // Generic course metadata (a beginner level, English, a short duration, the
 // preferred format and a free price) must never be enough to promote a course.
-// The total is therefore gated by role relevance:
+//
+// A course is a candidate only when at least one *relevance* signal ties it to
+// this user: an explicit target-role tag, one of the role's own skills, an
+// open skill gap, or the user's current roadmap. Catalogue category, career
+// goal, language, format, price and the saved flag are ranking signals, never
+// eligibility signals. This is what stops a general "SQL" course entering an
+// HR Specialist's recommendations merely because SQL exists in the catalogue.
+//
+// Only after a course passes the gate is its total computed:
 //
 //   total = 100 × relevance × (0.85 + 0.15 × genericFit)
 //
-// `relevance` is driven by the user's real gaps, the target role, the role's
-// own skills, the roadmap and an explicit focus skill. `genericFit` can only
-// move the total by 15 points, so it cannot overpower relevance. A course with
-// no role/gap/roadmap signal lands below 50 and can never be labelled the
-// next best step.
+// `genericFit` can only move the total by 15 points, so presentation and
+// language preferences can reorder relevant courses but cannot resurrect an
+// irrelevant one. A course with no role/gap/roadmap signal is never returned.
 
 import {
   GOAL_LEARNING_CATEGORIES,
@@ -355,10 +361,38 @@ function formatReason(
   roleTitle: string | null,
   matchedSkills: string[],
   gaps: AddressedGap[],
-  roadmapMatches: string[]
+  roadmapMatches: string[],
+  language: 'en' | 'ar'
 ): string {
+  const isArabicCourse = course.language.toLowerCase().startsWith('ar');
+  const isEnglishCourse = course.language.toLowerCase().startsWith('en');
   const parts: string[] = [];
   const topGaps = gaps.slice(0, 2);
+
+  if (language === 'ar') {
+    if (topGaps.length > 0) {
+      const gapText = topGaps
+        .map((gap) => `${gap.skill} (${gap.currentLevel}/5 إلى ${gap.targetLevel}/5)`)
+        .join(' و');
+      parts.push(`يسدّ فجوة ${gapText}.`);
+    } else if (matchedSkills.length > 0) {
+      parts.push(`يبني مهارة ${matchedSkills.slice(0, 2).join(' و')}.`);
+    } else {
+      parts.push('يضيف مجالًا جديدًا إلى ملفك.');
+    }
+    if (roleTitle) parts.push(`مرتبط مباشرة بدورك المستهدف: ${roleTitle}.`);
+    if (roadmapMatches.length > 0) {
+      parts.push(`يتقاطع مع تركيز خطتك على ${roadmapMatches.slice(0, 2).join(' و')}.`);
+    }
+    parts.push(`${course.provider}؛ ${formatLabel(course.format)}؛ ${availabilityLabel(course)}.`);
+    if (!isArabicCourse && isEnglishCourse && course.level !== 'Beginner') {
+      parts.push(
+        'المحتوى بالإنجليزية لأن المادة المتقدمة بالعربية محدودة؛ استخدمه بعد إتقان الأساسيات.'
+      );
+    }
+    return parts.join(' ');
+  }
+
   if (topGaps.length > 0) {
     const gapText = topGaps
       .map((gap) => `${gap.skill} (${gap.currentLevel}/5 to ${gap.targetLevel}/5)`)
@@ -377,6 +411,11 @@ function formatReason(
     parts.push(`Maps to your roadmap focus on ${roadmapMatches.slice(0, 2).join(' and ')}.`);
   }
   parts.push(`${course.provider}; ${formatLabel(course.format)}; ${availabilityLabel(course)}.`);
+  if (!isArabicCourse && isEnglishCourse && course.level !== 'Beginner') {
+    parts.push(
+      'This is in English because advanced material in Arabic is limited; use it after the Arabic foundations.'
+    );
+  }
   return parts.join(' ');
 }
 
@@ -491,12 +530,56 @@ export function scoreCourse(
       : 0;
 
   const languageScore = course.language.toLowerCase().startsWith(context.language) ? 1 : 0.3;
+  // The language preference is applied to the total as well as to the
+  // presentation fit, because a beginner who reads Arabic should not have to
+  // scroll past English courses to find an Arabic explanation of the same
+  // skill. English remains available — and is explicitly recommended for
+  // advanced material — but it has to earn its place.
+  const isArabicCourse = course.language.toLowerCase().startsWith('ar');
+  const isEnglishCourse = course.language.toLowerCase().startsWith('en');
+  const languagePreference =
+    context.language === 'ar'
+      ? isArabicCourse
+        ? 1
+        : course.level === 'Advanced'
+          ? 0.9
+          : 0.72
+      : isEnglishCourse
+        ? 1
+        : 0.82;
+  // Video and playlists are easier to follow than a text article for a
+  // beginner. The boost is deliberately small: it breaks ties towards video,
+  // it never promotes an irrelevant course.
+  const isVideo = course.format === 'video' || course.format === 'playlist';
+  const videoPreference = isVideo ? 1.05 : 0.97;
   const formatScore =
     context.preferredFormat === 'any' || course.format === context.preferredFormat ? 1 : 0.45;
   const savedScore = context.savedCourseIds.includes(course.id) ? 1 : 0;
   const budgetScore = budgetFit(course, context.budget);
   const goalScore = goalFit(course, context.careerGoal, context.targetRole);
   const domainScore = categoryServesDomain(course.category, context.targetRole?.domainId) ? 1 : 0;
+
+  // ---- Relevance gate -----------------------------------------------------
+  // A course is eligible only when it is genuinely tied to this user's target
+  // role, one of that role's own skills, an open gap, or the current roadmap.
+  // Category/domain, career goal, language, format, price, the saved flag and
+  // an explicit focus skill are deliberately absent from this test: they may
+  // rank an eligible course, but they must never create eligibility. Without a
+  // target role we keep the older, weaker behaviour so a new user can still
+  // explore the catalogue before choosing a role.
+  const roleTagRelevant = roleRelevance > 0;
+  const roleSkillRelevant = roleSkillScore > 0;
+  const gapRelevant = gapScore > 0;
+  const roadmapRelevant = roadmapScore > 0;
+  if (
+    context.targetRole &&
+    !roleTagRelevant &&
+    !roleSkillRelevant &&
+    !gapRelevant &&
+    !roadmapRelevant
+  ) {
+    return null;
+  }
 
   const genericFit = clamp01(
     levelFit(course.level, context.experienceLevel) * 0.45 +
@@ -507,7 +590,8 @@ export function scoreCourse(
   );
 
   // Direct signals. Goal/domain are deliberately weak: they describe the
-  // discipline, not this user's next requirement.
+  // discipline, not this user's next requirement. They can only fine-tune the
+  // ranking of a course that has already passed the gate above.
   const directRelevance = Math.max(
     roleRelevance,
     roleSkillScore * 0.95,
@@ -520,7 +604,10 @@ export function scoreCourse(
   const relevance = clamp01(Math.max(directRelevance, weakRelevance));
 
   const total = round(
-    100 * relevance * (0.85 + 0.15 * genericFit)
+    Math.min(
+      100,
+      100 * relevance * (0.85 + 0.15 * genericFit) * languagePreference * videoPreference
+    )
   );
 
   const strongSignal = Boolean(
@@ -556,7 +643,8 @@ export function scoreCourse(
     context.targetRole?.title ?? null,
     matchedSkills,
     sortedGaps,
-    roadmapSkillMatches
+    roadmapSkillMatches,
+    context.language
   );
 
   return {

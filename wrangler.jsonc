@@ -4,9 +4,13 @@
   // This file is the source of truth for the Pages project once it is deployed
   // with Wrangler (or once it is committed and the project is connected to
   // Git). The project name determines the free production URL:
-  //   https://careerpilot4ai.pages.dev
+  //   https://careerdev4ai.pages.dev
+  //
+  // The previous project (`careerpilot4ai`) is a separate, legacy deployment.
+  // It is intentionally not referenced here, so deploying this configuration
+  // can never modify it.
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "careerpilot4ai",
+  "name": "careerdev4ai",
   "pages_build_output_dir": "./dist",
 
   // A compatibility date of 2026-08-04 or later enables Node.js compatibility

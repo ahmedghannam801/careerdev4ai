@@ -5,6 +5,7 @@ import { EVIDENCE_TYPES } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { EvidenceType } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { EmptyState } from '../ui/EmptyState';
 
 export const EvidenceView: React.FC = () => {
   const { evidenceItems, addEvidence, deleteEvidence, t} = useCareer();
@@ -100,6 +101,23 @@ export const EvidenceView: React.FC = () => {
       </div>
 
       {/* Evidence Grid */}
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={ShieldCheck}
+          title={
+            evidenceItems.length === 0
+              ? t('No evidence yet')
+              : t('No evidence of this type')
+          }
+          description={
+            evidenceItems.length === 0
+              ? t('Evidence is what turns a claim into proof. Add a repository, a live demo, a certificate or an assessment, and the skills it covers count towards your gaps.')
+              : t('Try another type, or add evidence of this kind.')
+          }
+          actionLabel={evidenceItems.length === 0 ? t('Add your first evidence') : undefined}
+          onAction={evidenceItems.length === 0 ? () => setShowAddModal(true) : undefined}
+        />
+      ) : (
       <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filtered.map((item) => (
           <StaggerItem
@@ -166,6 +184,7 @@ export const EvidenceView: React.FC = () => {
           </StaggerItem>
         ))}
       </Stagger>
+      )}
 
       {/* Add Evidence Modal */}
       {showAddModal && (

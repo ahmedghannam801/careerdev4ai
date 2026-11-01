@@ -5,6 +5,7 @@ import { PROJECT_STATUS_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { ProjectStatus } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { EmptyState } from '../ui/EmptyState';
 import { ProjectAiPanel } from '../projects/ProjectAiPanel';
 
 /** The user-facing label of each project status. */
@@ -118,7 +119,7 @@ export const ProjectsView: React.FC = () => {
       <ProjectAiPanel />
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-wrap items-center gap-1.5 pb-1">
         {['all', 'in_progress', 'completed', 'planned', 'idea', 'published'].map((st) => (
           <button
             key={st}
@@ -135,6 +136,23 @@ export const ProjectsView: React.FC = () => {
       </div>
 
       {/* Projects List */}
+      {filteredProjects.length === 0 ? (
+        <EmptyState
+          icon={Plus}
+          title={
+            projects.length === 0
+              ? t('No projects yet')
+              : t('No projects with this status')
+          }
+          description={
+            projects.length === 0
+              ? t('A project is the strongest proof of a skill. Add one you have built, or ask the advisor for one that closes a gap in your target role.')
+              : t('Try another status, or add a project in this state.')
+          }
+          actionLabel={projects.length === 0 ? t('Add your first project') : undefined}
+          onAction={projects.length === 0 ? () => setShowAddModal(true) : undefined}
+        />
+      ) : (
       <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredProjects.map((project) => (
           <StaggerItem
@@ -249,6 +267,7 @@ export const ProjectsView: React.FC = () => {
           </StaggerItem>
         ))}
       </Stagger>
+      )}
 
       {/* Add Project Modal */}
       {showAddModal && (

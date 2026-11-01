@@ -190,6 +190,9 @@ describe('deterministic PDF parsing', () => {
         name: 'Google Data Analytics Professional Certificate (2023)',
         issuer: '',
         issueDate: '',
+        description: '',
+        skills: [],
+        credentialId: '',
       },
     ]);
   });

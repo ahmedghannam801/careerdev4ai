@@ -22,6 +22,7 @@
  */
 
 import type { RoleDefinition, SkillCategory } from './careerTypes.ts';
+import { skillMatchConfidence } from './skillMatching.ts';
 import {
   computeSkillGaps,
   describeGap,
@@ -615,12 +616,16 @@ function estimateHours(stage: number, gap: SkillGap): number {
  *
  * A resource has to actually teach the skill, and its level has to suit the
  * level the user is trying to reach.
+ *
+ * Matching uses the shared `skillMatchConfidence` rather than a loose token
+ * overlap. Only a declared alternative (confidence 1) or a full token-subset
+ * match (0.8) is accepted: sharing one word such as "data", "management" or
+ * "documentation" is not evidence that a resource teaches the gap.
  */
 export function matchResources(
   gap: SkillGap,
   resources: RoadmapResourceCandidate[],
 ): RoadmapResourceRef[] {
-  const target = normalizeSkillName(gap.name);
   const scored: { resource: RoadmapResourceCandidate; score: number }[] =
     [];
 
@@ -628,17 +633,11 @@ export function matchResources(
     const names = resource.skillNames ?? [];
     let best = 0;
     for (const name of names) {
-      const normalized = normalizeSkillName(name);
-      if (!normalized) continue;
-      if (normalized === target) {
+      const confidence = skillMatchConfidence(name, gap.name);
+      if (confidence >= 1) {
         best = Math.max(best, 100);
-      } else if (
-        normalized.includes(target) ||
-        target.includes(normalized)
-      ) {
-        best = Math.max(best, 60);
-      } else if (sharesSignificantTokens(normalized, target)) {
-        best = Math.max(best, 40);
+      } else if (confidence >= 0.8) {
+        best = Math.max(best, 80);
       }
     }
     if (best === 0) continue;
@@ -652,16 +651,25 @@ export function matchResources(
   return scored.map((entry) => entry.resource);
 }
 
-/** Resources matched against a role's learning topics (fallback path use). */
+/**
+ * Resources matched against a role's learning topics (fallback path use).
+ *
+ * The same conservative matcher applies: a topic only selects a resource when
+ * the resource explicitly teaches that topic. This path runs when the user has
+ * no gaps left, so a weak match here would attach unrelated material to a
+ * stage that is about applying existing skills.
+ */
 function matchResourcesByTopic(
   role: RoleDefinition,
   resources: RoadmapResourceCandidate[],
 ): RoadmapResourceCandidate[] {
-  const topics = (role.learningTopics ?? []).map(normalizeSkillName).filter(Boolean);
+  const topics = (role.learningTopics ?? []).filter(Boolean);
   if (!topics.length) return [];
   return resources.filter((resource) => {
-    const names = (resource.skillNames ?? []).map(normalizeSkillName);
-    return names.some((name) => topics.some((topic) => name.includes(topic) || topic.includes(name)));
+    const names = resource.skillNames ?? [];
+    return names.some((name) =>
+      topics.some((topic) => skillMatchConfidence(name, topic) >= 0.8)
+    );
   });
 }
 
@@ -750,16 +758,6 @@ function levelFitScore(
   if (targetLevel >= 4) return hours >= 8 ? 6 : 0;
   if (targetLevel <= 2) return hours <= 12 ? 6 : 0;
   return hours > 0 && hours <= 20 ? 5 : 0;
-}
-
-/** True when two normalised names share at least one meaningful token. */
-function sharesSignificantTokens(a: string, b: string): boolean {
-  const aTokens = tokenize(a);
-  const bTokens = tokenize(b);
-  if (!aTokens.length || !bTokens.length) return false;
-  return aTokens.some(
-    (token) => token.length >= 4 && bTokens.includes(token),
-  );
 }
 
 /** Splits a normalised name into comparable tokens. */

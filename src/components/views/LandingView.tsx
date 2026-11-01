@@ -35,7 +35,7 @@ interface LandingViewProps {
 const HERO_HEADLINE = 'Turn Your Ambition Into a Career Plan.';
 
 const HERO_SUPPORTING =
-  'CareerPilot AI helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.';
+  'CareerDev4AI helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.';
 
 /** The problems the platform exists to remove. */
 const FRAGMENTATION_POINTS = [
@@ -141,7 +141,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
           <div className="flex min-w-0 items-center gap-2.5">
             <Logo variant="icon" className="h-8 w-8 shrink-0" alt="" />
             <span className="hidden shrink-0 whitespace-nowrap text-base font-semibold tracking-tight text-[var(--text-primary)] sm:inline">
-              {t('CareerPilot AI')}
+              {t('CareerDev4AI')}
             </span>
           </div>
 
@@ -319,7 +319,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 {t('How it works')}
               </div>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                {t('CareerPilot brings the journey together.')}
+                {t('CareerDev4AI brings the journey together.')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
                 {t('One connected path instead of eight disconnected tools.')}
@@ -383,7 +383,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                   {t('Guidance grounded in your career, not generic advice.')}
                 </h2>
                 <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
-                  CareerPilot recommends based on the goals you set, the skills you have,
+                  CareerDev4AI recommends based on the goals you set, the skills you have,
                   the progress you have made and the courses you have taken — and it shows
                   its reasoning, so you can judge the advice for yourself.
                 </p>
@@ -417,7 +417,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 {t('Tailored for every career stage')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                CareerPilot adapts its priorities, recommendations and roadmaps to where
+                CareerDev4AI adapts its priorities, recommendations and roadmaps to where
                 you are starting from.
               </p>
             </div>
@@ -586,7 +586,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
           <Logo variant="full" className="h-10 w-auto self-start sm:h-12" />
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div>
-              <span>© 2026 CareerPilot AI. Personal Career Operating System.</span>
+              <span>© 2026 CareerDev4AI. Personal Career Operating System.</span>
               <span className="mx-2 text-[var(--border-subtle)]">·</span>
               <span>
                 Developed by{' '}

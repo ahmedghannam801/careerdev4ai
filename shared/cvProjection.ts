@@ -307,6 +307,12 @@ export function mergeCanonicalCvDocument(
       issuer: entry.issuer ?? '',
       issueDate: entry.issueDate ?? '',
       description: previousEntry?.description ?? entry.description ?? '',
+      expiryDate: entry.expiryDate ?? previousEntry?.expiryDate,
+      credentialId: entry.credentialId ?? previousEntry?.credentialId,
+      credentialUrl: entry.credentialUrl ?? previousEntry?.credentialUrl,
+      // The skills come from the certificate record. The candidate's own
+      // wording for this CV wins when they have written one.
+      skills: entry.skills?.length ? entry.skills : (previousEntry?.skills ?? []),
     });
   }
   for (const [index, entry] of previousCertifications.entries()) {

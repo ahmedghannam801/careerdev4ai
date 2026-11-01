@@ -7,7 +7,7 @@
  */
 
 export const appShellAr: Record<string, string> = {
-  'CareerPilot AI sign in': 'تسجيل الدخول إلى CareerPilot AI',
+  'CareerDev4AI sign in': 'تسجيل الدخول إلى CareerDev4AI',
   'Close modal': 'إغلاق النافذة',
   'Secure career state sync': 'مزامنة آمنة لحالة المسار المهني',
   'Full Name': 'الاسم الكامل',
@@ -20,9 +20,8 @@ export const appShellAr: Record<string, string> = {
   'Sign out': 'تسجيل الخروج',
   'Developed by': 'طُوِّر بواسطة',
   'Ahmed Ebrahim': 'أحمد إبراهيم',
-  'CareerPilot Copilot': 'مساعد CareerPilot',
-  'CareerPilot': 'CareerPilot',
-  'CareerPilot AI': 'CareerPilot AI',
+  'CareerDev4AI Copilot': 'مساعد CareerDev4AI',
+  'CareerDev4AI': 'CareerDev4AI',
   'Career Engine': 'محرك المسار المهني',
   'Workspace & Identity': 'مساحة العمل والهوية',
   'Open Navigation': 'فتح قائمة التنقل',
@@ -80,7 +79,7 @@ export const appShellAr: Record<string, string> = {
   'Choose a new password': 'اختر كلمة مرور جديدة',
   'Your reset link was accepted. Set a new password to finish.': 'تم قبول رابط إعادة التعيين. اختر كلمة مرور جديدة لإتمام العملية.',
   'Your password has been updated. You are signed in.': 'تم تحديث كلمة المرور. أنت مسجّل الدخول.',
-  'Continue to CareerPilot': 'المتابعة إلى CareerPilot',
+  'Continue to CareerDev4AI': 'المتابعة إلى CareerDev4AI',
   'New password': 'كلمة المرور الجديدة',
   'At least 8 characters': '8 أحرف على الأقل',
   'Confirm new password': 'تأكيد كلمة المرور الجديدة',
@@ -107,4 +106,7 @@ export const appShellAr: Record<string, string> = {
     'ستظهر هنا مواعيد خارطة الطريق ومراحل المقابلات والمعالم فور حدوثها.',
   'Advisor for': 'مستشار لـ',
   'Readiness': 'الجاهزية',
+  'Learn': 'التعلّم',
+  'Career Tools': 'أدوات المسار المهني',
+  'Tools': 'الأدوات',
 };

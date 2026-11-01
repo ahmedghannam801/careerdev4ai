@@ -99,7 +99,7 @@ export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({ userSt
       <motion.ol
         variants={stagger}
         className="relative mt-4 space-y-0"
-        aria-label={t('The CareerPilot journey')}
+        aria-label={t('The CareerDev4AI journey')}
       >
         {/* Progress rail: the connecting line behind the nodes. */}
         <svg

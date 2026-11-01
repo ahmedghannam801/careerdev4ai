@@ -13,7 +13,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
-const BASE = process.argv[2] || 'https://careerpilot4ai.pages.dev';
+const BASE = process.argv[2] || 'https://careerdev4ai.pages.dev';
 
 function envValue(name) {
   const text = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');

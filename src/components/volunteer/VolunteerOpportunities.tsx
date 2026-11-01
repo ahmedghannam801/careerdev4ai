@@ -21,7 +21,9 @@ import {
   Bookmark,
   BookmarkCheck,
   Building2,
+  CalendarDays,
   Globe,
+  Languages,
   Loader2,
   MapPin,
   Sparkles,
@@ -50,6 +52,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   'pro-bono': 'Pro bono',
   technology: 'Technology',
   engineering: 'Engineering',
+  healthcare: 'Healthcare',
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  ongoing: 'Ongoing',
+  program: 'Programme',
+  remote: 'Remote',
+  event: 'Event',
 };
 
 export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
@@ -59,6 +69,8 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
   const [opportunities, setOpportunities] = useState<VolunteerOpportunity[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeCountry, setActiveCountry] = useState<string>('all');
+  const [activeLanguage, setActiveLanguage] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,11 +102,16 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
 
   const visible = useMemo(
     () =>
-      activeCategory === 'all'
-        ? opportunities
-        : opportunities.filter((item) => item.category === activeCategory),
-    [opportunities, activeCategory]
+      opportunities.filter((item) => {
+        if (activeCategory !== 'all' && item.category !== activeCategory) return false;
+        if (activeCountry !== 'all' && item.country !== activeCountry) return false;
+        if (activeLanguage !== 'all' && !item.languages.includes(activeLanguage)) return false;
+        return true;
+      }),
+    [opportunities, activeCategory, activeCountry, activeLanguage]
   );
+
+  const egyptCount = opportunities.filter((item) => item.country === 'Egypt').length;
 
   const matched = visible.filter((item) => item.relevance > 0).length;
 
@@ -160,7 +177,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
       </div>
 
       {/* Category filter. Every category is always reachable. */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-wrap items-center gap-1.5 pb-1">
         <button
           type="button"
           onClick={() => setActiveCategory('all')}
@@ -185,16 +202,58 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
                   : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              {CATEGORY_LABELS[category] ?? category} ({count})
+              {t(CATEGORY_LABELS[category] ?? category)} ({count})
             </button>
           );
         })}
       </div>
 
+      {/* Location and language. Egypt is the default focus, but the full
+          global catalogue stays reachable. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[
+            { id: 'all', label: t('All countries') },
+            { id: 'Egypt', label: `${t('Egypt')} (${egyptCount})` },
+            { id: 'Global', label: t('Global') },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setActiveCountry(option.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                activeCountry === option.id
+                  ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+                  : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Languages className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+          {['all', 'Arabic', 'English'].map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setActiveLanguage(option)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                activeLanguage === option
+                  ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {option === 'all' ? t('Any language') : t(option)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {visible.length === 0 ? (
         <div className="p-10 rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 text-center">
           <p className="text-sm text-[var(--text-secondary)]">
-            {t('No opportunities in this category yet.')}
+            {t('No opportunities match these filters yet.')}
           </p>
         </div>
       ) : (
@@ -252,6 +311,24 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {opportunity.commitment}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1">
+                  <CalendarDays className="h-3 w-3" />
+                  {TYPE_LABELS[opportunity.opportunityType]
+                    ? t(TYPE_LABELS[opportunity.opportunityType])
+                    : opportunity.opportunityType}
+                </span>
+                {opportunity.languages.length > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <Languages className="h-3 w-3" />
+                    {opportunity.languages.map((language) => t(language)).join(' / ')}
+                  </span>
+                )}
+                {opportunity.deadline && (
+                  <span className="inline-flex items-center gap-1 font-mono">
+                    <CalendarDays className="h-3 w-3" />
+                    {t('Apply by')} {opportunity.deadline}
                   </span>
                 )}
               </div>

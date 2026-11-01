@@ -87,6 +87,9 @@ export interface CertificationDTO {
   expiryDate: string | null;
   url: string | null;
   credentialId: string | null;
+  description: string | null;
+  /** The skills and tools the certificate produced. */
+  skills: string[];
 }
 
 export interface LanguageDTO {
@@ -393,6 +396,8 @@ export async function postCertification(input: {
   expiryDate?: string;
   url?: string;
   credentialId?: string;
+  description?: string;
+  skillNames?: string[];
 }): Promise<CertificationDTO> {
   const data = await request<{ success: boolean; certification: CertificationDTO }>(
     '/api/certifications',
@@ -410,6 +415,8 @@ export async function patchCertification(
     expiryDate: string;
     url: string;
     credentialId: string;
+    description: string;
+    skillNames: string[];
   }>
 ): Promise<CertificationDTO> {
   const data = await request<{ success: boolean; certification: CertificationDTO }>(

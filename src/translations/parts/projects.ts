@@ -124,4 +124,17 @@ export const projectsAr: Record<string, string> = {
     'لا شيء ناقص في هذا المشروع. لديه وصف ومخرجات وتقنيات ومكان في دورك المستهدف.',
   'Do this:': 'افعل هذا:',
   'Role Skills This Project Does Not Yet Show': 'مهارات الدور التي لا يُظهرها هذا المشروع بعد',
+  'No projects with this status': 'لا توجد بهذه الحالة',
+  'A project is the strongest proof of a skill. Add one you have built, or ask the advisor for one that closes a gap in your target role.':
+    'المشروع هو أقوى دليل على مهارة. أضف مشروعًا أنجزته، أو اطلب من المستشار واحدًا يسدّ فجوة في دورك المستهدف.',
+  'Try another status, or add a project in this state.':
+    'جرّب حالة أخرى، أو أضف مشروعًا بهذه الحالة.',
+  'Add your first project': 'أضف مشروعك الأول',
+  'No evidence yet': 'لا يوجد دليل بعد',
+  'No evidence of this type': 'لا يوجد دليل من هذا النوع',
+  'Evidence is what turns a claim into proof. Add a repository, a live demo, a certificate or an assessment, and the skills it covers count towards your gaps.':
+    'الدليل هو ما يحوّل الادّعاء إلى إثبات. أضف مستودعًا أو عرضًا مباشرًا أو شهادة أو تقييمًا، والمهارات التي يغطيها تُحتسب ضمن فجوات مهاراتك.',
+  'Try another type, or add evidence of this kind.':
+    'جرّب نوعًا آخر، أو أضف دليلًا من هذا النوع.',
+  'Add your first evidence': 'أضف أول دليل لك',
 };

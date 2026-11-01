@@ -228,14 +228,14 @@ export const ApplicationsView: React.FC = () => {
         /* LIST VIEW */
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-start text-xs">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-[var(--text-muted)] uppercase tracking-wider text-[10px]">
                   <th className="pb-3 font-semibold">{t('Role & Company')}</th>
                   <th className="pb-3 font-semibold">{t('Stage')}</th>
                   <th className="pb-3 font-semibold">{t('Location / Mode')}</th>
                   <th className="pb-3 font-semibold">{t('Next Action')}</th>
-                  <th className="pb-3 font-semibold text-right">{t('Actions')}</th>
+                  <th className="pb-3 font-semibold text-end">{t('Actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -262,7 +262,7 @@ export const ApplicationsView: React.FC = () => {
                     <td className="py-3 text-[var(--color-primary-text)] font-medium">
                       {app.nextAction || '—'}
                     </td>
-                    <td className="py-3 text-right">
+                    <td className="py-3 text-end">
                       <button
                         onClick={() => deleteApplication(app.id)}
                         className="text-xs text-[var(--text-muted)] hover:text-[var(--color-danger)] px-2 py-1"

@@ -6,8 +6,8 @@
  */
 
 export const profileAr: Record<string, string> = {
-  'Choose CareerPilot Avatar': 'اختر صورة CareerPilot',
-  'Choose Your CareerPilot Avatar': 'اختر صورة CareerPilot الخاصة بك',
+  'Choose CareerDev4AI Avatar': 'اختر صورة CareerDev4AI',
+  'Choose Your CareerDev4AI Avatar': 'اختر صورة CareerDev4AI الخاصة بك',
   'Select a curated illustrated avatar that represents your professional profile.':
     'اختر صورة منتقاة تمثّل ملفك المهني.',
   'Copy shareable link': 'انسخ رابط المشاركة',
@@ -79,11 +79,20 @@ export const profileAr: Record<string, string> = {
   'Graduation Date': 'تاريخ التخرج',
   'GPA (optional)': 'المعدل (اختياري)',
   'Add Professional Certification': 'أضف شهادة مهنية',
+  'Edit Professional Certification': 'عدّل الشهادة المهنية',
   'Certificate Name': 'اسم الشهادة',
   'e.g. Meta Front-End Developer Certificate': 'مثال: شهادة مطوّر واجهات من Meta',
   'Issuing Organization': 'الجهة المانحة',
   'e.g. Meta / Coursera': 'مثال: Meta / Coursera',
   'Issue Date': 'تاريخ الإصدار',
+  'Expiry Date': 'تاريخ الانتهاء',
+  'Leave blank if it never expires': 'اتركه فارغًا إذا كانت الشهادة لا تنتهي',
+  'Description': 'الوصف',
+  'What this certificate covered and what you proved': 'ما الذي غطّته هذه الشهادة وما الذي أثبتّه',
+  'Skills & Tools Gained': 'المهارات والأدوات المكتسبة',
+  'e.g. Power BI, Excel, SQL, Python': 'مثال: Power BI، Excel، SQL، Python',
+  'Separate them with commas. These count towards your skill gaps.':
+    'افصل بينها بفواصل. هذه تُحتسب ضمن فجوات مهاراتك.',
   'Credential ID': 'معرّف الشهادة',
   'CERT-12345': 'CERT-12345',
   'Verification URL': 'رابط التحقق',
@@ -125,7 +134,7 @@ export const profileAr: Record<string, string> = {
   'Skills (comma separated)': 'المهارات (مفصولة بفواصل)',
   'GitHub Repo URL': 'رابط مستودع غيت هَب',
   'Live Demo URL': 'رابط العرض الحي',
-  'Back to CareerPilot': 'العودة إلى CareerPilot',
+  'Back to CareerDev4AI': 'العودة إلى CareerDev4AI',
   'Loading public profile…': 'جارٍ تحميل الملف العام…',
   'Profile not available': 'الملف غير متاح',
   'This profile does not exist or its owner has not made it public.':

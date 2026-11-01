@@ -151,6 +151,10 @@ export interface VolunteerOpportunity {
   domainIds: string[];
   verificationStatus: string;
   verifiedAt: string | null;
+  country: string;
+  languages: string[];
+  opportunityType: string;
+  deadline: string | null;
   relevance: number;
   relevanceReason: string | null;
   closesGap: boolean;

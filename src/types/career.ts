@@ -372,6 +372,14 @@ export interface CVProfile {
     issueDate: string;
     /** The line shown under the certificate. */
     description?: string;
+    /** When the certificate stops being valid. */
+    expiryDate?: string;
+    /** The credential identifier the issuing body gave the certificate. */
+    credentialId?: string;
+    /** Where the credential can be verified. */
+    credentialUrl?: string;
+    /** The skills and tools the certificate produced. */
+    skills?: string[];
   }>;
   /**
    * The professional links shown on this CV, in the order they are shown.
@@ -606,6 +614,10 @@ export interface UserCertificationEntry {
   expiryDate?: string;
   credentialId?: string;
   credentialUrl?: string;
+  /** What the certificate says about the work it certified. */
+  description?: string;
+  /** The skills and tools the certificate produced. */
+  skills?: string[];
 }
 
 export interface UserLanguageEntry {

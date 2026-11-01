@@ -101,6 +101,9 @@ export interface ProfileCertificationDTO {
   expiryDate: string | null;
   url: string | null;
   credentialId: string | null;
+  description: string | null;
+  /** The skills and tools the certificate produced. */
+  skills: string[];
 }
 
 export interface ProfileLanguageDTO {

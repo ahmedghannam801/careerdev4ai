@@ -966,6 +966,8 @@ function toCertification(dto: CertificationDTO): UserCertificationEntry {
     expiryDate: dto.expiryDate ?? undefined,
     credentialId: dto.credentialId ?? undefined,
     credentialUrl: dto.url ?? undefined,
+    description: dto.description ?? undefined,
+    skills: dto.skills ?? [],
   };
 }
 
@@ -1249,6 +1251,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               expiryDate: c.expiryDate ?? undefined,
               credentialId: c.credentialId ?? undefined,
               credentialUrl: c.url ?? undefined,
+              description: c.description ?? undefined,
+              skills: c.skills ?? [],
             })),
             languages: profileRecord.languages.map(l => ({
               id: l.id,
@@ -2397,7 +2401,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         name: entry.name,
         issuer: entry.provider,
         issueDate: entry.issueDate,
-        description: '',
+        // The description and the skills come from the certificate record, so
+        // a change in the profile reaches the CV without anyone retyping it.
+        description: entry.description ?? '',
+        expiryDate: entry.expiryDate,
+        credentialId: entry.credentialId,
+        credentialUrl: entry.credentialUrl,
+        skills: entry.skills ?? [],
       })),
       courses: completedCourseItems
         .map((item) => {
@@ -3274,6 +3284,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           expiryDate: entry.expiryDate,
           credentialId: entry.credentialId,
           url: entry.credentialUrl,
+          description: entry.description,
+          skillNames: entry.skills ?? [],
         };
         if (serverIds.has(entry.id)) {
           await patchCertification(entry.id, fields);
@@ -4415,6 +4427,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               name,
               issuer: detail?.issuer?.trim() || undefined,
               issueDate: detail?.issueDate?.trim() || undefined,
+              // The description, the tools and the credential identifier come
+              // from the document when it carried them, and are left empty
+              // when it did not.
+              description: detail?.description?.trim() || undefined,
+              credentialId: detail?.credentialId?.trim() || undefined,
+              skillNames: detail?.skills?.length ? detail.skills : undefined,
             });
             imported += 1;
           } catch (error) {

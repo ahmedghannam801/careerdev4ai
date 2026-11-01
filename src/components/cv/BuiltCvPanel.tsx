@@ -337,7 +337,7 @@ export const BuiltCvPanel: React.FC = () => {
             </ul>
             <p className="text-[10px] leading-relaxed text-[var(--text-muted)]">
               {t(
-                'Nothing here is filled in for you. CareerPilot will not invent a job, a date, a metric or a certificate you do not have.'
+                'Nothing here is filled in for you. CareerDev4AI will not invent a job, a date, a metric or a certificate you do not have.'
               )}
             </p>
           </div>

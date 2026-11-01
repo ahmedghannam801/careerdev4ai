@@ -26,6 +26,10 @@ export interface CertificationDTO {
   expiryDate: string | null;
   url: string | null;
   credentialId: string | null;
+  /** What the certificate says about the work it certified. */
+  description: string | null;
+  /** The skills and tools the certificate produced, through profile_certification_skills. */
+  skills: string[];
 }
 
 export interface CreateCertificationInput {
@@ -35,6 +39,9 @@ export interface CreateCertificationInput {
   expiryDate?: string;
   url?: string;
   credentialId?: string;
+  description?: string;
+  /** The names of the skills or tools the certificate produced. */
+  skillNames?: string[];
 }
 
 export type UpdateCertificationInput = Partial<CreateCertificationInput>;
@@ -47,11 +54,13 @@ interface CertificationRow {
   expiry_date: string | null;
   url: string | null;
   credential_id: string | null;
+  description: string | null;
 }
 
-const CERT_COLUMNS = 'id, name, issuer, issue_date, expiry_date, url, credential_id';
+const CERT_COLUMNS =
+  'id, name, issuer, issue_date, expiry_date, url, credential_id, description';
 
-function toCertification(row: CertificationRow): CertificationDTO {
+function toCertification(row: CertificationRow, skills: string[] = []): CertificationDTO {
   return {
     id: row.id,
     name: row.name,
@@ -60,7 +69,105 @@ function toCertification(row: CertificationRow): CertificationDTO {
     expiryDate: row.expiry_date,
     url: row.url,
     credentialId: row.credential_id,
+    description: row.description,
+    skills,
   };
+}
+
+/**
+ * Reads the skills linked to a set of certificates.
+ *
+ * The link rows carry the skill name as well as the skill id, so a name is
+ * available even when the catalogue row cannot be joined.
+ */
+async function skillsForCertifications(
+  certificationIds: string[]
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (certificationIds.length === 0) return map;
+  const { data, error } = await getSupabaseServer()
+    .from('profile_certification_skills')
+    .select('certification_id, skill_name')
+    .in('certification_id', certificationIds);
+  if (error) throw error;
+  for (const row of (data ?? []) as Array<{ certification_id: string; skill_name: string }>) {
+    const list = map.get(row.certification_id) ?? [];
+    const name = (row.skill_name ?? '').trim();
+    if (name && !list.includes(name)) list.push(name);
+    map.set(row.certification_id, list);
+  }
+  return map;
+}
+
+/**
+ * Resolves skill names against the shared catalogue.
+ *
+ * A name that is not in the catalogue yet is added to it, so the same skill
+ * cannot exist twice under two spellings. This mirrors what the evidence and
+ * project records already do.
+ */
+async function resolveSkillIds(
+  skillNames: string[]
+): Promise<Array<{ skill_id: string; skill_name: string }>> {
+  const resolved: Array<{ skill_id: string; skill_name: string }> = [];
+  const seen = new Set<string>();
+  for (const rawName of skillNames) {
+    const name = rawName.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const { data: found } = await getSupabaseServer()
+      .from('skills')
+      .select('id')
+      .eq('name', name)
+      .maybeSingle();
+    let id = found?.id as string | undefined;
+    if (!id) {
+      const { data: created, error: createError } = await getSupabaseServer()
+        .from('skills')
+        .insert({ name, category: 'technical' })
+        .select('id')
+        .single();
+      if (createError) throw createError;
+      id = created?.id as string;
+    }
+    if (id) resolved.push({ skill_id: id, skill_name: name });
+  }
+  return resolved;
+}
+
+/**
+ * Replaces the skills linked to a certificate.
+ *
+ * The previous links are removed first so that removing a skill from the
+ * certificate actually removes it, rather than leaving the old link behind.
+ */
+async function replaceCertificationSkills(
+  certificationId: string,
+  skillNames: string[]
+): Promise<string[]> {
+  const { error: clearError } = await getSupabaseServer()
+    .from('profile_certification_skills')
+    .delete()
+    .eq('certification_id', certificationId);
+  if (clearError) throw clearError;
+
+  const links = await resolveSkillIds(skillNames);
+  if (links.length > 0) {
+    const { error: linkError } = await getSupabaseServer()
+      .from('profile_certification_skills')
+      .upsert(
+        links.map((link) => ({
+          certification_id: certificationId,
+          skill_id: link.skill_id,
+          skill_name: link.skill_name,
+        })),
+        { onConflict: 'certification_id,skill_id' }
+      );
+    if (linkError) throw linkError;
+  }
+  return links.map((link) => link.skill_name);
 }
 
 export async function listCertifications(profileId: string): Promise<CertificationDTO[]> {
@@ -70,7 +177,9 @@ export async function listCertifications(profileId: string): Promise<Certificati
     .eq('profile_id', profileId)
     .order('issue_date', { ascending: false });
   if (error) throw error;
-  return ((data ?? []) as CertificationRow[]).map(toCertification);
+  const rows = (data ?? []) as CertificationRow[];
+  const skillMap = await skillsForCertifications(rows.map((row) => row.id));
+  return rows.map((row) => toCertification(row, skillMap.get(row.id) ?? []));
 }
 
 export async function createCertification(
@@ -91,11 +200,14 @@ export async function createCertification(
       expiry_date: input.expiryDate ? normalizeDateValue(input.expiryDate).date : null,
       url: input.url ?? null,
       credential_id: input.credentialId ?? null,
+      description: input.description ?? null,
     })
     .select(CERT_COLUMNS)
     .single();
   if (error) throw error;
-  return toCertification(data as CertificationRow);
+  const row = data as CertificationRow;
+  const skills = await replaceCertificationSkills(row.id, input.skillNames ?? []);
+  return toCertification(row, skills);
 }
 
 export async function updateCertification(
@@ -114,12 +226,27 @@ export async function updateCertification(
   }
   if (updates.url !== undefined) patch.url = updates.url ?? null;
   if (updates.credentialId !== undefined) patch.credential_id = updates.credentialId ?? null;
+  if (updates.description !== undefined) patch.description = updates.description ?? null;
   // Remove keys whose value is undefined — the Supabase client would otherwise
   // send them as NULL, which violates NOT NULL columns.
   for (const key of Object.keys(patch)) {
     if (patch[key] === undefined) delete patch[key];
   }
-  if (Object.keys(patch).length === 0) return null;
+  const hasColumnChange = Object.keys(patch).length > 0;
+  const hasSkillChange = updates.skillNames !== undefined;
+  if (!hasColumnChange && !hasSkillChange) return null;
+
+  // Ownership is established before any write. Without this a skillNames-only
+  // PATCH for another user's certificate id would rewrite that user's links,
+  // because the parent row itself is never touched.
+  const { data: owned, error: ownedError } = await getSupabaseServer()
+    .from('profile_certifications')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('id', certificationId)
+    .maybeSingle();
+  if (ownedError) throw ownedError;
+  if (!owned) return null;
 
   // The issue and expiry dates are checked against the record as it will be
   // after the change, not against the patch alone.
@@ -140,15 +267,42 @@ export async function updateCertification(
     }
   }
 
-  const { data, error } = await getSupabaseServer()
-    .from('profile_certifications')
-    .update(patch)
-    .eq('profile_id', profileId)
-    .eq('id', certificationId)
-    .select(CERT_COLUMNS)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? toCertification(data as CertificationRow) : null;
+  let row: CertificationRow | null = null;
+  if (hasColumnChange) {
+    const { data, error } = await getSupabaseServer()
+      .from('profile_certifications')
+      .update(patch)
+      .eq('profile_id', profileId)
+      .eq('id', certificationId)
+      .select(CERT_COLUMNS)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    row = data as CertificationRow;
+  }
+
+  let skills: string[] | undefined;
+  if (hasSkillChange) {
+    skills = await replaceCertificationSkills(certificationId, updates.skillNames ?? []);
+  }
+
+  if (!row) {
+    const { data, error } = await getSupabaseServer()
+      .from('profile_certifications')
+      .select(CERT_COLUMNS)
+      .eq('profile_id', profileId)
+      .eq('id', certificationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    row = data as CertificationRow;
+  }
+
+  if (skills === undefined) {
+    const skillMap = await skillsForCertifications([row.id]);
+    skills = skillMap.get(row.id) ?? [];
+  }
+  return toCertification(row, skills);
 }
 
 export async function deleteCertification(

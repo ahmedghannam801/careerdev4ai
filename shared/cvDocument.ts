@@ -83,6 +83,11 @@ export interface CvSourceCertification {
   issuer?: string | null;
   issueDate?: string | null;
   description?: string | null;
+  expiryDate?: string | null;
+  credentialId?: string | null;
+  credentialUrl?: string | null;
+  /** The skills and tools the certificate produced. */
+  skills?: string[];
 }
 
 export interface CvSourceCourse {
@@ -332,10 +337,17 @@ export function buildCvDocument(source: CvSourceData, existing?: Partial<CVProfi
     certificationDetails: certifications.map((entry, index) => {
       const previous = previousCertifications[index];
       return {
+        id: entry.id,
         name: entry.name,
         issuer: entry.issuer ?? '',
         issueDate: entry.issueDate ?? '',
+        // The wording is the candidate's own, so a description they wrote on
+        // this CV survives; the record fills the gap when they wrote none.
         description: previous?.description ?? entry.description ?? '',
+        expiryDate: entry.expiryDate ?? previous?.expiryDate,
+        credentialId: entry.credentialId ?? previous?.credentialId,
+        credentialUrl: entry.credentialUrl ?? previous?.credentialUrl,
+        skills: entry.skills?.length ? entry.skills : (previous?.skills ?? []),
       };
     }),
 

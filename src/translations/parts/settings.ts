@@ -66,7 +66,7 @@ export const settingsAr: Record<string, string> = {
   'Display Theme': 'مظهر العرض',
   'Light': 'فاتح',
   'Dark': 'داكن',
-  'Software Engineer & Creator of CareerPilot AI': 'مهندس برمجيات ومؤسس CareerPilot AI',
+  'Software Engineer & Creator of CareerDev4AI': 'مهندس برمجيات ومؤسس CareerDev4AI',
   'Contact': 'تواصل',
   'Profiles': 'الملفات',
   'Current Password': 'كلمة المرور الحالية',

@@ -21,6 +21,7 @@
 
 import { getSupabaseServer } from './supabase';
 import { getProfileDto } from './profile.ts';
+import { getPreferences } from './preferences.ts';
 import { getUserSkills } from './userSkills.ts';
 import { resolveRole } from '../../shared/careerRoles.ts';
 import {
@@ -47,6 +48,14 @@ export interface VolunteerOpportunityDTO {
   domainIds: string[];
   verificationStatus: string;
   verifiedAt: string | null;
+  /** Where the opportunity is based: 'Egypt', 'Global', ... */
+  country: string;
+  /** Languages the programme runs in. */
+  languages: string[];
+  /** 'ongoing' | 'program' | 'remote' | 'event'. */
+  opportunityType: string;
+  /** An application deadline, when the organisation publishes one. */
+  deadline: string | null;
   /** 0..100. Higher means a stronger match for this user. */
   relevance: number;
   /** Why this opportunity was ranked where it was. Null when it is general. */
@@ -72,6 +81,10 @@ interface OpportunityRow {
   domain_ids: string[] | null;
   verification_status: string;
   verified_at: string | null;
+  country: string | null;
+  languages: string[] | null;
+  opportunity_type: string | null;
+  deadline: string | null;
 }
 
 /**
@@ -84,7 +97,7 @@ export async function listVolunteerOpportunities(
     getSupabaseServer()
       .from('volunteer_opportunities')
       .select(
-        'id, title, organization, description, category, location, is_remote, commitment, application_url, skills_gained, required_skills, role_slugs, domain_ids, verification_status, verified_at'
+        'id, title, organization, description, category, location, is_remote, commitment, application_url, skills_gained, required_skills, role_slugs, domain_ids, verification_status, verified_at, country, languages, opportunity_type, deadline'
       )
       .eq('is_active', true)
       .order('organization', { ascending: true }),
@@ -117,12 +130,16 @@ export async function listVolunteerOpportunities(
       isRemote: row.is_remote,
       commitment: row.commitment,
       applicationUrl: row.application_url,
-      skillsGained: row.skills_gained ?? [],
-      requiredSkills: row.required_skills ?? [],
-      roleSlugs: row.role_slugs ?? [],
-      domainIds: row.domain_ids ?? [],
+      skillsGained: Array.from(new Set(row.skills_gained ?? [])),
+      requiredSkills: Array.from(new Set(row.required_skills ?? [])),
+      roleSlugs: Array.from(new Set(row.role_slugs ?? [])),
+      domainIds: Array.from(new Set(row.domain_ids ?? [])),
       verificationStatus: row.verification_status,
       verifiedAt: row.verified_at,
+      country: row.country ?? 'Global',
+      languages: Array.from(new Set(row.languages ?? [])),
+      opportunityType: row.opportunity_type ?? 'ongoing',
+      deadline: row.deadline,
       relevance: relevance.score,
       relevanceReason: relevance.reason,
       closesGap: relevance.closesGap,
@@ -169,6 +186,8 @@ interface RankingContext {
   roleId: string | null;
   roleTitle: string | null;
   domainId: string | null;
+  /** The interface language, so the reason is written in the user's language. */
+  language: 'en' | 'ar';
   /** Normalised names of the skills the user still needs. */
   gapSkillKeys: Set<string>;
   /** The role's own requirement names, for a weaker "relevant" signal. */
@@ -176,10 +195,14 @@ interface RankingContext {
 }
 
 async function loadUserContext(profileId: string): Promise<RankingContext> {
+  const preferences = await getPreferences(profileId).catch(() => null);
+  const language: 'en' | 'ar' = preferences?.language === 'ar' ? 'ar' : 'en';
+
   const empty: RankingContext = {
     roleId: null,
     roleTitle: null,
     domainId: null,
+    language,
     gapSkillKeys: new Set(),
     roleSkillKeys: new Set(),
   };
@@ -204,6 +227,7 @@ async function loadUserContext(profileId: string): Promise<RankingContext> {
     roleId: role.id,
     roleTitle: role.title,
     domainId: role.domainId ?? null,
+    language,
     gapSkillKeys: new Set(open.map((gap) => normalizeSkillName(gap.name))),
     roleSkillKeys: new Set(
       requirements.requiredSkills.map((skill) => normalizeSkillName(skill.name))
@@ -235,6 +259,7 @@ function scoreOpportunity(
   let score = 0;
   let reason: string | null = null;
   let closesGap = false;
+  const arabic = context.language === 'ar';
 
   if (gapHits.length > 0) {
     // The strongest signal: this volunteering exercises exactly what the user
@@ -242,22 +267,49 @@ function scoreOpportunity(
     const contribution = Math.min(55, 18 + gapHits.length * 12);
     score += contribution;
     closesGap = true;
-    reason = `Practises ${gapHits.length} of the skills you still need for ${context.roleTitle}.`;
+    reason = arabic
+      ? `تتيح لك التدرّب على مهارات ما زلت تحتاجها لدور ${context.roleTitle}.`
+      : `Practises ${gapHits.length} of the skills you still need for ${context.roleTitle}.`;
   }
 
   if ((row.role_slugs ?? []).includes(context.roleId)) {
     score += 30;
-    if (!reason) reason = `Matched to your target role, ${context.roleTitle}.`;
+    if (!reason)
+      reason = arabic
+        ? `مرتبطة بدورك المستهدف: ${context.roleTitle}.`
+        : `Matched to your target role, ${context.roleTitle}.`;
   }
 
   if (context.domainId && (row.domain_ids ?? []).includes(context.domainId)) {
     score += 15;
-    if (!reason) reason = 'Matches the domain of your target role.';
+    if (!reason)
+      reason = arabic
+        ? 'تقع في مجال دورك المستهدف.'
+        : 'Matches the domain of your target role.';
   }
 
   if (roleHits.length > 0) {
     score += Math.min(15, roleHits.length * 5);
-    if (!reason) reason = 'Uses skills this role asks for.';
+    if (!reason)
+      reason = arabic ? 'تستخدم مهارات يطلبها هذا الدور.' : 'Uses skills this role asks for.';
+  }
+
+  // Local relevance. The platform is built for beginners in Egypt and the
+  // Arab region, so an Egypt-based programme is easier to act on than a
+  // global one, and an Arabic-language programme is easier to join. This is
+  // a tie-breaker: it never outweighs a real skill or role match.
+  if ((row.country ?? 'Global') === 'Egypt') {
+    score += 10;
+    if (!reason)
+      reason = arabic
+        ? 'برنامج في مصر يمكنك الانضمام إليه محليًا.'
+        : 'An Egypt-based programme you can join locally.';
+  } else if ((row.languages ?? []).includes('Arabic')) {
+    score += 5;
+    if (!reason)
+      reason = arabic
+        ? 'متاح بالعربية، فتبدأ دون حاجز لغوي.'
+        : 'Available in Arabic, so you can start without a language barrier.';
   }
 
   return { score: Math.min(100, score), reason, closesGap };

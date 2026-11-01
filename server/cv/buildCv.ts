@@ -89,6 +89,11 @@ export interface BuiltCvCertification {
   issuer: string | null;
   issueDate: string | null;
   url: string | null;
+  expiryDate: string | null;
+  credentialId: string | null;
+  description: string | null;
+  /** The skills and tools the certificate produced. */
+  skills: string[];
 }
 
 export interface BuiltCvCourse {
@@ -263,6 +268,10 @@ export async function buildCvFromProfile(
     issuer: entry.issuer ?? null,
     issueDate: entry.issueDate ?? null,
     url: entry.url ?? null,
+    expiryDate: entry.expiryDate ?? null,
+    credentialId: entry.credentialId ?? null,
+    description: entry.description ?? null,
+    skills: entry.skills ?? [],
   }));
 
   const builtCourses: BuiltCvCourse[] = courses.map((course) => ({

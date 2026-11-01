@@ -105,4 +105,46 @@ export const dashboardAr: Record<string, string> = {
   'Tracked active applications': 'الطلبات النشطة المتتبَّعة',
   'ATS Score:': 'درجة ATS:',
   'Refresh ATS Score': 'تحديث درجة ATS',
+
+  // Three-question dashboard
+  'Ready to apply': 'جاهز للتقديم',
+  'Almost there': 'على وشك',
+  'Building foundations': 'تبني الأساس',
+  'This is the first unfinished step in your roadmap for': 'هذه أول خطوة غير مكتملة في خارطة طريقك لـ',
+  'Review your plan': 'راجع خطتك',
+  'Open your roadmap and confirm the next step.': 'افتح خارطة طريقك وأكّد الخطوة التالية.',
+  'Your roadmap has no unfinished step right now.': 'لا توجد خطوة غير مكتملة في خارطة طريقك الآن.',
+  'Welcome back': 'مرحبًا بعودتك',
+  'Your next move for': 'خطوتك التالية لـ',
+  'Ask Copilot': 'اسأل المساعد',
+  'Where you are': 'أين أنت الآن',
+  'Readiness is measured against the real requirements of this role, not against a generic template.':
+    'تُقاس الجاهزية مقابل المتطلبات الفعلية لهذا الدور، لا مقابل قالب عام.',
+  'steps done': 'خطوات مكتملة',
+  'Your next step': 'خطوتك التالية',
+  'Why this': 'لماذا هذه الخطوة',
+  'Start this step': 'ابدأ هذه الخطوة',
+  'Mark complete': 'وضع علامة مكتمل',
+  'View full roadmap': 'عرض خارطة الطريق كاملة',
+  'What can help': 'ما الذي يمكن أن يساعدك',
+  'Pick one, not all of them': 'اختر واحدًا، لا كلها',
+  'More in Learn': 'المزيد في التعلّم',
+  'No course ranked yet': 'لم تُرتَّب دورة بعد',
+  'Open the Learning Hub to rank real courses against your gaps.':
+    'افتح مركز التعلّم لترتيب دورات حقيقية مقابل فجواتك.',
+  'Build': 'ابنِ',
+  'No project yet': 'لا يوجد مشروع بعد',
+  'A small project is the fastest way to prove a skill.':
+    'المشروع الصغير هو أسرع طريقة لإثبات مهارة.',
+  'Practise in Egypt': 'تدرّب في مصر',
+  'Egyptian organisations you can join now, filtered by the skills you still need.':
+    'منظمات مصرية يمكنك الانضمام إليها الآن، مصفّاة حسب المهارات التي ما زلت تحتاجها.',
+  'See Egypt opportunities': 'اطّلع على فرص مصر',
+  'More detail': 'تفاصيل أكثر',
+  'Career health, milestones, weekly review and today’s actions':
+    'صحة المسار المهني والمعالم والمراجعة الأسبوعية وإجراءات اليوم',
+  'Today’s high-impact actions': 'إجراءات اليوم عالية الأثر',
+  'Interview stages and roadmap deadlines appear here as they come up.':
+    'تظهر مراحل المقابلات ومواعيد خارطة الطريق هنا فور ورودها.',
+  'Interview practice': 'التدريب على المقابلات',
 };

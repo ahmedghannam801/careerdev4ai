@@ -92,4 +92,12 @@ export const volunteerAr: Record<string, string> = {
   'The volunteering record could not be saved. Please try again.':
     'تعذّر حفظ سجل التطوع. يرجى المحاولة مرة أخرى.',
   'The volunteering record could not be removed.': 'تعذّرت إزالة سجل التطوع.',
+
+  // Country / language / type filters
+  'All countries': 'كل الدول',
+  'Egypt': 'مصر',
+  'Global': 'عالمي',
+  'Any language': 'أي لغة',
+  'No opportunities match these filters yet.': 'لا توجد فرص تطابق هذه المرشّحات بعد.',
+  'Apply by': 'التقديم بحلول',
 };

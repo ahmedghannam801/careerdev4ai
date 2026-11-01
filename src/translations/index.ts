@@ -3,7 +3,7 @@ export type Language = 'en' | 'ar';
 export const translations = {
   en: {
     // Brand
-    brandName: 'CareerPilot AI',
+    brandName: 'CareerDev4AI',
     brandTagline: 'Personal Career Operating System',
 
     // Nav items
@@ -152,7 +152,7 @@ export const translations = {
 
     // Landing
     heroTitle: 'Build a career, not just a CV.',
-    heroSubtitle: 'CareerPilot AI connects your goals, skills, learning, projects, CV, applications, and interviews into one personalized career operating system.',
+    heroSubtitle: 'CareerDev4AI connects your goals, skills, learning, projects, CV, applications, and interviews into one personalized career operating system.',
     heroCTA: 'Start Your Career Journey',
     heroSecondaryCTA: 'Explore Target Roles',
     howItWorksTitle: 'One Connected Career Graph',
@@ -160,7 +160,7 @@ export const translations = {
   },
   ar: {
     // Brand
-    brandName: 'CareerPilot AI',
+    brandName: 'CareerDev4AI',
     brandTagline: 'نظام تشغيل المسار المهني الذكي',
 
     // Nav items
@@ -309,7 +309,7 @@ export const translations = {
 
     // Landing
     heroTitle: 'ابنِ مساراً مهنياً حقيقياً، وليس مجرد سيرة ذاتية.',
-    heroSubtitle: 'يربط CareerPilot AI أهدافك ومهاراتك ومشاريعك وسيرتك الذاتية وطلباتك ومقابلاتك في نظام تشغيل مهني شخصي متكامل.',
+    heroSubtitle: 'يربط CareerDev4AI أهدافك ومهاراتك ومشاريعك وسيرتك الذاتية وطلباتك ومقابلاتك في نظام تشغيل مهني شخصي متكامل.',
     heroCTA: 'ابدأ رحلتك المهنية الآن',
     heroSecondaryCTA: 'استكشف الأدوار المستهدفة',
     howItWorksTitle: 'شبكة مهنية ذكية مترابطة',

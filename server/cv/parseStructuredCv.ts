@@ -70,7 +70,17 @@ export interface ParsedCv {
   projects: ParsedCvProject[];
   skillsList: string[];
   certifications: string[];
-  certificationDetails: Array<{ name: string; issuer: string; issueDate: string }>;
+  certificationDetails: Array<{
+    name: string;
+    issuer: string;
+    issueDate: string;
+    /** The line shown under the certificate, when the CV gave one. */
+    description: string;
+    /** The tools the certificate covered, when the CV listed them. */
+    skills: string[];
+    /** The identifier the issuing body printed on the certificate. */
+    credentialId: string;
+  }>;
 }
 
 export interface CvConfidence {
@@ -1051,26 +1061,238 @@ function parseSkills(blocks: DocumentBlock[]): string[] {
   return skills.slice(0, 40);
 }
 
+/**
+ * Words that mark a line as being about a qualification.
+ *
+ * A line only becomes a certificate when it looks like one. Without this
+ * gate a CV line such as "Led 15+ community workshops reaching 200+
+ * participants" was imported as a certificate the candidate never earned.
+ */
+const CERTIFICATION_WORDS =
+  /\b(certificat(?:e|ion|ed)|certifications|diploma|certificate|courses?|trainings?|programmes?|programs?|bootcamp|academy|workshops?|pathways?|curriculum|masterclass|nanodegree|licen[cs]e|diplomas?)\b/i;
+
+/**
+ * Organisations that appear as the body that issued a certificate.
+ *
+ * These are the names a CV actually uses. A line that mentions one of them
+ * is about a qualification even when it carries no word like "certificate".
+ */
+const KNOWN_ISSUERS =
+  /\b(coursera|udemy|edx|google|microsoft|amazon|aws|meta|facebook|linkedin|ibm|nvidia|datacamp|scaler|apna|great\s?learning|itida|nti|iti\b|hp\s?life|digital\s?egypt|mohammed\s?bin\s?rashid|university|universit(?:y|é)|institute|center|centre|academy|school|college)\b/i;
+
+/**
+ * Lines that are never a certificate, however they are worded.
+ *
+ * Each one is something a CV contains and an importer has to keep out of the
+ * certificate list.
+ */
+const NEVER_A_CERTIFICATE: RegExp[] = [
+  /^view\s+pdf$/i,
+  /^portfolio\b/i,
+  /^skills?\s*:/i,
+  /^certificat(?:e|ion)s?\s*:/i,
+  /^\(?\+?\d[\d\s\-()]{6,}\)?$/, // a phone number
+  /https?:\/\//i, // a link
+  /^[\w.+-]+@[\w-]+\.\w+$/, // an email address
+  /^(?:key\s+)?achievements?$/i,
+  /^(?:professional\s+)?(?:development|experience|summary|profile|education)$/i,
+];
+
+/** A past-tense verb at the start of a line means the line is a sentence. */
+const SENTENCE_OPENERS =
+  /^(led|managed|delivered|achieved|eliminated|built|developed|conducted|organized|organised|served|increased|reduced|designed|implemented|coordinated|established|founded|supervised|facilitated|automated|earned|completed|created|launched|supported|improved|handled|drove|grew|maintained|presented|produced|provided|reviewed|streamlined|trained|worked|reduced|generated|reduced)\b/i;
+
+/** A month and a year, or a bare year. */
+const DATE_SEGMENT =
+  /^(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?:19|20)\d{2}|(?:19|20)\d{2})$/i;
+
+/** The identifier an issuing body prints on the certificate. */
+const CREDENTIAL_ID = /\b(?:student\s*id|cert(?:ificate)?\s*id|credential\s*id|id)\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9-]{3,})\b/i;
+
+/** An organisation name inside a segment. */
+function looksLikeIssuer(segment: string): boolean {
+  const trimmed = segment.trim();
+  if (!trimmed || trimmed.length > 70) return false;
+  if (trimmed.split(/\s+/).length > 7) return false;
+  if (/^[A-Z][a-z]+$/.test(trimmed) && !KNOWN_ISSUERS.test(trimmed)) return false;
+  if (KNOWN_ISSUERS.test(trimmed)) return true;
+  if (/\b(university|institute|academy|school|college|centre|center|labs?|ltd|inc|corp|corporation|group)\b/i.test(trimmed)) {
+    return true;
+  }
+  // "ITIDA & NTI" — two organisations joined by an ampersand.
+  if (/^[A-Za-z][A-Za-z .'-]{1,30}\s&\s[A-Za-z][A-Za-z .'-]{1,30}$/.test(trimmed)) return true;
+  return false;
+}
+
+/** A comma-separated list of short tool names. */
+function looksLikeSkillList(segment: string): string[] {
+  const parts = segment
+    .split(/[,;]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return [];
+  // Every part has to read like a tool name: short, no full stops, no verbs.
+  const usable = parts.every(
+    (part) =>
+      part.length <= 42 &&
+      part.split(/\s+/).length <= 5 &&
+      !/[.!?]/.test(part) &&
+      !SENTENCE_OPENERS.test(part) &&
+      !/^\d+$/.test(part)
+  );
+  if (!usable) return [];
+  return parts;
+}
+
+/**
+ * Splits a certification line into the parts it carries.
+ *
+ * A CV line often holds several facts in one row: the name, the body that
+ * issued it, the date, the hours spent, the credential identifier and the
+ * tools it covered. The separator is whatever the CV used.
+ *
+ * The first part is always the name. Nothing after it can become the name,
+ * which is what keeps "Google Data Analytics Professional Certificate" a
+ * certificate name rather than a claim that Google issued it.
+ */
+function splitCertificationParts(text: string): string[] {
+  const columns = text
+    .split(/\s*[|·•]\s*/)
+    .map((column) => column.trim())
+    .filter(Boolean);
+  const parts: string[] = [];
+  for (const column of columns) {
+    // A dash inside the column separates the name from its issuer.
+    for (const piece of column.split(/\s+[–—]\s+|\s+-\s+/)) {
+      const trimmed = piece.trim();
+      if (trimmed) parts.push(trimmed);
+    }
+  }
+  return parts;
+}
+
 function parseCertifications(blocks: DocumentBlock[]): {
   names: string[];
-  details: Array<{ name: string; issuer: string; issueDate: string }>;
+  details: Array<{
+    name: string;
+    issuer: string;
+    issueDate: string;
+    description: string;
+    skills: string[];
+    credentialId: string;
+  }>;
 } {
   const names: string[] = [];
-  const details: Array<{ name: string; issuer: string; issueDate: string }> = [];
+  const details: Array<{
+    name: string;
+    issuer: string;
+    issueDate: string;
+    description: string;
+    skills: string[];
+    credentialId: string;
+  }> = [];
   const seen = new Set<string>();
 
   for (const block of blocks) {
-    const text = stripBullet(block.text).replace(/\s+/g, ' ').trim();
+    // A PDF line often starts with the column separator.
+    const raw = stripBullet(block.text).replace(/\s+/g, ' ').trim();
+    const text = raw.replace(/^[|:\s]+/, '').trim();
     if (!text || text.length < 3 || text.length > 160) continue;
     if (matchSectionHeading(text)) continue;
-    if (/[.!?]$/.test(text) && text.split(/\s+/).length > 12) continue;
-    const key = text.toLowerCase();
+    if (NEVER_A_CERTIFICATE.some((pattern) => pattern.test(text))) continue;
+
+    // A qualification is a noun phrase. A sentence is not.
+    if (/[.!?]$/.test(text)) continue;
+    if (/%/.test(text)) continue;
+    if (SENTENCE_OPENERS.test(text)) continue;
+    if (text.split(/\s+/).length > 18) continue;
+
+    const parts = splitCertificationParts(text);
+    if (parts.length === 0) continue;
+
+    // The name is the first part. Everything after it carries the facts
+    // about it, and nothing after it can become the name.
+    const name = parts[0];
+    const rest = parts.slice(1);
+
+    // An entry that starts with a phone number, an email address or a link
+    // is contact information the layout left in this column, not a
+    // qualification.
+    if (/^\(?\+?\d[\d\s\-()]{5,}\)?$/.test(name)) continue;
+    if (/^[\w.+-]+@[\w-]+\.\w+$/.test(name)) continue;
+    if (/^https?:\/\//i.test(name)) continue;
+
+    let issuer = '';
+    let issueDate = '';
+    let description = '';
+    const skills: string[] = [];
+
+    const credentialMatch = text.match(CREDENTIAL_ID);
+    const credentialId = credentialMatch ? credentialMatch[1] : '';
+
+    for (const part of rest) {
+      // "(120 hrs)" and a hanging "(120 hrs" are both dropped.
+      const cleaned = part
+        .replace(/\(\s*\d+\s*(?:hrs?|hours?)?[^)]*\)/gi, '') // "(120 hrs)"
+        .replace(/\(\s*\d+\s*(?:hrs?|hours?)?$/i, '') // "(120 hrs"
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!cleaned) continue;
+
+      if (!issueDate && DATE_SEGMENT.test(cleaned)) {
+        issueDate = cleaned;
+        continue;
+      }
+      // A credential identifier is the identifier, not a description.
+      if (CREDENTIAL_ID.test(cleaned)) continue;
+
+      const partSkills = looksLikeSkillList(cleaned);
+      if (partSkills.length >= 2) {
+        for (const skill of partSkills) {
+          if (!skills.includes(skill)) skills.push(skill);
+        }
+        continue;
+      }
+      if (!issuer && looksLikeIssuer(cleaned)) {
+        issuer = cleaned;
+        continue;
+      }
+      if (!description && cleaned.length <= 120) {
+        description = cleaned;
+      }
+    }
+
+    // The evidence has to say this is a qualification. A line that mentions
+    // no certificate word, no date, no issuing body and carries no
+    // structure is something else on the CV.
+    const hasKeyword = CERTIFICATION_WORDS.test(text);
+    const hasIssuer = Boolean(issuer);
+    const hasDate = Boolean(issueDate);
+    const hasSeparator = parts.length > 1;
+    // A list of the tools a certificate covered is evidence of a
+    // qualification in its own right: the document named the tools and
+    // pointed them at one entry.
+    const hasTools = skills.length >= 2;
+    const score =
+      (hasKeyword ? 2 : 0) +
+      (hasIssuer ? 2 : 0) +
+      (hasDate ? 1 : 0) +
+      (hasSeparator ? 1 : 0) +
+      (hasTools ? 2 : 0);
+    if (score < 2) continue;
+
+    const key = name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    names.push(text);
-    // The exact wording is the evidence. No provider and no issue date are
-    // inferred from the certificate name.
-    details.push({ name: text, issuer: '', issueDate: '' });
+    names.push(name);
+    details.push({
+      name,
+      issuer,
+      issueDate,
+      description,
+      skills,
+      credentialId,
+    });
   }
 
   return { names: names.slice(0, 15), details: details.slice(0, 15) };

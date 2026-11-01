@@ -87,27 +87,57 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const primaryNavItems = [
-    { id: 'dashboard', label: t('navHome'), icon: Home },
-    { id: 'my-career', label: t('navMyCareer'), icon: Compass },
-    { id: 'roadmap', label: t('navRoadmap'), icon: Layers },
-    { id: 'skills', label: t('navSkills'), icon: Award },
-    { id: 'learning', label: t('navLearn'), icon: BookOpen },
-    { id: 'projects', label: t('navProjects'), icon: FolderGit2 },
-    { id: 'volunteer', label: t('navVolunteer'), icon: HeartHandshake },
-    { id: 'cv-studio', label: t('navCV'), icon: FileText },
-    { id: 'jobs', label: t('navJobs'), icon: Briefcase },
-    { id: 'applications', label: t('navApplications'), icon: Calendar },
-    { id: 'interviews', label: t('navInterviews'), icon: Target },
+  // Navigation is grouped into five destinations rather than two long
+  // lists. Every existing route is still reachable; the grouping only says
+  // what kind of thing it is.
+  const navGroups = [
+    {
+      id: 'home',
+      label: t('Home'),
+      items: [{ id: 'dashboard', label: t('navHome'), icon: Home }],
+    },
+    {
+      id: 'career',
+      label: t('Career'),
+      items: [
+        { id: 'my-career', label: t('navMyCareer'), icon: Compass },
+        { id: 'roadmap', label: t('navRoadmap'), icon: Layers },
+        { id: 'skills', label: t('navSkills'), icon: Award },
+        { id: 'progress', label: t('navProgress'), icon: TrendingUp },
+      ],
+    },
+    {
+      id: 'learn',
+      label: t('Learn'),
+      items: [
+        { id: 'learning', label: t('navLearn'), icon: BookOpen },
+        { id: 'projects', label: t('navProjects'), icon: FolderGit2 },
+        { id: 'volunteer', label: t('navVolunteer'), icon: HeartHandshake },
+      ],
+    },
+    {
+      id: 'tools',
+      label: t('Career Tools'),
+      items: [
+        { id: 'cv-studio', label: t('navCV'), icon: FileText },
+        { id: 'jobs', label: t('navJobs'), icon: Briefcase },
+        { id: 'applications', label: t('navApplications'), icon: Calendar },
+        { id: 'interviews', label: t('navInterviews'), icon: Target },
+        { id: 'documents', label: t('My Documents'), icon: FolderClosed },
+      ],
+    },
+    {
+      id: 'profile',
+      label: t('Profile'),
+      items: [
+        { id: 'profile', label: t('My Profile'), icon: User },
+        { id: 'activity', label: t('Recent Activity'), icon: Activity },
+        { id: 'settings', label: t('navSettings'), icon: Settings },
+      ],
+    },
   ];
 
-  const secondaryNavItems = [
-    { id: 'profile', label: t('My Profile'), icon: User },
-    { id: 'documents', label: t('My Documents'), icon: FolderClosed },
-    { id: 'activity', label: t('Recent Activity'), icon: Activity },
-    { id: 'progress', label: t('navProgress'), icon: TrendingUp },
-    { id: 'settings', label: t('navSettings'), icon: Settings },
-  ];
+  const allNavItems = navGroups.flatMap((group) => group.items);
   const handleNavClick = (viewId: string) => {
     onNavigate(viewId);
     setMobileMenuOpen(false);
@@ -116,7 +146,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
   // The breadcrumb shows the name of the current page rather than its route
   // id, so a phone shows a word that fits instead of "cv-studio".
   const currentViewLabel =
-    [...primaryNavItems, ...secondaryNavItems].find((item) => item.id === currentView)?.label ??
+    allNavItems.find((item) => item.id === currentView)?.label ??
     currentView
       .split('-')
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -151,7 +181,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex flex-col md:flex-row">
       {/* Desktop Sidebar Rail */}
-      <aside className="hidden md:flex flex-col w-64 bg-[var(--surface-main)] border-r border-[var(--border-subtle)] shrink-0 sticky top-0 h-screen select-none">
+      <aside className="hidden md:flex flex-col w-64 bg-[var(--surface-main)] border-e border-[var(--border-subtle)] shrink-0 sticky top-0 h-screen select-none">
         {/* Brand Header */}
         <div className="p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
           <button 
@@ -161,7 +191,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <Logo variant="icon" className="h-8 w-8" alt="" />
             <div>
               <div className="font-bold text-sm tracking-tight text-[var(--text-primary)]">
-                {t('CareerPilot AI')}
+                {t('CareerDev4AI')}
               </div>
               <div className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[140px]">
                 {targetRole.title}
@@ -172,57 +202,36 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
         {/* Navigation Links Scroll Container */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-          {/* Main Career Navigation */}
-          <div className="space-y-1">
-            <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
-              {t('Career Engine')}
+          {navGroups.map((group, groupIndex) => (
+            <div
+              key={group.id}
+              className={`space-y-1 ${groupIndex > 0 ? 'pt-2 border-t border-[var(--border-subtle)]' : ''}`}
+            >
+              <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                {group.label}
+              </div>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentView === item.id;
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavClick(item.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                      isActive
+                        ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold shadow-2xs'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--text-muted)]'}`} />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            {primaryNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentView === item.id;
-
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavClick(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                    isActive
-                      ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold shadow-2xs'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--text-muted)]'}`} />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Personal Workspace Navigation */}
-          <div className="space-y-1 pt-2 border-t border-[var(--border-subtle)]">
-            <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
-              {t('Workspace & Identity')}
-            </div>
-            {secondaryNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentView === item.id;
-
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavClick(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                    isActive
-                      ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold shadow-2xs'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--text-muted)]'}`} />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          ))}
         </div>
 
         {/* Sidebar Footer: Copilot Quick Launch & Profile Widget */}
@@ -281,7 +290,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 onClick={() => onNavigate('dashboard')} 
                 className="hidden shrink-0 font-medium hover:text-[var(--text-primary)] sm:inline"
               >
-                {t('CareerPilot')}
+                {t('CareerDev4AI')}
               </button>
               <span className="hidden shrink-0 text-[var(--text-muted)] sm:inline">/</span>
               <span className="truncate font-semibold text-[var(--text-primary)]">
@@ -408,7 +417,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         {/* Global Authenticated Shell Footer */}
         <footer className="mt-auto border-t border-[var(--border-subtle)] px-4 sm:px-8 py-3 text-xs text-[var(--text-muted)]">
           <div className="flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-2">
-            <span>© 2026 CareerPilot AI</span>
+            <span>© 2026 CareerDev4AI</span>
             <span>
               {t('Developed by')}{' '}
               <a
@@ -450,7 +459,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2">
                 <Logo variant="icon" className="h-7 w-7" alt="" />
-                <span className="font-bold text-sm text-[var(--text-primary)]">{t('CareerPilot AI')}</span>
+                <span className="font-bold text-sm text-[var(--text-primary)]">{t('CareerDev4AI')}</span>
               </div>
               <button 
                 onClick={() => setMobileMenuOpen(false)}
@@ -461,48 +470,36 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               </button>
             </div>
 
-              <div className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
-                <div className="px-2 text-[10px] font-bold uppercase text-[var(--text-muted)] mb-1">{t('Career')}</div>
-                {primaryNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = currentView === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleNavClick(item.id)}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={`w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold'
-                          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-
-                <div className="px-2 text-[10px] font-bold uppercase text-[var(--text-muted)] mt-3 mb-1">{t('Workspace')}</div>
-                {secondaryNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = currentView === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleNavClick(item.id)}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={`w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold'
-                          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
+              <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4">
+                {navGroups.map((group, groupIndex) => (
+                  <div
+                    key={group.id}
+                    className={groupIndex > 0 ? 'border-t border-[var(--border-subtle)] pt-3' : ''}
+                  >
+                    <div className="px-2 text-[10px] font-bold uppercase text-[var(--text-muted)] mb-1">
+                      {group.label}
+                    </div>
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = currentView === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleNavClick(item.id)}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={`w-full min-h-11 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-semibold'
+                              : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 shrink-0" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
 
             <div className="space-y-2 border-t border-[var(--border-subtle)] px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
@@ -543,8 +540,8 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         {[
           { id: 'dashboard', label: t('Home'), icon: Home },
           { id: 'my-career', label: t('Career'), icon: Compass },
-          { id: 'roadmap', label: t('Roadmap'), icon: Layers },
-          { id: 'jobs', label: t('Jobs'), icon: Briefcase },
+          { id: 'learning', label: t('Learn'), icon: BookOpen },
+          { id: 'cv-studio', label: t('Tools'), icon: Briefcase },
           { id: 'profile', label: t('Profile'), icon: User },
         ].map((item) => {
           const Icon = item.icon;

@@ -146,4 +146,9 @@ export const learningAr: Record<string, string> = {
   'Submit Response for AI Scoring': 'إرسال الإجابة للتقييم بالذكاء الاصطناعي',
   'Score:': 'الدرجة:',
   'Recorded Mock Sessions': 'الجلسات التجريبية المسجَّلة',
+
+  // Language preference
+  'Arabic': 'العربية',
+  'English': 'الإنجليزية',
+  'All languages': 'كل اللغات',
 };

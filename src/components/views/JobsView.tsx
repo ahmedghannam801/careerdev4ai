@@ -111,7 +111,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             {t('No live job feed is connected in this release.')}
           </p>
           <p>
-            CareerPilot does not display invented vacancies or placeholder application links. The
+            CareerDev4AI does not display invented vacancies or placeholder application links. The
             searches below open real job boards using your target role and location, and anything
             you decide to apply for can be tracked in the Applications pipeline.
           </p>

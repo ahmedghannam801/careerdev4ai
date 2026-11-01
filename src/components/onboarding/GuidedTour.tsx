@@ -116,7 +116,7 @@ export const GUIDES: GuideDefinition[] = [
       {
         target: '[data-guide="cv-build"]',
         title: 'Your CV, built from your data',
-        body: 'CareerPilot assembles this from the experience, skills, projects, volunteering and courses you have entered. It never invents anything.',
+        body: 'CareerDev4AI assembles this from the experience, skills, projects, volunteering and courses you have entered. It never invents anything.',
       },
     ],
   },

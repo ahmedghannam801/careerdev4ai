@@ -1,22 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ArrowRight,
-  Sparkles,
-  CheckCircle2,
+  BookOpen,
   Briefcase,
-  Target,
   Calendar,
-  FileText,
-  Activity,
-  ShieldCheck,
+  CheckCircle2,
   CheckSquare,
-  Square
+  ChevronDown,
+  Clock,
+  FileText,
+  FolderGit2,
+  HeartHandshake,
+  Languages,
+  PlayCircle,
+  ShieldCheck,
+  Sparkles,
+  Square,
+  Target,
+  TrendingUp,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
-import { Stagger, StaggerItem } from '../motion/Motion';
-import { CountUp } from '../motion/CountUp';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
+import { CountUp } from '../motion/CountUp';
 import { EmptyState } from '../ui/EmptyState';
 
 interface DashboardViewProps {
@@ -24,11 +30,6 @@ interface DashboardViewProps {
   onOpenCopilot: () => void;
 }
 
-/**
- * One entry of the "Upcoming Milestones" list. Every field is derived from
- * the signed-in user's own records — an application in an interview stage, or
- * a roadmap task that carries a deadline.
- */
 interface MilestoneEntry {
   id: string;
   kind: 'interview' | 'deadline';
@@ -38,12 +39,6 @@ interface MilestoneEntry {
   detail: string;
 }
 
-/**
- * Renders a date as "OCT 25". Accepts either a full ISO timestamp or a
- * plain "YYYY-MM-DD" day (which is parsed as a LOCAL day, not UTC, so the
- * day does not slip backwards for users behind UTC). Returns '' when there
- * is no date.
- */
 const formatMilestoneDate = (value?: string): string => {
   if (!value) return '';
   const dayOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -54,556 +49,704 @@ const formatMilestoneDate = (value?: string): string => {
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
 };
 
+/**
+ * The dashboard answers three questions and nothing else:
+ *
+ *   1. Where am I?      target role, readiness, and the three numbers that
+ *                       describe real progress;
+ *   2. What is next?    exactly one next step, with its reason and a start
+ *                       control;
+ *   3. What can help?   the one course, the one project and the one
+ *                       volunteering route that are relevant now.
+ *
+ * Everything else — the metric grid, career health, milestones, the weekly
+ * review — is still there, behind one "More detail" control. The page used
+ * to show all of it at once, which is why it read as a wall of competing
+ * recommendations.
+ */
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpenCopilot }) => {
-  const { 
-    profile, 
-    targetRole, 
-    analysis, 
-    roadmapPhases, 
-    skills, 
-    applications, 
-    projects, 
+  const {
+    profile,
+    targetRole,
+    analysis,
+    roadmapPhases,
+    skills,
+    applications,
+    projects,
     updateTaskStatus,
     dailyActions,
     toggleDailyAction,
     weeklyReview,
     careerHealth,
     cvVersions,
-    t} = useCareer();
+    learningRecommendations,
+    t,
+  } = useCareer();
 
-  // Find next pending roadmap tasks
-  const pendingTasks = roadmapPhases
-    .flatMap(p => p.milestones.flatMap(m => m.tasks))
-    .filter(t => t.status !== 'completed');
+  const [showDetails, setShowDetails] = useState(false);
 
-  const topTask = pendingTasks[0];
-  const activeApplications = applications.filter(a => !['rejected', 'withdrawn', 'offer'].includes(a.stage));
-  const interviewCount = applications.filter(a => ['interview', 'technical', 'final'].includes(a.stage)).length;
-  const activeProject = projects.find(p => p.status === 'in_progress') || projects[0];
+  const allTasks = roadmapPhases.flatMap((phase) =>
+    phase.milestones.flatMap((milestone) => milestone.tasks)
+  );
+  const pendingTasks = allTasks.filter(
+    (task) => task.status !== 'completed' && task.status !== 'skipped'
+  );
+  const nextTask = pendingTasks[0];
+  const totalTasks = allTasks.length;
+  const completedTasks = allTasks.filter((task) => task.status === 'completed').length;
+  const masteredSkillsCount = skills.filter((skill) => skill.gap === 0).length;
+  const activeApplications = applications.filter(
+    (application) => !['rejected', 'withdrawn', 'offer'].includes(application.stage)
+  );
+  const interviewCount = applications.filter((application) =>
+    ['interview', 'technical', 'final'].includes(application.stage)
+  ).length;
+  const activeProject = projects.find((project) => project.status === 'in_progress') || projects[0];
+  const topLearning = learningRecommendations[0];
 
-  const totalTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks)).length;
-  const completedTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks.filter(t => t.status === 'completed'))).length;
-  const masteredSkillsCount = skills.filter(s => s.gap === 0).length;
+  const readiness = Math.round(analysis.matchPercentage);
+  const readinessLabel =
+    readiness >= 80 ? t('Ready to apply') : readiness >= 55 ? t('Almost there') : t('Building foundations');
 
-  // The month the milestones below belong to: the current one.
-  const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const nextStep = nextTask
+    ? {
+        title: nextTask.title,
+        description: nextTask.description,
+        reason:
+          nextTask.rationale ??
+          `${t('This is the first unfinished step in your roadmap for')} ${targetRole.title}.`,
+        hours: nextTask.estimatedHours,
+        skill: nextTask.skillName ?? null,
+      }
+    : analysis.nextBestAction
+      ? {
+          title: analysis.nextBestAction.title,
+          description: analysis.nextBestAction.description,
+          reason: analysis.nextBestAction.reason,
+          hours: null as number | null,
+          skill: null as string | null,
+        }
+      : {
+          title: t('Review your plan'),
+          description: t('Open your roadmap and confirm the next step.'),
+          reason: t('Your roadmap has no unfinished step right now.'),
+          hours: null as number | null,
+          skill: null as string | null,
+        };
 
-  // "Upcoming Milestones" is built from the user's own records: the
-  // applications that are in an interview stage, and the roadmap tasks that
-  // carry a deadline. Nothing here is hard-coded.
   const interviewMilestones: MilestoneEntry[] = applications
-    .filter(a => ['interview', 'technical', 'final'].includes(a.stage))
-    .map(a => ({
-      id: `milestone-interview-${a.id}`,
+    .filter((application) => ['interview', 'technical', 'final'].includes(application.stage))
+    .map((application) => ({
+      id: `milestone-interview-${application.id}`,
       kind: 'interview' as const,
-      label: `${a.stage.charAt(0).toUpperCase()}${a.stage.slice(1)} ${t('Stage')}`,
-      date: a.nextActionDate || '',
-      title: a.company,
-      detail: a.interviewStageDetails || a.role
+      label: `${application.stage.charAt(0).toUpperCase()}${application.stage.slice(1)} ${t('Stage')}`,
+      date: application.nextActionDate || '',
+      title: application.company,
+      detail: application.interviewStageDetails || application.role,
     }));
 
   const deadlineMilestones: MilestoneEntry[] = roadmapPhases
-    .flatMap(p => p.milestones.flatMap(m => m.tasks.map(task => ({ task, milestoneTitle: m.title }))))
-    .filter(({ task }) => !!task.deadline && task.status !== 'completed')
+    .flatMap((phase) =>
+      phase.milestones.flatMap((milestone) =>
+        milestone.tasks.map((task) => ({ task, milestoneTitle: milestone.title }))
+      )
+    )
+    .filter(({ task }) => Boolean(task.deadline) && task.status !== 'completed')
     .map(({ task, milestoneTitle }) => ({
       id: `milestone-deadline-${task.id}`,
       kind: 'deadline' as const,
       label: t('Roadmap Deadline'),
       date: task.deadline || '',
       title: task.title,
-      detail: milestoneTitle
+      detail: milestoneTitle,
     }));
 
-  const upcomingMilestones: MilestoneEntry[] = [...interviewMilestones, ...deadlineMilestones];
+  const upcomingMilestones = [...interviewMilestones, ...deadlineMilestones];
 
   return (
-    <div className="space-y-8">
-      {/* Welcome & Role Context Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
+    <div className="space-y-6">
+      {/* Greeting: one sentence, one target. */}
+      <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
-            <span>{profile.careerState.replace('_', ' ').toUpperCase()}</span>
-            <span>·</span>
-            <span>{t('TARGETING:')} {targetRole.title.toUpperCase()}</span>
+          <div className="text-xs text-[var(--text-secondary)]">
+            {t('Welcome back')}, {profile.name}
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            {t('dashboardWelcome')}, {profile.name}
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+            {t('Your next move for')} {targetRole.title}
           </h1>
         </div>
-
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
             onClick={() => onNavigate('my-career')}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-primary)] transition-colors"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
           >
             {t('Switch Target Role')}
           </button>
           <button
+            type="button"
             onClick={onOpenCopilot}
-            className="px-3.5 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>{t('Consult Copilot')}</span>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>{t('Ask Copilot')}</span>
           </button>
         </div>
       </div>
 
-      {/* TOP SECTION: What should I do next? (Next Best Action) */}
-      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] relative overflow-hidden shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)] flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{t('Next Best Action')}</span>
+      {/* 1. Where am I? */}
+      <section
+        aria-labelledby="dashboard-where"
+        className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs"
+      >
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              <Target className="h-3 w-3" />
+              {t('Where you are')}
             </div>
-
-            <h2 className="text-xl font-bold text-[var(--text-primary)]">
-              {analysis.nextBestAction?.title || t('Review Core Skill Milestones')}
-            </h2>
-
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-              {analysis.nextBestAction?.description}
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="dashboard-where" className="text-lg font-bold text-[var(--text-primary)]">
+                {targetRole.title}
+              </h2>
+              <span className="rounded-full bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]">
+                {readinessLabel}
+              </span>
+            </div>
+            <p className="max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
+              {t('Readiness is measured against the real requirements of this role, not against a generic template.')}
             </p>
-
-            <div className="pt-1 text-xs text-[var(--text-muted)] flex items-center gap-2">
-              <span className="font-medium text-[var(--text-primary)]">{t('Why am I seeing this?')}</span>
-              <span>·</span>
-              <span>{analysis.nextBestAction?.reason}</span>
-            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
-            {topTask && (
-              <button
-                onClick={() => updateTaskStatus(topTask.id, 'completed')}
-                className="px-4 py-2.5 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] flex items-center justify-center gap-1.5 transition-all shadow-xs"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{t('Mark Action Complete')}</span>
-              </button>
-            )}
-            <button
-              onClick={() => onNavigate('roadmap')}
-              className="px-4 py-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] flex items-center justify-center gap-1 transition-colors"
-            >
-              <span>{t('View Full Roadmap')}</span>
-              <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* DAILY CAREER ACTIONS (Sections 35, 36) */}
-      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-[var(--color-primary-text)]" />
-            <h2 className="text-base font-bold text-[var(--text-primary)]">{t('Today\'s High-Impact Actions')}</h2>
-          </div>
-          <span className="text-xs text-[var(--text-muted)] font-mono">
-            {dailyActions.filter(a => a.completed).length} {t('of')} {dailyActions.length} {t('completed')}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {dailyActions.map((action) => (
-            <div
-              key={action.id}
-              onClick={() => toggleDailyAction(action.id)}
-              className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
-                action.completed
-                  ? 'bg-[var(--surface-secondary)]/50 border-[var(--border-subtle)] opacity-75'
-                  : 'bg-[var(--surface-secondary)]/30 border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
-              }`}
-            >
-              <div className="mt-0.5 text-[var(--color-primary-text)]">
-                {action.completed ? (
-                  <CheckSquare className="w-4 h-4 text-[var(--color-success-strong)]" />
-                ) : (
-                  <Square className="w-4 h-4 text-[var(--text-muted)]" />
-                )}
-              </div>
-              <div className="space-y-1 flex-1">
-                <div className={`text-xs font-bold ${action.completed ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
-                  {action.title}
-                </div>
-                <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                  {action.description}
-                </div>
-                <div className="text-[10px] text-[var(--text-muted)] pt-1 flex items-center justify-between">
-                  <span>{action.reason}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onNavigate(action.actionView);
-                    }}
-                    className="text-[var(--color-primary-text)] hover:underline font-semibold"
-                  >
-                    {t('Open →')}
-                  </button>
-                </div>
-              </div>
+          <div className="w-full shrink-0 lg:w-72" data-guide="readiness">
+            <div className="flex items-end justify-between">
+              <span className="text-[11px] text-[var(--text-secondary)]">{t('Role readiness')}</span>
+              <span className="font-mono text-2xl font-bold tabular-nums text-[var(--text-primary)]">
+                <CountUp value={readiness} format={(value) => `${Math.round(value)}%`} />
+              </span>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* CORE SCANNABLE METRICS GRID
-          Only this grid animates. The rest of the dashboard stays still so
-          navigating back to it never feels like the whole page re-enters. */}
-      <Stagger gap={0.06} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StaggerItem>
-          <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-            <div className="text-xs text-[var(--text-secondary)]">{t('Role Readiness Match')}</div>
-            <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
-              <CountUp value={analysis.matchPercentage} format={(v) => `${Math.round(v)}%`} />
-            </div>
-            <div className="mt-3">
+            <div className="mt-2">
               <AnimatedProgress
-                value={analysis.matchPercentage}
+                value={readiness}
                 label={t('Role readiness match')}
                 fillClassName="bg-[var(--color-primary)]"
               />
             </div>
-            <div className="mt-2 text-[11px] text-[var(--text-muted)]">
-              {t('measured against')} {targetRole.title} {t('requirements')}
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              {t('Skills')}
+            </div>
+            <div className="mt-0.5 font-mono text-sm font-bold text-[var(--text-primary)]">
+              {masteredSkillsCount}/{skills.length}
+            </div>
+            <div className="text-[10px] text-[var(--text-muted)]">{t('mastered')}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              {t('Roadmap')}
+            </div>
+            <div className="mt-0.5 font-mono text-sm font-bold text-[var(--text-primary)]">
+              {completedTasks}/{totalTasks}
+            </div>
+            <div className="text-[10px] text-[var(--text-muted)]">{t('steps done')}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              {t('Applications')}
+            </div>
+            <div className="mt-0.5 font-mono text-sm font-bold text-[var(--text-primary)]">
+              {activeApplications.length}
+            </div>
+            <div className="text-[10px] text-[var(--text-muted)]">
+              {interviewCount > 0 ? `${interviewCount} ${t('interviews')}` : t('active')}
             </div>
           </div>
-        </StaggerItem>
+        </div>
 
-        <StaggerItem>
-          <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-            <div className="text-xs text-[var(--text-secondary)]">{t('Skills Mastered')}</div>
-            <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
-              <CountUp value={masteredSkillsCount} />
-              <span className="text-sm font-normal text-[var(--text-muted)]"> / {skills.length}</span>
+        {analysis.criticalGaps.length > 0 && (
+          <div data-guide="skill-gaps" className="mt-4 border-t border-[var(--border-subtle)] pt-3">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              {t('Primary Skill Gaps')}
             </div>
-            <div className="mt-3">
-              <AnimatedProgress
-                value={skills.length > 0 ? (masteredSkillsCount / skills.length) * 100 : 0}
-                label={t('Skills mastered')}
-                fillClassName="bg-[var(--color-success-strong)]"
-              />
-            </div>
-            <div className="mt-2 text-[11px] text-[var(--text-muted)]">
-              {analysis.criticalGaps.length} {t('critical gaps remaining')}
-            </div>
-          </div>
-        </StaggerItem>
-
-        <StaggerItem>
-          <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-            <div className="text-xs text-[var(--text-secondary)]">{t('Roadmap Completion')}</div>
-            <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
-              <CountUp value={completedTasks} />
-              <span className="text-sm font-normal text-[var(--text-muted)]"> / {totalTasks}</span>
-            </div>
-            <div className="mt-3">
-              <AnimatedProgress
-                value={totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0}
-                label={t('Roadmap completion')}
-                fillClassName="bg-[var(--color-accent)]"
-              />
-            </div>
-            <div className="mt-2 text-[11px] text-[var(--text-muted)]">
-              {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}% {t('overall progress')}
-            </div>
-          </div>
-        </StaggerItem>
-
-        <StaggerItem>
-          <div className="h-full p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)]">
-            <div className="text-xs text-[var(--text-secondary)]">{t('Active Applications')}</div>
-            <div className="mt-2 text-3xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
-              <CountUp value={activeApplications.length} />
-            </div>
-            <div className="mt-3">
-              <AnimatedProgress
-                value={applications.length > 0 ? (activeApplications.length / applications.length) * 100 : 0}
-                label={t('Active applications')}
-                fillClassName="bg-[var(--color-primary-text)]"
-              />
-            </div>
-            <div className="mt-2 text-[11px] text-[var(--color-primary-text)] font-medium">
-              {interviewCount} {interviewCount === 1 ? t('interview') : t('interviews')} {t('in progress')}
-            </div>
-          </div>
-        </StaggerItem>
-      </Stagger>
-
-      {/* 2-Column Operational Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column (8 cols): Critical Gaps & In-Flight Project */}
-        <div className="lg:col-span-8 space-y-8">
-          {/* Critical Skill Gaps */}
-          <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Primary Skill Gaps')}</h3>
-                <p className="text-xs text-[var(--text-secondary)]">{t('Calculated against')} {targetRole.title} {t('industry benchmarks')}</p>
-              </div>
-              <button
-                onClick={() => onNavigate('skills')}
-                className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
-              >
-                {t('Manage Skills →')}
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {analysis.criticalGaps.map((gap, idx) => (
-                <div key={idx} className="p-3.5 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-[var(--text-primary)]">{gap.skill}</span>
-                      <span className="text-xs text-[var(--text-muted)]">· {t('Current Level')} {gap.current} → {t('Target Level')} {gap.target}</span>
-                    </div>
-                    <div className="text-xs text-[var(--text-secondary)]">{gap.reason}</div>
-                  </div>
-                  <button
-                    onClick={() => onNavigate('learning')}
-                    className="self-start sm:self-auto px-3 py-1.5 rounded bg-[var(--surface-main)] hover:bg-[var(--accent-surface)] text-xs font-medium text-[var(--color-primary-text)] border border-[var(--border-subtle)] whitespace-nowrap transition-colors"
-                  >
-                    {t('View Resource')}
-                  </button>
-                </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {analysis.criticalGaps.slice(0, 3).map((gap) => (
+                <button
+                  key={gap.skill}
+                  type="button"
+                  onClick={() => onNavigate('skills')}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 px-2.5 py-1 text-[10px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--accent-primary)]"
+                >
+                  <span>{gap.skill}</span>
+                  <span className="font-mono text-[var(--text-muted)]">
+                    {gap.current}/{gap.target}
+                  </span>
+                </button>
               ))}
             </div>
           </div>
+        )}
+      </section>
 
-          {/* Active Project & Evidence */}
-          {activeProject && (
-            <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Active Portfolio Project')}</h3>
-                  <p className="text-xs text-[var(--text-secondary)]">{t('Proof of skill for hiring managers')}</p>
+      {/* 2. What is next? Exactly one step. */}
+      <section
+        aria-labelledby="dashboard-next"
+        data-guide="next-action"
+        className="relative overflow-hidden rounded-2xl border border-[var(--accent-primary)]/30 bg-[var(--surface-main)] p-5 shadow-xs sm:p-6"
+      >
+        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-2xl space-y-2.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+              <Sparkles className="h-3.5 w-3.5" />
+              {t('Your next step')}
+            </div>
+            <h2 id="dashboard-next" className="text-xl font-bold text-[var(--text-primary)]">
+              {nextStep.title}
+            </h2>
+            <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+              {nextStep.description}
+            </p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
+              {nextStep.skill && <span>{nextStep.skill}</span>}
+              {nextStep.hours ? (
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {nextStep.hours}h
+                </span>
+              ) : null}
+            </div>
+            <div className="rounded-xl bg-[var(--surface-secondary)]/60 px-3 py-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+              <span className="font-semibold text-[var(--text-primary)]">{t('Why this')}: </span>
+              {nextStep.reason}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
+            <button
+              type="button"
+              onClick={() => onNavigate('roadmap')}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-4 py-2.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
+            >
+              <PlayCircle className="h-4 w-4" />
+              {t('Start this step')}
+            </button>
+            {nextTask && (
+              <button
+                type="button"
+                onClick={() => updateTaskStatus(nextTask.id, 'completed')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--color-success-strong)]/40 hover:text-[var(--color-success-strong)]"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {t('Mark complete')}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onNavigate('roadmap')}
+              className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+            >
+              {t('View full roadmap')}
+              <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. What can help? One course, one project, one local route. */}
+      <section aria-labelledby="dashboard-help" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              <TrendingUp className="h-3 w-3" />
+              {t('What can help')}
+            </div>
+            <h2 id="dashboard-help" className="mt-0.5 text-base font-bold text-[var(--text-primary)]">
+              {t('Pick one, not all of them')}
+            </h2>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {/* Learning */}
+          <article className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              <BookOpen className="h-3 w-3" />
+              {t('Learn')}
+            </div>
+            {topLearning ? (
+              <>
+                <h3 className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
+                  {topLearning.course.title}
+                </h3>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+                  <span className="inline-flex items-center gap-1">
+                    <Languages className="h-3 w-3" />
+                    {t(topLearning.course.language)}
+                  </span>
+                  <span>·</span>
+                  <span>
+                    {t(
+                      topLearning.course.format
+                        .replace('_', ' ')
+                        .replace(/^\w/, (letter) => letter.toUpperCase())
+                    )}
+                  </span>
+                  <span>·</span>
+                  <span>{topLearning.course.provider}</span>
                 </div>
-                <button
-                  onClick={() => onNavigate('projects')}
-                  className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
-                >
-                  {t('All Projects →')}
-                </button>
-              </div>
-
-              <div className="p-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-bold text-sm text-[var(--text-primary)]">{activeProject.title}</div>
-                    <div className="text-xs text-[var(--text-muted)]">{activeProject.difficulty} · {t('Status:')} {activeProject.status.replace('_', ' ')}</div>
-                  </div>
-                  {activeProject.repositoryUrl && (
-                    <a
-                      href={activeProject.repositoryUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-[var(--color-primary-text)] hover:underline font-medium"
-                    >
-                      {t('Repository ↗')}
-                    </a>
-                  )}
+                <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {topLearning.aiExplanation ?? topLearning.reason}
+                </p>
+                <div className="mt-auto flex items-center gap-2 pt-3">
+                  <a
+                    href={topLearning.course.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
+                  >
+                    {t('Open resource')}
+                    <ArrowRight className="h-3 w-3 rtl:rotate-180" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('learning')}
+                    className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  >
+                    {t('More in Learn')}
+                  </button>
                 </div>
+              </>
+            ) : (
+              <EmptyState
+                compact
+                icon={BookOpen}
+                title={t('No course ranked yet')}
+                description={t('Open the Learning Hub to rank real courses against your gaps.')}
+              />
+            )}
+          </article>
 
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+          {/* Project */}
+          <article className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              <FolderGit2 className="h-3 w-3" />
+              {t('Build')}
+            </div>
+            {activeProject ? (
+              <>
+                <h3 className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
+                  {activeProject.title}
+                </h3>
+                <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                   {activeProject.goal}
                 </p>
-
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {activeProject.skills.map((s, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                      {s}
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {activeProject.skills.slice(0, 3).map((skill) => (
+                    <span
+                      key={skill}
+                      className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
+                    >
+                      {skill}
                     </span>
                   ))}
                 </div>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('projects')}
+                  className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
+                >
+                  {t('Open the project')}
+                  <ArrowRight className="h-3 w-3 rtl:rotate-180" />
+                </button>
+              </>
+            ) : (
+              <EmptyState
+                compact
+                icon={FolderGit2}
+                title={t('No project yet')}
+                description={t('A small project is the fastest way to prove a skill.')}
+              />
+            )}
+          </article>
+
+          {/* Volunteering */}
+          <article className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              <HeartHandshake className="h-3 w-3" />
+              {t('Volunteer')}
             </div>
-          )}
+            <h3 className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
+              {t('Practise in Egypt')}
+            </h3>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+              {t('Egyptian organisations you can join now, filtered by the skills you still need.')}
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate('volunteer')}
+              className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
+            >
+              {t('See Egypt opportunities')}
+              <ArrowRight className="h-3 w-3 rtl:rotate-180" />
+            </button>
+          </article>
+        </div>
+      </section>
 
-          {/* WEEKLY CAREER REVIEW (Section 37) */}
-          <div className="p-6 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[var(--text-primary)]">{t('Weekly Career Review')}</h3>
-                <p className="text-xs text-[var(--text-secondary)]">{t('Week')} {weeklyReview.weekNumber} · {weeklyReview.startDate} - {weeklyReview.endDate}</p>
-              </div>
-              <span className="font-mono text-xs font-bold text-[var(--color-success-strong)] bg-[var(--color-success-surface)] px-2.5 py-1 rounded">
-                {t('Health Score:')} {weeklyReview.healthScore}/100
-              </span>
+      {/* Progressive disclosure: the detail is available, not in the way. */}
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">
+        <button
+          type="button"
+          onClick={() => setShowDetails((value) => !value)}
+          aria-expanded={showDetails}
+          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start"
+        >
+          <div>
+            <div className="text-sm font-semibold text-[var(--text-primary)]">
+              {t('More detail')}
             </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">{t('Accomplishments This Week')}</div>
-                <ul className="space-y-1 text-[var(--text-secondary)]">
-                  {weeklyReview.keyAchievements.map((ach, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-[var(--color-success-strong)] font-bold">✓</span>
-                      <span>{ach}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="pt-2 border-t border-[var(--border-subtle)]">
-                <div className="font-semibold text-[var(--text-muted)] uppercase text-[10px] mb-1.5">{t('Priorities For Next Week')}</div>
-                <ul className="space-y-1 text-[var(--text-secondary)]">
-                  {weeklyReview.nextWeekPriorities.map((pri, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-[var(--color-primary-text)] font-bold">→</span>
-                      <span>{pri}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <div className="text-[11px] text-[var(--text-secondary)]">
+              {t('Career health, milestones, weekly review and today’s actions')}
             </div>
           </div>
-        </div>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform ${showDetails ? 'rotate-180' : ''}`}
+          />
+        </button>
 
-        {/* Right Column (4 cols): Deadlines, Career Health Dimensions */}
-        <div className="lg:col-span-4 space-y-8">
-          {/* Upcoming Deadlines & Interviews */}
-          <div className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-[var(--color-primary-text)]" />
-                <span>{t('Upcoming Milestones')}</span>
-              </h3>
-              <span className="text-xs text-[var(--text-muted)]">{currentMonthLabel}</span>
-            </div>
-
+        {showDetails && (
+          <div className="space-y-5 border-t border-[var(--border-subtle)] p-5">
+            {/* Today's actions */}
             <div className="space-y-3">
-              {upcomingMilestones.length === 0 ? (
-                <EmptyState
-                  compact
-                  icon={Calendar}
-                  title={t('No upcoming milestones yet')}
-                  description={t('Interview stages and roadmap deadlines appear here as they come up, so nothing important slips.')}
-                />
-              ) : (
-                upcomingMilestones.map((milestone) => (
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                  {t('Today’s high-impact actions')}
+                </h3>
+                <span className="font-mono text-[11px] text-[var(--text-muted)]">
+                  {dailyActions.filter((action) => action.completed).length} {t('of')}{' '}
+                  {dailyActions.length} {t('completed')}
+                </span>
+              </div>
+              <div className="grid gap-2 md:grid-cols-3">
+                {dailyActions.map((action) => (
                   <div
-                    key={milestone.id}
-                    className={`p-3 rounded-lg border space-y-1 ${
-                      milestone.kind === 'interview'
-                        ? 'border-[var(--accent-primary)]/30 bg-[var(--accent-surface)]/40'
-                        : 'border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50'
+                    key={action.id}
+                    onClick={() => toggleDailyAction(action.id)}
+                    className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-start transition-colors ${
+                      action.completed
+                        ? 'border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 opacity-75'
+                        : 'border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 hover:border-[var(--border-strong)]'
                     }`}
                   >
-                    <div
-                      className={`flex items-center justify-between text-xs font-semibold ${
-                        milestone.kind === 'interview'
-                          ? 'text-[var(--color-primary-text)]'
-                          : 'text-[var(--text-secondary)]'
-                      }`}
-                    >
-                      <span>{milestone.label}</span>
-                      {milestone.date && <span className="font-mono">{formatMilestoneDate(milestone.date)}</span>}
+                    <div className="mt-0.5 text-[var(--color-primary-text)]">
+                      {action.completed ? (
+                        <CheckSquare className="h-4 w-4 text-[var(--color-success-strong)]" />
+                      ) : (
+                        <Square className="h-4 w-4 text-[var(--text-muted)]" />
+                      )}
                     </div>
-                    <div className="text-xs text-[var(--text-primary)] font-medium">{milestone.title}</div>
-                    {milestone.detail && (
-                      <div className="text-[11px] text-[var(--text-muted)]">{milestone.detail}</div>
-                    )}
-                    {milestone.kind === 'interview' && (
-                      <button
-                        onClick={() => onNavigate('interviews')}
-                        className="mt-2 text-xs font-semibold text-[var(--color-primary-text)] hover:underline block"
+                    <div className="min-w-0 space-y-0.5">
+                      <div
+                        className={`text-xs font-bold ${
+                          action.completed
+                            ? 'text-[var(--text-muted)] line-through'
+                            : 'text-[var(--text-primary)]'
+                        }`}
                       >
-                        {t('Prepare STAR Answers →')}
+                        {action.title}
+                      </div>
+                      <div className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                        {action.description}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onNavigate(action.actionView);
+                        }}
+                        className="text-[10px] font-semibold text-[var(--color-primary-text)] hover:underline"
+                      >
+                        {t('Open')}
                       </button>
-                    )}
+                    </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* EXPLAINABLE CAREER HEALTH (Section 38) */}
-          <div className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-[var(--color-success-strong)]" />
-                <span>{t('Career Health Breakdown')}</span>
-              </h3>
-              <span className="font-mono text-xs font-bold text-[var(--text-primary)]">
-                {careerHealth.overallHealth}%
-              </span>
+                ))}
+              </div>
             </div>
 
-            <div className="space-y-3 text-xs">
+            {/* Metrics */}
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
               {[
-                { label: t('Skills Confidence'), val: careerHealth.skillsConfidence, hint: t('Mastered vs remaining gaps') },
-                { label: t('Evidence Coverage'), val: careerHealth.evidenceCoverage, hint: t('GitHub repos and live demos') },
-                { label: t('CV Role Alignment'), val: careerHealth.cvAlignment, hint: t('ATS keyword match score') },
-                { label: t('Market Engagement'), val: careerHealth.marketEngagement, hint: t('Tracked active applications') }
-              ].map((dim, i) => (
-                <div key={i} className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="font-medium text-[var(--text-primary)]">{dim.label}</span>
-                    <span className="font-mono text-[var(--text-muted)]">{dim.val}%</span>
+                { label: t('Role readiness match'), value: `${readiness}%` },
+                { label: t('Skills mastered'), value: `${masteredSkillsCount}/${skills.length}` },
+                { label: t('Roadmap completion'), value: `${completedTasks}/${totalTasks}` },
+                { label: t('Active applications'), value: `${activeApplications.length}` },
+              ].map((metric) => (
+                <div
+                  key={metric.label}
+                  className="rounded-xl border border-[var(--border-subtle)] p-3"
+                >
+                  <div className="text-[10px] text-[var(--text-secondary)]">{metric.label}</div>
+                  <div className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--text-primary)]">
+                    {metric.value}
                   </div>
-                  <div className="h-1.5 bg-[var(--color-progress-track)] rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[var(--color-progress-strong)] rounded-full"
-                      style={{ width: `${dim.val}%` }} 
-                    />
-                  </div>
-                  <div className="text-[10px] text-[var(--text-muted)]">{dim.hint}</div>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Quick Nav Tools */}
-          <div className="p-5 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-            <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-              {t('Career Workspaces')}
-            </h3>
-
-            <div className="space-y-1.5 text-xs">
-              <button
-                onClick={() => onNavigate('cv-studio')}
-                className="w-full p-2.5 rounded-lg hover:bg-[var(--surface-secondary)] flex items-center justify-between text-[var(--text-primary)] transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[var(--color-primary-text)]" />
-                  <span className="font-medium">
-                    CV Studio (
-                    {isAtsAnalysisForRole(cvVersions[0]?.targetRoleTitle, targetRole.title)
-                      ? `${t('ATS Score:')} ${cvVersions[0]?.atsAnalysis?.overallScore ?? '—'}`
-                      : cvVersions[0]?.atsAnalysis
-                        ? t('Refresh ATS Score')
-                        : `${t('ATS Score:')} —`}
-                    )
+            {/* Career health + milestones */}
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="rounded-xl border border-[var(--border-subtle)] p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-[var(--text-primary)]">
+                    <ShieldCheck className="h-4 w-4 text-[var(--color-success-strong)]" />
+                    {t('Career Health Breakdown')}
+                  </h3>
+                  <span className="font-mono text-xs font-bold text-[var(--text-primary)]">
+                    {careerHealth.overallHealth}%
                   </span>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)] rtl:rotate-180" />
-              </button>
+                <div className="mt-3 space-y-2.5">
+                  {[
+                    { label: t('Skills Confidence'), val: careerHealth.skillsConfidence },
+                    { label: t('Evidence Coverage'), val: careerHealth.evidenceCoverage },
+                    { label: t('CV Role Alignment'), val: careerHealth.cvAlignment },
+                    { label: t('Market Engagement'), val: careerHealth.marketEngagement },
+                  ].map((dimension) => (
+                    <div key={dimension.label} className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="font-medium text-[var(--text-primary)]">
+                          {dimension.label}
+                        </span>
+                        <span className="font-mono text-[var(--text-muted)]">{dimension.val}%</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--color-progress-strong)]"
+                          style={{ width: `${dimension.val}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
+              <div className="rounded-xl border border-[var(--border-subtle)] p-4">
+                <h3 className="flex items-center gap-1.5 text-sm font-bold text-[var(--text-primary)]">
+                  <Calendar className="h-4 w-4 text-[var(--color-primary-text)]" />
+                  {t('Upcoming Milestones')}
+                </h3>
+                <div className="mt-3 space-y-2">
+                  {upcomingMilestones.length === 0 ? (
+                    <EmptyState
+                      compact
+                      icon={Calendar}
+                      title={t('No upcoming milestones yet')}
+                      description={t('Interview stages and roadmap deadlines appear here as they come up.')}
+                    />
+                  ) : (
+                    upcomingMilestones.slice(0, 4).map((milestone) => (
+                      <div
+                        key={milestone.id}
+                        className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-2.5"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                            {milestone.label}
+                          </div>
+                          <div className="truncate text-xs font-medium text-[var(--text-primary)]">
+                            {milestone.title}
+                          </div>
+                        </div>
+                        {milestone.date && (
+                          <span className="shrink-0 font-mono text-[10px] text-[var(--text-muted)]">
+                            {formatMilestoneDate(milestone.date)}
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Weekly review */}
+            <div className="rounded-xl border border-[var(--border-subtle)] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                  {t('Weekly Career Review')}
+                </h3>
+                <span className="rounded bg-[var(--color-success-surface)] px-2 py-0.5 font-mono text-[11px] font-bold text-[var(--color-success-strong)]">
+                  {t('Health Score:')} {weeklyReview.healthScore}/100
+                </span>
+              </div>
+              <div className="mt-2 grid gap-3 text-xs sm:grid-cols-2">
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                    {t('Accomplishments This Week')}
+                  </div>
+                  <ul className="space-y-1 text-[var(--text-secondary)]">
+                    {weeklyReview.keyAchievements.map((achievement, index) => (
+                      <li key={index} className="flex items-start gap-1.5">
+                        <span className="font-bold text-[var(--color-success-strong)]">✓</span>
+                        <span>{achievement}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                    {t('Priorities For Next Week')}
+                  </div>
+                  <ul className="space-y-1 text-[var(--text-secondary)]">
+                    {weeklyReview.nextWeekPriorities.map((priority, index) => (
+                      <li key={index} className="flex items-start gap-1.5">
+                        <span className="font-bold text-[var(--color-primary-text)]">→</span>
+                        <span>{priority}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Workspace links */}
+            <div className="flex flex-wrap gap-2">
               <button
+                type="button"
+                onClick={() => onNavigate('cv-studio')}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--accent-primary)]"
+              >
+                <FileText className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
+                {t('CV Studio')}
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  {isAtsAnalysisForRole(cvVersions[0]?.targetRoleTitle, targetRole.title)
+                    ? `${cvVersions[0]?.atsAnalysis?.overallScore ?? '—'}`
+                    : '—'}
+                </span>
+              </button>
+              <button
+                type="button"
                 onClick={() => onNavigate('jobs')}
-                className="w-full p-2.5 rounded-lg hover:bg-[var(--surface-secondary)] flex items-center justify-between text-[var(--text-primary)] transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--accent-primary)]"
               >
-                <div className="flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-[var(--color-success-strong)]" />
-                  <span className="font-medium">{t('Job Search & Applications')}</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)] rtl:rotate-180" />
+                <Briefcase className="h-3.5 w-3.5 text-[var(--color-success-strong)]" />
+                {t('Job Search & Applications')}
               </button>
-
               <button
+                type="button"
                 onClick={() => onNavigate('interviews')}
-                className="w-full p-2.5 rounded-lg hover:bg-[var(--surface-secondary)] flex items-center justify-between text-[var(--text-primary)] transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--accent-primary)]"
               >
-                <div className="flex items-center gap-2">
-                  <Target className="w-4 h-4 text-[var(--color-warning)]" />
-                  <span className="font-medium">{t('AI Mock Interview Simulator')}</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)] rtl:rotate-180" />
+                <Target className="h-3.5 w-3.5 text-[var(--color-warning)]" />
+                {t('Interview practice')}
               </button>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

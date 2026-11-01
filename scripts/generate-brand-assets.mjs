@@ -1,5 +1,5 @@
 /**
- * CareerPilot AI — official brand asset pipeline.
+ * CareerDev4AI — official brand asset pipeline.
  * -----------------------------------------------------------------------------
  * Turns the approved brand assets in `src/assets/brand/official/` into every
  * derivative the platform ships:
@@ -280,7 +280,7 @@ async function build() {
     .resize(512, 512, { kernel: 'lanczos3' })
     .png(PNG_OUTPUT)
     .toBuffer();
-  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CareerPilot AI">
+  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CareerDev4AI">
   <image href="data:image/png;base64,${icon512.toString('base64')}" width="512" height="512"/>
 </svg>
 `;
@@ -291,8 +291,8 @@ async function build() {
   /* ------------------------------------------------------------------ */
   console.log('→ web manifest');
   const manifest = {
-    name: 'CareerPilot AI',
-    short_name: 'CareerPilot AI',
+    name: 'CareerDev4AI',
+    short_name: 'CareerDev4AI',
     description: 'Your personal career operating system.',
     start_url: '/',
     display: 'standalone',

@@ -28,7 +28,7 @@ const GITHUB_OAUTH_CALLBACK_PATH = '/auth/callback';
  * application, which already handles it. The address is listed in Supabase's
  * allow-list, so the link always lands somewhere that works.
  */
-const NATIVE_PASSWORD_RESET_REDIRECT = 'https://careerpilot4ai.pages.dev/';
+const NATIVE_PASSWORD_RESET_REDIRECT = 'https://careerdev4ai.pages.dev/';
 
 export const AuthModal: React.FC = () => {
   const {
@@ -219,7 +219,7 @@ export const AuthModal: React.FC = () => {
             ref={panelRef}
             role="dialog"
             aria-modal="true"
-            aria-label={t('CareerPilot AI sign in')}
+            aria-label={t('CareerDev4AI sign in')}
             className="relative w-full max-w-md space-y-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 shadow-2xl sm:p-8"
             variants={dialogVariants(reduced)}
             initial="hidden"
@@ -240,7 +240,7 @@ export const AuthModal: React.FC = () => {
             <Logo variant="full" className="h-11 sm:h-12 w-auto mx-auto" />
             <div>
               <h3 className="font-bold text-base text-[var(--text-primary)]">
-                {mode === 'login' ? 'Sign in to CareerPilot' : mode === 'register' ? 'Create Your Account' : 'Reset Password'}
+                {mode === 'login' ? 'Sign in to CareerDev4AI' : mode === 'register' ? 'Create Your Account' : 'Reset Password'}
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">{t('Secure career state sync')}</p>
             </div>

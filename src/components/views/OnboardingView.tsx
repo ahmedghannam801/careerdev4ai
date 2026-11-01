@@ -229,7 +229,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 {t('Let\'s build your career path')}
               </h2>
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                CareerPilot works from one thing: the career you pick. Everything else — your
+                CareerDev4AI works from one thing: the career you pick. Everything else — your
                 roadmap, the courses, the projects, the volunteering and your CV — is built from
                 the role you choose and the skills you actually have.
               </p>
@@ -489,7 +489,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             </div>
             {planPreview ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {[
                     { label: 'Steps', value: String(planPreview.totalTasks) },
                     { label: 'Hours', value: String(planPreview.estimatedHours) },
@@ -497,7 +497,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                   ].map((stat) => (
                     <div
                       key={stat.label}
-                      className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] text-center"
+                      className="p-2 sm:p-3 min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] text-center"
                     >
                       <div className="text-lg font-bold font-mono text-[var(--color-primary-text)]">
                         {stat.value}

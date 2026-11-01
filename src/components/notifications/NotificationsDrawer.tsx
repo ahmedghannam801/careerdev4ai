@@ -2,7 +2,7 @@ import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Bell, X, Check, Calendar, AlertCircle, Award } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
+import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 
 interface NotificationsDrawerProps {
   isOpen: boolean;
@@ -11,7 +11,7 @@ interface NotificationsDrawerProps {
 }
 
 export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
-  const { notifications, visibleNotifications, markNotificationRead, clearNotifications, t} =
+  const { notifications, visibleNotifications, markNotificationRead, clearNotifications, settings, t } =
     useCareer();
   const reduced = useReducedMotion() ?? false;
 
@@ -21,8 +21,8 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
         <motion.div
           role="dialog"
           aria-label={t('Notifications')}
-          className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[380px]"
-          variants={drawerVariants(reduced)}
+          className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[380px]"
+          variants={settings.language === 'ar' ? drawerLeftVariants(reduced) : drawerVariants(reduced)}
           initial="hidden"
           animate="visible"
           exit="exit"

@@ -42,7 +42,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`CareerPilot AI Server running on port ${PORT}`);
+    console.log(`CareerDev4AI Server running on port ${PORT}`);
   });
 }
 

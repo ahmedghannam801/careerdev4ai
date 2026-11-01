@@ -270,6 +270,15 @@ async function main() {
     // The URL is the state of the application, so a refresh reopens the same
     // page. Pure.
     join(TESTS_DIR, 'routing.test.ts'),
+    // Certificates: what the record holds, and what may be called a
+    // certificate. Pure.
+    join(TESTS_DIR, 'certificates.test.ts'),
+    // The shared AI answer formatter: what the copilot's markdown becomes
+    // before it reaches the reader. Pure.
+    join(TESTS_DIR, 'ai-response.test.ts'),
+    // The recommendation relevance gate, the learning CTA URL rule and
+    // roadmap resource attachment. Pure.
+    join(TESTS_DIR, 'recommendation-relevance.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

@@ -1,10 +1,10 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * CareerPilot AI — Capacitor configuration.
+ * CareerDev4AI — Capacitor configuration.
  *
  * The Android application is a native wrapper around the very same build that
- * is deployed to https://careerpilot4ai.pages.dev. Nothing about the web
+ * is deployed to https://careerdev4ai.pages.dev. Nothing about the web
  * application changes: the bundle, the branding, the routes, the backend and
  * the authentication behaviour are the ones that already exist.
  *
@@ -26,7 +26,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 const config: CapacitorConfig = {
   appId: 'com.careerpilot.ai',
-  appName: 'CareerPilot AI',
+  appName: 'CareerDev4AI',
   webDir: 'dist-android',
   server: {
     androidScheme: 'https',

@@ -85,4 +85,56 @@ export const roadmapAr: Record<string, string> = {
   'medium': 'متوسط',
   'low': 'منخفض',
   'sufficient': 'كافٍ',
+
+  // Staged roadmap timeline
+  'Foundation': 'التأسيس',
+  'Practice': 'التطبيق',
+  'Job Preparation': 'التحضير للعمل',
+  'YOUR PLAN, ONE STAGE AT A TIME': 'خطتك، مرحلة واحدة في كل مرة',
+  'No roadmap yet': 'لا توجد خارطة طريق بعد',
+  'Choose a target role and CareerDev4AI will build a staged plan from your real skill gaps.':
+    'اختر دورًا مستهدفًا وسيبني CareerDev4AI خطة مرحلية من فجوات مهاراتك الفعلية.',
+  'Choose a target role': 'اختر دورًا مستهدفًا',
+  'Where you are, what comes next, and why each step is here.':
+    'أين أنت، وما التالي، ولماذا كل خطوة هنا.',
+  'Upcoming': 'قادم',
+  'Reached': 'تم الوصول',
+  'Final state': 'الحالة النهائية',
+  'Job Ready': 'جاهز للعمل',
+  'All steps complete': 'كل الخطوات مكتملة',
+  'to go': 'متبقية',
+  'All actions': 'كل الإجراءات',
+  'Current stage': 'المرحلة الحالية',
+  'No actions match this filter in this stage.': 'لا توجد إجراءات تطابق هذا التصفية في هذه المرحلة.',
+  'Show all': 'عرض الكل',
+  'Resources for this stage': 'مصادر هذه المرحلة',
+  'Project for this stage': 'مشروع هذه المرحلة',
+  'See project briefs': 'اطّلع على ملخصات المشاريع',
+  'Every roadmap step is complete. The next move is to apply: tailor your CV, track applications and practise interviews.':
+    'كل خطوات خارطة الطريق مكتملة. الخطوة التالية هي التقديم: خصّص سيرتك الذاتية، وتتبّع الطلبات، وتدرّب على المقابلات.',
+  'Finish the remaining': 'أكمل ما تبقّى من',
+  'actions to reach this state. It is calculated from your own completed steps, not from a new plan.':
+    'إجراءات للوصول إلى هذه الحالة. وهي محسوبة من خطواتك المكتملة، لا من خطة جديدة.',
+  'Tailor my CV': 'خصّص سيرتي الذاتية',
+  'Find roles': 'ابحث عن أدوار',
+
+  // Redesigned learning card hierarchy
+  'START HERE': 'ابدأ من هنا',
+  'START': 'البداية',
+  'Your next action': 'إجراؤك التالي',
+  'View stage': 'عرض المرحلة',
+  'LEARN THIS': 'تعلّم هذا',
+  'WHY THIS MATTERS': 'لماذا هذا مهم',
+  'RESOURCE': 'المصدر',
+  'OUTCOME': 'النتيجة',
+  'Start Learning': 'ابدأ التعلّم',
+  'Continue Learning': 'متابعة التعلّم',
+  'Review resource': 'مراجعة المصدر',
+  'More resources': 'مصادر إضافية',
+  'No verified resource link is attached to this step yet.':
+    'لا يوجد رابط مصدر موثّق مرتبط بهذه الخطوة بعد.',
+  'PROJECTS': 'المشاريع',
+  'Proof of work': 'إثبات العمل',
+  'These projects turn the skills above into evidence a hiring manager can see.':
+    'هذه المشاريع تحوّل المهارات أعلاه إلى أدلة يراها مسؤول التوظيف.',
 };

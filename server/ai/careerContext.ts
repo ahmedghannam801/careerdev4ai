@@ -295,7 +295,7 @@ export function buildAiContextBlock(context: AiCareerContext): string {
   const lines: string[] = [];
   const role = context.targetRole;
 
-  lines.push('Here is the user\'s CURRENT career state, read from their CareerPilot account:');
+  lines.push('Here is the user\'s CURRENT career state, read from their CareerDev4AI account:');
   lines.push(`- Persona: ${context.careerState ?? 'not set'}`);
   if (context.careerGoal) {
     const label = CAREER_GOAL_LABELS[context.careerGoal] ?? context.careerGoal;

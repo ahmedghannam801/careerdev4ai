@@ -629,7 +629,7 @@ export const SettingsView: React.FC = () => {
                   <button
                     key={lvl}
                     onClick={() => updateAiPreferences({ personalizationLevel: lvl })}
-                    className={`py-2 rounded-lg capitalize font-semibold border transition-colors ${
+                    className={`py-2 px-1 sm:px-2 rounded-lg text-[11px] sm:text-xs capitalize font-semibold border transition-colors ${
                       aiPreferences.personalizationLevel === lvl
                         ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] border-[var(--accent-primary)]'
                         : 'bg-[var(--surface-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
@@ -798,7 +798,7 @@ export const SettingsView: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  {t('CareerPilot AI')}
+                  {t('CareerDev4AI')}
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   Your Personal Career Operating System: goals, skills, roadmaps, learning, projects, evidence, CVs, job applications, and interview practice in one unified workspace.
@@ -820,7 +820,7 @@ export const SettingsView: React.FC = () => {
                 {t('Ahmed Ebrahim')}
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1">
-                {t('Software Engineer & Creator of CareerPilot AI')}
+                {t('Software Engineer & Creator of CareerDev4AI')}
               </p>
             </div>
 

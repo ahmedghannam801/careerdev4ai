@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Sparkles, X, Send, Bot, User, ArrowRight, Lightbulb } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
+import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
+import { AiResponse } from './AiResponse';
 
 interface CopilotDrawerProps {
   isOpen: boolean;
@@ -11,7 +12,7 @@ interface CopilotDrawerProps {
 }
 
 export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
-  const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, profile, t} = useCareer();
+  const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, profile, settings, t} = useCareer();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion() ?? false;
@@ -34,9 +35,9 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       {isOpen && (
         <motion.div
           role="dialog"
-          aria-label={t('CareerPilot Copilot')}
-          className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-l border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[440px]"
-          variants={drawerVariants(reduced)}
+          aria-label={t('CareerDev4AI Copilot')}
+          className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[440px]"
+          variants={settings.language === 'ar' ? drawerLeftVariants(reduced) : drawerVariants(reduced)}
           initial="hidden"
           animate="visible"
           exit="exit"
@@ -48,7 +49,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerPilot Copilot')}</div>
+            <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerDev4AI Copilot')}</div>
             <div className="text-xs text-[var(--text-secondary)]">{t('Advisor for')} {targetRole.title}</div>
           </div>
         </div>
@@ -102,7 +103,11 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
                   : 'bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]'
               }`}
             >
-              <div className="whitespace-pre-wrap">{msg.text}</div>
+              {msg.sender === 'assistant' ? (
+                <AiResponse text={msg.text} />
+              ) : (
+                <div className="whitespace-pre-wrap">{msg.text}</div>
+              )}
               
               {/* Context suggestions attached to assistant messages */}
               {msg.suggestions && msg.suggestions.length > 0 && (
@@ -137,7 +142,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
               <Bot className="w-4 h-4" />
             </div>
             <span className="flex items-center gap-2">
-              <span aria-live="polite">{t('CareerPilot is analyzing your graph')}</span>
+              <span aria-live="polite">{t('CareerDev4AI is analyzing your graph')}</span>
               <span className="flex items-center gap-0.5" aria-hidden="true">
                 {[0, 1, 2].map((dot) => (
                   <motion.span
