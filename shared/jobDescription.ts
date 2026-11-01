@@ -27,6 +27,7 @@
  */
 
 import { skillMatchConfidence } from './skillMatching.ts';
+import type { AiLanguageCode } from './aiLanguages.ts';
 
 // ---------------------------------------------------------------------------
 // The job description analysis
@@ -638,7 +639,7 @@ export function collectJobRequirements(
 export function buildAtsMatchReport(
   analysis: JobDescriptionAnalysis,
   facts: AtsProfileFacts,
-  options: { language?: 'en' | 'ar' } = {}
+  options: { language?: AiLanguageCode } = {}
 ): AtsMatchReport {
   const language = options.language === 'ar' ? 'ar' : 'en';
   const index = buildEvidenceIndex(facts);

@@ -259,6 +259,10 @@ describe('the volunteer opportunities catalogue', () => {
         opportunity.roleSlugs.length > 0,
         'an opportunity is tagged with the roles it suits'
       );
+      assert.ok(
+        opportunity.country === 'Egypt' || opportunity.isRemote,
+        `the catalogue is limited to Egypt and online roles: ${opportunity.title} (${opportunity.country})`
+      );
     }
   });
 

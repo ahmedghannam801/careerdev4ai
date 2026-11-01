@@ -151,4 +151,62 @@ export const learningAr: Record<string, string> = {
   'Arabic': 'العربية',
   'English': 'الإنجليزية',
   'All languages': 'كل اللغات',
+
+  // Training & Courses
+  'Training & Courses': 'التدريب والدورات',
+  'your target role': 'وظيفتك المستهدفة',
+  'Training that moves you toward': 'تدريب يقربك من',
+  'Courses, certifications, learning paths, workshops and tutorials checked against your target role.':
+    'دورات وشهادات ومسارات تعلّم وورش عمل ودروس مُراجَعة مقابل وظيفتك المستهدفة.',
+  'Open Learning Hub': 'افتح مركز التعلّم',
+  'This page lists training resources, not job vacancies.':
+    'تعرض هذه الصفحة موارد تدريبية، لا وظائف شاغرة.',
+  'Every resource below passed a relevance gate for your target role before it appeared. A resource that does not close a role, skill, gap or roadmap need is not shown, however well it matches your preferred language or format.':
+    'كل مورد أدناه اجتاز بوابة الصلة بوظيفتك المستهدفة قبل ظهوره. لا يُعرض مورد لا يسدّ حاجة في الوظيفة أو المهارات أو الفجوات أو خطة الطريق، مهما ناسب لغتك أو صيغتك المفضلة.',
+  'Search training resources': 'ابحث في موارد التدريب',
+  'resources shown': 'موارد معروضة',
+  'All training': 'كل التدريب',
+  'Loading training resources…': 'جارٍ تحميل موارد التدريب…',
+  'Training resources could not be loaded.': 'تعذّر تحميل موارد التدريب.',
+  'No relevant training is available yet': 'لا يوجد تدريب ذو صلة متاح بعد',
+  'No training matches these filters': 'لا يوجد تدريب يطابق هذه المرشّحات',
+  'When a course, certification or tutorial closes a real gap for your target role, it will appear here. Refresh to check again, or browse the full catalogue in the Learning Hub.':
+    'عندما تسدّ دورة أو شهادة أو درس فجوة حقيقية في وظيفتك المستهدفة، سيظهر هنا. حدِّث للتحقق مجددًا، أو تصفّح الكتالوج الكامل في مركز التعلّم.',
+  'Clear the search or choose another training type to see the rest.':
+    'امسح البحث أو اختر نوع تدريب آخر لرؤية الباقي.',
+  'Find training': 'ابحث عن تدريب',
+  'Courses': 'الدورات',
+  'Learning paths': 'مسارات التعلّم',
+  'Workshops & bootcamps': 'ورش العمل والمعسكرات',
+  'Tutorials & videos': 'الدروس والفيديوهات',
+  'Other training': 'تدريب آخر',
+  'Bootcamp': 'معسكر تدريبي',
+  'Workshop': 'ورشة عمل',
+  'Training resource': 'مورد تدريبي',
+  'resources': 'موارد',
+
+  // Catalog branding and personalized recommendations
+  'Priority provider': 'مزوّد ذو أولوية',
+  'Explain with AI': 'اشرح بالذكاء الاصطناعي',
+  'AI explanations were not available; the deterministic reasons are shown.':
+    'لم تتوفر تفسيرات الذكاء الاصطناعي؛ تُعرض الأسباب الحتمية.',
+  'Apply preferences': 'طبّق التفضيلات',
+  'Recommended for You': 'مُوصى به لك',
+  'Browse the full catalog': 'تصفّح الكتالوج الكامل',
+  'No recommendations match these filters. Clear a filter or refresh your ranking.':
+    'لا توجد توصيات تطابق هذه المرشّحات. امسح مرشّحًا أو حدِّث ترتيبك.',
+  'No recommendations are available yet. Refresh your ranking to try again.':
+    'لا توجد توصيات متاحة بعد. حدِّث ترتيبك للمحاولة مرة أخرى.',
+  'Filter the catalog': 'رشّح الكتالوج',
+  'Search courses, providers, skills or topics':
+    'ابحث عن دورات أو مزوّدين أو مهارات أو موضوعات',
+  'All target roles': 'كل الوظائف المستهدفة',
+  'All skills': 'كل المهارات',
+  'All providers': 'كل المزوّدين',
+  'Availability': 'التوفر',
+  'Course type': 'نوع الدورة',
+  'No personalized recommendations match these filters.':
+    'لا توجد توصيات مخصّصة تطابق هذه المرشّحات.',
+  'Full catalog': 'الكتالوج الكامل',
+  'match these filters': 'تطابق هذه المرشّحات',
 };

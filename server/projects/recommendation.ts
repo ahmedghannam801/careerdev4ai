@@ -38,6 +38,10 @@ import {
 import { computeSkillGaps, coveredSkillGaps, openSkillGaps, toRoleSkillRequirements } from '../../shared/skillGap.ts';
 import { resolveRole } from '../../shared/careerRoles.ts';
 import type { JobDescriptionAnalysis } from '../../shared/jobDescription.ts';
+import {
+  aiLanguageInstruction,
+  type AiLanguageCode,
+} from '../../shared/aiLanguages.ts';
 import { getProfileDto } from '../db/profile.ts';
 import { getUserSkills } from '../db/userSkills.ts';
 import { listProjects } from '../db/projects.ts';
@@ -231,7 +235,7 @@ export function attachRealResources(
 export function buildProjectPlanPrompt(input: {
   briefs: ProjectBrief[];
   context: ProjectRecommendationContext;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
 }): string {
   const { briefs, context } = input;
   const parts: string[] = [];
@@ -332,9 +336,7 @@ export function buildProjectPlanPrompt(input: {
   parts.push('- Never promise a metric, a user number or an outcome the candidate cannot produce.');
   parts.push('- Keep the scope to one project a candidate can finish. Four to eight steps is right.');
   parts.push('- Return one plan per project, in the same order as the list above.');
-  if (input.language === 'ar') {
-    parts.push('- Write the plans in Arabic.');
-  }
+  parts.push(`- ${aiLanguageInstruction(input.language ?? 'en')}`);
   parts.push(
     '- Return JSON: {"plans": [{"title": string, "whyItFits": string, "skillsToDevelop": string[], "tools": string[], "difficulty": "Beginner"|"Intermediate"|"Advanced", "expectedOutcome": string, "steps": string[], "milestones": [{"title": string, "outcome": string}], "deliverables": string[], "cvPresentation": string}]}'
   );
@@ -353,7 +355,7 @@ export async function recommendProjects(input: {
   jobDescription?: JobDescriptionAnalysis | null;
   ai: ProjectAiClient | null;
   model: string;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
   limit?: number;
 }): Promise<{
   plans: ProjectPlan[];

@@ -126,6 +126,7 @@ import {
 import { buildCvFromProfile } from './server/cv/buildCv.ts';
 import {
   generateCvAssistText,
+  generateCvHeadlineSuggestions,
   type CvAssistRequest,
 } from './server/cv/aiAssist.ts';
 import {
@@ -153,6 +154,11 @@ import {
   dismissGuide,
 } from './server/db/guides.ts';
 import { loadAiCareerContext, buildAiContextBlock } from './server/ai/careerContext.ts';
+import {
+  aiLanguageInstruction,
+  normalizeAiLanguage,
+  type AiLanguageCode,
+} from './shared/aiLanguages.ts';
 import {
   groundingRules,
   stripUngroundedSentences,
@@ -1517,7 +1523,11 @@ app.post('/api/copilot', requireAuth, aiRateLimit, async (req: Request, res: Res
     // taken from the request body. The browser used to send the whole context,
     // which meant the assistant was reasoning about unverified client data
     // and had no roadmap, learning or experience to work from.
-    const careerContext = await loadAiCareerContext(req.authUser!.id);
+    // The response language is an explicit choice, not something inferred
+    // from the prompt. It is passed into the context loader so the same
+    // instruction appears in every prompt built on this block.
+    const language = normalizeAiLanguage(req.body?.language);
+    const careerContext = await loadAiCareerContext(req.authUser!.id, { language });
     const contextBlock = buildAiContextBlock(careerContext);
 
     // The active view is a UI hint, not a career fact, so it is still taken
@@ -1540,7 +1550,7 @@ ${contextBlock}
 Answering rules:
 1. Answer the user's actual question first, in one or two sentences. Then add only the detail that helps them act.
 2. Match the answer length to the question. A simple question gets a short answer; a plan request can use a numbered sequence.
-3. Write in Arabic when the question is in Arabic. Use correct Arabic terminology and keep industry-standard technical names in English (SQL, React, CV, ATS). Never mix languages without a reason.
+3. Write in the response language specified in the career state block. Keep industry-standard technical names (SQL, React, CV, ATS) in English. Never mix languages without a reason.
 4. Do not use markdown headers (#), bold asterisks (**), horizontal rules (---), tables, or nested bullets. The interface renders plain text with simple lists only.
 5. Use a short list only when listing steps or options. At most one level of bullets.
 6. When you recommend a learning resource, name it, say why it fits this user, and give the direct link if the state below contains one. Never invent a URL.
@@ -1655,9 +1665,11 @@ app.post('/api/analyze-career', requireAuth, aiRateLimit, async (req: Request, r
     const userSkills = boundedList(req.body?.userSkills, 40, 200);
     const requiredSkills = boundedList(targetRole?.requiredSkills, 40, 200);
     const persona = str(careerState, 80) ?? 'Professional';
+    const language = normalizeAiLanguage(req.body?.language);
 
     const prompt = `Analyze candidate for role "${resolvedRoleTitle}".
 Current persona: "${persona}".
+${aiLanguageInstruction(language)}
 Skills: ${JSON.stringify(userSkills)}.
 Required for role: ${JSON.stringify(requiredSkills)}.
 Analyse the candidate for this role in this domain. Do not assume a technical or software role; judge the candidate against the requirements of the role that was given.
@@ -1725,7 +1737,9 @@ Return valid JSON schema:
 app.post('/api/optimize-cv', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { cvText, targetRoleTitle, targetRoleSkills } = req.body;
+    const language = normalizeAiLanguage(req.body?.language);
     const prompt = `Evaluate CV for role "${targetRoleTitle}". Required: ${JSON.stringify(targetRoleSkills || [])}.
+${aiLanguageInstruction(language)}
 CV: ${cvText}
 ${groundingRules()}
 Return JSON schema:
@@ -1814,7 +1828,9 @@ app.post('/api/mock-interview', requireAuth, aiRateLimit, async (req: Request, r
     if (!safeQuestion || !safeAnswer) {
       return res.status(400).json({ error: 'A question and an answer are required' });
     }
+    const language = normalizeAiLanguage(req.body?.language);
     const prompt = `Evaluate interview answer for "${safeRoleTitle}". Type: ${safeType}.
+${aiLanguageInstruction(language)}
 Question: "${safeQuestion}"
 Answer: "${safeAnswer}"
 ${groundingRules()}
@@ -1886,8 +1902,10 @@ app.post('/api/suggest-summary', requireAuth, aiRateLimit, async (req: Request, 
     const safeAchievements = boundedList(keyAchievements, 20, 300)
       .filter((entry): entry is string => typeof entry === 'string')
       .join('; ') || 'High performance, collaborative delivery';
+    const language = normalizeAiLanguage(req.body?.language);
     const prompt = `Write a high-impact, professional, authentic 3-4 sentence professional summary for a resume/profile.
 Person: ${safeName}
+${aiLanguageInstruction(language)}
 Target Role: ${summaryRoleTitle}
 Career State: ${safeCareerState}
 Years of Experience: ${safeYears}
@@ -1970,8 +1988,10 @@ app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Req
     const safeExperiences = boundedList(experiences, 20, 400);
     const safeSkills = boundedList(skills, 40, 120);
     const safeProjects = boundedList(projects, 20, 400);
+    const language = normalizeAiLanguage(req.body?.language);
     const prompt = `Write a tailored, compelling cover letter for:
 Candidate: ${safeCandidateName}
+${aiLanguageInstruction(language)}
 Company: ${safeCompany}
 Role: ${safeJobTitle}
 Tone: ${safeTone}
@@ -2062,6 +2082,56 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, async (req: Request, res
     const sourceKind = isCvAssistSourceKind(body.sourceKind) ? body.sourceKind : undefined;
     const sourceId = str(body.sourceId, 64) ?? undefined;
 
+    // Headline suggestions are their own mode. They are deterministic first,
+    // and the model only adds options on top. That is why this branch runs
+    // before the "no model configured" check: a candidate without an AI key
+    // still gets usable headlines.
+    if (field === 'headline' && body.suggestions === true) {
+      const request = {
+        targetRoleTitle: str(body.targetRoleTitle, 200) ?? undefined,
+        additionalTargetRoles: boundedList(body.additionalTargetRoles, 5, 120)
+          .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0),
+        language: normalizeAiLanguage(body.language),
+      };
+
+      const wantsAi = body.ai !== false && Boolean(process.env.GEMINI_API_KEY);
+      if (!wantsAi) {
+        const outcome = await generateCvHeadlineSuggestions(
+          req.authUser!.id,
+          request,
+          null,
+          null
+        );
+        return res.json({ success: true, ...outcome });
+      }
+
+      // The model is optional here. When the daily allowance is spent the
+      // deterministic options are still returned, so the studio never shows
+      // a quota error where a useful answer exists.
+      if (!tryConsumeAiBudget(req.authUser!.id)) {
+        const outcome = await generateCvHeadlineSuggestions(
+          req.authUser!.id,
+          request,
+          null,
+          null
+        );
+        return res.json({
+          success: true,
+          ...outcome,
+          fallbackReason:
+            "The AI assistant has reached today's usage limit, so locally generated headline options are shown.",
+        });
+      }
+
+      const outcome = await generateCvHeadlineSuggestions(
+        req.authUser!.id,
+        request,
+        ai,
+        getGeminiModel()
+      );
+      return res.json({ success: true, ...outcome });
+    }
+
     // No model on this server means no text can be produced. This is checked
     // before the daily budget is touched, so a missing key is never reported
     // as an exhausted quota.
@@ -2078,7 +2148,7 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, async (req: Request, res
       targetRoleTitle: str(body.targetRoleTitle, 200) ?? undefined,
       tone: isCvAssistTone(body.tone) ? body.tone : undefined,
       length: isCvAssistLength(body.length) ? body.length : undefined,
-      language: body.language === 'ar' ? 'ar' : 'en',
+      language: normalizeAiLanguage(body.language),
       attempt: typeof body.attempt === 'number' && Number.isFinite(body.attempt)
         ? Math.max(0, Math.min(20, Math.floor(body.attempt)))
         : 0,
@@ -2175,7 +2245,7 @@ function readJobDescription(body: unknown): { ok: true; text: string } | { ok: f
  */
 async function readOptionalJobDescription(
   body: unknown,
-  options: { ai: JobDescriptionAiClient | null; model: string; language: 'en' | 'ar' }
+  options: { ai: JobDescriptionAiClient | null; model: string; language: AiLanguageCode }
 ): Promise<JobDescriptionAnalysis | null> {
   const read = readJobDescription(body);
   if (!read.ok) return null;
@@ -2194,7 +2264,7 @@ app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, async (req
       });
     }
 
-    const language = body.language === 'ar' ? 'ar' : 'en';
+    const language = normalizeAiLanguage(body.language);
 
     // The model's reading of the advertisement is an improvement, not a
     // requirement. When it is unavailable the deterministic reader still
@@ -2249,7 +2319,7 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, async (re
       });
     }
 
-    const language = body.language === 'ar' ? 'ar' : 'en';
+    const language = normalizeAiLanguage(body.language);
 
     // The candidate's current document. It is used as the candidate's own
     // writing, so the model improves it rather than replacing it. The ids in
@@ -2320,7 +2390,7 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, async (re
 app.post('/api/projects/recommendations', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
-    const language = body.language === 'ar' ? 'ar' : 'en';
+    const language = normalizeAiLanguage(body.language);
 
     const limitRaw = body.limit === undefined || body.limit === null ? undefined : Number(body.limit);
     const limit =
@@ -2382,7 +2452,7 @@ app.post('/api/projects/recommendations', requireAuth, aiRateLimit, async (req: 
 app.post('/api/projects/analyze', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
-    const language = body.language === 'ar' ? 'ar' : 'en';
+    const language = normalizeAiLanguage(body.language);
 
     const hasModel = Boolean(process.env.GEMINI_API_KEY);
     const aiBudget = hasModel ? tryConsumeAiBudget(req.authUser!.id) : false;
@@ -4068,7 +4138,15 @@ app.patch('/api/profile-links/:id', requireAuth, async (req: Request, res: Respo
     }
     const link = await updateProfileLink(req.authUser!.id, req.params.id, {
       kind: str(body.kind, 60) ?? undefined,
-      label: body.label === null ? undefined : (str(body.label, 200) ?? undefined),
+      // `null` is a request to clear the custom label. A missing key means
+      // "leave it alone"; an empty string means the same as `null`, because a
+      // blank label is not a label.
+      label:
+        body.label === undefined
+          ? undefined
+          : body.label === null
+            ? null
+            : (str(body.label, 200)?.trim() || null),
       url: parsedUrl.value,
     });
     if (!link) return res.status(404).json({ error: 'Profile link not found' });
@@ -5074,6 +5152,12 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
       return res.status(400).json({ error: 'language must be en or ar' });
     }
 
+    // The AI explanation language is an explicit choice. An unknown code is
+    // normalised rather than rejected, because a stale browser preference must
+    // never make the Learning Hub unusable.
+    const aiLanguage =
+      body.aiLanguage === undefined ? undefined : normalizeAiLanguage(body.aiLanguage);
+
     const limitRaw = body.limit;
     const limit = limitRaw === undefined || limitRaw === null ? undefined : Number(limitRaw);
     if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 20)) {
@@ -5084,6 +5168,7 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
       targetRoleId: str(body.targetRoleId, 120) ?? undefined,
       targetRoleTitle: str(body.targetRoleTitle, 200) ?? undefined,
       language: language as 'en' | 'ar' | undefined,
+      aiLanguage,
       preferredFormat: preferredFormat as LearningFormat | 'any' | undefined,
       weeklyHours,
       budget: budget as (typeof LEARNING_BUDGETS)[number] | undefined,

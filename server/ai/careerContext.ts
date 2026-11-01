@@ -26,6 +26,11 @@ import { listRoadmaps } from '../db/roadmap.ts';
 import { getPreferences } from '../db/preferences.ts';
 import { resolveRole } from '../../shared/careerRoles.ts';
 import type { TargetRole } from '../../shared/careerTypes.ts';
+import {
+  aiLanguageInstruction,
+  normalizeAiLanguage,
+  type AiLanguageCode,
+} from '../../shared/aiLanguages.ts';
 
 /** Normalises a skill name the same way the frontend does. */
 function normalizeSkillName(name: string): string {
@@ -50,8 +55,8 @@ export interface AiCareerContext {
   targetRoleId: string | null;
   /** The catalogue slug of the target role's domain. */
   targetRoleDomain: string | null;
-  /** The interface language the user has chosen. */
-  language: 'en' | 'ar';
+  /** The language the assistant must answer in. */
+  language: AiLanguageCode;
   /** How far the user's rated skills cover the target role's requirements. */
   skillGaps: AiSkillGap[];
   /** The user's own rated skills, including ones the role does not require. */
@@ -81,7 +86,10 @@ export interface AiCurrentSkill {
  * context. A failure in one optional area degrades that area only — the rest
  * of the context still loads.
  */
-export async function loadAiCareerContext(userId: string): Promise<AiCareerContext> {
+export async function loadAiCareerContext(
+  userId: string,
+  options: { language?: unknown } = {}
+): Promise<AiCareerContext> {
   const [
     profile,
     skills,
@@ -225,7 +233,9 @@ export async function loadAiCareerContext(userId: string): Promise<AiCareerConte
     .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name))
     .slice(0, 20);
 
-  const language: 'en' | 'ar' = preferences?.language === 'ar' ? 'ar' : 'en';
+  const language: AiLanguageCode = normalizeAiLanguage(
+    options.language ?? (preferences?.language === 'ar' ? 'ar' : 'en')
+  );
 
   return {
     careerState: profile?.userType ?? null,
@@ -364,13 +374,10 @@ export function buildAiContextBlock(context: AiCareerContext): string {
   }
   lines.push(`- Job applications tracked: ${context.applicationsCount}`);
 
-  // The user's interface language. Without this the model answers an Arabic
-  // interface in English whenever the question is typed in English.
-  lines.push(
-    context.language === 'ar'
-      ? '- The user is using the Arabic interface. Reply in Arabic (Modern Standard Arabic).'
-      : '- The user is using the English interface. Reply in English.',
-  );
+  // The user's explicit response language. Without this the model answers an
+  // Arabic interface in English whenever the question is typed in English, and
+  // a French or German request can drift back into English mid-answer.
+  lines.push(`- ${aiLanguageInstruction(context.language)}`);
 
   // The single most important rule for every prompt built on this block.
   lines.push(

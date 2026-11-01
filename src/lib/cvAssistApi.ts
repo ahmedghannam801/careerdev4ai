@@ -13,6 +13,7 @@ import type {
   CvAssistSourceKind,
   CvAssistTone,
 } from '../../shared/cvAiAssist';
+import type { AiLanguageCode } from '../../shared/aiLanguages';
 
 export interface CvAssistPayload {
   success: boolean;
@@ -35,9 +36,31 @@ export interface CvAssistRequestBody {
   targetRoleTitle?: string;
   tone?: CvAssistTone;
   length?: CvAssistLength;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
   /** Which attempt this is. The first attempt is 0. */
   attempt?: number;
+}
+
+/** The headline options the server returns. */
+export interface CvHeadlineSuggestionsPayload {
+  success: boolean;
+  /** The options to show, never empty on a successful response. */
+  suggestions: string[];
+  /** True when at least one option came from the model. */
+  aiUsed: boolean;
+  /** Why local options are being shown instead, when they are. */
+  fallbackReason: string | null;
+}
+
+export interface CvHeadlineSuggestionsRequestBody {
+  targetRoleTitle?: string;
+  additionalTargetRoles?: string[];
+  language?: AiLanguageCode;
+  /**
+   * Whether the model may be used. `false` asks for the deterministic options
+   * only, which is what a candidate with AI writing switched off receives.
+   */
+  ai?: boolean;
 }
 
 /**
@@ -59,4 +82,41 @@ export async function assistCvField(body: CvAssistRequestBody): Promise<CvAssist
     groundingNote:
       typeof response.groundingNote === 'string' ? response.groundingNote : null,
   };
+}
+
+/**
+ * Asks for headline options.
+ *
+ * The request is bounded in time. A stalled model call must not leave the
+ * studio spinning: the caller falls back to the deterministic generator when
+ * this throws, so the control always leaves its loading state.
+ */
+export async function suggestCvHeadlines(
+  body: CvHeadlineSuggestionsRequestBody
+): Promise<CvHeadlineSuggestionsPayload> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await apiRequest<Partial<CvHeadlineSuggestionsPayload>>(
+      '/api/cv/ai-assist',
+      {
+        method: 'POST',
+        body: JSON.stringify({ field: 'headline', suggestions: true, ...body }),
+        signal: controller.signal,
+      }
+    );
+    return {
+      success: response.success ?? true,
+      suggestions: Array.isArray(response.suggestions)
+        ? response.suggestions.filter(
+            (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0
+          )
+        : [],
+      aiUsed: response.aiUsed === true,
+      fallbackReason:
+        typeof response.fallbackReason === 'string' ? response.fallbackReason : null,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }

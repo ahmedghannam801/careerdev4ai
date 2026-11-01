@@ -12,6 +12,7 @@ import type {
   ProjectPlan,
   ProjectSkillGap,
 } from '../../shared/projectRecommendation';
+import type { AiLanguageCode } from '../../shared/aiLanguages';
 
 export interface ProjectRecommendationContextSummary {
   targetRoleTitle: string | null;
@@ -54,7 +55,7 @@ export interface ProjectHealthPayload {
  */
 export async function fetchProjectRecommendations(body: {
   jobDescription?: string;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
   limit?: number;
 }): Promise<ProjectRecommendationPayload> {
   const response = await apiRequest<Partial<ProjectRecommendationPayload>>(
@@ -87,7 +88,7 @@ export async function fetchProjectRecommendations(body: {
 
 /** Checks the projects the candidate already has. */
 export async function fetchProjectHealth(body: {
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
 }): Promise<ProjectHealthPayload> {
   const response = await apiRequest<Partial<ProjectHealthPayload>>('/api/projects/analyze', {
     method: 'POST',

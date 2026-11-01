@@ -293,6 +293,16 @@
   [data-cv-print] li {
     break-inside: avoid;
   }
+
+  /* A printed CV has no clickable links, so the address itself must be on the
+     paper. Only absolute http(s) links are expanded; an email address or a
+     relative anchor is left as the candidate wrote it. */
+  [data-cv-print] a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #475569;
+    word-break: break-all;
+  }
 }
 
 @layer components {

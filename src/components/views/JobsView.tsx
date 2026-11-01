@@ -1,219 +1,285 @@
+/**
+ * Training & Courses.
+ *
+ * This route used to be the job board. It built searches on external vacancy
+ * sites, because the product has no live job feed and will not invent one.
+ * The section the candidate actually needs is the one the platform can fill
+ * from its own records: a relevance-gated list of courses, certifications,
+ * learning paths, workshops and tutorials that close a real gap for their
+ * target role.
+ *
+ * The relevance gate runs before this page sees anything (see
+ * `server/learning/recommendation.ts`). This view only filters and groups what
+ * already passed it. It never shows a vacancy, a job-board search or a
+ * placeholder application link.
+ */
+
 import React, { useMemo, useState } from 'react';
 import {
+  AlertCircle,
+  BookOpen,
+  Filter,
+  GraduationCap,
+  RefreshCw,
   Search,
-  Briefcase,
-  MapPin,
-  ExternalLink,
-  ArrowRight,
-  CheckCircle2,
-  Info,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { Reveal } from '../motion/Motion';
+import { EmptyState } from '../ui/EmptyState';
+import { CourseCard } from '../learning/CourseCard';
+import {
+  TRAINING_GROUPS,
+  filterTrainingResources,
+  groupTrainingResources,
+  type TrainingGroupId,
+} from '../../../shared/trainingResources';
 
 interface JobsViewProps {
   onNavigate: (view: string) => void;
 }
 
-/**
- * Job Search.
- *
- * This release has no live job-feed provider connected, so the page does not
- * invent listings or application URLs. It builds real queries on public job
- * boards from the user's target role and location, and every role the user
- * finds can be tracked in the Applications pipeline (which is persisted in
- * PostgreSQL).
- */
 export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
-  const { targetRole, profile, applications, t} = useCareer();
+  const {
+    t,
+    targetRole,
+    learningRecommendations,
+    learningRecommendationMeta,
+    isLearningLoading,
+    learningError,
+    refreshLearningRecommendations,
+    getLearningItem,
+    saveLearningCourse,
+    startLearningCourse,
+    completeLearningCourse,
+  } = useCareer();
 
-  const [keywords, setKeywords] = useState(targetRole.title);
-  const [location, setLocation] = useState(profile.location || '');
+  const [group, setGroup] = useState<TrainingGroupId | 'all'>('all');
+  const [query, setQuery] = useState('');
 
-  const query = keywords.trim() || targetRole.title;
-  const place = location.trim();
-
-  const boards = useMemo(
-    () => [
-      {
-        id: 'linkedin',
-        name: 'LinkedIn Jobs',
-        description: 'Search public job posts and filter by location and work mode.',
-        buildUrl: () =>
-          `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(
-            query
-          )}${place ? `&location=${encodeURIComponent(place)}` : ''}`,
-      },
-      {
-        id: 'indeed',
-        name: 'Indeed',
-        description: 'Broad job-board search with salary and remote filters.',
-        buildUrl: () =>
-          `https://www.indeed.com/jobs?q=${encodeURIComponent(query)}${
-            place ? `&l=${encodeURIComponent(place)}` : ''
-          }`,
-      },
-      {
-        id: 'google',
-        name: 'Google Jobs',
-        description: 'Aggregates postings from multiple job sites in one search.',
-        buildUrl: () =>
-          `https://www.google.com/search?q=${encodeURIComponent(
-            `${query} jobs${place ? ` ${place}` : ''}`
-          )}&ibp=htl;jobs`,
-      },
-      {
-        id: 'wellfound',
-        name: 'Wellfound',
-        description: 'Startup and scale-up roles, including remote positions.',
-        buildUrl: () => `https://wellfound.com/jobs?q=${encodeURIComponent(query)}`,
-      },
-    ],
-    [query, place]
+  const filtered = useMemo(
+    () => filterTrainingResources(learningRecommendations, { group, query }),
+    [learningRecommendations, group, query]
   );
 
-  const roleSkills = [
-    ...(targetRole.requiredSkills ?? []).map((skill) => ({ ...skill, required: true })),
-    ...(targetRole.preferredSkills ?? []).map((skill) => ({ ...skill, required: false })),
-  ];
+  const groups = useMemo(() => groupTrainingResources(filtered), [filtered]);
+
+  const roleLabel =
+    learningRecommendationMeta.targetRoleTitle || targetRole.title || t('your target role');
 
   return (
     <Reveal className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
+      <div className="flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 md:flex-row md:items-center">
         <div>
-          <div className="text-xs text-[var(--text-secondary)] font-semibold uppercase tracking-wider">
-            {t('Job Search')}
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {t('Training & Courses')}
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Find roles for {targetRole.title}
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+            {t('Training that moves you toward')} {roleLabel}
           </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Launch a real search on a public job board, then track the roles you find in your
-            application pipeline.
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+            {t(
+              'Courses, certifications, learning paths, workshops and tutorials checked against your target role.'
+            )}
           </p>
         </div>
 
-        <button
-          onClick={() => onNavigate('applications')}
-          className="px-4 py-2 rounded-xl bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-xs font-semibold text-[var(--color-primary-text)] border border-[var(--border-subtle)] flex items-center gap-1.5 transition-colors self-start md:self-auto"
-        >
-          <span>Applications Pipeline ({applications.length})</span>
-          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={() => onNavigate('learning')}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 py-2 text-xs font-semibold text-[var(--color-primary-text)] transition-colors hover:bg-[var(--accent-surface)]"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>{t('Open Learning Hub')}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Honest scope notice */}
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 flex items-start gap-3">
-        <Info className="w-4 h-4 text-[var(--color-primary-text)] shrink-0 mt-0.5" />
+      {/* Scope notice: this is not a job board. */}
+      <div className="flex items-start gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5">
+        <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
         <div className="space-y-1 text-xs text-[var(--text-secondary)]">
           <p className="font-semibold text-[var(--text-primary)]">
-            {t('No live job feed is connected in this release.')}
+            {t('This page lists training resources, not job vacancies.')}
           </p>
           <p>
-            CareerDev4AI does not display invented vacancies or placeholder application links. The
-            searches below open real job boards using your target role and location, and anything
-            you decide to apply for can be tracked in the Applications pipeline.
+            {t(
+              'Every resource below passed a relevance gate for your target role before it appeared. A resource that does not close a role, skill, gap or roadmap need is not shown, however well it matches your preferred language or format.'
+            )}
           </p>
         </div>
       </div>
 
-      {/* Search builder */}
-      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-5 shadow-xs">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
-              {t('Job title or keywords')}
-            </label>
-            <div className="relative">
-              <Search className="w-4 h-4 text-[var(--text-muted)] absolute start-3 top-3" />
-              <input
-                type="text"
-                value={keywords}
-                onChange={(event) => setKeywords(event.target.value)}
-                placeholder={t('e.g. Frontend Engineer')}
-                className="w-full ps-9 pe-3.5 py-2.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
-              />
-            </div>
+      {/* Controls */}
+      <div className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="relative w-full md:max-w-sm">
+            <Search className="absolute start-3 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('Search training resources')}
+              aria-label={t('Search training resources')}
+              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] py-2 pe-3.5 ps-9 text-xs text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none"
+            />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
-              {t('Location (optional)')}
-            </label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-[var(--text-muted)] absolute start-3 top-3" />
-              <input
-                type="text"
-                value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                placeholder={t('e.g. Remote or Berlin')}
-                className="w-full ps-9 pe-3.5 py-2.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+
+          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+            <Filter className="h-3.5 w-3.5" />
+            <span>
+              {filtered.length} {t('of')} {learningRecommendations.length}{' '}
+              {t('resources shown')}
+            </span>
+            <button
+              type="button"
+              onClick={() => void refreshLearningRecommendations({ ai: false })}
+              disabled={isLearningLoading}
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2 py-1 font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40"
+            >
+              <RefreshCw
+                className={`h-3 w-3 shrink-0 ${isLearningLoading ? 'animate-spin' : ''}`}
               />
-            </div>
+              <span>{t('Refresh')}</span>
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {boards.map((board) => (
-            <a
-              key={board.id}
-              href={board.buildUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 hover:border-[var(--accent-primary)]/50 hover:bg-[var(--surface-secondary)] transition-[border-color,background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md flex items-start justify-between gap-3 group"
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setGroup('all')}
+            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+              group === 'all'
+                ? 'border-[var(--accent-primary)] bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
+                : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            {t('All training')}
+          </button>
+          {TRAINING_GROUPS.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => setGroup(entry.id)}
+              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+                group === entry.id
+                  ? 'border-[var(--accent-primary)] bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
+                  : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
             >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-                  <Briefcase className="w-4 h-4 text-[var(--color-primary-text)]" />
-                  <span>{board.name}</span>
-                </div>
-                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                  {board.description}
-                </p>
-              </div>
-              <ExternalLink className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--color-primary-text)] shrink-0 mt-0.5" />
-            </a>
+              {t(entry.label)}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Target-role expectations */}
-      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
-        <div>
-          <h2 className="text-sm font-bold text-[var(--text-primary)]">
-            {t('What employers usually ask for')}
-          </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            These are the requirements defined for your target role. Use them to read a posting and
-            tailor your CV — there is no invented match score.
+      {/* Loading */}
+      {isLearningLoading && (
+        <div role="status" className="space-y-3">
+          <p className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            {t('Loading training resources…')}
           </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          {roleSkills.map((skill) => (
+          {[0, 1, 2].map((index) => (
             <div
-              key={`${skill.required ? 'required' : 'preferred'}-${skill.name}`}
-              className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success-strong)] shrink-0 mt-0.5" />
-              <div>
-                <div className="font-semibold text-[var(--text-primary)]">{skill.name}</div>
-                <div className="text-[11px] text-[var(--text-muted)]">
-                  {skill.required ? 'Core requirement' : 'Preferred'} · target level {skill.minLevel}/5
-                </div>
-              </div>
-            </div>
+              key={index}
+              className="h-32 animate-pulse rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]"
+            />
           ))}
         </div>
+      )}
 
-        <button
-          onClick={() => onNavigate('applications')}
-          className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors"
+      {/* Error */}
+      {!isLearningLoading && learningError && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 p-5"
         >
-          <span>{t('Track a role you found')}</span>
-          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
-        </button>
-      </div>
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-warning)]" />
+          <div className="space-y-2 text-xs text-[var(--text-secondary)]">
+            <p className="font-semibold text-[var(--text-primary)]">
+              {t('Training resources could not be loaded.')}
+            </p>
+            <p>{learningError}</p>
+            <button
+              type="button"
+              onClick={() => void refreshLearningRecommendations({ ai: false })}
+              className="rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)]"
+            >
+              {t('Try again')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty */}
+      {!isLearningLoading && !learningError && filtered.length === 0 && (
+        <EmptyState
+          icon={GraduationCap}
+          title={
+            learningRecommendations.length === 0
+              ? t('No relevant training is available yet')
+              : t('No training matches these filters')
+          }
+          description={
+            learningRecommendations.length === 0
+              ? t(
+                  'When a course, certification or tutorial closes a real gap for your target role, it will appear here. Refresh to check again, or browse the full catalogue in the Learning Hub.'
+                )
+              : t('Clear the search or choose another training type to see the rest.')
+          }
+          actionLabel={
+            learningRecommendations.length === 0 ? t('Refresh recommendations') : t('Clear filters')
+          }
+          onAction={() => {
+            if (learningRecommendations.length === 0) {
+              void refreshLearningRecommendations({ ai: false });
+            } else {
+              setGroup('all');
+              setQuery('');
+            }
+          }}
+        />
+      )}
+
+      {/* Success */}
+      {!isLearningLoading && !learningError && groups.length > 0 && (
+        <div className="space-y-7">
+          {groups.map((entry) => (
+            <section key={entry.id} className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                  {t(entry.label)}
+                </h2>
+                <span className="text-[11px] text-[var(--text-muted)]">
+                  {entry.items.length} {t('resources')}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {entry.items.map((recommendation) => {
+                  const course = recommendation.course;
+                  const item = getLearningItem(course.id);
+
+                  return (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      recommendation={recommendation}
+                      item={item}
+                      onSave={saveLearningCourse}
+                      onStart={startLearningCourse}
+                      onComplete={completeLearningCourse}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </Reveal>
   );
 };

@@ -83,8 +83,11 @@ const ANALYSIS_SECTIONS: Array<{
 ];
 
 export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state, setState }) => {
-  const { t, settings, activeCV, updateCV } = useCareer();
-  const language = settings.language === 'ar' ? 'ar' : 'en';
+  const { t, aiPreferences, activeCV, updateCV } = useCareer();
+  // The AI response language is a separate, explicit setting. It is not the
+  // interface language: a candidate reading the app in Arabic may still want
+  // an English job analysis.
+  const language = aiPreferences.preferredLanguage;
 
   const {
     jobDescription,

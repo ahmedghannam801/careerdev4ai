@@ -97,6 +97,7 @@ export const volunteerAr: Record<string, string> = {
   'All countries': 'كل الدول',
   'Egypt': 'مصر',
   'Global': 'عالمي',
+  'Online': 'عبر الإنترنت',
   'Any language': 'أي لغة',
   'No opportunities match these filters yet.': 'لا توجد فرص تطابق هذه المرشّحات بعد.',
   'Apply by': 'التقديم بحلول',

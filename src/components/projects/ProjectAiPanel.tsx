@@ -55,8 +55,10 @@ const SEVERITY_STYLES: Record<string, string> = {
 };
 
 export const ProjectAiPanel: React.FC = () => {
-  const { t, settings, projects, addProject } = useCareer();
-  const language = settings.language === 'ar' ? 'ar' : 'en';
+  const { t, aiPreferences, projects, addProject } = useCareer();
+  // The AI response language comes from the explicit selector, never from the
+  // interface language.
+  const language = aiPreferences.preferredLanguage;
 
   const [jobDescription, setJobDescription] = useState('');
   const [plans, setPlans] = useState<ProjectPlan[] | null>(null);
@@ -115,6 +117,18 @@ export const ProjectAiPanel: React.FC = () => {
    */
   const handleCreate = async (plan: ProjectPlan) => {
     if (creatingTitle) return;
+    // Starting the same recommendation twice must not create a second record.
+    // The session flag below covers repeated clicks; this covers a reload,
+    // where the advisor can offer the same plan again.
+    const alreadyExists = projects.some(
+      (project) => project.title.trim().toLowerCase() === plan.title.trim().toLowerCase()
+    );
+    if (alreadyExists) {
+      setCreatedTitles((previous) =>
+        previous.includes(plan.title) ? previous : [...previous, plan.title]
+      );
+      return;
+    }
     setError(null);
     setCreatingTitle(plan.title);
     try {

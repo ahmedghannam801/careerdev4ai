@@ -279,6 +279,20 @@ async function main() {
     // The recommendation relevance gate, the learning CTA URL rule and
     // roadmap resource attachment. Pure.
     join(TESTS_DIR, 'recommendation-relevance.test.ts'),
+    // The CV headline generator, the professional-link diff and the
+    // Training & Courses page rules. Pure.
+    join(TESTS_DIR, 'headline-suggestions.test.ts'),
+    join(TESTS_DIR, 'professional-links.test.ts'),
+    join(TESTS_DIR, 'training-courses.test.ts'),
+    // The sequential adaptive interview plan and the catalogue's provider
+    // tier / availability vocabulary. Pure.
+    join(TESTS_DIR, 'interview-plan.test.ts'),
+    // The explicit AI response language shared by the client and the server.
+    // Pure.
+    join(TESTS_DIR, 'ai-languages.test.ts'),
+    // The same two tools against the running API: a real user's headline
+    // options and a link that survives a reload.
+    join(TESTS_DIR, 'career-tools.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

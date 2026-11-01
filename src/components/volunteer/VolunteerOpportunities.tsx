@@ -67,7 +67,6 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
 }) => {
   const { t } = useCareer();
   const [opportunities, setOpportunities] = useState<VolunteerOpportunity[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeCountry, setActiveCountry] = useState<string>('all');
   const [activeLanguage, setActiveLanguage] = useState<string>('all');
@@ -81,7 +80,6 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
       .then((response) => {
         if (cancelled) return;
         setOpportunities(response.opportunities ?? []);
-        setCategories(response.categories ?? []);
         setError(null);
       })
       .catch((fetchError: unknown) => {
@@ -100,18 +98,33 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
     };
   }, []);
 
+  // The product only offers opportunities the user can actually take up:
+  // on-site roles in Egypt, and roles that can be done online from anywhere.
+  // The API already scopes the catalogue this way; filtering again here keeps
+  // the rule true if a cached response predates it.
+  const catalogue = useMemo(
+    () => opportunities.filter((item) => item.country === 'Egypt' || item.isRemote),
+    [opportunities]
+  );
+
   const visible = useMemo(
     () =>
-      opportunities.filter((item) => {
+      catalogue.filter((item) => {
         if (activeCategory !== 'all' && item.category !== activeCategory) return false;
-        if (activeCountry !== 'all' && item.country !== activeCountry) return false;
+        if (activeCountry === 'Egypt' && item.country !== 'Egypt') return false;
+        if (activeCountry === 'Online' && !item.isRemote) return false;
         if (activeLanguage !== 'all' && !item.languages.includes(activeLanguage)) return false;
         return true;
       }),
-    [opportunities, activeCategory, activeCountry, activeLanguage]
+    [catalogue, activeCategory, activeCountry, activeLanguage]
   );
 
-  const egyptCount = opportunities.filter((item) => item.country === 'Egypt').length;
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(catalogue.map((item) => item.category))).sort(),
+    [catalogue]
+  );
+
+  const egyptCount = catalogue.filter((item) => item.country === 'Egypt').length;
 
   const matched = visible.filter((item) => item.relevance > 0).length;
 
@@ -187,10 +200,10 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
               : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          {t('All')} ({opportunities.length})
+          {t('All')} ({catalogue.length})
         </button>
-        {categories.map((category) => {
-          const count = opportunities.filter((item) => item.category === category).length;
+        {categoryOptions.map((category) => {
+          const count = catalogue.filter((item) => item.category === category).length;
           return (
             <button
               key={category}
@@ -208,14 +221,14 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
         })}
       </div>
 
-      {/* Location and language. Egypt is the default focus, but the full
-          global catalogue stays reachable. */}
+      {/* Location and language. The catalogue holds on-site opportunities in
+          Egypt and online opportunities that can be done from anywhere. */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {[
             { id: 'all', label: t('All countries') },
             { id: 'Egypt', label: `${t('Egypt')} (${egyptCount})` },
-            { id: 'Global', label: t('Global') },
+            { id: 'Online', label: t('Online') },
           ].map((option) => (
             <button
               key={option.id}

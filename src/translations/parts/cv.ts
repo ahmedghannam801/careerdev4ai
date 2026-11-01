@@ -287,4 +287,42 @@ export const cvAr: Record<string, string> = {
   'Rewritten Experience Bullets': 'نقاط الخبرة المُعاد صياغتها',
   'Rewritten Project Bullets': 'نقاط المشاريع المُعاد صياغتها',
   "Skills In The Job's Order": 'المهارات بترتيب الوظيفة',
+
+  // Professional links
+  'Enter a URL for the link.': 'أدخل رابطًا لهذا العنصر.',
+  'Enter a valid http(s) URL.': 'أدخل رابطًا صالحًا يبدأ بـ http(s).',
+  'Link label': 'تسمية الرابط',
+  'Link URL': 'عنوان الرابط',
+  'Link type': 'نوع الرابط',
+  'Label (optional)': 'التسمية (اختياري)',
+  'Unsaved changes': 'تغييرات غير محفوظة',
+  'Link added.': 'أُضيف الرابط.',
+  'Link removed.': 'أُزيل الرابط.',
+  'Links refreshed.': 'حُدِّثت الروابط.',
+  'Only http(s) links are accepted. A bare domain such as linkedin.com/in/name is accepted.':
+    'تُقبل روابط http(s) فقط. يمكن إدخال نطاق مباشر مثل linkedin.com/in/name.',
+
+  // Headline suggestions
+  'Suggest headlines': 'اقترح عناوين',
+  'Choose a headline': 'اختر عنوانًا',
+  'Refresh suggestions': 'حدِّث الاقتراحات',
+  'Writing headline suggestions…': 'جارٍ كتابة اقتراحات العنوان…',
+  'Headline suggestions could not be loaded.': 'تعذّر تحميل اقتراحات العنوان.',
+  'Locally generated suggestions are shown instead, based on your profile.':
+    'تُعرض اقتراحات مولَّدة محليًا بدلًا من ذلك، بناءً على ملفك.',
+  'The AI returned no usable options, so locally generated suggestions are shown.':
+    'لم يُرجع الذكاء الاصطناعي خيارات قابلة للاستخدام، لذا تُعرض اقتراحات مولَّدة محليًا.',
+  'No headline suggestions are available yet. Try refreshing, or write your own.':
+    'لا توجد اقتراحات للعنوان بعد. جرّب التحديث أو اكتب عنوانك بنفسك.',
+  'Headline updated. Choose another option if you prefer it.':
+    'تم تحديث العنوان. اختر خيارًا آخر إن كان أنسب لك.',
+
+  // Target role tracks
+  'Target Role Tracks': 'مسارات الوظائف المستهدفة',
+  'Add every role this CV is aimed at. Each track stays independent; the primary track drives your roadmap and ATS audit.':
+    'أضف كل وظيفة تستهدفها هذه السيرة. يبقى كل مسار مستقلًا؛ ويقود المسار الأساسي خارطة طريقك وتدقيق ATS.',
+  'Make primary': 'اجعله أساسيًا',
+  'No additional tracks yet.': 'لا توجد مسارات إضافية بعد.',
+  'Add a target role track': 'أضف مسار وظيفة مستهدفة',
+  'Add another target role…': 'أضف وظيفة مستهدفة أخرى…',
 };

@@ -99,7 +99,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
   label,
   disabledReason,
 }) => {
-  const { t, settings, aiPreferences, privacyPreferences } = useCareer();
+  const { t, aiPreferences, privacyPreferences } = useCareer();
   const enabled = aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -126,7 +126,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
           targetRoleTitle,
           tone,
           length,
-          language: settings.language,
+          language: aiPreferences.preferredLanguage,
           attempt,
         });
         setDraft(response.text);
@@ -156,7 +156,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
       targetRoleTitle,
       tone,
       length,
-      settings.language,
+      aiPreferences.preferredLanguage,
       t,
     ]
   );

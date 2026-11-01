@@ -18,6 +18,7 @@ import type {
   LearningRecommendation,
   RecommendationResult,
 } from './recommendation.ts';
+import { aiLanguageInstruction } from '../../shared/aiLanguages.ts';
 
 export interface AiClientLike {
   models: {
@@ -204,6 +205,7 @@ HARD RULES:
 {"recommendations":[{"courseId":"...","reason":"...","skillGap":"...","roadmapLink":"..."}]}
 - reason: 2-4 specific sentences, 20-800 characters.
 - skillGap and roadmapLink are optional short phrases, max 300 characters.
+- ${aiLanguageInstruction(context.aiLanguage)}
 
 USER CONTEXT:
 careerGoal: ${context.careerGoal}

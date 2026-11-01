@@ -21,6 +21,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { AiLanguageSelector } from '../ui/AiLanguageSelector';
 import { SETTINGS_TABS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -583,6 +584,8 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="space-y-4 text-xs">
+            <AiLanguageSelector variant="card" />
+
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>
                 <span className="font-bold text-[var(--text-primary)] block">{t('AI Recommendations')}</span>

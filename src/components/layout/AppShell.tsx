@@ -25,9 +25,11 @@ import {
   FolderClosed,
   MoreHorizontal,
   LogOut,
-  HeartHandshake
+  HeartHandshake,
+  GraduationCap
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { AiLanguageSelector } from '../ui/AiLanguageSelector';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { CopilotDrawer } from '../copilot/CopilotDrawer';
 import { NotificationsDrawer } from '../notifications/NotificationsDrawer';
@@ -120,7 +122,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       label: t('Career Tools'),
       items: [
         { id: 'cv-studio', label: t('navCV'), icon: FileText },
-        { id: 'jobs', label: t('navJobs'), icon: Briefcase },
+        { id: 'jobs', label: t('navJobs'), icon: GraduationCap },
         { id: 'applications', label: t('navApplications'), icon: Calendar },
         { id: 'interviews', label: t('navInterviews'), icon: Target },
         { id: 'documents', label: t('My Documents'), icon: FolderClosed },
@@ -321,6 +323,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
             {/* Language & theme stay in the header from tablet width; phones use the drawer. */}
             <div className="hidden items-center gap-2 md:flex">
+              <AiLanguageSelector />
               {languageToggle}
               {themeToggle}
             </div>
@@ -512,6 +515,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                   {themeToggle}
                 </div>
               </div>
+              <AiLanguageSelector />
               <button
                 onClick={() => { openCopilot(); setMobileMenuOpen(false); }}
                 className="w-full min-h-11 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2"

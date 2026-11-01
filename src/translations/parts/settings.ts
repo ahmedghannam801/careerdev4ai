@@ -86,4 +86,7 @@ export const settingsAr: Record<string, string> = {
   'Arabic (RTL)': 'العربية (RTL)',
   'Show guided tours': 'إظهار الجولات الإرشادية',
   'Reset all guided tours': 'إعادة ضبط كل الجولات الإرشادية',
+  'AI response language': 'لغة ردود الذكاء الاصطناعي',
+  'Every AI answer, summary and feedback will be written in this language. It is separate from the interface language.':
+    'ستُكتب كل إجابة وملخّص وملاحظات من الذكاء الاصطناعي بهذه اللغة. وهي منفصلة عن لغة الواجهة.',
 };

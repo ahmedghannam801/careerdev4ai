@@ -33,6 +33,8 @@ import {
   createSkillLookup,
   skillMatchConfidence,
 } from '../../shared/skillMatching.ts';
+import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
+import { providerTier } from '../../shared/courseProviders.ts';
 
 export type Availability =
   | 'free'
@@ -81,6 +83,13 @@ export interface LearningCourse {
   format: LearningFormat;
   description: string | null;
   isVerified: boolean;
+  /** Curated provider priority: 1 (priority), 2 (reputable), 3 (other). */
+  providerTier?: 1 | 2 | 3;
+  /** Provider rating when the provider publishes one; never invented. */
+  rating?: number | null;
+  ratingCount?: number | null;
+  /** An optional branded image. Cards fall back to provider branding. */
+  thumbnailUrl?: string | null;
   skills: CourseSkill[];
   roles: CourseRole[];
 }
@@ -130,6 +139,8 @@ export interface LearningContext {
   roadmapCourseIds: string[];
   experienceLevel: ExperienceLevel;
   language: 'en' | 'ar';
+  /** The language the AI explanations are written in. */
+  aiLanguage: AiLanguageCode;
   preferredFormat: LearningFormat | 'any';
   weeklyHours: number;
   budget: BudgetPreference;
@@ -664,7 +675,7 @@ export interface RankOptions extends ScoreCourseOptions {
   limit?: number;
 }
 
-/** Deterministic ranking. Ties break on role relevance and then on title. */
+/** Deterministic ranking. Ties break on provider tier, role relevance, then title. */
 export function rankCourses(
   courses: LearningCourse[],
   context: LearningContext,
@@ -676,8 +687,12 @@ export function rankCourses(
     const scored = scoreCourse(course, context, options);
     if (scored) ranked.push(scored);
   }
+  const tierOf = (recommendation: LearningRecommendation): number =>
+    recommendation.course.providerTier ?? providerTier(recommendation.course.provider);
   ranked.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    const tierDifference = tierOf(a) - tierOf(b);
+    if (tierDifference !== 0) return tierDifference;
     if (b.roleRelevance !== a.roleRelevance) return b.roleRelevance - a.roleRelevance;
     return a.course.title.localeCompare(b.course.title);
   });

@@ -44,6 +44,10 @@ import {
 } from '../ai/grounding.ts';
 import { buildGroundingProfileForUser } from '../ai/groundingProfile.ts';
 import { buildAiContextBlock, loadAiCareerContext } from '../ai/careerContext.ts';
+import {
+  aiLanguageInstruction,
+  type AiLanguageCode,
+} from '../../shared/aiLanguages.ts';
 import { listExperiences } from '../db/experiences.ts';
 import { listEducations } from '../db/educations.ts';
 import { listProjects } from '../db/projects.ts';
@@ -169,7 +173,7 @@ export async function loadAtsProfileFacts(userId: string): Promise<AtsProfileFac
  */
 export function buildJobDescriptionPrompt(
   jdText: string,
-  options: { language?: 'en' | 'ar' } = {}
+  options: { language?: AiLanguageCode } = {}
 ): string {
   const parts: string[] = [];
 
@@ -195,8 +199,7 @@ export function buildJobDescriptionPrompt(
   parts.push('- Keep each item to one short line, with no bullet characters.');
   if (options.language === 'ar') {
     parts.push('- The advertisement may be in Arabic. Write the extracted items in the advertisement\'s own language.');
-  }
-  parts.push('- Return JSON only, with those seven keys.');
+  }  parts.push('- Return JSON only, with those seven keys.');
   parts.push('- Example of the shape: {"jobTitle": "...", "requiredSkills": ["..."], "technicalSkills": ["..."], "keywords": ["..."], "responsibilities": ["..."], "experienceRequirements": ["..."], "qualifications": ["..."]}');
 
   return parts.join('\n');
@@ -214,7 +217,7 @@ export async function analyzeJobDescription(
   options: {
     ai: JobDescriptionAiClient | null;
     model: string;
-    language?: 'en' | 'ar';
+    language?: AiLanguageCode;
   }
 ): Promise<{ analysis: JobDescriptionAnalysis; aiUsed: boolean; fallbackReason: string | null }> {
   const text = jdText.trim().slice(0, MAX_JOB_DESCRIPTION_CHARS);
@@ -290,7 +293,7 @@ export function buildAtsCvPrompt(input: {
   experienceBlock: string;
   projectBlock: string;
   documentBlock: string;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
 }): string {
   const parts: string[] = [];
   const supported = input.match.matched
@@ -346,9 +349,7 @@ export function buildAtsCvPrompt(input: {
   parts.push('- Never write a skill the candidate\'s record does not list, even when the job description asks for it.');
   parts.push('- If a bullet cannot be written truthfully from the record, leave it out rather than inventing it.');
   parts.push('- Keep every bullet to one line and start it with a past-tense action verb.');
-  if (input.language === 'ar') {
-    parts.push('- Write the CV content in Arabic.');
-  }
+  parts.push(`- ${aiLanguageInstruction(input.language ?? 'en')}`);
   parts.push(groundingRules());
   parts.push('');
   parts.push(
@@ -374,7 +375,7 @@ export async function generateAtsCvContent(input: {
   document?: ClientCvDocument | null;
   ai: JobDescriptionAiClient | null;
   model: string;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
 }): Promise<{ ok: true; content: AtsCvContent } | { ok: false; reason: 'no_model' | 'invalid_response' }> {
   if (!input.ai) {
     return { ok: false, reason: 'no_model' };
@@ -563,7 +564,7 @@ export async function generateAtsCvContent(input: {
 export async function buildJobDescriptionMatch(
   userId: string,
   analysis: JobDescriptionAnalysis,
-  options: { language?: 'en' | 'ar' } = {}
+  options: { language?: AiLanguageCode } = {}
 ): Promise<AtsMatchReport> {
   const facts = await loadAtsProfileFacts(userId);
   return buildAtsMatchReport(analysis, facts, { language: options.language });

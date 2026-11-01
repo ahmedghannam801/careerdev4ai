@@ -18,30 +18,42 @@
  *   - nothing is overwritten. The assistant proposes; the user accepts.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Award,
   BookOpen,
   Briefcase,
+  Check,
   FolderGit2,
   GraduationCap,
   HeartHandshake,
   Link2,
+  Loader2,
   Plus,
   Sparkles,
+  Star,
+  Target,
   Trash2,
   Wrench,
 } from 'lucide-react';
 import { AiAssist } from './AiAssist';
+import { HeadlineSuggestions } from './HeadlineSuggestions';
 import { useCareer } from '../../context/CareerContext';
+import { TARGET_ROLES } from '../../data/rolesData';
 import {
   deleteProfileLink,
-  fetchProfileLinks,
   patchProfileLink,
   postProfileLink,
 } from '../../lib/coreApi';
 import { CV_LINK_KINDS, cvLinkLabel } from '../../../shared/cvDocument';
-import type { CVLink, CVProfile } from '../../types/career';
+import {
+  diffProfileLink,
+  hasProfileLinkChanges,
+  profileLinkDraft,
+  validateProfileLinkUrl,
+  type ProfileLinkDraft,
+} from '../../../shared/profileLinks';
+import type { CVLink, CVProfile, TargetRole } from '../../types/career';
 
 interface CvSectionEditorProps {
   /** The document being edited. */
@@ -126,9 +138,8 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               className={LINK_INPUT_CLASS}
             />
             <div className="mt-2">
-              <AiAssist
-                field="headline"
-                existingText={cv.title}
+              <HeadlineSuggestions
+                value={cv.title}
                 targetRoleTitle={targetRoleTitle}
                 onApply={(text) => update({ title: text })}
               />
@@ -165,6 +176,9 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
           </div>
         </div>
       </section>
+
+      {/* ---- Target Role Tracks ---- */}
+      <TargetRoleTracks />
 
       {/* ---- Professional Links ---- */}
       <ProfessionalLinksEditor
@@ -557,6 +571,148 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
 };
 
 /**
+ * The target role tracks.
+ *
+ * A CV can be aimed at more than one role, and each track is a real, separate
+ * career target — a Data Analyst and an HR Specialist are not a single
+ * combined title. The primary target drives the roadmap and the ATS audit;
+ * the additional tracks are kept in `saved_roles` and feed the headline
+ * suggestions, so the assistant only proposes a combined headline when the
+ * tracks are genuinely compatible.
+ */
+const TargetRoleTracks: React.FC = () => {
+  const {
+    t,
+    targetRole,
+    savedRoles,
+    saveRole,
+    removeSavedRole,
+    setPrimaryTargetRole,
+  } = useCareer();
+  const [pendingId, setPendingId] = useState('');
+  const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
+
+  const additional = savedRoles.filter((role) => role.id !== targetRole.id);
+  const available = TARGET_ROLES.filter(
+    (role) =>
+      role.id !== targetRole.id && !additional.some((entry) => entry.id === role.id)
+  );
+
+  const handleAdd = () => {
+    const role = TARGET_ROLES.find((entry) => entry.id === pendingId);
+    if (!role) return;
+    saveRole(role);
+    setPendingId('');
+  };
+
+  const handleMakePrimary = async (role: TargetRole) => {
+    if (busyRoleId) return;
+    setBusyRoleId(role.id);
+    const previousPrimary = targetRole;
+    try {
+      const changed = await setPrimaryTargetRole(role.id);
+      // Keep the old primary as an additional track so promoting a role never
+      // silently drops a target the candidate had added.
+      if (changed && previousPrimary.id !== role.id) {
+        saveRole(previousPrimary);
+      }
+    } finally {
+      setBusyRoleId(null);
+    }
+  };
+
+  return (
+    <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
+      <div>
+        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+          <Target className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+          {t('Target Role Tracks')}
+        </h3>
+        <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
+          {t(
+            'Add every role this CV is aimed at. Each track stays independent; the primary track drives your roadmap and ATS audit.'
+          )}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--text-primary)]">
+          <Star className="h-3 w-3 shrink-0 text-[var(--accent-primary)]" />
+          {targetRole.title}
+          <span className="rounded-full bg-[var(--accent-primary)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-on-primary)]">
+            {t('Primary')}
+          </span>
+        </span>
+
+        {additional.map((role) => (
+          <span
+            key={role.id}
+            className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-secondary)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
+          >
+            {role.title}
+            <button
+              type="button"
+              onClick={() => void handleMakePrimary(role)}
+              disabled={busyRoleId !== null}
+              className="text-[var(--text-muted)] transition-colors hover:text-[var(--accent-primary)] disabled:opacity-40"
+              aria-label={`${t('Make primary')}: ${role.title}`}
+              title={t('Make primary')}
+            >
+              {busyRoleId === role.id ? (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              ) : (
+                <Star className="h-3 w-3 shrink-0" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => removeSavedRole(role.id)}
+              className="text-[var(--text-muted)] transition-colors hover:text-[var(--color-danger)]"
+              aria-label={`${t('Remove')}: ${role.title}`}
+            >
+              <Trash2 className="h-3 w-3 shrink-0" />
+            </button>
+          </span>
+        ))}
+
+        {additional.length === 0 && (
+          <span className="self-center text-[11px] text-[var(--text-muted)]">
+            {t('No additional tracks yet.')}
+          </span>
+        )}
+      </div>
+
+      {available.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <select
+            value={pendingId}
+            onChange={(event) => setPendingId(event.target.value)}
+            aria-label={t('Add a target role track')}
+            className="min-w-0 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-1.5 text-[11px] text-[var(--text-primary)]"
+          >
+            <option value="">{t('Add another target role…')}</option>
+            {available.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.title}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!pendingId}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40"
+          >
+            <Plus className="h-3 w-3 shrink-0" />
+            {t('Add')}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+};
+
+/**
  * The bullet list editor.
  *
  * Bullets are edited one line at a time, because a CV bullet is a line and
@@ -640,30 +796,232 @@ const BulletsEditor: React.FC<{
  * A link belongs to the profile, so adding, editing and removing one writes
  * back to the profile. The order and the on/off switch belong to this CV:
  * the same person may show a GitHub link on one CV and not on another.
+ *
+ * Each row keeps a local draft. The URL is written to the profile when the
+ * field is saved or loses focus, not on every keystroke. That distinction is
+ * what makes an edit persist: the old code wrote the keystroke into the CV
+ * first and then compared the input against the value it had just written, so
+ * the comparison was always false.
  */
+const ProfessionalLinkRow: React.FC<{
+  link: CVLink;
+  index: number;
+  total: number;
+  updateLink: (id: string, changes: Partial<CVLink>) => void;
+  moveLink: (id: string, direction: -1 | 1) => void;
+  onRemove: (link: CVLink) => void;
+}> = ({ link, index, total, updateLink, moveLink, onRemove }) => {
+  const { t, refreshProfileLinks } = useCareer();
+  const [draft, setDraft] = useState<ProfileLinkDraft>(() => profileLinkDraft(link));
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  // A change from the profile (a refresh, or this row's own save) resets the
+  // draft to the stored values. A change the candidate is still typing does
+  // not touch the parent, so this effect does not run on every keystroke.
+  useEffect(() => {
+    setDraft(profileLinkDraft(link));
+    setStatus('idle');
+    setError(null);
+  }, [link.id, link.label, link.url]);
+
+  const pending = diffProfileLink({ label: link.label, url: link.url }, draft);
+  const dirty = hasProfileLinkChanges(pending) || pending.urlError !== null;
+
+  const save = async () => {
+    if (status === 'saving') return;
+    const diff = diffProfileLink({ label: link.label, url: link.url }, draft);
+    if (diff.urlError) {
+      setStatus('error');
+      setError(
+        diff.urlError === 'empty'
+          ? t('Enter a URL for the link.')
+          : t('Enter a valid http(s) URL.')
+      );
+      return;
+    }
+    if (!hasProfileLinkChanges(diff)) {
+      setStatus('idle');
+      setError(null);
+      return;
+    }
+
+    setStatus('saving');
+    setError(null);
+    try {
+      const updated = await patchProfileLink(link.id, diff.patch);
+      updateLink(link.id, {
+        label: cvLinkLabel(updated.kind, updated.label),
+        url: updated.url,
+      });
+      // The profile is the source of truth for the URL and the label, so the
+      // document projection must be given the saved row.
+      await refreshProfileLinks();
+      setStatus('saved');
+    } catch (requestError) {
+      setStatus('error');
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : t('That link could not be updated.')
+      );
+    }
+  };
+
+  const reset = () => {
+    setDraft(profileLinkDraft(link));
+    setStatus('idle');
+    setError(null);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void save();
+    } else if (event.key === 'Escape') {
+      reset();
+    }
+  };
+
+  return (
+    <li className="space-y-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-2.5 py-2">
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={draft.label}
+          onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))}
+          onBlur={() => void save()}
+          onKeyDown={handleKeyDown}
+          placeholder={cvLinkLabel(link.kind)}
+          aria-label={t('Link label')}
+          className="w-24 shrink-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[11px] font-semibold text-[var(--text-primary)] hover:border-[var(--border-subtle)] focus:border-[var(--border-subtle)]"
+        />
+        <input
+          type="url"
+          value={draft.url}
+          onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))}
+          onBlur={() => void save()}
+          onKeyDown={handleKeyDown}
+          placeholder="https://"
+          aria-label={t('Link URL')}
+          className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] focus:border-[var(--border-subtle)]"
+        />
+        <label className="flex shrink-0 items-center gap-1 text-[10px] text-[var(--text-muted)]">
+          <input
+            type="checkbox"
+            checked={link.enabled}
+            onChange={(event) => updateLink(link.id, { enabled: event.target.checked })}
+            className="h-3 w-3 shrink-0 accent-[var(--accent-primary)]"
+          />
+          {t('Show')}
+        </label>
+        <button
+          type="button"
+          onClick={() => moveLink(link.id, -1)}
+          disabled={index === 0}
+          className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-30"
+          aria-label={t('Move up')}
+        >
+          <span aria-hidden="true" className="text-[11px] leading-none">
+            ↑
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => moveLink(link.id, 1)}
+          disabled={index === total - 1}
+          className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-30"
+          aria-label={t('Move down')}
+        >
+          <span aria-hidden="true" className="text-[11px] leading-none">
+            ↓
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(link)}
+          className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--color-danger)]"
+          aria-label={t('Remove')}
+        >
+          <Trash2 className="h-3 w-3 shrink-0" />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 text-[10px] leading-relaxed">
+          {status === 'saving' && (
+            <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              {t('Saving…')}
+            </span>
+          )}
+          {status === 'saved' && (
+            <span className="inline-flex items-center gap-1 text-[var(--color-success-strong)]">
+              <Check className="h-3 w-3 shrink-0" />
+              {t('Saved')}
+            </span>
+          )}
+          {status === 'error' && (
+            <span role="alert" className="text-[var(--color-warning)]">
+              {error}
+            </span>
+          )}
+          {status === 'idle' && dirty && (
+            <span className="text-[var(--text-muted)]">{t('Unsaved changes')}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={!dirty || status === 'saving'}
+          className="shrink-0 rounded-md border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-30"
+        >
+          {t('Save')}
+        </button>
+      </div>
+    </li>
+  );
+};
+
 const ProfessionalLinksEditor: React.FC<{
   links: CVLink[];
   update: (updates: Partial<CVProfile>) => void;
   updateLink: (id: string, changes: Partial<CVLink>) => void;
   moveLink: (id: string, direction: -1 | 1) => void;
 }> = ({ links, update, updateLink, moveLink }) => {
-  const { t } = useCareer();
+  const { t, refreshProfileLinks } = useCareer();
   const [isAdding, setIsAdding] = useState(false);
   const [newKind, setNewKind] = useState('linkedin');
+  const [newLabel, setNewLabel] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
   const handleAdd = async () => {
-    const url = newUrl.trim();
-    if (!url) return;
+    const validation = validateProfileLinkUrl(newUrl);
+    if (!validation.valid) {
+      setError(
+        validation.error === 'empty'
+          ? t('Enter a URL for the link.')
+          : t('Enter a valid http(s) URL.')
+      );
+      return;
+    }
+
     setIsBusy(true);
     setError(null);
+    setSuccess(null);
     try {
-      const created = await postProfileLink({ kind: newKind, url });
+      const created = await postProfileLink({
+        kind: newKind,
+        label: newLabel.trim() || undefined,
+        url: validation.url,
+      });
+      await refreshProfileLinks();
       update({
         links: [
-          ...links,
+          ...links.filter((entry) => entry.id !== created.id),
           {
             id: created.id,
             kind: created.kind,
@@ -674,7 +1032,9 @@ const ProfessionalLinksEditor: React.FC<{
         ],
       });
       setNewUrl('');
+      setNewLabel('');
       setIsAdding(false);
+      setSuccess(t('Link added.'));
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -686,29 +1046,18 @@ const ProfessionalLinksEditor: React.FC<{
     }
   };
 
-  const handleEditUrl = async (link: CVLink, url: string) => {
-    const previous = link.url;
-    updateLink(link.id, { url });
-    try {
-      await patchProfileLink(link.id, { url });
-    } catch (requestError) {
-      // The URL is put back the way it was: a link that shows a URL the
-      // profile does not hold would be a link that goes nowhere.
-      updateLink(link.id, { url: previous });
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : t('That link could not be updated.')
-      );
-    }
-  };
-
   const handleRemove = async (link: CVLink) => {
     const previous = links;
+    setError(null);
+    setSuccess(null);
     update({ links: links.filter((entry) => entry.id !== link.id) });
     try {
       await deleteProfileLink(link.id);
+      await refreshProfileLinks();
+      setSuccess(t('Link removed.'));
     } catch (requestError) {
+      // A link that is gone from the CV but still in the profile would come
+      // back on the next projection, so the removal is rolled back.
       update({ links: previous });
       setError(
         requestError instanceof Error
@@ -721,8 +1070,9 @@ const ProfessionalLinksEditor: React.FC<{
   const handleRefresh = async () => {
     setIsBusy(true);
     setError(null);
+    setSuccess(null);
     try {
-      const fromProfile = await fetchProfileLinks();
+      const fromProfile = await refreshProfileLinks();
       update({
         links: fromProfile.map((link) => {
           const existing = links.find((entry) => entry.id === link.id);
@@ -735,6 +1085,7 @@ const ProfessionalLinksEditor: React.FC<{
           };
         }),
       });
+      setSuccess(t('Links refreshed.'));
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -764,7 +1115,11 @@ const ProfessionalLinksEditor: React.FC<{
           </button>
           <button
             type="button"
-            onClick={() => setIsAdding((value) => !value)}
+            onClick={() => {
+              setIsAdding((value) => !value);
+              setError(null);
+              setSuccess(null);
+            }}
             className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
           >
             <Plus className="h-3 w-3 shrink-0" />
@@ -782,12 +1137,19 @@ const ProfessionalLinksEditor: React.FC<{
         </div>
       )}
 
+      {success && (
+        <p role="status" className="text-[11px] text-[var(--color-success-strong)]">
+          {success}
+        </p>
+      )}
+
       {isAdding && (
         <div className="space-y-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={newKind}
-              onChange={(e) => setNewKind(e.target.value)}
+              onChange={(event) => setNewKind(event.target.value)}
+              aria-label={t('Link type')}
               className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-1 text-[11px] text-[var(--text-primary)]"
             >
               {CV_LINK_KINDS.map((kind) => (
@@ -797,10 +1159,19 @@ const ProfessionalLinksEditor: React.FC<{
               ))}
             </select>
             <input
+              type="text"
+              value={newLabel}
+              onChange={(event) => setNewLabel(event.target.value)}
+              placeholder={t('Label (optional)')}
+              aria-label={t('Link label')}
+              className="w-32 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-1 text-[11px] text-[var(--text-primary)]"
+            />
+            <input
               type="url"
               value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
+              onChange={(event) => setNewUrl(event.target.value)}
               placeholder="https://"
+              aria-label={t('Link URL')}
               className="min-w-0 flex-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-1 text-[11px] text-[var(--text-primary)]"
             />
             <button
@@ -809,12 +1180,16 @@ const ProfessionalLinksEditor: React.FC<{
               disabled={isBusy || !newUrl.trim()}
               className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-primary)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)] disabled:opacity-40"
             >
-              <Sparkles className="h-3 w-3 shrink-0" />
+              {isBusy ? (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3 shrink-0" />
+              )}
               <span>{t('Add')}</span>
             </button>
           </div>
           <p className="text-[10px] text-[var(--text-muted)]">
-            {t('Only http(s) links are accepted.')}
+            {t('Only http(s) links are accepted. A bare domain such as linkedin.com/in/name is accepted.')}
           </p>
         </div>
       )}
@@ -824,65 +1199,15 @@ const ProfessionalLinksEditor: React.FC<{
       ) : (
         <ul className="space-y-2">
           {links.map((link, index) => (
-            <li
+            <ProfessionalLinkRow
               key={link.id}
-              className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-2.5 py-2"
-            >
-              <input
-                type="text"
-                value={link.label}
-                onChange={(e) => updateLink(link.id, { label: e.target.value })}
-                className="w-24 shrink-0 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[11px] font-semibold text-[var(--text-primary)] hover:border-[var(--border-subtle)] focus:border-[var(--border-subtle)]"
-              />
-              <input
-                type="url"
-                value={link.url}
-                onChange={(e) => updateLink(link.id, { url: e.target.value })}
-                onBlur={(e) => {
-                  if (e.target.value !== link.url) void handleEditUrl(link, e.target.value);
-                }}
-                className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] focus:border-[var(--border-subtle)]"
-              />
-              <label className="flex shrink-0 items-center gap-1 text-[10px] text-[var(--text-muted)]">
-                <input
-                  type="checkbox"
-                  checked={link.enabled}
-                  onChange={(e) => updateLink(link.id, { enabled: e.target.checked })}
-                  className="h-3 w-3 shrink-0 accent-[var(--accent-primary)]"
-                />
-                {t('Show')}
-              </label>
-              <button
-                type="button"
-                onClick={() => moveLink(link.id, -1)}
-                disabled={index === 0}
-                className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-30"
-                aria-label={t('Move up')}
-              >
-                <span aria-hidden="true" className="text-[11px] leading-none">
-                  ↑
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => moveLink(link.id, 1)}
-                disabled={index === links.length - 1}
-                className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-30"
-                aria-label={t('Move down')}
-              >
-                <span aria-hidden="true" className="text-[11px] leading-none">
-                  ↓
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleRemove(link)}
-                className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--color-danger)]"
-                aria-label={t('Remove')}
-              >
-                <Trash2 className="h-3 w-3 shrink-0" />
-              </button>
-            </li>
+              link={link}
+              index={index}
+              total={links.length}
+              updateLink={updateLink}
+              moveLink={moveLink}
+              onRemove={(entry) => void handleRemove(entry)}
+            />
           ))}
         </ul>
       )}

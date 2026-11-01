@@ -26,6 +26,10 @@ import {
 import { findUngroundedClaims, withOwnText } from '../ai/grounding.ts';
 import { buildGroundingProfileForUser } from '../ai/groundingProfile.ts';
 import type { ProjectRecord } from '../../shared/projectRecommendation.ts';
+import {
+  aiLanguageInstruction,
+  type AiLanguageCode,
+} from '../../shared/aiLanguages.ts';
 
 /** The AI client shape this module needs. */
 export interface ProjectAnalysisAiClient {
@@ -49,7 +53,7 @@ export function buildProjectHealthPrompt(input: {
   project: ProjectRecord;
   issues: ProjectIssue[];
   context: ProjectRecommendationContext;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
 }): string {
   const { project, issues, context } = input;
   const parts: string[] = [];
@@ -92,9 +96,7 @@ export function buildProjectHealthPrompt(input: {
   parts.push('- There must be exactly one improvement line per problem listed above, in the same order.');
   parts.push('- Never invent a technology, a metric, a company or a dataset the record does not contain.');
   parts.push('- The CV line must be writable today from the record. If the record is too thin, write the line for what is there.');
-  if (input.language === 'ar') {
-    parts.push('- Write in Arabic.');
-  }
+  parts.push(`- ${aiLanguageInstruction(input.language ?? 'en')}`);
   parts.push(
     '- Return JSON: {"cvPresentation": string, "improvements": string[]}'
   );
@@ -114,7 +116,7 @@ export async function analyzeProjects(input: {
   context: ProjectRecommendationContext;
   ai: ProjectAnalysisAiClient | null;
   model: string;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
 }): Promise<{ reports: ProjectHealthReport[]; aiUsed: boolean; aiFallbackReason: string | null }> {
   const groundingProfile = await buildGroundingProfileForUser(input.userId);
 

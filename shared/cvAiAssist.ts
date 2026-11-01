@@ -256,6 +256,79 @@ export const CV_ASSIST_MAX_BULLET_CHARS = 400;
 /** The upper bound on the number of bullets in one answer. */
 export const CV_ASSIST_MAX_BULLETS = 10;
 
+/** How many headline options the studio asks for and shows. */
+export const CV_HEADLINE_SUGGESTION_COUNT = 5;
+
+/** The upper bound on one headline, in characters. */
+export const CV_HEADLINE_SUGGESTION_MAX_CHARS = 140;
+
+/** The upper bound on a headline suggestion list, however it was produced. */
+export const CV_HEADLINE_SUGGESTION_MAX_ITEMS = 8;
+
+/**
+ * Validates the model's headline suggestions.
+ *
+ * A list of empty strings, or one over-long line, is not a set of options the
+ * candidate can choose from. The caller falls back to the deterministic
+ * generator when this returns anything.
+ */
+export function validateHeadlineSuggestionsPayload(payload: unknown): string[] {
+  const errors: string[] = [];
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return ['response is not an object'];
+  }
+  const record = payload as { suggestions?: unknown };
+  if (!Array.isArray(record.suggestions)) {
+    return ['suggestions is not an array'];
+  }
+  if (record.suggestions.length === 0) {
+    errors.push('no suggestions');
+  }
+  if (record.suggestions.length > CV_HEADLINE_SUGGESTION_MAX_ITEMS) {
+    errors.push('too many suggestions');
+  }
+  let usable = 0;
+  for (const suggestion of record.suggestions) {
+    if (typeof suggestion !== 'string' || suggestion.trim().length === 0) {
+      errors.push('a suggestion is empty');
+      continue;
+    }
+    if (suggestion.length > CV_HEADLINE_SUGGESTION_MAX_CHARS) {
+      errors.push('a suggestion is too long');
+      continue;
+    }
+    usable += 1;
+  }
+  if (usable === 0 && !errors.includes('no suggestions')) {
+    errors.push('no usable suggestions');
+  }
+  return errors;
+}
+
+/**
+ * Turns a validated answer into the list the studio shows.
+ *
+ * Duplicates are removed case-insensitively: two identical options are one
+ * option, and showing them twice wastes a slot the candidate could use.
+ */
+export function parseHeadlineSuggestionsPayload(payload: unknown): string[] {
+  const record = payload as { suggestions?: unknown };
+  if (!Array.isArray(record?.suggestions)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const entry of record.suggestions) {
+    if (typeof entry !== 'string') continue;
+    const text = entry.replace(/\s+/g, ' ').trim();
+    if (!text || text.length > CV_HEADLINE_SUGGESTION_MAX_CHARS) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(text);
+    if (result.length >= CV_HEADLINE_SUGGESTION_MAX_ITEMS) break;
+  }
+  return result;
+}
+
 /**
  * Validates the model's answer.
  *

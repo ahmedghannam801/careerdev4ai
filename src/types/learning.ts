@@ -1,6 +1,8 @@
 // Client-side shapes for the B.5 Learning Hub. These mirror the JSON returned
 // by /api/learning/*; the database remains the source of truth.
 
+import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
+
 export type CourseAvailability =
   | 'free'
   | 'free_with_limitations'
@@ -46,6 +48,13 @@ export interface LearningCourse {
   format: CourseFormat;
   description: string | null;
   isVerified: boolean;
+  /** Curated provider priority: 1 (priority), 2 (reputable), 3 (other). */
+  providerTier?: 1 | 2 | 3;
+  /** Provider rating when the provider publishes one; never invented. */
+  rating?: number | null;
+  ratingCount?: number | null;
+  /** An optional branded image. Cards fall back to provider branding. */
+  thumbnailUrl?: string | null;
   skills: CourseSkill[];
   roles: CourseRole[];
 }
@@ -138,6 +147,8 @@ export interface LearningPreferences {
   targetRoleId?: string;
   targetRoleTitle?: string;
   language?: 'en' | 'ar';
+  /** The language the AI explanations are written in. */
+  aiLanguage?: AiLanguageCode;
   preferredFormat?: CourseFormat | 'any';
   weeklyHours?: number;
   budget?: 'free_only' | 'low' | 'any';

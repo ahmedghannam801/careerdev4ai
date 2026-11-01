@@ -9,6 +9,7 @@
 export type { SkillCategory, TargetRole, RoleSkill } from '../../shared/careerTypes.ts';
 
 import type { SkillCategory, TargetRole } from '../../shared/careerTypes.ts';
+import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
 
 export type CareerState = 
   | 'student' 
@@ -722,7 +723,12 @@ export interface AiPreferences {
   writingAssistance: boolean;
   proactiveSuggestions: boolean;
   personalizationLevel: 'focused' | 'balanced' | 'comprehensive';
-  preferredLanguage: 'en' | 'ar';
+  /**
+   * The language the assistant answers in. This is separate from the interface
+   * language: a candidate can read the product in Arabic and ask for an
+   * English CV summary, or the reverse.
+   */
+  preferredLanguage: AiLanguageCode;
 }
 
 export interface NotificationPreferences {

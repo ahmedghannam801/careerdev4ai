@@ -19,6 +19,7 @@ import type {
   AtsMatchReport,
   JobDescriptionAnalysis,
 } from '../../shared/jobDescription';
+import type { AiLanguageCode } from '../../shared/aiLanguages';
 
 export interface JobDescriptionAnalysisPayload {
   success: boolean;
@@ -57,7 +58,7 @@ export interface ClientCvSnapshot {
 /** Reads a job description and reports what it asks for. */
 export async function analyzeJobDescription(body: {
   jobDescription: string;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
 }): Promise<JobDescriptionAnalysisPayload> {
   const response = await apiRequest<Partial<JobDescriptionAnalysisPayload>>(
     '/api/cv/job-description/analyze',
@@ -102,7 +103,7 @@ export async function analyzeJobDescription(body: {
 /** Writes the CV for a job description. */
 export async function generateJobDescriptionCv(body: {
   jobDescription: string;
-  language?: 'en' | 'ar';
+  language?: AiLanguageCode;
   /** The candidate's current document, so the result improves it. */
   cv?: ClientCvSnapshot | null;
 }): Promise<JobDescriptionCvPayload> {

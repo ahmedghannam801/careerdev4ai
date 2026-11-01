@@ -15,6 +15,7 @@ import {
   listUserSkillsWithNames,
 } from '../db/learning.ts';
 import { resolveRole } from '../../shared/careerRoles.ts';
+import { normalizeAiLanguage, type AiLanguageCode } from '../../shared/aiLanguages.ts';
 import type {
   BudgetPreference,
   ExperienceLevel,
@@ -29,6 +30,7 @@ export interface RecommendationPreferences {
   targetRoleId?: string;
   targetRoleTitle?: string;
   language?: 'en' | 'ar';
+  aiLanguage?: AiLanguageCode;
   preferredFormat?: LearningFormat | 'any';
   weeklyHours?: number;
   budget?: BudgetPreference;
@@ -193,6 +195,7 @@ export async function buildLearningContext(
         targetRole?.level ?? null
       ),
       language,
+      aiLanguage: normalizeAiLanguage(preferences.aiLanguage, language),
       preferredFormat: explicitFormat ?? derivedFormat ?? 'any',
       weeklyHours,
       budget,

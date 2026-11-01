@@ -1083,7 +1083,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                   onClick={() => onNavigate?.('jobs')}
                   className="rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)]"
                 >
-                  {t('Find roles')}
+                  {t('Find training')}
                 </button>
               </div>
             </div>

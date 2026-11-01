@@ -100,6 +100,11 @@ export async function listVolunteerOpportunities(
         'id, title, organization, description, category, location, is_remote, commitment, application_url, skills_gained, required_skills, role_slugs, domain_ids, verification_status, verified_at, country, languages, opportunity_type, deadline'
       )
       .eq('is_active', true)
+      // The catalogue is scoped to what this product offers: opportunities in
+      // Egypt and opportunities that can be done online from anywhere. An
+      // on-site role in another country is not something the user can apply
+      // for from here, so it is not part of the list.
+      .or('country.eq.Egypt,is_remote.eq.true')
       .order('organization', { ascending: true }),
     getSupabaseServer()
       .from('volunteer_opportunity_saves')

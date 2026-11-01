@@ -1,43 +1,129 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Sparkles, CheckCircle2, AlertCircle, History, HelpCircle } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowRight,
+  BrainCircuit,
+  CheckCircle2,
+  History,
+  HelpCircle,
+  MessageSquare,
+  RotateCcw,
+  Sparkles,
+  Target,
+} from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { INTERVIEW_CATEGORIES } from '../../lib/routing';
-import { useRouteParam } from '../../lib/useRouteParams';
 import { getAccessToken } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
-import { questionsForRole, QuestionItem } from '../../data/interviewBank';
-import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import {
+  buildInterviewPlan,
+  type InterviewPlanQuestion,
+} from '../../data/interviewBank';
+import { Reveal } from '../motion/Motion';
+
+interface InterviewFeedback {
+  score?: number;
+  strengths?: string[];
+  improvements?: string[];
+  starEvaluation?: {
+    situation?: string;
+    task?: string;
+    action?: string;
+    result?: string;
+  };
+  suggestedAnswer?: string;
+}
+
+interface AnsweredQuestion {
+  question: string;
+  stage: 'behavioral' | 'technical';
+  score: number | null;
+}
 
 export const InterviewsView: React.FC = () => {
-  const { targetRole, interviewSessions, saveInterviewSession, t} = useCareer();
-  const [selectedCategory, setSelectedCategory] = useRouteParam<'all' | 'star' | 'technical' | 'behavioral'>('category', INTERVIEW_CATEGORIES, 'all');
+  const {
+    t,
+    targetRole,
+    profile,
+    interviewSessions,
+    saveInterviewSession,
+    projects,
+    volunteerExperiences,
+    learningItems,
+    learningCatalog,
+    ownedSkills,
+    aiPreferences,
+  } = useCareer();
 
-  // The practice material follows the user's actual target role: the
-  // universal questions plus the role's own interview topics from the
-  // catalogue.
-  const questionBank = useMemo(() => questionsForRole(targetRole), [targetRole]);
-  const [activeQuestion, setActiveQuestion] = useState<QuestionItem | null>(null);
-  const [userAnswer, setUserAnswer] = useState('');
+  const [plan, setPlan] = useState<InterviewPlanQuestion[] | null>(null);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [answer, setAnswer] = useState('');
+  const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [evaluationResult, setEvaluationResult] = useState<any>(null);
-  const [evaluationError, setEvaluationError] = useState<string | null>(null);
+  const [showTransition, setShowTransition] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
 
-  const filteredQuestions = questionBank.filter(q =>
-    selectedCategory === 'all' ? true : q.category === selectedCategory
-  );
+  const completedTraining = useMemo(() => {
+    const courseById = new Map(learningCatalog.map((course) => [course.id, course]));
+    return learningItems
+      .filter((item) => item.status === 'completed')
+      .map((item) => courseById.get(item.courseId))
+      .filter((course): course is NonNullable<typeof course> => Boolean(course))
+      .map((course) => ({ title: course.title, provider: course.provider }));
+  }, [learningCatalog, learningItems]);
 
-  // Keep a question selected as the bank changes.
-  useEffect(() => {
-    if (!activeQuestion && filteredQuestions.length > 0) {
-      setActiveQuestion(filteredQuestions[0]);
-    }
-  }, [filteredQuestions, activeQuestion]);
+  const buildPlan = () =>
+    buildInterviewPlan({
+      role: targetRole,
+      experiences: profile.experiences.map((entry) => ({
+        role: entry.role,
+        company: entry.company,
+        achievements: entry.achievements,
+        skillsUsed: entry.skillsUsed,
+      })),
+      projects: projects.map((entry) => ({
+        title: entry.title,
+        description: entry.description,
+        skills: entry.skills,
+      })),
+      volunteering: volunteerExperiences.map((entry) => ({
+        organization: entry.organization,
+        role: entry.role,
+        responsibilities: entry.responsibilities,
+        achievements: entry.achievements,
+        skills: entry.skills,
+      })),
+      completedTraining,
+      ownedSkills: ownedSkills.map((skill) => skill.name),
+    });
+
+  const startInterview = () => {
+    const nextPlan = buildPlan();
+    setPlan(nextPlan);
+    setQuestionIndex(0);
+    setAnswer('');
+    setFeedback(null);
+    setError(null);
+    setShowTransition(false);
+    setCompleted(false);
+    setAnswered([]);
+  };
+
+  const currentQuestion = plan?.[questionIndex] ?? null;
+
+  const resetForQuestion = (nextIndex: number) => {
+    setQuestionIndex(nextIndex);
+    setAnswer('');
+    setFeedback(null);
+    setError(null);
+  };
 
   const handleEvaluate = async () => {
-    if (!userAnswer.trim() || isEvaluating || !activeQuestion) return;
+    if (!currentQuestion || !answer.trim() || isEvaluating) return;
     setIsEvaluating(true);
-    setEvaluationError(null);
-    setEvaluationResult(null);
+    setError(null);
+    setFeedback(null);
 
     try {
       const token = await getAccessToken();
@@ -45,282 +131,480 @@ export const InterviewsView: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           roleTitle: targetRole.title,
-          interviewType: activeQuestion.category,
-          question: activeQuestion.question,
-          userAnswer: userAnswer.trim()
-        })
+          interviewType: currentQuestion.category,
+          question: currentQuestion.question,
+          userAnswer: answer.trim(),
+          language: aiPreferences.preferredLanguage,
+        }),
       });
 
       if (res.ok) {
-        const feedback = await res.json();
-        setEvaluationResult(feedback);
-
-        // Save session
-        saveInterviewSession({
+        const result = (await res.json()) as InterviewFeedback;
+        setFeedback(result);
+        setAnswered((prev) => [
+          ...prev,
+          {
+            question: currentQuestion.question,
+            stage: currentQuestion.stage,
+            score: typeof result.score === 'number' ? result.score : null,
+          },
+        ]);
+        void saveInterviewSession({
           roleTitle: targetRole.title,
-          type: activeQuestion.category,
-          question: activeQuestion.question,
-          userAnswer: userAnswer.trim(),
-          aiFeedback: feedback
+          type: currentQuestion.category,
+          question: currentQuestion.question,
+          userAnswer: answer.trim(),
+          aiFeedback: {
+            score: typeof result.score === 'number' ? result.score : 0,
+            strengths: result.strengths ?? [],
+            improvements: result.improvements ?? [],
+            starEvaluation: result.starEvaluation
+              ? {
+                  situation: result.starEvaluation.situation ?? '',
+                  task: result.starEvaluation.task ?? '',
+                  action: result.starEvaluation.action ?? '',
+                  result: result.starEvaluation.result ?? '',
+                }
+              : undefined,
+            suggestedAnswer: result.suggestedAnswer ?? '',
+          },
         });
       } else {
-        // The server refused or could not answer. The candidate is told
-        // plainly that no feedback was produced — no score is invented.
         const body = await res.json().catch(() => null);
-        setEvaluationError(
+        setError(
           body?.error ??
-            t('The interviewer is unavailable right now. No feedback was generated — please try again shortly.')
+            t(
+              'The interviewer is unavailable right now. No feedback was generated — please try again shortly.'
+            )
         );
       }
-    } catch (e) {
-      console.error(e);
-      // Honesty rule: a fabricated score and a fabricated model answer would
-      // be indistinguishable from real feedback. The candidate is told that
-      // nothing was evaluated, and their answer is kept.
-      setEvaluationError(
-        t('The interviewer is unreachable right now, so your answer was not evaluated. Your answer is still saved below — please try again shortly.')
+    } catch (requestError) {
+      console.error(requestError);
+      setError(
+        t(
+          'The interviewer is unreachable right now, so your answer was not evaluated. Your answer is kept below — please try again shortly.'
+        )
       );
     } finally {
       setIsEvaluating(false);
     }
   };
 
+  const handleNext = () => {
+    if (!plan || !currentQuestion) return;
+    const next = plan[currentQuestion.index + 1];
+    if (!next) {
+      setCompleted(true);
+      return;
+    }
+    resetForQuestion(next.index);
+    if (next.stage !== currentQuestion.stage) {
+      setShowTransition(true);
+    }
+  };
+
+  const averageScore = useMemo(() => {
+    const scored = answered.filter(
+      (entry): entry is AnsweredQuestion & { score: number } => entry.score !== null
+    );
+    if (scored.length === 0) return null;
+    return (
+      scored.reduce((sum, entry) => sum + entry.score, 0) / scored.length
+    ).toFixed(1);
+  }, [answered]);
+
+  const behavioralCount = plan?.filter((question) => question.stage === 'behavioral').length ?? 8;
+  const technicalCount = plan?.filter((question) => question.stage === 'technical').length ?? 7;
+
   return (
     <Reveal className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
+      <div className="flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 md:flex-row md:items-center">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">{t('INTERVIEW READINESS LAB')}</div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            {t('STAR & Technical Mock Simulator')}
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {t('INTERVIEW READINESS LAB')}
+          </div>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+            {t('Adaptive Mock Interview')}
           </h1>
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">
+            {t(
+              'One question at a time, adapted to your CV: behavioural and personal first, then technical questions for your target role.'
+            )}
+          </p>
         </div>
-
         <div className="text-xs text-[var(--text-muted)]">
-          {t('Target Role:')} <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>
+          {t('Target Role:')}{' '}
+          <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>
         </div>
       </div>
 
-      {/* Main Simulator & Question Bank Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column (5 cols): Question Bank Directory */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {(['all', 'star', 'technical', 'behavioral'] as const).map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
-                  selectedCategory === cat
-                    ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
-                    : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {t(cat.toUpperCase())}
-              </button>
-            ))}
+      {/* Start screen */}
+      {!plan && (
+        <section className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 lg:col-span-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-primary-text)]">
+              <BrainCircuit className="h-4 w-4 shrink-0" />
+              {t('Your interview plan')}
+            </div>
+            <h2 className="mt-2 text-lg font-bold text-[var(--text-primary)]">
+              {t('15 questions, two stages')}
+            </h2>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">
+              {t(
+                'The first stage is behavioural and personal. It is built from your real experience, projects, volunteering, training and skills. The second stage is technical and follows your primary target role.'
+              )}
+            </p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                  {t('Behavioural & personal')}
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                  {behavioralCount} {t('questions')} · {t('adapted to your CV')}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+                  <Target className="h-3.5 w-3.5 shrink-0" />
+                  {t('Technical')}
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                  {technicalCount} {t('questions')} · {targetRole.title}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={startInterview}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90"
+            >
+              <Sparkles className="h-4 w-4 shrink-0" />
+              {t('Start Mock Interview')}
+            </button>
           </div>
 
-          <Stagger inView gap={0.06} className="space-y-3 max-h-[650px] overflow-y-auto pe-1">
-            {filteredQuestions.map((q) => {
-              const isSelected = activeQuestion?.id === q.id;
-
-              return (
-                <StaggerItem
-                  key={q.id}
-                  onClick={() => {
-                    setActiveQuestion(q);
-                    setUserAnswer('');
-                    setEvaluationResult(null);
-                    setEvaluationError(null);
-                  }}
-                  className={`p-4 rounded-xl border text-start cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-                    isSelected
-                      ? 'bg-[var(--accent-surface)]/50 border-[var(--accent-primary)] shadow-xs'
-                      : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-1">
-                    <span className="font-mono font-bold uppercase text-[var(--color-primary-text)]">{t(q.category)}</span>
-                    <span>{t(q.roleTarget === 'all' ? 'Universal' : targetRole.title)}</span>
-                  </div>
-                  <h3 className="font-bold text-xs text-[var(--text-primary)] leading-snug">
-                    {q.question}
-                  </h3>
-                </StaggerItem>
-              );
-            })}
-          </Stagger>
-        </div>
-
-        {/* Right Column (7 cols): Active Mock Drill & AI Evaluation */}
-        <div className="lg:col-span-7 space-y-6">
-          {!activeQuestion ? (
-            <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-              {t('Choose a question from the bank to begin a practice drill.')}
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6">
+            <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
+              <History className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
+              {t('Recorded Mock Sessions')} ({interviewSessions.length})
             </div>
-          ) : (
-          <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                {t('Active Prompt')} · {t(activeQuestion.category.toUpperCase())}
-              </span>
-              <h2 className="text-base font-bold text-[var(--text-primary)] leading-relaxed">
-                "{activeQuestion.question}"
-              </h2>
-            </div>
-
-            {/* Recommended Framework Callout */}
-            <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] text-xs space-y-1">
-              <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-                <span>{t('Recommended Framework & Strategy')}</span>
-              </div>
-              <p className="text-[var(--text-secondary)] leading-relaxed">
-                {activeQuestion.recommendedFramework}
+            {interviewSessions.length === 0 ? (
+              <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                {t('No recorded sessions yet. Your first answer will appear here.')}
               </p>
-              <div className="pt-1.5 border-t border-[var(--border-subtle)]/70 text-[11px] text-[var(--text-muted)]">
-                <strong>{t('Key Points to Hit:')}</strong> {activeQuestion.sampleKeyPoints.join(' · ')}
-              </div>
-            </div>
-
-            {/* User Answer Textarea */}
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-[var(--text-secondary)]">
-                {t('Draft your spoken or written response')}
-              </label>
-              <textarea
-                rows={5}
-                value={userAnswer}
-                onChange={(e) => setUserAnswer(e.target.value)}
-                placeholder={t('Situation: Set the context... Task: What was expected... Action: Specific steps you took... Result: Outcome and metrics...')}
-                className="w-full p-3.5 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed focus:outline-none focus:border-[var(--accent-primary)]"
-              />
-            </div>
-
-            {/* Evaluate Button */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleEvaluate}
-                disabled={!userAnswer.trim() || isEvaluating}
-                className="px-5 py-2.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-2 transition-all shadow-xs disabled:opacity-50"
-              >
-                <Sparkles className={`w-4 h-4 ${isEvaluating ? 'animate-spin' : ''}`} />
-                <span>{t(isEvaluating ? 'Evaluating with AI...' : 'Submit Response for AI Scoring')}</span>
-              </button>
-            </div>
-          </div>
-          )}
-
-          {/* Honest failure notice: the answer was NOT evaluated, and no
-              score or model answer was invented for it. */}
-          {evaluationError && (
-            <div className="p-4 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-strong)] space-y-1.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
-                <AlertCircle className="w-4 h-4 text-[var(--color-primary-text)]" />
-                {t('No feedback was generated')}
-              </div>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{evaluationError}</p>
-            </div>
-          )}
-
-          {/* AI Evaluation Result Card */}
-          {evaluationResult && (
-            <Reveal delay={0.06} className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--accent-primary)]/40 space-y-5 shadow-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
-                <div>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">{t('AI Mock Evaluation')}</span>
-                  <div className="text-sm font-bold text-[var(--text-primary)]">{t('Response Score & Coaching Feedback')}</div>
-                </div>
-                <div className="text-end">
-                  <div className="text-3xl font-extrabold font-mono text-[var(--color-primary-text)]">
-                    {evaluationResult.score} / 10
-                  </div>
-                </div>
-              </div>
-
-              {/* Strengths & Improvements */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-1.5 p-3 rounded-lg bg-[var(--color-success-surface)] border border-[var(--color-success-strong)]/20">
-                  <div className="font-bold text-[var(--color-success-strong)] flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{t('Strengths')}</span>
-                  </div>
-                  <ul className="space-y-1 text-[var(--text-secondary)]">
-                    {evaluationResult.strengths?.map((s: string, i: number) => (
-                      <li key={i}>• {s}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="space-y-1.5 p-3 rounded-lg bg-[var(--color-warning)]/5 border border-[var(--color-warning)]/20">
-                  <div className="font-bold text-[var(--color-warning)] flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{t('Areas for Polish')}</span>
-                  </div>
-                  <ul className="space-y-1 text-[var(--text-secondary)]">
-                    {evaluationResult.improvements?.map((imp: string, i: number) => (
-                      <li key={i}>• {imp}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* STAR Breakdown */}
-              {evaluationResult.starEvaluation && (
-                <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] text-xs space-y-2">
-                  <div className="font-bold text-[var(--text-primary)]">{t('STAR Framework Assessment')}</div>
-                  <div className="grid grid-cols-2 gap-3 text-[11px] text-[var(--text-secondary)]">
-                    <div><strong>{t('Situation:')}</strong> {evaluationResult.starEvaluation.situation}</div>
-                    <div><strong>{t('Task:')}</strong> {evaluationResult.starEvaluation.task}</div>
-                    <div><strong>{t('Action:')}</strong> {evaluationResult.starEvaluation.action}</div>
-                    <div><strong>{t('Result:')}</strong> {evaluationResult.starEvaluation.result}</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Suggested Answer */}
-              {evaluationResult.suggestedAnswer && (
-                <div className="space-y-1 text-xs">
-                  <div className="font-bold text-[var(--color-primary-text)]">{t('Executive Suggested Answer Model:')}</div>
-                  <p className="text-[var(--text-secondary)] leading-relaxed italic bg-[var(--surface-secondary)]/40 p-3 rounded-lg border border-[var(--border-subtle)]">
-                    "{evaluationResult.suggestedAnswer}"
-                  </p>
-                </div>
-              )}
-            </Reveal>
-          )}
-
-          {/* Past Sessions History */}
-          {interviewSessions.length > 0 && (
-            <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
-              <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                <History className="w-4 h-4 text-[var(--color-primary-text)]" />
-                <span>{t('Recorded Mock Sessions')} ({interviewSessions.length})</span>
-              </div>
-              <div className="space-y-3">
-                {interviewSessions.map((session) => (
-                  <div key={session.id} className="p-3 rounded-lg bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] text-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[var(--text-primary)] line-clamp-1">{session.question}</span>
-                      <span className="font-mono font-bold text-[var(--color-primary-text)] shrink-0 ms-2">
-                        {t('Score:')} {session.aiFeedback?.score || 8}/10
+            ) : (
+              <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pe-1">
+                {interviewSessions.slice(0, 8).map((session) => (
+                  <div
+                    key={session.id}
+                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 p-2.5 text-xs"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="line-clamp-2 font-semibold text-[var(--text-primary)]">
+                        {session.question}
                       </span>
+                      {typeof session.aiFeedback?.score === 'number' && (
+                        <span className="shrink-0 font-mono font-bold text-[var(--color-primary-text)]">
+                          {session.aiFeedback.score}/10
+                        </span>
+                      )}
                     </div>
-                    <div className="text-[11px] text-[var(--text-muted)]">
+                    <div className="mt-1 text-[10px] text-[var(--text-muted)]">
                       {session.roleTitle} · {session.createdAt}
                     </div>
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Completion screen */}
+      {plan && completed && (
+        <section className="rounded-2xl border border-[var(--color-success-strong)]/30 bg-[var(--surface-main)] p-6">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-success-strong)]">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            {t('Interview complete')}
+          </div>
+          <h2 className="mt-2 text-xl font-bold text-[var(--text-primary)]">
+            {t('You completed all 15 questions.')}
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            {t('Answered')}: {answered.length} / {plan.length}
+            {averageScore !== null && (
+              <>
+                {' · '}
+                {t('Average score')}: {averageScore}/10
+              </>
+            )}
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+              <div className="text-xs font-semibold text-[var(--text-primary)]">
+                {t('Behavioural')}
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                {answered.filter((entry) => entry.stage === 'behavioral').length}{' '}
+                {t('answered')}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+              <div className="text-xs font-semibold text-[var(--text-primary)]">
+                {t('Technical')}
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                {answered.filter((entry) => entry.stage === 'technical').length} {t('answered')}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={startInterview}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90"
+          >
+            <RotateCcw className="h-4 w-4 shrink-0" />
+            {t('Practice Again')}
+          </button>
+        </section>
+      )}
+
+      {/* Transition screen */}
+      {plan && !completed && showTransition && currentQuestion && (
+        <section className="rounded-2xl border border-[var(--accent-primary)]/40 bg-gradient-to-br from-[var(--accent-surface)] via-[var(--surface-main)] to-[var(--surface-main)] p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent-primary)]/15">
+            <CheckCircle2 className="h-6 w-6 text-[var(--color-primary-text)]" />
+          </div>
+          <h2 className="mt-3 text-xl font-bold text-[var(--text-primary)]">
+            {t('Behavioral Interview Complete')}
+          </h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-[var(--text-secondary)]">
+            {t(
+              "Great. Now let's move to the Technical interview. The next questions are specific to"
+            )}{' '}
+            <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowTransition(false)}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90"
+          >
+            {t('Start Technical Interview')}
+            <ArrowRight className="h-4 w-4 shrink-0" />
+          </button>
+        </section>
+      )}
+
+      {/* Question screen */}
+      {plan && !completed && !showTransition && currentQuestion && (
+        <section className="space-y-5">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-[var(--accent-primary)] px-2.5 py-1 text-[11px] font-bold text-[var(--color-on-primary)]">
+                  {t('Question')} {currentQuestion.index + 1} {t('of')} {plan.length}
+                </span>
+                <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  {currentQuestion.stage === 'behavioral'
+                    ? t('Behavioural & personal')
+                    : t('Technical')}
+                </span>
+              </div>
+              <span className="text-[11px] text-[var(--text-muted)]">
+                {answered.length} {t('answered')}
+              </span>
+            </div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
+              <div
+                className="h-full rounded-full bg-[var(--color-progress-strong)] transition-all"
+                style={{ width: `${((currentQuestion.index + 1) / plan.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 shadow-xs">
+            <h2 className="text-base font-bold leading-relaxed text-[var(--text-primary)]">
+              {currentQuestion.question}
+            </h2>
+            {currentQuestion.personalization && (
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                {t('Adapted from')}: {currentQuestion.personalization}
+              </p>
+            )}
+
+            <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 p-3.5 text-xs">
+              <div className="flex items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+                <HelpCircle className="h-3.5 w-3.5 shrink-0 text-[var(--color-primary-text)]" />
+                {t('Recommended Framework & Strategy')}
+              </div>
+              <p className="mt-1 leading-relaxed text-[var(--text-secondary)]">
+                {currentQuestion.recommendedFramework}
+              </p>
+              <div className="mt-2 border-t border-[var(--border-subtle)]/70 pt-2 text-[11px] text-[var(--text-muted)]">
+                <strong>{t('Key Points to Hit:')}</strong>{' '}
+                {currentQuestion.sampleKeyPoints.join(' · ')}
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <label className="block text-xs font-semibold text-[var(--text-secondary)]">
+                {t('Your answer')}
+              </label>
+              <textarea
+                rows={6}
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                disabled={Boolean(feedback)}
+                placeholder={t(
+                  'Situation: Set the context... Task: What was expected... Action: Specific steps you took... Result: Outcome and metrics...'
+                )}
+                className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3.5 text-xs leading-relaxed text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none disabled:opacity-70"
+              />
+            </div>
+
+            {!feedback && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void handleEvaluate()}
+                  disabled={!answer.trim() || isEvaluating}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-5 py-2.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-all hover:bg-[var(--accent-secondary)] disabled:opacity-50"
+                >
+                  <Sparkles
+                    className={`h-4 w-4 shrink-0 ${isEvaluating ? 'animate-spin' : ''}`}
+                  />
+                  {t(isEvaluating ? 'Evaluating with AI...' : 'Submit Answer')}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-main)] p-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+                <AlertCircle className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
+                {t('No feedback was generated')}
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleEvaluate()}
+                disabled={isEvaluating}
+                className="mt-2 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
+              >
+                {t('Try again')}
+              </button>
             </div>
           )}
-        </div>
-      </div>
+
+          {feedback && (
+            <Reveal
+              delay={0.06}
+              className="space-y-5 rounded-2xl border border-[var(--accent-primary)]/40 bg-[var(--surface-main)] p-6 shadow-xs"
+            >
+              <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">
+                    {t('AI Mock Evaluation')}
+                  </span>
+                  <div className="text-sm font-bold text-[var(--text-primary)]">
+                    {t('Response Score & Coaching Feedback')}
+                  </div>
+                </div>
+                <div className="text-end">
+                  <div className="font-mono text-3xl font-extrabold text-[var(--color-primary-text)]">
+                    {feedback.score ?? '—'} / 10
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
+                <div className="space-y-1.5 rounded-lg border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] p-3">
+                  <div className="flex items-center gap-1.5 font-bold text-[var(--color-success-strong)]">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    <span>{t('Strengths')}</span>
+                  </div>
+                  <ul className="space-y-1 text-[var(--text-secondary)]">
+                    {(feedback.strengths ?? []).map((item, index) => (
+                      <li key={`strength-${index}`}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="space-y-1.5 rounded-lg border border-[var(--color-warning)]/20 bg-[var(--color-warning)]/5 p-3">
+                  <div className="flex items-center gap-1.5 font-bold text-[var(--color-warning)]">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{t('Areas for Polish')}</span>
+                  </div>
+                  <ul className="space-y-1 text-[var(--text-secondary)]">
+                    {(feedback.improvements ?? []).map((item, index) => (
+                      <li key={`improvement-${index}`}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {feedback.starEvaluation && (
+                <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 p-3.5 text-xs">
+                  <div className="font-bold text-[var(--text-primary)]">
+                    {t('STAR Framework Assessment')}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 text-[11px] text-[var(--text-secondary)] sm:grid-cols-2">
+                    <div>
+                      <strong>{t('Situation:')}</strong>{' '}
+                      {feedback.starEvaluation.situation}
+                    </div>
+                    <div>
+                      <strong>{t('Task:')}</strong> {feedback.starEvaluation.task}
+                    </div>
+                    <div>
+                      <strong>{t('Action:')}</strong> {feedback.starEvaluation.action}
+                    </div>
+                    <div>
+                      <strong>{t('Result:')}</strong> {feedback.starEvaluation.result}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {feedback.suggestedAnswer && (
+                <div className="space-y-1 text-xs">
+                  <div className="font-bold text-[var(--color-primary-text)]">
+                    {t('Executive Suggested Answer Model:')}
+                  </div>
+                  <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3 italic leading-relaxed text-[var(--text-secondary)]">
+                    "{feedback.suggestedAnswer}"
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-5 py-2.5 text-xs font-semibold text-[var(--color-on-primary)] hover:opacity-90"
+                >
+                  {currentQuestion.index + 1 >= plan.length
+                    ? t('Finish Interview')
+                    : t('Next Question')}
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                </button>
+              </div>
+            </Reveal>
+          )}
+        </section>
+      )}
     </Reveal>
   );
 };

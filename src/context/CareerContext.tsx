@@ -419,6 +419,16 @@ interface CareerContextType {
   activeCV: CVProfile;
   cvVersions: CVVersion[];
   updateCV: (updates: Partial<CVProfile>) => void;
+  /**
+   * The profile links the candidate owns, in the shape the API returns.
+   *
+   * The CV document is a projection of these rows, so a mutation must update
+   * this state as well as the document; otherwise the next projection drops
+   * the edit the candidate just made.
+   */
+  profileLinks: ProfileLinkDTO[];
+  /** Re-reads the profile links and updates the document projection. */
+  refreshProfileLinks: () => Promise<ProfileLinkDTO[]>;
   loadCVFromMyData: () => void;
   saveCVVersion: (name: string) => void;
   duplicateCVVersion: (versionId: string) => void;
@@ -1905,7 +1915,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           experiences: profile.experiences,
           skills: skills.map(s => s.name),
           projects: projects.map(p => ({ title: p.title, description: p.description, skills: p.skills })),
-          tone
+          tone,
+          language: aiPreferences.preferredLanguage
         })
       });
       const data = await res.json();
@@ -1941,7 +1952,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           careerState: profile.careerState,
           yearsExperience: profile.yearsOfExperience,
           skills: skills.map(s => s.name),
-          keyAchievements: profile.experiences.flatMap(e => e.achievements).slice(0, 3)
+          keyAchievements: profile.experiences.flatMap(e => e.achievements).slice(0, 3),
+          language: aiPreferences.preferredLanguage
         })
       });
       const data = await res.json();
@@ -3481,6 +3493,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           targetRole,
           userSkills: skills,
           careerState: profile.careerState,
+          language: aiPreferences.preferredLanguage,
         })
       });
       if (res.ok) {
@@ -3618,7 +3631,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     setIsLearningLoading(true);
     try {
-      const result = await fetchLearningRecommendations(effectivePreferences);
+      const result = await fetchLearningRecommendations({
+        // The explanation language follows the explicit AI response language,
+        // not the interface language. A caller may still override it.
+        aiLanguage: preferences.aiLanguage ?? aiPreferences.preferredLanguage,
+        ...effectivePreferences,
+      });
       setLearningRecommendations(result.recommendations ?? []);
       setLearningRecommendationMeta((prev) => ({
         ...prev,
@@ -3644,6 +3662,20 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const getLearningItem = (courseId: string) =>
     learningItems.find((item) => item.courseId === courseId);
+
+  /**
+   * Re-reads the candidate's profile links.
+   *
+   * Adding, editing or removing a link is a change to the profile, not just
+   * to this CV. Updating `profileLinks` rebuilds `cvSource`, which re-projects
+   * the document and preserves the order and on/off switches the candidate
+   * chose for this CV.
+   */
+  const refreshProfileLinks = useCallback(async (): Promise<ProfileLinkDTO[]> => {
+    const links = await fetchProfileLinks();
+    setProfileLinks(links);
+    return links;
+  }, []);
 
   const persistLearningStatus = async (
     courseId: string,
@@ -4492,7 +4524,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         body: JSON.stringify({
           cvText,
           targetRoleTitle: targetRole.title,
-          targetRoleSkills: targetRole.requiredSkills.map(s => s.name)
+          targetRoleSkills: targetRole.requiredSkills.map(s => s.name),
+          language: aiPreferences.preferredLanguage
         })
       });
 
@@ -4714,7 +4747,11 @@ Skills: ${activeCV.skillsList.join(', ')}
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ userPrompt: text, context: { activeView } })
+        body: JSON.stringify({
+          userPrompt: text,
+          context: { activeView },
+          language: aiPreferences.preferredLanguage,
+        })
       });
 
       if (res.ok) {
@@ -5065,6 +5102,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         activeCV,
         cvVersions,
         updateCV,
+        profileLinks,
+        refreshProfileLinks,
         loadCVFromMyData,
         saveCVVersion,
         duplicateCVVersion,

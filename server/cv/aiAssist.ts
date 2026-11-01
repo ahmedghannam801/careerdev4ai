@@ -40,13 +40,32 @@ import {
   type GroundingProfile,
 } from '../ai/grounding.ts';
 import { buildGroundingProfileForUser } from '../ai/groundingProfile.ts';
-import { loadAiCareerContext, buildAiContextBlock } from '../ai/careerContext.ts';
+import {
+  loadAiCareerContext,
+  buildAiContextBlock,
+  type AiCareerContext,
+} from '../ai/careerContext.ts';
+import {
+  CV_HEADLINE_SUGGESTION_COUNT,
+  parseHeadlineSuggestionsPayload,
+  validateHeadlineSuggestionsPayload,
+} from '../../shared/cvAiAssist.ts';
+import {
+  generateHeadlineSuggestions,
+  mergeHeadlineSuggestions,
+  type HeadlineSuggestionInput,
+} from '../../shared/headlineSuggestions.ts';
 import { listExperiences } from '../db/experiences.ts';
 import { listEducations } from '../db/educations.ts';
 import { listProjects } from '../db/projects.ts';
 import { listVolunteerExperiences } from '../db/volunteer.ts';
 import { listCertifications } from '../db/profileExtensions.ts';
 import { listLearningItems, listCourses } from '../db/learning.ts';
+import {
+  aiLanguageInstruction,
+  normalizeAiLanguage,
+  type AiLanguageCode,
+} from '../../shared/aiLanguages.ts';
 
 /** The maximum length of the candidate's own notes about the field. */
 const MAX_CONTEXT_CHARS = 1200;
@@ -81,8 +100,8 @@ export interface CvAssistRequest {
   tone?: CvAssistTone;
   /** How much to write. */
   length?: CvAssistLength;
-  /** The interface language the answer is written in. */
-  language?: 'en' | 'ar';
+  /** The language the answer is written in. */
+  language?: AiLanguageCode;
   /**
    * Which attempt this is. The first attempt carries no hint; later ones ask
    * the model to lead from a different angle, so a regeneration is a
@@ -275,9 +294,7 @@ export function buildCvAssistPrompt(input: {
     parts.push('- Write one short paragraph. Do not use bullet points or headings.');
   }
   parts.push(`- Tone: ${CV_ASSIST_TONE_INSTRUCTIONS[tone]}`);
-  if (request.language === 'ar') {
-    parts.push('- Write the answer in Arabic.');
-  }
+  parts.push(`- ${aiLanguageInstruction(request.language ?? 'en')}`);
   if (variation) {
     parts.push(`- ${variation}`);
   }
@@ -395,7 +412,9 @@ export async function generateCvAssistText(
     return { ok: false, reason: 'source_not_found' };
   }
 
-  const careerContext = await loadAiCareerContext(userId);
+  const careerContext = await loadAiCareerContext(userId, {
+    language: request.language,
+  });
   const contextBlock = buildAiContextBlock(careerContext);
   const prompt = buildCvAssistPrompt({ request, careerContextBlock: contextBlock, sourceBlock });
 
@@ -434,4 +453,215 @@ export async function generateCvAssistText(
   const grounded = groundCvAssistAnswer(parsed, groundingProfile, userText);
 
   return { ok: true, result: grounded };
+}
+
+/**
+ * The inputs for a headline suggestion request.
+ *
+ * The target role is the one the candidate chose, so the body may name it, but
+ * the server's own context wins when the two disagree: the context was read
+ * from the profile for this verified user.
+ */
+export interface CvHeadlineRequest {
+  targetRoleTitle?: string;
+  language?: AiLanguageCode;
+  /** Other target roles the candidate is preparing, for a combined headline. */
+  additionalTargetRoles?: readonly string[];
+}
+
+/** What the headline endpoint returns. */
+export interface CvHeadlineSuggestionsResult {
+  /** The options to show, never empty. */
+  suggestions: string[];
+  /** True when at least one option came from the model. */
+  aiUsed: boolean;
+  /** Why the deterministic options are being shown instead, when they are. */
+  fallbackReason: string | null;
+}
+
+/**
+ * Builds the deterministic generator's input from the candidate's record.
+ *
+ * Only facts the candidate supplied are passed through: the target role, the
+ * skills they rated, their own experience and education lines, and their
+ * career goal. The role's required skills are used only to order the
+ * candidate's skills, never to add one they do not have.
+ */
+export function headlineInputFromCareerContext(
+  context: AiCareerContext,
+  request: CvHeadlineRequest
+): HeadlineSuggestionInput {
+  const targetRoleTitle =
+    request.targetRoleTitle?.trim() ||
+    context.targetRoleTitle?.trim() ||
+    context.targetRole?.title?.trim() ||
+    '';
+
+  const roleSkills = [
+    ...(context.targetRole?.requiredSkills ?? []).map((skill) => skill.name),
+    ...(context.targetRole?.preferredSkills ?? []).map((skill) => skill.name),
+  ];
+
+  return {
+    targetRoleTitle,
+    skills: context.currentSkills.map((skill) => skill.name),
+    roleSkills,
+    experience: context.experience,
+    education: context.education,
+    careerGoal: context.careerGoal,
+    additionalTargetRoles: request.additionalTargetRoles ?? [],
+    projects: context.projects,
+    certifications: context.certifications,
+    volunteering: context.volunteering,
+    training: context.learningSummary,
+    language: normalizeAiLanguage(request.language ?? context.language),
+    limit: CV_HEADLINE_SUGGESTION_COUNT,
+  };
+}
+
+/**
+ * The prompt for headline options.
+ *
+ * Exported so a test can inspect it without a model call. The grounding rule
+ * and the role-relevance rule are both in the prompt, because the model is
+ * one of the places a wrong headline can come from.
+ */
+export function buildCvHeadlineSuggestionsPrompt(input: {
+  request: CvHeadlineRequest;
+  careerContextBlock: string;
+  targetRoleTitle: string;
+}): string {
+  const parts: string[] = [];
+  parts.push('You are writing the headline options for a CV.');
+  parts.push('');
+  parts.push(
+    'The headline is the single line under the candidate\'s name. It states who the candidate is and the role they are aiming at.'
+  );
+  if (input.targetRoleTitle) {
+    parts.push(`The CV is aimed at the role: ${input.targetRoleTitle}.`);
+  }
+  parts.push('');
+  parts.push("The candidate's own record, read from their CareerDev4AI account:");
+  parts.push(input.careerContextBlock);
+  parts.push('');
+  parts.push('Requirements:');
+  parts.push(
+    `- Write exactly ${CV_HEADLINE_SUGGESTION_COUNT} different headline options, one per suggestion.`
+  );
+  parts.push('- Every option must name the target role above.');
+  parts.push(
+    '- Use only the facts in the record. Do not invent a job title, employer, skill, degree, number or achievement.'
+  );
+  parts.push('- Each option is one line of 3 to 14 words, at most 140 characters.');
+  parts.push('- Do not use quotes, numbering, bullet characters or explanations.');
+  parts.push(`- ${aiLanguageInstruction(input.request.language ?? 'en')}`);
+  if ((input.request.additionalTargetRoles ?? []).length > 0) {
+    parts.push(
+      '- The candidate is preparing more than one target role. A combined headline is allowed only when the roles share a real skill or domain; never join unrelated occupations in one line.'
+    );
+  }
+  parts.push(groundingRules());
+  parts.push('- Return JSON: { "suggestions": string[] }');
+  return parts.join('\n');
+}
+
+/**
+ * Produces headline options for the verified user.
+ *
+ * The deterministic set is generated first and is always returned when the
+ * model is absent, rate-limited, slow or wrong. This function never throws:
+ * a failed AI call degrades to the local options with a reason, so the studio
+ * can never be left in a loading state it cannot leave.
+ */
+export async function generateCvHeadlineSuggestions(
+  userId: string,
+  request: CvHeadlineRequest,
+  ai: CvAssistAiClient | null,
+  model: string | null
+): Promise<CvHeadlineSuggestionsResult> {
+  let context: AiCareerContext | null = null;
+  try {
+    context = await loadAiCareerContext(userId, { language: request.language });
+  } catch (error) {
+    console.error('Failed to load the career context for headline suggestions:', error);
+  }
+
+  const input: HeadlineSuggestionInput = context
+    ? headlineInputFromCareerContext(context, request)
+    : {
+        targetRoleTitle: request.targetRoleTitle ?? '',
+        additionalTargetRoles: request.additionalTargetRoles ?? [],
+        language: normalizeAiLanguage(request.language),
+        limit: CV_HEADLINE_SUGGESTION_COUNT,
+      };
+
+  const deterministic = generateHeadlineSuggestions(input);
+
+  if (!ai || !model) {
+    return { suggestions: deterministic, aiUsed: false, fallbackReason: null };
+  }
+
+  try {
+    const contextBlock = context ? buildAiContextBlock(context) : '';
+    const prompt = buildCvHeadlineSuggestionsPrompt({
+      request,
+      careerContextBlock: contextBlock,
+      targetRoleTitle: input.targetRoleTitle,
+    });
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(response.text || '{}');
+    } catch {
+      return {
+        suggestions: deterministic,
+        aiUsed: false,
+        fallbackReason:
+          'The AI returned an unreadable answer, so locally generated headline options are shown.',
+      };
+    }
+
+    const errors = validateHeadlineSuggestionsPayload(payload);
+    if (errors.length > 0) {
+      console.error('CV headline suggestions returned an invalid payload:', errors);
+      return {
+        suggestions: deterministic,
+        aiUsed: false,
+        fallbackReason:
+          'The AI returned no usable headline options, so locally generated options are shown.',
+      };
+    }
+
+    const aiSuggestions = parseHeadlineSuggestionsPayload(payload);
+    const suggestions = mergeHeadlineSuggestions(
+      aiSuggestions,
+      deterministic,
+      { targetRoleTitle: input.targetRoleTitle, additionalTargetRoles: input.additionalTargetRoles },
+      CV_HEADLINE_SUGGESTION_COUNT
+    );
+
+    return {
+      suggestions,
+      aiUsed: aiSuggestions.length > 0,
+      fallbackReason:
+        aiSuggestions.length > 0
+          ? null
+          : 'The AI returned no role-relevant headline options, so locally generated options are shown.',
+    };
+  } catch (error) {
+    // A provider quota error or an outage is not the candidate's problem. The
+    // local options are still useful, so they are returned with a reason.
+    console.error('CV headline suggestion failed:', error);
+    return {
+      suggestions: deterministic,
+      aiUsed: false,
+      fallbackReason:
+        'The AI assistant is unavailable right now, so locally generated headline options are shown.',
+    };
+  }
 }

@@ -1,338 +1,99 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   BookOpen,
   BookmarkCheck,
-  BookmarkPlus,
   CheckCircle2,
-  Clock,
-  ExternalLink,
   Filter,
   Languages,
   PlayCircle,
   RefreshCw,
   Search,
   Sparkles,
-  Target,
   Trophy,
   X,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import type {
-  CourseAvailability,
   CourseFormat,
+  CourseLevel,
   LearningCourse,
   LearningItem,
   LearningRecommendation,
-  CourseLevel,
 } from '../../types/learning';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
-import {
-  LEARNING_AVAILABILITY,
-  LEARNING_FORMATS,
-  LEARNING_LANGUAGES,
-  LEARNING_LEVELS,
-  LEARNING_TABS,
-} from '../../lib/routing';
+import { CourseCard } from '../learning/CourseCard';
+import { LEARNING_TABS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
+import {
+  availabilityBucket,
+  availabilityLabel,
+  providerTier,
+  type AvailabilityBucket,
+} from '../../../shared/courseProviders';
 
 type HubTab = 'recommended' | 'saved' | 'in_progress' | 'completed' | 'catalog';
 
-const AVAILABILITY_LABELS: Record<CourseAvailability, string> = {
-  free: 'Free',
-  free_with_limitations: 'Free with limitations',
-  audit: 'Free to audit',
-  free_course_paid_certificate: 'Free course, paid certificate',
-  paid: 'Paid',
-  youtube_free: 'Free on YouTube',
-};
+type DurationFilter = 'all' | 'short' | 'medium' | 'long';
+type AvailabilityFilter = 'all' | AvailabilityBucket;
 
-const AVAILABILITY_STYLES: Record<CourseAvailability, string> = {
-  free: 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)] border-[var(--color-success-strong)]/20',
-  youtube_free: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)] border-[var(--color-danger)]/20',
-  audit: 'bg-[var(--color-accent)]/15 text-[var(--color-accent-strong)] border-[var(--color-accent)]/40',
-  free_course_paid_certificate: 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)] border-[var(--color-success-strong)]/25',
-  free_with_limitations: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)] border-[var(--color-warning)]/20',
-  paid: 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-subtle)]',
-};
+const FORMAT_OPTIONS: Array<{ value: CourseFormat | 'all'; label: string }> = [
+  { value: 'all', label: 'All course types' },
+  { value: 'course', label: 'Course' },
+  { value: 'professional_certificate', label: 'Professional certificate' },
+  { value: 'learning_path', label: 'Learning path' },
+  { value: 'tutorial', label: 'Tutorial' },
+  { value: 'video', label: 'Video' },
+  { value: 'playlist', label: 'Playlist' },
+];
 
-const FORMAT_LABELS: Record<CourseFormat, string> = {
-  course: 'Course',
-  professional_certificate: 'Professional certificate',
-  learning_path: 'Learning path',
-  tutorial: 'Tutorial',
-  video: 'Video',
-  playlist: 'Playlist',
-};
+const LEVEL_OPTIONS: Array<{ value: CourseLevel | 'all'; label: string }> = [
+  { value: 'all', label: 'All levels' },
+  { value: 'Beginner', label: 'Beginner' },
+  { value: 'Intermediate', label: 'Intermediate' },
+  { value: 'Advanced', label: 'Advanced' },
+];
 
-function scoreLabel(score: number): string {
-  return `${Math.round(score)}% match`;
+const DURATION_OPTIONS: Array<{ value: DurationFilter; label: string }> = [
+  { value: 'all', label: 'Any duration' },
+  { value: 'short', label: 'Short — up to 10 hours' },
+  { value: 'medium', label: 'Medium — 11 to 40 hours' },
+  { value: 'long', label: 'Long — over 40 hours' },
+];
+
+const AVAILABILITY_OPTIONS: Array<{ value: AvailabilityFilter; label: string }> = [
+  { value: 'all', label: 'Any availability' },
+  { value: 'free', label: 'FREE' },
+  { value: 'free_audit', label: 'FREE AUDIT' },
+  { value: 'paid', label: 'PAID' },
+];
+
+function matchesDuration(course: LearningCourse, duration: DurationFilter): boolean {
+  if (duration === 'all') return true;
+  if (course.durationHours === null) return false;
+  if (duration === 'short') return course.durationHours <= 10;
+  if (duration === 'medium') return course.durationHours > 10 && course.durationHours <= 40;
+  return course.durationHours > 40;
 }
 
-function skillNames(rec?: LearningRecommendation, course?: LearningCourse): string[] {
-  if (rec?.matchedSkills.length) return rec.matchedSkills.slice(0, 4);
-  return (course ?? rec?.course)?.skills.map((skill) => skill.name).slice(0, 4) ?? [];
-}
-
-interface CourseCardProps {
-  course: LearningCourse;
-  recommendation?: LearningRecommendation;
-  item?: LearningItem;
-  onSave: (courseId: string, reason?: string) => void;
-  onStart: (courseId: string, reason?: string) => void;
-  onComplete: (courseId: string) => void;
-  onDismiss: (courseId: string, reason?: string) => void;
-  onRemove: (courseId: string) => void;
-  onProgress: (courseId: string, percent: number) => void;
-  progressDraft?: number;
-  onProgressDraft: (courseId: string, percent: number) => void;
-  compact?: boolean;
-}
-
-const CourseCard: React.FC<CourseCardProps> = ({
-  course,
-  recommendation,
-  item,
-  onSave,
-  onStart,
-  onComplete,
-  onDismiss,
-  onRemove,
-  onProgress,
-  progressDraft,
-  onProgressDraft,
-  compact = false,
-}) => {
-  const { t } = useCareer();
-  const reason =
-    recommendation?.aiExplanation ??
-    recommendation?.reason ??
-    item?.recommendationReason ??
-    course.description;
-  const skills = skillNames(recommendation, course);
-  const roleRelevance = recommendation ? Math.round(recommendation.roleRelevance * 100) : null;
-  const isCompleted = item?.status === 'completed';
-  const isInProgress = item?.status === 'in_progress';
-  const isSaved = item?.status === 'saved';
-  const isDismissed = item?.status === 'dismissed';
-  const draft = progressDraft ?? item?.progressPercent ?? 0;
-
+function matchesSearch(course: LearningCourse, search: string): boolean {
+  const term = search.trim().toLowerCase();
+  if (!term) return true;
   return (
-    <article
-      className={`rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition-colors hover:border-[var(--border-strong)] ${
-        compact ? '' : 'h-full flex flex-col'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-            <span>{course.provider}</span>
-            <span aria-hidden>•</span>
-            <span>{t(FORMAT_LABELS[course.format])}</span>
-            <span aria-hidden>•</span>
-            <span>{t(course.level)}</span>
-            <span aria-hidden>•</span>
-            <span>{course.language === 'Arabic' ? t('Arabic') : t('English')}</span>
-          </div>
-          <h3 className="mt-1 text-base font-semibold text-[var(--text-primary)] leading-snug">
-            {course.title}
-          </h3>
-        </div>
-        {recommendation && (
-          <div className="shrink-0 rounded-full border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--color-accent-strong)]">
-            {scoreLabel(recommendation.score)}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${AVAILABILITY_STYLES[course.availability]}`}>
-          {t(AVAILABILITY_LABELS[course.availability])}
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
-          <Languages size={11} /> {course.language === 'Arabic' ? t('Arabic') : t('English')}
-        </span>
-        {course.durationHours !== null && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
-            <Clock size={11} /> {course.durationHours}h
-          </span>
-        )}
-        {roleRelevance !== null && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
-            <Target size={11} /> {roleRelevance}% {t('role fit')}
-          </span>
-        )}
-        {isCompleted && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-success-strong)]">
-            <CheckCircle2 size={11} /> {t('Completed')}
-          </span>
-        )}
-        {isDismissed && (
-          <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">
-            {t('Dismissed')}
-          </span>
-        )}
-      </div>
-
-      {reason && (
-        <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-3">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            <Sparkles size={12} /> {t('Why this now')}
-          </div>
-          <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-secondary)]">{reason}</p>
-          {recommendation?.aiSkillGap && (
-            <p className="mt-2 text-xs text-[var(--text-secondary)]">
-              <span className="font-semibold text-[var(--text-primary)]">{t('Skill gap:')}</span>{' '}
-              {recommendation.aiSkillGap}
-            </p>
-          )}
-          {recommendation?.aiRoadmapLink && (
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              <span className="font-semibold text-[var(--text-primary)]">{t('Roadmap link:')}</span>{' '}
-              {recommendation.aiRoadmapLink}
-            </p>
-          )}
-        </div>
-      )}
-
-      {skills.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {skills.map((skill) => (
-            <span
-              key={skill}
-              className="rounded-md bg-[var(--bg-elevated)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"
-            >
-              {skill}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {recommendation && recommendation.gapsAddressed.length > 0 && (
-        <p className="mt-2 text-xs text-[var(--text-muted)]">
-          {t('Gap addressed:')}{' '}
-          {recommendation.gapsAddressed
-            .slice(0, 2)
-            .map((gap) => `${gap.skill} ${gap.currentLevel}→${gap.targetLevel}`)
-            .join(', ')}
-        </p>
-      )}
-
-      {course.availabilityNote && (
-        <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
-          {course.availabilityNote}
-        </p>
-      )}
-
-      {(isInProgress || isCompleted) && (
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
-            <span>{t('Progress')}</span>
-            <span>{item?.progressPercent ?? 0}%</span>
-          </div>
-          <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
-            <div
-              className="h-full rounded-full bg-[var(--color-progress-strong)] transition-all"
-              style={{ width: `${item?.progressPercent ?? 0}%` }}
-            />
-          </div>
-          {isInProgress && (
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                aria-label={`${t('Progress for')} ${course.title}`}
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={draft}
-                onChange={(event) => onProgressDraft(course.id, Number(event.target.value))}
-                className="h-2 flex-1 accent-[var(--color-progress-strong)]"
-              />
-              <button
-                type="button"
-                onClick={() => onProgress(course.id, draft)}
-                className="rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
-              >
-                {t('Save')}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className={`mt-4 flex flex-wrap items-center gap-2 ${compact ? '' : 'mt-auto pt-4'}`}>
-        {!isCompleted && (
-          <button
-            type="button"
-            onClick={() => onStart(course.id, recommendation?.reason)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] hover:opacity-90"
-          >
-            <PlayCircle size={14} /> {t(isInProgress ? 'Continue' : 'Start')}
-          </button>
-        )}
-        {!isCompleted && (
-          <button
-            type="button"
-            onClick={() => onComplete(course.id)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--color-success-strong)]/40 hover:text-[var(--color-success-strong)]"
-          >
-            <CheckCircle2 size={14} /> {t('Complete')}
-          </button>
-        )}
-        {!isSaved && !isInProgress && !isCompleted && (
-          <button
-            type="button"
-            onClick={() => onSave(course.id, recommendation?.reason)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
-          >
-            <BookmarkPlus size={14} /> {t('Save')}
-          </button>
-        )}
-        {isSaved && (
-          <motion.span
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-success-strong)]"
-          >
-            <BookmarkCheck size={14} /> {t('Saved')}
-          </motion.span>
-        )}
-        {!isCompleted && (
-          <button
-            type="button"
-            onClick={() => onDismiss(course.id, recommendation?.reason)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          >
-            <X size={14} /> {t('Dismiss')}
-          </button>
-        )}
-        {(isSaved || isInProgress || isDismissed) && (
-          <button
-            type="button"
-            onClick={() => onRemove(course.id)}
-            className="text-xs text-[var(--text-muted)] underline-offset-2 hover:underline"
-          >
-            {t('Remove')}
-          </button>
-        )}
-        <a
-          href={course.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--color-accent-strong)] hover:underline"
-        >
-          {t('Open resource')} <ExternalLink size={12} />
-        </a>
-      </div>
-    </article>
+    course.title.toLowerCase().includes(term) ||
+    course.provider.toLowerCase().includes(term) ||
+    course.category.toLowerCase().includes(term) ||
+    (course.description ?? '').toLowerCase().includes(term) ||
+    course.skills.some((skill) => skill.name.toLowerCase().includes(term))
   );
-};
+}
 
 export const LearningCenterView: React.FC = () => {
   const {
+    t,
+    targetRole,
+    savedRoles,
     learningCatalog,
     learningItems,
     learningRecommendations,
@@ -346,39 +107,32 @@ export const LearningCenterView: React.FC = () => {
     completeLearningCourse,
     updateLearningProgress,
     removeLearningCourse,
-    targetRole, t} = useCareer();
+  } = useCareer();
 
-  // The categories the catalogue actually offers. They are read before the
-  // filter state below, because the filter is validated against them.
-  const categories = useMemo(
-    () => [...new Set(learningCatalog.map((course) => course.category))].sort(),
-    [learningCatalog]
-  );
-
-  // The open tab and the filters are part of the page the user is looking at,
-  // so they live in the URL and survive a refresh.
   const [tab, setTab] = useRouteParam<HubTab>('tab', LEARNING_TABS, 'recommended');
-  const [category, setCategory] = useRouteParam<string>(
-    'category',
-    ['all', ...categories],
-    'all'
-  );
-  const [level, setLevel] = useRouteParam<string>('level', LEARNING_LEVELS, 'all');
-  const [availability, setAvailability] = useRouteParam<string>(
-    'availability',
-    LEARNING_AVAILABILITY,
-    'all'
-  );
-  const [format, setFormat] = useRouteParam<string>('format', LEARNING_FORMATS, 'all');
-  const [language, setLanguage] = useRouteParam<string>('language', LEARNING_LANGUAGES, 'all');
   const [search, setSearch] = useState('');
+  const [progressDrafts, setProgressDrafts] = useState<Record<string, number>>({});
   const [weeklyHours, setWeeklyHours] = useState(learningRecommendationMeta.weeklyHours);
-  const [budget, setBudget] = useState<'free_only' | 'low' | 'any'>(learningRecommendationMeta.budget);
+  const [budget, setBudget] = useState<'free_only' | 'low' | 'any'>(
+    learningRecommendationMeta.budget
+  );
   const [preferredFormat, setPreferredFormat] = useState<CourseFormat | 'any'>(
     learningRecommendationMeta.preferredFormat
   );
-  const [progressDrafts, setProgressDrafts] = useState<Record<string, number>>({});
-  const [requestedAi, setRequestedAi] = useState(false);
+
+  // Explore filters.
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [skillFilter, setSkillFilter] = useState<string>('all');
+  const [providerFilter, setProviderFilter] = useState<string>('all');
+  const [availabilityFilter, setAvailabilityFilter] =
+    useState<AvailabilityFilter>('all');
+  const [levelFilter, setLevelFilter] = useState<CourseLevel | 'all'>('all');
+  const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
+  const [languageFilter, setLanguageFilter] = useState<string>('all');
+  const [formatFilter, setFormatFilter] = useState<CourseFormat | 'all'>('all');
+
+  const initialRequest = useRef(false);
+  const [aiRequested, setAiRequested] = useState(false);
 
   useEffect(() => {
     setWeeklyHours(learningRecommendationMeta.weeklyHours);
@@ -390,14 +144,16 @@ export const LearningCenterView: React.FC = () => {
     learningRecommendationMeta.preferredFormat,
   ]);
 
-  // Ask for AI explanations once when the hub opens. The request still goes
-  // through the deterministic engine; if Gemini is unavailable the same
-  // candidates are shown with the fallback reason.
+  // The page never calls the model on open. Deterministic recommendations are
+  // already loaded with the career graph; this is only a safety net for a
+  // first visit where that initial request failed.
   useEffect(() => {
-    if (requestedAi) return;
-    setRequestedAi(true);
-    void refreshLearningRecommendations({ ai: true });
-  }, [refreshLearningRecommendations, requestedAi]);
+    if (initialRequest.current) return;
+    initialRequest.current = true;
+    if (learningRecommendations.length === 0 && !isLearningLoading) {
+      void refreshLearningRecommendations({ ai: false });
+    }
+  }, [isLearningLoading, learningRecommendations.length, refreshLearningRecommendations]);
 
   const itemByCourse = useMemo(() => {
     const map = new Map<string, LearningItem>();
@@ -419,47 +175,130 @@ export const LearningCenterView: React.FC = () => {
     return map;
   }, [learningRecommendations]);
 
-  const searchMatches = (course: LearningCourse) => {
-    if (!search.trim()) return true;
-    const term = search.toLowerCase();
-    return (
-      course.title.toLowerCase().includes(term) ||
-      course.provider.toLowerCase().includes(term) ||
-      course.skills.some((skill) => skill.name.toLowerCase().includes(term))
+  const roleOptions = useMemo(() => {
+    const entries = [targetRole, ...savedRoles].filter(
+      (role, index, list) => list.findIndex((entry) => entry.id === role.id) === index
     );
+    return entries;
+  }, [savedRoles, targetRole]);
+
+  const skillOptions = useMemo(
+    () =>
+      [...new Set(learningCatalog.flatMap((course) => course.skills.map((s) => s.name)))]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    [learningCatalog]
+  );
+
+  const providerOptions = useMemo(
+    () =>
+      [...new Set(learningCatalog.map((course) => course.provider))]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    [learningCatalog]
+  );
+
+  const languageOptions = useMemo(
+    () =>
+      [...new Set(learningCatalog.map((course) => course.language))]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    [learningCatalog]
+  );
+
+  const matchesExploreFilters = (course: LearningCourse) => {
+    if (roleFilter !== 'all' && !course.roles.some((role) => role.roleSlug === roleFilter)) {
+      return false;
+    }
+    if (skillFilter !== 'all' && !course.skills.some((skill) => skill.name === skillFilter)) {
+      return false;
+    }
+    if (providerFilter !== 'all' && course.provider !== providerFilter) return false;
+    if (
+      availabilityFilter !== 'all' &&
+      availabilityBucket(course.availability) !== availabilityFilter
+    ) {
+      return false;
+    }
+    if (levelFilter !== 'all' && course.level !== levelFilter) return false;
+    if (!matchesDuration(course, durationFilter)) return false;
+    if (languageFilter !== 'all' && course.language !== languageFilter) return false;
+    if (formatFilter !== 'all' && course.format !== formatFilter) return false;
+    return matchesSearch(course, search);
   };
 
-  const matchesFilters = (course: LearningCourse) => {
-    if (category !== 'all' && course.category !== category) return false;
-    if (level !== 'all' && course.level !== level) return false;
-    if (availability !== 'all' && course.availability !== availability) return false;
-    if (format !== 'all' && course.format !== format) return false;
-    if (language !== 'all' && course.language !== language) return false;
-    return searchMatches(course);
-  };
+  const filteredRecommendations = learningRecommendations.filter((recommendation) =>
+    matchesExploreFilters(recommendation.course)
+  );
 
-  const filteredRecommendations = learningRecommendations.filter((rec) =>
-    matchesFilters(rec.course)
+  const catalogFiltered = useMemo(
+    () =>
+      learningCatalog
+        .filter(matchesExploreFilters)
+        .sort((a, b) => {
+          const tier = providerTier(a.provider) - providerTier(b.provider);
+          if (tier !== 0) return tier;
+          return a.title.localeCompare(b.title);
+        }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      learningCatalog,
+      roleFilter,
+      skillFilter,
+      providerFilter,
+      availabilityFilter,
+      levelFilter,
+      durationFilter,
+      languageFilter,
+      formatFilter,
+      search,
+    ]
   );
 
   const itemsByStatus = (status: LearningItem['status']) =>
     learningItems
       .filter((item) => item.status === status)
       .map((item) => ({ item, course: courseById.get(item.courseId) }))
-      .filter((entry): entry is { item: LearningItem; course: LearningCourse } => Boolean(entry.course));
+      .filter(
+        (entry): entry is { item: LearningItem; course: LearningCourse } =>
+          Boolean(entry.course)
+      );
 
   const savedItems = itemsByStatus('saved');
   const inProgressItems = itemsByStatus('in_progress');
   const completedItems = itemsByStatus('completed');
 
-  const catalogFiltered = learningCatalog.filter(matchesFilters);
+  const clearFilters = () => {
+    setRoleFilter('all');
+    setSkillFilter('all');
+    setProviderFilter('all');
+    setAvailabilityFilter('all');
+    setLevelFilter('all');
+    setDurationFilter('all');
+    setLanguageFilter('all');
+    setFormatFilter('all');
+    setSearch('');
+  };
 
-  const handleRefresh = () => {
+  const activeFilterCount = [
+    roleFilter !== 'all',
+    skillFilter !== 'all',
+    providerFilter !== 'all',
+    availabilityFilter !== 'all',
+    levelFilter !== 'all',
+    durationFilter !== 'all',
+    languageFilter !== 'all',
+    formatFilter !== 'all',
+    search.trim().length > 0,
+  ].filter(Boolean).length;
+
+  const handleRefresh = (ai: boolean) => {
+    if (ai) setAiRequested(true);
     void refreshLearningRecommendations({
       weeklyHours,
       budget,
       preferredFormat,
-      ai: true,
+      ai,
     });
   };
 
@@ -489,7 +328,12 @@ export const LearningCenterView: React.FC = () => {
     { id: 'catalog', label: 'Explore catalog', count: learningCatalog.length },
   ];
 
-  const top = filteredRecommendations[0];
+  const top = learningRecommendations[0];
+  const roleLabel =
+    learningRecommendationMeta.targetRoleTitle || targetRole.title || t('your target role');
+
+  const filterSelectClass =
+    'rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]';
 
   return (
     <Reveal className="space-y-7">
@@ -502,18 +346,32 @@ export const LearningCenterView: React.FC = () => {
             {t('What should you learn next?')}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">
-            {learningRecommendationMeta.targetRoleTitle ?? targetRole.title}: {t('recommendations are ranked from your skill gaps, roadmap and learning history. Every course is a real catalogue entry.')}
+            {roleLabel}:{' '}
+            {t(
+              'recommendations are ranked from your skill gaps, roadmap and learning history. Every course is a real catalogue entry.'
+            )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={isLearningLoading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90 disabled:opacity-50"
-        >
-          <RefreshCw size={15} className={isLearningLoading ? 'animate-spin' : ''} />
-          {t(isLearningLoading ? 'Ranking…' : 'Refresh recommendations')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleRefresh(false)}
+            disabled={isLearningLoading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:border-[var(--border-strong)] disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={isLearningLoading ? 'animate-spin' : ''} />
+            {t(isLearningLoading ? 'Ranking…' : 'Refresh')}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRefresh(true)}
+            disabled={isLearningLoading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90 disabled:opacity-50"
+          >
+            <Sparkles size={15} />
+            {t('Explain with AI')}
+          </button>
+        </div>
       </div>
 
       {learningError && (
@@ -546,42 +404,31 @@ export const LearningCenterView: React.FC = () => {
         <span className="mx-2 text-[var(--text-muted)]">•</span>
         {learningRecommendationMeta.roadmapSkillCount} {t('roadmap skills')}
         <span className="mx-2 text-[var(--text-muted)]">•</span>
-        {learningRecommendationMeta.weeklyHours}{t('h/week')}, {t(learningRecommendationMeta.budget.replace('_', ' '))}
+        {learningRecommendationMeta.weeklyHours}
+        {t('h/week')}, {t(learningRecommendationMeta.budget.replace('_', ' '))}
+        {aiRequested && !learningRecommendationMeta.aiUsed && (
+          <span className="ms-2 text-[var(--text-muted)]">
+            {t('AI explanations were not available; the deterministic reasons are shown.')}
+          </span>
+        )}
       </div>
 
-      {top && (
-        <section className="rounded-2xl border border-[var(--color-accent)]/25 bg-gradient-to-br from-[var(--color-accent)]/10 via-[var(--bg-surface)] to-[var(--bg-surface)] p-5">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
-            <Trophy size={14} /> {t('Next best step')}
-          </div>
-          <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-            <div>
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">{top.course.title}</h2>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                {top.aiExplanation ?? top.reason}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {top.matchedSkills.slice(0, 4).map((skill) => (
-                  <span
-                    key={skill}
-                    className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
-              <div className="text-3xl font-bold text-[var(--color-accent-strong)]">{Math.round(top.score)}</div>
-              <div className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                {t('deterministic')}
-                <br />
-                {t('match score')}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] pb-2">
+        {tabs.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            onClick={() => setTab(entry.id)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === entry.id
+                ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            {t(entry.label)} <span className="text-[11px] opacity-70">{entry.count}</span>
+          </button>
+        ))}
+      </div>
 
       <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -615,126 +462,102 @@ export const LearningCenterView: React.FC = () => {
             {t('Format')}
             <select
               value={preferredFormat}
-              onChange={(event) => setPreferredFormat(event.target.value as CourseFormat | 'any')}
+              onChange={(event) =>
+                setPreferredFormat(event.target.value as CourseFormat | 'any')
+              }
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[var(--text-primary)]"
             >
               <option value="any">{t('Any format')}</option>
-              <option value="course">{t('Course')}</option>
-              <option value="learning_path">{t('Learning path')}</option>
-              <option value="professional_certificate">{t('Professional certificate')}</option>
-              <option value="tutorial">{t('Tutorial')}</option>
-              <option value="video">{t('Video')}</option>
-              <option value="playlist">{t('Playlist')}</option>
+              {FORMAT_OPTIONS.filter((option) => option.value !== 'all').map((option) => (
+                <option key={option.value} value={option.value}>
+                  {t(option.label)}
+                </option>
+              ))}
             </select>
           </label>
           <button
             type="button"
-            onClick={handleRefresh}
+            onClick={() => handleRefresh(false)}
             disabled={isLearningLoading}
-            className="ml-auto rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--color-accent)] disabled:opacity-50"
+            className="ms-auto rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--color-accent)] disabled:opacity-50"
           >
-            {t('Apply')}
+            {t('Apply preferences')}
           </button>
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] pb-2">
-        {tabs.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            onClick={() => setTab(entry.id)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === entry.id
-                ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            {t(entry.label)} <span className="text-[11px] opacity-70">{entry.count}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search size={14} className="pointer-events-none absolute start-2.5 top-2.5 text-[var(--text-muted)]" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t('Search courses, providers or skills')}
-            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-2 ps-8 pe-3 text-sm text-[var(--text-primary)]"
-          />
-        </div>
-        <select
-          value={category}
-          onChange={(event) => setCategory(event.target.value)}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
-        >
-          <option value="all">{t('All categories')}</option>
-          {categories.map((entry) => (
-            <option key={entry} value={entry}>
-              {t(entry)}
-            </option>
-          ))}
-        </select>
-        <select
-          value={level}
-          onChange={(event) => setLevel(event.target.value)}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
-        >
-          <option value="all">{t('All levels')}</option>
-          {(['Beginner', 'Intermediate', 'Advanced'] as CourseLevel[]).map((entry) => (
-            <option key={entry} value={entry}>
-              {t(entry)}
-            </option>
-          ))}
-        </select>
-        <select
-          value={availability}
-          onChange={(event) => setAvailability(event.target.value)}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
-        >
-          <option value="all">{t('All availability')}</option>
-          {Object.entries(AVAILABILITY_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {t(label)}
-            </option>
-          ))}
-        </select>
-        <select
-          value={format}
-          onChange={(event) => setFormat(event.target.value)}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
-        >
-          <option value="all">{t('All formats')}</option>
-          {Object.entries(FORMAT_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {t(label)}
-            </option>
-          ))}
-        </select>
-        <select
-          value={language}
-          onChange={(event) => setLanguage(event.target.value)}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]"
-          aria-label={t('Language')}
-        >
-          <option value="all">{t('All languages')}</option>
-          <option value="Arabic">{t('Arabic')}</option>
-          <option value="English">{t('English')}</option>
-        </select>
-      </div>
-
       {tab === 'recommended' && (
         <section className="space-y-4">
-          {filteredRecommendations.length === 0 ? (
+          {top && (
+            <div className="rounded-2xl border border-[var(--color-accent)]/25 bg-gradient-to-br from-[var(--color-accent)]/10 via-[var(--bg-surface)] to-[var(--bg-surface)] p-5">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
+                <Trophy size={14} /> {t('Next best step')}
+              </div>
+              <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                <div>
+                  <h2 className="text-xl font-bold text-[var(--text-primary)]">
+                    {top.course.title}
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    {top.aiExplanation ?? top.reason}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {top.matchedSkills.slice(0, 4).map((skill) => (
+                      <span
+                        key={skill}
+                        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+                  <div className="text-3xl font-bold text-[var(--color-accent-strong)]">
+                    {Math.round(top.score)}
+                  </div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                    {t('deterministic')}
+                    <br />
+                    {t('match score')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                {t('Recommended for You')} — {roleLabel}
+              </h2>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                {learningRecommendations.length} {t('courses')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTab('catalog')}
+              className="text-xs font-semibold text-[var(--color-accent-strong)] hover:underline"
+            >
+              {t('Browse the full catalog')}
+            </button>
+          </div>
+
+          {learningRecommendations.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)]">
               <BookOpen size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
-              {t('No recommendations match these filters. Increase your budget or clear a filter.')}
+              {t(
+                'No recommendations are available yet. Refresh your ranking to try again.'
+              )}
             </div>
           ) : (
-            <Stagger key="recommended" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredRecommendations.slice(0, 12).map((recommendation) => (
+            <Stagger
+              key="recommended"
+              gap={0.06}
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            >
+              {learningRecommendations.slice(0, 12).map((recommendation) => (
                 <StaggerItem key={recommendation.course.id} className="h-full">
                   <CourseCard {...cardProps(recommendation.course, recommendation)} />
                 </StaggerItem>
@@ -751,7 +574,9 @@ export const LearningCenterView: React.FC = () => {
               compact
               icon={BookmarkCheck}
               title={t('Nothing saved yet')}
-              description={t('Save a course from your recommendations and it will wait here until you are ready to start it.')}
+              description={t(
+                'Save a course from your recommendations and it will wait here until you are ready to start it.'
+              )}
             />
           ) : (
             <Stagger key="saved" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -772,13 +597,22 @@ export const LearningCenterView: React.FC = () => {
               compact
               icon={PlayCircle}
               title={t('No course in progress')}
-              description={t('Start a course and it will appear here, with the progress you have made so far.')}
+              description={t(
+                'Start a course and it will appear here, with the progress you have made so far.'
+              )}
             />
           ) : (
-            <Stagger key="in_progress" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Stagger
+              key="in_progress"
+              gap={0.06}
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            >
               {inProgressItems.map(({ course }) => (
                 <StaggerItem key={course.id} className="h-full">
-                  <CourseCard {...cardProps(course, recommendationById.get(course.id))} />
+                  <CourseCard
+                    {...cardProps(course, recommendationById.get(course.id))}
+                    showProgress
+                  />
                 </StaggerItem>
               ))}
             </Stagger>
@@ -793,7 +627,9 @@ export const LearningCenterView: React.FC = () => {
               compact
               icon={CheckCircle2}
               title={t('No completed learning yet')}
-              description={t('Finish a course and it will be recorded here as learning evidence for your career.')}
+              description={t(
+                'Finish a course and it will be recorded here as learning evidence for your career.'
+              )}
             />
           ) : (
             completedItems.map(({ item, course }) => (
@@ -805,7 +641,8 @@ export const LearningCenterView: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-[var(--text-primary)]">{course.title}</div>
                   <div className="text-xs text-[var(--text-secondary)]">
-                    {course.provider} · {t(AVAILABILITY_LABELS[course.availability])} · {t('completed')}{' '}
+                    {course.provider} · {availabilityLabel(course.availability)} ·{' '}
+                    {t('completed')}{' '}
                     {item.completedAt ? new Date(item.completedAt).toLocaleDateString() : ''}
                   </div>
                 </div>
@@ -827,31 +664,259 @@ export const LearningCenterView: React.FC = () => {
       )}
 
       {tab === 'catalog' && (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {learningCatalog.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)] md:col-span-2 xl:col-span-3">
-              <BookOpen size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
-              {t('The course catalogue could not be loaded. Refresh the page to try again.')}
+        <section className="space-y-5">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-sm font-bold text-[var(--text-primary)]">
+                <Filter size={14} /> {t('Filter the catalog')}
+                {activeFilterCount > 0 && (
+                  <span className="rounded-full bg-[var(--accent-primary)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-on-primary)]">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </div>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                >
+                  <X size={12} /> {t('Clear filters')}
+                </button>
+              )}
             </div>
-          ) : catalogFiltered.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)] md:col-span-2 xl:col-span-3">
-              <Search size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
-              {t('No courses match these filters. Clear a filter or search term.')}
+
+            <div className="mt-3">
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute start-2.5 top-2.5 text-[var(--text-muted)]"
+                />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={t('Search courses, providers, skills or topics')}
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] py-2 ps-8 pe-3 text-sm text-[var(--text-primary)]"
+                />
+              </div>
             </div>
-          ) : (
-            <Stagger key="catalog" gap={0.06} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {catalogFiltered.map((course) => (
-                <StaggerItem key={course.id} className="h-full">
-                  <CourseCard {...cardProps(course, recommendationById.get(course.id))} compact />
-                </StaggerItem>
-              ))}
-            </Stagger>
-          )}
+
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                {t('Target role')}
+                <select
+                  value={roleFilter}
+                  onChange={(event) => setRoleFilter(event.target.value)}
+                  className={filterSelectClass}
+                >
+                  <option value="all">{t('All target roles')}</option>
+                  {roleOptions.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                {t('Skill')}
+                <select
+                  value={skillFilter}
+                  onChange={(event) => setSkillFilter(event.target.value)}
+                  className={filterSelectClass}
+                >
+                  <option value="all">{t('All skills')}</option>
+                  {skillOptions.map((skill) => (
+                    <option key={skill} value={skill}>
+                      {skill}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                {t('Provider')}
+                <select
+                  value={providerFilter}
+                  onChange={(event) => setProviderFilter(event.target.value)}
+                  className={filterSelectClass}
+                >
+                  <option value="all">{t('All providers')}</option>
+                  {providerOptions.map((provider) => (
+                    <option key={provider} value={provider}>
+                      {provider}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                {t('Availability')}
+                <select
+                  value={availabilityFilter}
+                  onChange={(event) =>
+                    setAvailabilityFilter(event.target.value as AvailabilityFilter)
+                  }
+                  className={filterSelectClass}
+                >
+                  {AVAILABILITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label === 'Any availability'
+                        ? t(option.label)
+                        : option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                {t('Difficulty')}
+                <select
+                  value={levelFilter}
+                  onChange={(event) =>
+                    setLevelFilter(event.target.value as CourseLevel | 'all')
+                  }
+                  className={filterSelectClass}
+                >
+                  {LEVEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {t(option.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                {t('Duration')}
+                <select
+                  value={durationFilter}
+                  onChange={(event) =>
+                    setDurationFilter(event.target.value as DurationFilter)
+                  }
+                  className={filterSelectClass}
+                >
+                  {DURATION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {t(option.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                <span className="inline-flex items-center gap-1">
+                  <Languages size={11} /> {t('Language')}
+                </span>
+                <select
+                  value={languageFilter}
+                  onChange={(event) => setLanguageFilter(event.target.value)}
+                  className={filterSelectClass}
+                >
+                  <option value="all">{t('All languages')}</option>
+                  {languageOptions.map((language) => (
+                    <option key={language} value={language}>
+                      {language}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                {t('Course type')}
+                <select
+                  value={formatFilter}
+                  onChange={(event) =>
+                    setFormatFilter(event.target.value as CourseFormat | 'all')
+                  }
+                  className={filterSelectClass}
+                >
+                  {FORMAT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {t(option.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                {t('Recommended for You')} — {roleLabel}
+              </h2>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                {filteredRecommendations.length} {t('courses')}
+              </p>
+            </div>
+            {filteredRecommendations.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--text-secondary)]">
+                <BookOpen size={22} className="mx-auto mb-2 text-[var(--text-muted)]" />
+                {t('No personalized recommendations match these filters.')}
+              </div>
+            ) : (
+              <Stagger
+                key="catalog-recommended"
+                gap={0.05}
+                className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+              >
+                {filteredRecommendations.map((recommendation) => (
+                  <StaggerItem key={recommendation.course.id} className="h-full">
+                    <CourseCard {...cardProps(recommendation.course, recommendation)} />
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            )}
+          </div>
+
+          <div className="space-y-4 border-t border-[var(--border-subtle)] pt-5">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                {t('Full catalog')}
+              </h2>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                {learningCatalog.length} {t('courses')}
+                {catalogFiltered.length !== learningCatalog.length
+                  ? ` · ${catalogFiltered.length} ${t('match these filters')}`
+                  : ''}
+              </p>
+            </div>
+
+            {learningCatalog.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)]">
+                <BookOpen size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
+                {t('The course catalogue could not be loaded. Refresh the page to try again.')}
+              </div>
+            ) : catalogFiltered.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-8 text-center text-sm text-[var(--text-secondary)]">
+                <Search size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
+                {t('No courses match these filters. Clear a filter or search term.')}
+              </div>
+            ) : (
+              <Stagger
+                key="catalog"
+                gap={0.05}
+                className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+              >
+                {catalogFiltered.map((course) => (
+                  <StaggerItem key={course.id} className="h-full">
+                    <CourseCard
+                      {...cardProps(course, recommendationById.get(course.id))}
+                      compact
+                      showReason={false}
+                    />
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            )}
+          </div>
         </section>
       )}
 
       <footer className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--text-secondary)]">
-        {t('Completing a course records learning progress; it does not automatically mark a skill as mastered. Update skill levels explicitly in the Skills Center.')}
+        {t(
+          'Completing a course records learning progress; it does not automatically mark a skill as mastered. Update skill levels explicitly in the Skills Center.'
+        )}
       </footer>
     </Reveal>
   );

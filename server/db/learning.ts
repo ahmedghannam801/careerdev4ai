@@ -29,6 +29,10 @@ interface CourseRow {
   format: LearningFormat;
   description: string | null;
   is_verified: boolean;
+  provider_tier: number | null;
+  rating: number | string | null;
+  rating_count: number | null;
+  thumbnail_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +93,14 @@ function toCourse(
     format: row.format,
     description: row.description,
     isVerified: row.is_verified,
+    providerTier:
+      row.provider_tier === 1 || row.provider_tier === 2 || row.provider_tier === 3
+        ? row.provider_tier
+        : undefined,
+    rating:
+      row.rating === null || row.rating === undefined ? null : Number(row.rating),
+    ratingCount: row.rating_count ?? null,
+    thumbnailUrl: row.thumbnail_url ?? null,
     skills,
     roles,
   };

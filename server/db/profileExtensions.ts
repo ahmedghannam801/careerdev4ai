@@ -443,7 +443,12 @@ export interface CreateProfileLinkInput {
   url: string;
 }
 
-export type UpdateProfileLinkInput = Partial<CreateProfileLinkInput>;
+export interface UpdateProfileLinkInput {
+  kind?: string;
+  /** `null` clears the custom label and restores the kind's default. */
+  label?: string | null;
+  url?: string;
+}
 
 interface ProfileLinkRow {
   id: string;

@@ -480,7 +480,7 @@ export async function postProfileLink(input: {
 
 export async function patchProfileLink(
   id: string,
-  updates: { kind?: string; label?: string; url?: string }
+  updates: { kind?: string; label?: string | null; url?: string }
 ): Promise<ProfileLinkDTO> {
   const data = await request<{ success: boolean; link: ProfileLinkDTO }>(
     `/api/profile-links/${id}`,
