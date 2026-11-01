@@ -14,16 +14,17 @@
 | New public URL | <https://careerdev4ai.pages.dev/> |
 | New Cloudflare Pages project | `careerdev4ai` |
 | Production branch | `main` |
-| Deployment ID | `eed6ba5b-30d4-4590-9c08-8fb3c4912237` |
-| Deployment URL | <https://eed6ba5b.careerdev4ai.pages.dev> |
-| Source commit recorded by Pages | `90fd68f` (built from the uncommitted working tree) |
-| Files uploaded | 50 static files + `_headers` + `_worker.js` |
+| Deployment ID | `dc27e48e-eaf5-4b6a-93f0-1160a799a2d4` |
+| Deployment URL | <https://dc27e48e.careerdev4ai.pages.dev> |
+| Source commit recorded by Pages | `796edc2` — `fix: improve roadmap relevance and learning UX` |
+| Files uploaded | 27 new/changed static files + `_headers` + `_worker.js` |
 | Backend | Existing Supabase project `ciihprsfdojzvjnqgbxl` (reused, unmodified) |
 | Old public URL | <https://careerpilot4ai.pages.dev/> |
 | Old project status | **Untouched**, still serving the previous build |
 
 The new site is a separate Pages project. The old one was neither redeployed,
-renamed, nor deleted.
+renamed, nor deleted. The previous deployment (`eed6ba5b`, source `90fd68f`)
+remains in the Pages history and can be used for rollback.
 
 ---
 
@@ -47,8 +48,9 @@ Build output at deploy time:
 dist/index.html                       3.48 kB
 dist/assets/careerpilot-icon-*.png   40.76 kB
 dist/assets/careerpilot-logo-*.png  194.17 kB
-dist/assets/index-*.css              80.20 kB
-dist/assets/index-*.js               ~600.7 kB   (advisory warning only)
+dist/assets/index-rAAY25kA.css       78.52 kB
+dist/assets/index-C0Vs6WKr.js       587.46 KiB (601.55 kB, advisory warning only)
+dist/assets/RoadmapView-CCG_F6ay.js  31.33 KiB
 ```
 
 ---
@@ -112,8 +114,10 @@ what publishes `careerdev4ai.pages.dev`.
 | Canonical | `https://careerdev4ai.pages.dev/` |
 | `CareerPilot` in HTML | 0 |
 | `CareerDev4AI` in HTML | 6 |
-| `CareerPilot` across all 6 built JS assets | 0 |
-| `CareerDev4AI` across the same assets | 50 |
+| `CareerPilot` across all built JS assets | 0 |
+| `CareerDev4AI` across the same assets | 50+ |
+| Deployed `RoadmapView-CCG_F6ay.js` | contains `START HERE`, `LEARN THIS`, `WHY THIS MATTERS`, `RESOURCE`, `OUTCOME`, `Start Learning` |
+| Deployed bundle matches local `dist/index.html` | yes (`assets/index-C0Vs6WKr.js`) |
 
 ### 5.2 API surface
 
@@ -183,6 +187,28 @@ permissions-policy: camera=(), microphone=(), geolocation=()
 The CSP `connect-src` still points at the reused Supabase project, which is
 correct: the backend did not change.
 
+### 5.6 Follow-up verification — relevance and roadmap UX
+
+Authenticated checks used a temporary Supabase user with the target role
+`HR Specialist` (profile written through the admin API, signed in through the
+real UI). The user and its cascade data were deleted afterwards.
+
+| Check | Result |
+| --- | --- |
+| `POST /api/learning/recommendations` (`hr-specialist`, `ai:false`) | 200; CIPD, BambooHR, Arabic HR course, Excel, Trust/Communication; **0 SQL-like titles** |
+| `POST /api/learning/recommendations` (`data-analyst`, `ai:false`) | 200; SQL courses present, as expected for that role |
+| `POST /api/roadmap/generate` | 200; 4 phases, 14 tasks, 0 unsafe resource URLs, 0 SQL resources on non-SQL HR tasks |
+| Live roadmap `Start Learning` hrefs | real stored sources, e.g. ICO, CIPD, BambooHR, Coursera, edX |
+| CTA attributes | `target="_blank"`, `rel="noopener noreferrer"`, minimum height 44 px |
+| Stage order | START → Foundation → Core Skills → Practice → Projects → Job Preparation → Final state |
+| 320 / 390 / 768 px, LTR and RTL | no page-level horizontal overflow; 6 CTAs at ≥ 44 px; stepper scrolls only inside its own container |
+| Live Learning Hub page | HR Specialist next step CIPD; no SQL text in the recommendation list |
+| Legacy `https://careerpilot4ai.pages.dev/` | 200, old build unchanged |
+
+The viewport measurements used a same-origin local harness because the deployed
+origin sends `X-Frame-Options: DENY`. The harness and proxy lived outside the
+repository and were stopped after the check.
+
 ---
 
 ## 6. Legacy deployment protection
@@ -207,14 +233,16 @@ careerpilot4ai   careerpilot4ai.pages.dev   No git provider     modified ~4 hour
 
 ## 7. Cleanup
 
-- Temporary verification user `cp-verify-…@example.com` deleted via the Supabase
-  admin API (HTTP 200).
-- Temporary credentials file removed.
-- Temporary verification/cleanup scripts left only in
+- Temporary verification users (`cp-verify-…@example.com` and the follow-up
+  `cp-live-…@example.invalid` / `cp-live-ui-…@example.invalid`) were deleted via
+  the Supabase admin API (HTTP 200). Cascade deletes removed their profiles,
+  roadmap, learning items and preferences.
+- Temporary credentials files were removed.
+- Temporary verification/cleanup scripts, the local dev server and the
+  frame-friendly viewport proxy were left only in
   `D:\Claude-Workspace\Temp\opencode\` — outside the repository, never imported
-  by the app.
-- Local dev server stopped; no QA harness files were added to the repo in this
-  pass.
+  by the app. The servers were stopped after the checks.
+- No QA harness files were added to the repo in this pass.
 
 ---
 
@@ -229,17 +257,23 @@ careerpilot4ai   careerpilot4ai.pages.dev   No git provider     modified ~4 hour
    as configured and the Copilot UI renders and accepts input, but the free tier
    returned `429 RESOURCE_EXHAUSTED` earlier in the session, so an actual model
    response was not captured against the new origin.
-3. **Mobile viewport not re-emulated.** Responsive behaviour was verified in the
-   earlier UX pass at 320/390/768/1000 px. This pass confirmed no page-level
-   horizontal overflow and correct RTL at available desktop widths, but did not
-   run a true 390 px device emulation. The rebrand did not touch layout CSS.
-4. **Deployed from an uncommitted working tree.** 73 modified and 14 untracked
-   files are still uncommitted. The Pages source hash `90fd68f` refers to the
-   last commit, not the exact bytes uploaded, so the deployment is not
-   reproducible from git until these changes are committed.
-5. **Bundle size warning.** `index-*.js` ≈ 600.7 kB, just over Vite's advisory
-   threshold. Pre-existing; no action taken.
-6. **Old deployment remains publicly reachable** with the old branding. That is
+3. **Mobile viewport.** The redesigned roadmap was measured at true
+   `320 / 390 / 768 px` viewports in both LTR and RTL through a same-origin local
+   harness (the deployed origin sends `X-Frame-Options: DENY`, so it cannot be
+   iframed directly). At every width there was no page-level horizontal
+   overflow, the CTAs were at least 44 px tall, and the stage stepper scrolled
+   only inside its own container. Desktop (`1000 px`) was checked on the live
+   origin.
+4. **Committed and traceable deployment.** The working tree is committed as
+   `796edc2`; the Pages deployment records the same source hash. Future
+   deployments are reproducible from git.
+5. **Bundle size warning.** `index-C0Vs6WKr.js` is 601.55 kB, just over Vite's
+   advisory threshold. Pre-existing; no action taken.
+6. **AI enrichment fallback.** The live Learning Hub reported
+   “AI generation failed; deterministic ranking was used”. This is the designed
+   fallback while the free Gemini tier is rate-limited; the deterministic
+   relevance gate and ranking are fully exercised and tested.
+7. **Old deployment remains publicly reachable** with the old branding. That is
    intentional per the requirement to preserve it, but it means two brands are
    live until the old project is retired or redirected — a decision left to the
    owner.
@@ -250,9 +284,10 @@ careerpilot4ai   careerpilot4ai.pages.dev   No git provider     modified ~4 hour
 
 Nothing to roll back on the old project — it was never modified. To withdraw the
 new brand, delete or unpublish the `careerdev4ai` Pages project; the legacy
-`careerpilot4ai` deployment continues to serve unchanged. To revert the code,
-restore the 73 modified files from git history (they are uncommitted, so
-`git diff` is the record).
+`careerpilot4ai` deployment continues to serve unchanged. To roll the code back,
+revert commit `796edc2` and redeploy; the previous Pages deployment
+`eed6ba5b-30d4-4590-9c08-8fb3c4912237` (source `90fd68f`) also remains in the
+project history and can be promoted if needed.
 
 ---
 
@@ -260,9 +295,7 @@ restore the 73 modified files from git history (they are uncommitted, so
 
 1. Add the new origin to Supabase Auth → URL Configuration (Site URL and
    redirect allow-list) and re-test Google / LinkedIn / GitHub sign-in.
-2. Commit the working tree so future Pages deployments are traceable to a
-   commit.
-3. Run one live Copilot prompt once the Gemini quota resets, to close the last
+2. Run one live Copilot prompt once the Gemini quota resets, to close the last
    functional gap.
-4. Decide whether `careerpilot4ai` should be retired, redirected, or kept as a
+3. Decide whether `careerpilot4ai` should be retired, redirected, or kept as a
    frozen legacy snapshot.

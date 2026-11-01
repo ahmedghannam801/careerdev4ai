@@ -16,14 +16,17 @@ point-in-time records.
 | --- | --- |
 | Rebrand coverage (user-facing surfaces) | **Complete** — no `CareerPilot` in built HTML or JS bundles |
 | `npm run lint` (`tsc --noEmit`) | **Pass** — 0 errors |
-| `npm test` | **Pass** — 548 tests, 546 pass, 2 skipped, 0 fail |
-| Localisation coverage | **Pass** — 1097/1097 source strings (100%), English + Arabic |
+| `npm test` | **Pass** — 560 tests, 558 pass, 2 skipped, 0 fail |
+| Localisation coverage | **Pass** — 1110/1110 source strings (100%), English + Arabic |
 | `npm run build` | **Pass** — exit 0, `dist/` + `dist/_worker.js` produced |
+| Commit | `796edc2` — `fix: improve roadmap relevance and learning UX` |
 | New deployment `careerdev4ai` | **Live** — <https://careerdev4ai.pages.dev/> |
 | Legacy deployment `careerpilot4ai` | **Untouched** — still serving the old build |
 
-The rebrand is cosmetic and configuration-only. No route, schema, RLS policy,
-Supabase project, stored data, or product behaviour was changed.
+The rebrand itself was cosmetic and configuration-only. No route, schema, RLS
+policy, Supabase project or stored data was changed. The follow-up pass in
+section 9 tightened recommendation relevance and rebuilt the roadmap learning
+card hierarchy; both are covered by new regression tests and live verification.
 
 ---
 
@@ -160,7 +163,7 @@ No output, exit 0.
 ```
 > careerdev4ai@1.0.0 test
 > node tests/runner.mjs
-ℹ tests 548   ℹ pass 546   ℹ fail 0   ℹ skipped 2
+ℹ tests 560   ℹ pass 558   ℹ fail 0   ℹ skipped 2
 [test] PASS
 ```
 
@@ -169,7 +172,7 @@ The two skips are the pre-existing conditional cases (they only run when
 live database and deletes every identity and storage object it creates.
 
 ```
-localisation coverage: 1097/1097 source strings (100%)
+localisation coverage: 1110/1110 source strings (100%)
 raw English literals still in the components: 55 (unchanged baseline)
 ```
 
@@ -220,44 +223,137 @@ Confirmed after deployment:
    completion was generated during this pass because the free tier returned
    `429 RESOURCE_EXHAUSTED` earlier in the session. The configuration and the
    UI path are verified; the model call itself is not.
-3. **Mobile viewport.** Responsive behaviour was verified in the earlier UX
-   pass at 320/390/768/1000 px in both LTR and RTL. This pass confirmed no
-   page-level horizontal overflow and correct RTL at the available desktop
-   widths, but did not re-run a true 390 px emulation. The mobile CSS is
-   unchanged by the rebrand.
+3. **Mobile viewport.** The redesigned roadmap was measured at true
+   `320 / 390 / 768 px` viewports in both LTR and RTL using a same-origin local
+   harness (the deployed site sends `X-Frame-Options: DENY`, so it cannot be
+   iframed). At every width the page had no horizontal overflow, the six
+   Start Learning CTAs were at least 44 px tall, and the stage stepper scrolled
+   only inside its own container. Desktop (`1000 px`) was checked on the live
+   origin.
 4. **Chunk size warning** as noted in section 5 — cosmetic.
-5. **Working tree is uncommitted.** 73 modified files and 14 untracked files
-   (see section 8). Nothing has been committed; the deployment was built from
-   the working tree.
+5. **AI enrichment fallback.** The live Learning Hub reported
+   “AI generation failed; deterministic ranking was used”. This is the designed
+   fallback while the free Gemini tier is rate-limited; the deterministic
+   relevance gate and ranking are fully exercised and tested.
 
 ---
 
 ## 8. Working tree state
 
 ```
-73 files changed, 2616 insertions(+), 1089 deletions(-)
-untracked: 14
+796edc2  fix: improve roadmap relevance and learning UX
+         (93 files, 7229 insertions, 1125 deletions — deployed)
+ddfba34  docs: record relevance, roadmap UX and deployment verification
+         (these two reports)
+working tree: clean
 ```
 
-Untracked entries are the earlier UX work and its reports, not rebrand
-artifacts:
+The commit includes the earlier rebrand/UX work and its reports, the new
+relevance-gate regression tests, `shared/learningLinks.ts`, the redesigned
+roadmap UI and the Arabic strings. No secret, `.env`, `dist/` or generated
+Android asset was committed. No destructive git command (`reset --hard`,
+`clean -fd`, `checkout .`) was used at any point.
 
-```
-CAREERDEV4AI_FINAL_TEST_REPORT.md
-CAREERDEV4AI_UX_IMPLEMENTATION.md
-CAREERDEV4AI_UX_INTELLIGENCE_AUDIT.md
-PLATFORM_AUDIT_FIXED_REPORT.md
-PLATFORM_AUDIT_WORKING_REPORT.md
-QA_VERIFICATION_REPORT.md
-server/db/skillEvidence.ts
-src/components/copilot/AiResponse.tsx
-src/lib/aiResponse.ts
-supabase/migrations/20261101000001_certificate_details_and_skills.sql
-supabase/migrations/20261102000001_arabic_video_catalog.sql
-supabase/migrations/20261102000002_volunteer_egypt.sql
-tests/ai-response.test.ts
-tests/certificates.test.ts
-```
+---
 
-No destructive git command (`reset --hard`, `clean -fd`, `checkout .`) was used
-at any point.
+## 9. Follow-up pass — relevance gate and roadmap learning UX
+
+### 9.1 Problem
+
+An HR target role could receive an unrelated SQL course. The old scoring allowed
+catalogue category, career goal, language, format, price and the saved flag to
+create enough “weak relevance” for a course to enter the list. The roadmap also
+mixed learning resources, status and details into one low-contrast card, and its
+`Start Learning` action did not reliably open the stored source.
+
+### 9.2 Recommendation relevance gate
+
+`server/learning/recommendation.ts` now treats relevance as a **gate**, not a
+weight. When a target role exists, a course is eligible only if at least one of
+these is true:
+
+- it carries an explicit tag for the target role (`roleRelevance > 0`);
+- it teaches one of the role’s own skills (`roleSkillScore > 0`);
+- it closes an open skill gap (`gapScore > 0`);
+- it is attached to the current roadmap (`roadmapScore > 0`).
+
+Category/domain, career goal, language, format, price, the saved flag and an
+explicit focus skill are ranking signals only; they cannot make an ineligible
+course eligible. Without a target role the older, weaker exploration behaviour
+is kept so a new user can still browse before choosing a role. Language and
+format can reorder relevant courses but cannot resurrect an irrelevant one.
+
+No role-specific exception was hard-coded: SQL is still allowed for Data
+Analyst and HR Analyst because it is genuinely one of their role skills, while
+HR Specialist rejects a general SQL course through the generic rule.
+
+### 9.3 Roadmap learning hierarchy
+
+`src/components/views/RoadmapView.tsx` now presents each step as:
+
+1. **START HERE** — one obvious next action, its stage and the attached source.
+2. **LEARN THIS** — the skill and priority.
+3. **WHY THIS MATTERS** — the role-specific reason.
+4. **RESOURCE** — the primary learning source with `Start Learning ↗`, plus
+   secondary sources.
+5. **OUTCOME** — what the step makes the user able to do.
+6. **Details / Status** — prerequisites, projects, hours and the status control,
+   visually subordinate.
+
+The primary CTA opens the stored URL in a new tab (`target="_blank"`,
+`rel="noopener noreferrer"`). `shared/learningLinks.ts` only allows absolute
+`http(s)` URLs; a missing or unsafe URL renders an honest “no verified resource
+link” message instead of a misleading action. Task status is updated to
+`in_progress` on the same click, so existing progress semantics are preserved.
+
+The plan order is now explicit: **START → Foundation → Core Skills → Practice →
+Projects → Job Preparation → JOB READY**. Progress, completed tasks,
+prerequisites, projects, saved resources, target-role logic, Arabic/English
+filtering and persisted roadmap data are all read from the existing state; the
+view never regenerates or resets a roadmap.
+
+Resource attachment in `shared/roadmapGenerator.ts` now uses the shared
+`skillMatchConfidence` with a `>= 0.8` threshold, replacing the loose
+“shares one significant token” match that could attach unrelated material.
+
+### 9.4 Regression tests
+
+New `tests/recommendation-relevance.test.ts` (12 tests, wired into
+`tests/runner.mjs`) covers:
+
+- HR role + HR resource → allowed;
+- HR role + unrelated SQL resource → rejected and absent from the ranking;
+- category, saved flag and focus skill cannot create eligibility;
+- Data Analyst + SQL → allowed;
+- language/format cannot override relevance;
+- a relevant course survives a language/format mismatch;
+- next-step selection prefers the HR course;
+- stored URL → CTA URL; missing/relative/`javascript:`/`ftp:`/malformed URL →
+  no external action;
+- roadmap resource attachment only to the gap it teaches;
+- no re-created work for a skill already met;
+- first stage remains current for a new user.
+
+`tests/b5.test.ts` was updated for the gate. The full suite is now
+560 tests / 558 pass / 2 skipped / 0 fail, and localisation is 1110/1110.
+
+### 9.5 Live verification (post-deploy)
+
+| Check | Result |
+| --- | --- |
+| `GET https://careerdev4ai.pages.dev/` | 200 |
+| Deployed `RoadmapView-CCG_F6ay.js` | contains `START HERE`, `LEARN THIS`, `WHY THIS MATTERS`, `RESOURCE`, `OUTCOME`, `Start Learning` |
+| Live HR Specialist recommendations | CIPD, BambooHR, Arabic HR course, Excel, Trust/Communication; **0 SQL-like titles** |
+| Live Data Analyst recommendations | SQL courses present (legitimate role skills) |
+| Live roadmap (HR Specialist, temp user) | 4 phases / 14 tasks; 0 unsafe resource URLs; 0 SQL resources on non-SQL HR tasks |
+| Live `Start Learning` hrefs | real stored sources, e.g. `https://ico.org.uk/...`, `https://www.cipd.org/en/knowledge/`, `https://support.bamboohr.com/` |
+| CTA shape | `target="_blank"`, `rel="noopener noreferrer"`, 44 px minimum height |
+| Stage order | START → Foundation → Core Skills → Practice → Projects → Job Preparation → Final state |
+| 320 / 390 / 768 px, LTR and RTL | no page-level horizontal overflow; stepper scrolls inside its own container; CTA ≥ 44 px |
+| Legacy `https://careerpilot4ai.pages.dev/` | 200, old build unchanged |
+| `/api/health` | 200, model configured |
+
+Temporary verification users were created through the Supabase admin API and
+deleted afterwards (HTTP 200). The local dev server and frame-friendly proxy used
+for the viewport measurements were stopped; no harness file was added to the
+repository.
