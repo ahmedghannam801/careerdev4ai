@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Bell, X, Check, Calendar, AlertCircle, Award, Megaphone } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Calendar, AlertCircle, Award, Megaphone } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 
@@ -11,9 +11,26 @@ interface NotificationsDrawerProps {
 }
 
 export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
-  const { notifications, visibleNotifications, markNotificationRead, clearNotifications, settings, t } =
-    useCareer();
+  const {
+    notifications,
+    visibleNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    recordNotificationClick,
+    clearNotifications,
+    settings,
+    t,
+  } = useCareer();
   const reduced = useReducedMotion() ?? false;
+  const unread = visibleNotifications.filter((n) => !n.read).length;
+
+  const follow = async (notificationId: string, linkView: string) => {
+    // The click is recorded on the delivery ledger before navigation, so the
+    // administrator's click rate reflects real CTA use.
+    await recordNotificationClick(notificationId);
+    onNavigate(linkView);
+    onClose();
+  };
 
   return (
     <AnimatePresence>
@@ -31,13 +48,22 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-[var(--color-primary-text)]" />
           <span className="text-sm font-semibold text-[var(--text-primary)]">{t('Notifications')}</span>
-          {visibleNotifications.filter(n => !n.read).length > 0 && (
+          {unread > 0 && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--accent-surface)] text-[var(--color-primary-text)] font-medium">
-              {visibleNotifications.filter(n => !n.read).length} {t('new')}
+              {unread} {t('new')}
             </span>
           )}
         </div>
         <div className="flex items-center gap-1">
+          {unread > 0 && (
+            <button
+              onClick={markAllNotificationsRead}
+              className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2 py-1 rounded"
+              title={t('Mark all as read')}
+            >
+              <CheckCheck className="w-3.5 h-3.5" /> {t('Mark all read')}
+            </button>
+          )}
           {notifications.length > 0 && (
             <button
               onClick={clearNotifications}
@@ -80,9 +106,11 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                 key={n.id}
                 variants={staggerItemVariants(reduced)}
                 className={`p-3 rounded-lg border text-sm transition-colors ${
-                  n.read
-                    ? 'bg-[var(--surface-main)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
-                    : 'bg-[var(--surface-secondary)]/80 border-[var(--color-border-strong)] text-[var(--text-primary)]'
+                  n.priority === 'critical'
+                    ? 'border-[var(--color-danger)]/40 bg-[var(--color-danger)]/5 text-[var(--text-primary)]'
+                    : n.read
+                      ? 'bg-[var(--surface-main)] border-[var(--border-subtle)] text-[var(--text-secondary)]'
+                      : 'bg-[var(--surface-secondary)]/80 border-[var(--color-border-strong)] text-[var(--text-primary)]'
                 }`}
               >
               <div className="flex items-start justify-between gap-2">
@@ -92,6 +120,11 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                   {n.type === 'achievement' && <Award className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />}
                   {n.type === 'announcement' && <Megaphone className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />}
                   <span>{n.title}</span>
+                  {n.priority === 'critical' && (
+                    <span className="rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-danger)]">
+                      {t('Critical')}
+                    </span>
+                  )}
                 </div>
                 {!n.read && (
                   <button
@@ -108,7 +141,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                 <span>{n.timestamp}</span>
                 {n.linkAction && (
                   <button
-                    onClick={() => { onNavigate(n.linkAction!); onClose(); }}
+                    onClick={() => void follow(n.id, n.linkAction!)}
                     className="text-[var(--color-primary-text)] hover:underline font-medium"
                   >
                     {t('Take Action →')}

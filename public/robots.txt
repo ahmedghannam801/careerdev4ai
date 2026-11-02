@@ -1,0 +1,16 @@
+# CareerDev4AI
+#
+# The public pages - the home page, the career catalogue, the learning
+# catalogue and the volunteering catalogue - are open to every crawler.
+#
+# This file is a crawl instruction, not a security control. Every private
+# area of the application is protected by authentication, and private
+# records are never published here.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+
+# Sitemaps
+Sitemap: https://careerdev4ai.pages.dev/sitemap.xml

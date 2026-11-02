@@ -52,6 +52,7 @@ import {
   type OpportunityAudience,
   type OpportunityKind,
 } from '../../../shared/opportunities';
+import { trackEvent } from '../../lib/analytics';
 
 interface VolunteerOpportunitiesProps {
   /** Called when the user wants to record a stint they just started. */
@@ -183,6 +184,17 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
   // Expired rows are hidden in the catalogue, not merely ranked last: an
   // application link that no longer accepts applications is not actionable.
   const catalogue = useMemo(() => opportunities.filter((item) => item.live), [opportunities]);
+
+  // The funnel records that the opportunities catalogue was reached. Only the
+  // size of the catalogue and the filter that was active are reported — never
+  // the opportunities themselves, and never anything about the person looking.
+  useEffect(() => {
+    if (isLoading || catalogue.length === 0) return;
+    trackEvent('opportunity_view', {
+      count: catalogue.length,
+      opportunity_category: activeKind === 'all' ? 'all' : activeKind,
+    });
+  }, [isLoading, catalogue.length, activeKind]);
 
   const kindOptions = useMemo(
     () =>
@@ -675,6 +687,14 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
                       href={opportunity.applicationUrl}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => {
+                        // The funnel records that the visitor followed an
+                        // opportunity through to the organisation's own site.
+                        // Only the kind of opportunity is reported.
+                        trackEvent('opportunity_click', {
+                          opportunity_category: opportunity.kind ?? 'unknown',
+                        });
+                      }}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-90"
                     >
                       {t('Apply on their site')}

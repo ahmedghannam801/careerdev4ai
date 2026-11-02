@@ -114,12 +114,45 @@ export const ADMIN_ROLE_DESCRIPTIONS: Record<AdminRole, string> = {
   moderator: 'Reviews content, moderates announcements and reports problematic material.',
 };
 
-/** Announcement priorities. */
-export const ANNOUNCEMENT_PRIORITIES = ['normal', 'important', 'urgent'] as const;
+/** Announcement priorities. Critical is reserved for genuine platform-wide notices. */
+export const ANNOUNCEMENT_PRIORITIES = ['normal', 'important', 'critical'] as const;
 export type AnnouncementPriority = (typeof ANNOUNCEMENT_PRIORITIES)[number];
 
-export const ANNOUNCEMENT_STATUSES = ['draft', 'published', 'archived'] as const;
+export const ANNOUNCEMENT_PRIORITY_LABELS: Record<AnnouncementPriority, string> = {
+  normal: 'Normal',
+  important: 'Important',
+  critical: 'Critical',
+};
+
+export const ANNOUNCEMENT_STATUSES = [
+  'draft',
+  'scheduled',
+  'published',
+  'expired',
+  'archived',
+] as const;
 export type AnnouncementStatus = (typeof ANNOUNCEMENT_STATUSES)[number];
+
+export const ANNOUNCEMENT_CATEGORIES = [
+  'general',
+  'learning',
+  'opportunity',
+  'platform',
+  'event',
+  'deadline',
+  'security',
+] as const;
+export type AnnouncementCategory = (typeof ANNOUNCEMENT_CATEGORIES)[number];
+
+export const ANNOUNCEMENT_CATEGORY_LABELS: Record<AnnouncementCategory, string> = {
+  general: 'General',
+  learning: 'Learning',
+  opportunity: 'Opportunity',
+  platform: 'Platform',
+  event: 'Event',
+  deadline: 'Deadline',
+  security: 'Security',
+};
 
 /** The audience a communication can be sent to. */
 export const ANNOUNCEMENT_AUDIENCES = [
@@ -157,4 +190,186 @@ export function isAnnouncementPriority(value: string): value is AnnouncementPrio
 
 export function isAnnouncementStatus(value: string): value is AnnouncementStatus {
   return (ANNOUNCEMENT_STATUSES as readonly string[]).includes(value);
+}
+
+export function isAnnouncementCategory(value: string): value is AnnouncementCategory {
+  return (ANNOUNCEMENT_CATEGORIES as readonly string[]).includes(value);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Audience targeting                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The fields the targeting engine can resolve.
+ *
+ * Each field maps to real, stored data. Fields the product does not collect
+ * (for example an academic year) are deliberately absent: a filter that can
+ * never match would be a lie in the UI.
+ */
+export const AUDIENCE_FIELDS = [
+  'career',
+  'industry',
+  'user_type',
+  'country',
+  'city',
+  'university',
+  'field_of_study',
+  'degree',
+  'skill',
+  'roadmap',
+  'roadmap_stage',
+  'learning_completed',
+  'learning_in_progress',
+  'project_completed',
+  'project_active',
+  'users',
+] as const;
+
+export type AudienceField = (typeof AUDIENCE_FIELDS)[number];
+
+export const AUDIENCE_FIELD_LABELS: Record<AudienceField, string> = {
+  career: 'Career / target role',
+  industry: 'Career field',
+  user_type: 'Account type',
+  country: 'Country',
+  city: 'City / governorate',
+  university: 'University',
+  field_of_study: 'Faculty / field of study',
+  degree: 'Degree',
+  skill: 'Skill',
+  roadmap: 'Enrolled roadmap (target role)',
+  roadmap_stage: 'Roadmap step not completed',
+  learning_completed: 'Completed course',
+  learning_in_progress: 'Course in progress',
+  project_completed: 'Completed project',
+  project_active: 'Active project',
+  users: 'Specific users (profile IDs)',
+};
+
+/** Fields whose values are chosen from a known list instead of free text. */
+export const AUDIENCE_SUGGESTION_FIELDS = [
+  'career',
+  'industry',
+  'user_type',
+  'skill',
+  'university',
+  'field_of_study',
+  'degree',
+  'roadmap',
+] as const;
+
+export interface AudienceCondition {
+  field: AudienceField;
+  values: string[];
+}
+
+export interface AudienceRuleGroup {
+  logic: 'and' | 'or';
+  conditions: AudienceCondition[];
+}
+
+export const AUDIENCE_LIMITS = {
+  groups: 6,
+  conditionsPerGroup: 12,
+  valuesPerCondition: 100,
+  valueLength: 120,
+} as const;
+
+export function isAudienceField(value: string): value is AudienceField {
+  return (AUDIENCE_FIELDS as readonly string[]).includes(value);
+}
+
+export function isAudienceLogic(value: string): value is 'and' | 'or' {
+  return value === 'and' || value === 'or';
+}
+
+/** Whether a set of rules is usable. An empty array means "legacy audience". */
+export function hasAudienceRules(rules: unknown): rules is AudienceRuleGroup[] {
+  return Array.isArray(rules) && rules.length > 0;
+}
+
+/**
+ * Validates and normalises targeting rules coming from the client.
+ *
+ * The server calls this before anything is stored. Unknown fields, empty
+ * conditions and oversized inputs are rejected rather than silently ignored,
+ * so a malformed rule cannot broaden an audience.
+ */
+export function normaliseAudienceRules(input: unknown): AudienceRuleGroup[] {
+  if (input === undefined || input === null) return [];
+  if (!Array.isArray(input)) throw new Error('Targeting rules must be a list of groups');
+  if (input.length > AUDIENCE_LIMITS.groups) {
+    throw new Error(`At most ${AUDIENCE_LIMITS.groups} targeting groups are allowed`);
+  }
+
+  const groups: AudienceRuleGroup[] = [];
+  for (const rawGroup of input) {
+    if (!rawGroup || typeof rawGroup !== 'object') {
+      throw new Error('Each targeting group must be an object');
+    }
+    const group = rawGroup as Record<string, unknown>;
+    const logic = group.logic === undefined ? 'and' : String(group.logic);
+    if (!isAudienceLogic(logic)) throw new Error('A targeting group logic must be and or or');
+    const rawConditions = group.conditions;
+    if (!Array.isArray(rawConditions)) {
+      throw new Error('Each targeting group needs a conditions list');
+    }
+    if (rawConditions.length === 0) continue;
+    if (rawConditions.length > AUDIENCE_LIMITS.conditionsPerGroup) {
+      throw new Error(
+        `At most ${AUDIENCE_LIMITS.conditionsPerGroup} conditions are allowed per group`
+      );
+    }
+
+    const conditions: AudienceCondition[] = [];
+    for (const rawCondition of rawConditions) {
+      if (!rawCondition || typeof rawCondition !== 'object') {
+        throw new Error('Each condition must be an object');
+      }
+      const condition = rawCondition as Record<string, unknown>;
+      const field = String(condition.field ?? '');
+      if (!isAudienceField(field)) {
+        throw new Error(`Unknown targeting field: ${field || '(empty)'}`);
+      }
+      if (!Array.isArray(condition.values)) {
+        throw new Error('Each targeting condition needs a values list');
+      }
+      const values = Array.from(
+        new Set(
+          condition.values
+            .map((value) => String(value ?? '').trim())
+            .filter(Boolean)
+        )
+      );
+      if (values.length === 0) continue;
+      if (values.length > AUDIENCE_LIMITS.valuesPerCondition) {
+        throw new Error(
+          `At most ${AUDIENCE_LIMITS.valuesPerCondition} values are allowed per condition`
+        );
+      }
+      if (values.some((value) => value.length > AUDIENCE_LIMITS.valueLength)) {
+        throw new Error(`Targeting values must be at most ${AUDIENCE_LIMITS.valueLength} characters`);
+      }
+      conditions.push({ field, values });
+    }
+    if (conditions.length > 0) groups.push({ logic, conditions });
+  }
+  return groups;
+}
+
+/** A readable one-line summary of the targeting, stored with the announcement. */
+export function describeAudienceRules(rules: AudienceRuleGroup[]): string {
+  if (rules.length === 0) return 'Legacy audience';
+  return rules
+    .map(
+      (group) =>
+        `(${group.conditions
+          .map(
+            (condition) =>
+              `${AUDIENCE_FIELD_LABELS[condition.field]}: ${condition.values.join(' / ')}`
+          )
+          .join(group.logic === 'or' ? ' OR ' : ' AND ')})`
+    )
+    .join(' AND ');
 }

@@ -17,8 +17,10 @@ export interface NotificationDTO {
   message: string | null;
   type: 'interview' | 'roadmap' | 'application' | 'achievement' | 'system' | 'announcement';
   read: boolean;
+  clicked: boolean;
   linkView: string | null;
   announcementId?: string | null;
+  priority?: 'normal' | 'important' | 'critical' | null;
   createdAt: string;
 }
 
@@ -60,6 +62,18 @@ export async function markAllNotificationsRead(): Promise<NotificationDTO[]> {
     { method: 'POST' }
   );
   return data.notifications ?? [];
+}
+
+/**
+ * Records a click on a notification's CTA. The server writes the click to the
+ * delivery ledger; it is never inferred from a page view.
+ */
+export async function recordNotificationClick(id: string): Promise<string | null> {
+  const data = await request<{ success: boolean; linkView: string | null }>(
+    `/api/notifications/${id}/click`,
+    { method: 'POST' }
+  );
+  return data.linkView ?? null;
 }
 
 /** Deletes every notification and returns how many were removed. */

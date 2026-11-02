@@ -506,6 +506,10 @@ export interface UserNotification {
   // stay identical or persisted rows are cast to a type the UI cannot render.
   type: 'roadmap' | 'interview' | 'application' | 'achievement' | 'system' | 'announcement';
   read: boolean;
+  /** True once the user followed the notification's CTA. */
+  clicked?: boolean;
+  /** Announcement priority, when this notification came from an announcement. */
+  priority?: 'normal' | 'important' | 'critical' | null;
   timestamp: string;
   linkAction?: string;
 }

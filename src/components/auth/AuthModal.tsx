@@ -9,6 +9,7 @@ import { onNativeOAuthResult } from '../../lib/nativeBridge';
 import { Logo } from '../brand/Logo';
 import { backdropVariants, dialogVariants } from '../../lib/motion';
 import { useDismissOnEscape, useFocusTrap, useScrollLock } from '../../lib/overlay';
+import { trackEvent } from '../../lib/analytics';
 
 type OAuthProvider = 'google' | 'linkedin_oidc' | 'github';
 
@@ -157,6 +158,9 @@ export const AuthModal: React.FC = () => {
       const res = await login(email, password);
       setLoading(false);
       if (res.success) {
+        // The funnel records that a session was opened. Nothing about the
+        // account itself is sent — only the fact that it happened.
+        trackEvent('login');
         close();
       } else {
         setError(res.error || 'Failed to authenticate');
@@ -170,6 +174,9 @@ export const AuthModal: React.FC = () => {
       const res = await register(name, email, password);
       setLoading(false);
       if (res.success) {
+        // The account was created, whether or not the session is confirmed
+        // yet. The name and the address are never part of the event.
+        trackEvent('sign_up');
         if (res.error) {
           // Email confirmation is required: the account was created, but the
           // user is not signed in yet. Keep the dialog open so the

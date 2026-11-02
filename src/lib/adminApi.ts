@@ -8,6 +8,12 @@
 import { apiRequest as request } from './apiClient';
 import type { LearningCourse } from '../types/learning';
 import type { VolunteerOpportunity } from './personalizationApi';
+import type {
+  AnnouncementCategory,
+  AnnouncementStatus,
+  AnnouncementPriority,
+  AudienceRuleGroup,
+} from '../../shared/admin';
 
 export interface AdminDTO {
   id: string;
@@ -32,16 +38,32 @@ export interface AdminAnnouncement {
   id: string;
   title: string;
   body: string;
-  priority: 'normal' | 'important' | 'urgent';
-  status: 'draft' | 'published' | 'archived';
+  imageUrl: string | null;
+  thumbnailUrl: string | null;
+  category: AnnouncementCategory;
+  priority: AnnouncementPriority;
+  status: AnnouncementStatus;
   audienceType: AdminAudience['type'];
   audienceValues: string[];
+  audienceRules: AudienceRuleGroup[];
+  audienceSummary: string | null;
+  ctaText: string | null;
+  ctaUrl: string | null;
   linkView: string | null;
   createdBy: string | null;
   createdByName: string | null;
+  publishAt: string | null;
+  expiresAt: string | null;
   publishedAt: string | null;
   archivedAt: string | null;
   recipientCount: number;
+  stats: {
+    deliveredCount: number;
+    readCount: number;
+    clickedCount: number;
+    readRate: number;
+    clickRate: number;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -59,8 +81,7 @@ export interface AdminAnalytics {
   activeOpportunities: number;
 }
 
-export interface AdminUserSummary {
-  id: string;
+export interface AdminUserSummary {  id: string;
   fullName: string | null;
   username: string | null;
   targetRole: string | null;
@@ -79,6 +100,78 @@ export interface AdminAuditEntry {
   createdAt: string;
 }
 
+/** The numbers of one period. */
+export interface TrafficPeriod {
+  activeUsers: number;
+  sessions: number;
+  pageViews: number;
+}
+
+/** A row of the traffic-source report. */
+export interface TrafficSource {
+  source: string;
+  channel: string;
+  sessions: number;
+  users: number;
+}
+
+/** A row of the top-pages report. */
+export interface TrafficPage {
+  path: string;
+  title: string;
+  views: number;
+  users: number;
+}
+
+/** A row of the devices report. */
+export interface TrafficDevice {
+  device: string;
+  sessions: number;
+  users: number;
+}
+
+/** A row of the geography report. */
+export interface TrafficCountry {
+  country: string;
+  users: number;
+  sessions: number;
+}
+
+/** A step of the conversion funnel. */
+export interface TrafficFunnelStep {
+  step: string;
+  event: string;
+  count: number;
+  users: number;
+  rate: number;
+}
+
+/**
+ * The traffic report of the Google Analytics property.
+ *
+ * `connected` is false when the property is not wired up on this deployment.
+ * The panel then explains what to add rather than showing empty numbers.
+ */
+export interface TrafficReport {
+  connected: boolean;
+  propertyId?: string;
+  measuredAt: string;
+  today: TrafficPeriod;
+  last7Days: TrafficPeriod;
+  last30Days: TrafficPeriod;
+  totals: {
+    totalUsers: number;
+    newUsers: number;
+    returningUsers: number;
+  };
+  sources: TrafficSource[];
+  topPages: TrafficPage[];
+  devices: TrafficDevice[];
+  countries: TrafficCountry[];
+  funnel: TrafficFunnelStep[];
+  message?: string;
+}
+
 export async function fetchAdminMe(): Promise<AdminDTO | null> {
   const data = await request<{ admin: AdminDTO | null }>('/api/admin/me');
   return data.admin ?? null;
@@ -87,6 +180,12 @@ export async function fetchAdminMe(): Promise<AdminDTO | null> {
 export async function fetchAdminAnalytics(): Promise<AdminAnalytics> {
   const data = await request<{ analytics: AdminAnalytics }>('/api/admin/analytics');
   return data.analytics;
+}
+
+/** Reads the traffic report of the Google Analytics property. */
+export async function fetchTrafficReport(): Promise<TrafficReport> {
+  const data = await request<{ traffic: TrafficReport }>('/api/admin/analytics/traffic');
+  return data.traffic;
 }
 
 export async function fetchAdmins(): Promise<AdminDTO[]> {
@@ -136,10 +235,18 @@ export async function fetchAdminAnnouncements(): Promise<AdminAnnouncement[]> {
 export interface AnnouncementInput {
   title: string;
   body: string;
+  category: AnnouncementCategory;
   priority: AdminAnnouncement['priority'];
   audienceType: AdminAudience['type'];
   audienceValues: string[];
+  audienceRules: AudienceRuleGroup[];
   linkView?: string | null;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  ctaText?: string | null;
+  ctaUrl?: string | null;
+  publishAt?: string | null;
+  expiresAt?: string | null;
 }
 
 export async function createAnnouncement(
@@ -159,6 +266,30 @@ export async function patchAnnouncement(
   const data = await request<{ announcement: AdminAnnouncement }>(
     `/api/admin/announcements/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: JSON.stringify(input) }
+  );
+  return data.announcement;
+}
+
+/** Previews the audience with the same resolver delivery will use. */
+export async function previewAnnouncement(input: {
+  audienceType?: AdminAudience['type'];
+  audienceValues?: string[];
+  audienceRules?: AudienceRuleGroup[];
+}): Promise<{ count: number; summary: string }> {
+  const data = await request<{ preview: { count: number; summary: string } }>(
+    '/api/admin/announcements/preview',
+    { method: 'POST', body: JSON.stringify(input) }
+  );
+  return data.preview;
+}
+
+export async function scheduleAnnouncement(
+  id: string,
+  publishAt: string
+): Promise<AdminAnnouncement> {
+  const data = await request<{ announcement: AdminAnnouncement }>(
+    `/api/admin/announcements/${encodeURIComponent(id)}/schedule`,
+    { method: 'POST', body: JSON.stringify({ publishAt }) }
   );
   return data.announcement;
 }

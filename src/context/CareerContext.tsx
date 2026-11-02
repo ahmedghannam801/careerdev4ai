@@ -53,6 +53,7 @@ import { validateTargetRoleSelection } from '../../shared/targetRoleSelection';
 import { translations } from '../translations';
 import { translate } from '../translations/sourceStrings';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
+import { trackEvent } from '../lib/analytics';
 import { apiUrl } from '../lib/native';
 import { planPersonalImport } from '../../shared/cvImport';
 import { mergeCanonicalCvDocument } from '../../shared/cvProjection';
@@ -158,6 +159,8 @@ import {
 import {
   fetchNotifications,
   markNotificationRead as markNotificationReadApi,
+  markAllNotificationsRead as markAllNotificationsReadApi,
+  recordNotificationClick as recordNotificationClickApi,
   clearNotifications as clearNotificationsApi,
   type NotificationDTO,
 } from '../lib/notificationsApi';
@@ -474,6 +477,8 @@ interface CareerContextType {
   /** Notifications allowed by the device-local notification preferences. */
   visibleNotifications: UserNotification[];
   markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  recordNotificationClick: (id: string) => Promise<string | null>;
   clearNotifications: () => void;
 
   // Preferences & Settings
@@ -877,6 +882,8 @@ function toUserNotification(dto: NotificationDTO): UserNotification {
     message: dto.message ?? '',
     type: dto.type as UserNotification['type'],
     read: dto.read,
+    clicked: dto.clicked,
+    priority: dto.priority ?? null,
     timestamp: dto.createdAt,
     linkAction: dto.linkView ?? undefined,
   };
@@ -2942,6 +2949,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setTargetRole(role);
       setRoadmapPhases(toRoadmapPhases(roadmap));
       setIsEnrolledInRoadmap(roadmap.isEnrolled);
+      // The funnel records that a career was chosen. Only the domain and the
+      // level are reported: the role's own identifier is never sent.
+      trackEvent('select_career', {
+        career_domain: role.domainId,
+        level: role.level,
+      });
       return true;
     } catch (error) {
       console.error('Failed to persist target role:', error);
@@ -3607,6 +3620,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       } else {
         setIsEnrolledInRoadmap(true);
       }
+      // The funnel records that a roadmap was started. The domain is a
+      // catalogue value, not a personal one, so it is safe to report.
+      trackEvent('roadmap_enroll', {
+        career_domain: targetRole.domainId,
+        level: targetRole.level,
+      });
     } catch (error) {
       console.error('Failed to enroll in roadmap:', error);
     }
@@ -3691,6 +3710,17 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
       applyLearningItem(item);
       setLearningError(null);
+      // The funnel records the two milestones of the learning journey: a
+      // resource that was started and a resource that was finished. Only the
+      // catalogue category is reported — never the course's identity, the
+      // user's progress or the reason for the recommendation.
+      if (status === 'in_progress' || status === 'completed') {
+        const course = learningCatalog.find((entry) => entry.id === courseId);
+        trackEvent(status === 'completed' ? 'learning_complete' : 'learning_start', {
+          learning_category: course?.category ?? 'unknown',
+          level: course?.level ?? undefined,
+        });
+      }
       // Refresh the deterministic ranking so dismissed/completed items leave
       // the recommendation list immediately. AI explanations are not
       // regenerated for every button press.
@@ -3717,7 +3747,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // explicit action in the Skills Center.
     await persistLearningStatus(courseId, 'completed');
   };
-
   const updateLearningProgress = async (courseId: string, percent: number) => {
     const existing = getLearningItem(courseId);
     setIsLearningLoading(true);
@@ -3765,6 +3794,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         skills: project.skills,
       });
       setProjects(prev => [toCareerProject(dto), ...prev]);
+      // The funnel records that a project was started. The project's title and
+      // its links are never reported — only the domain it belongs to.
+      trackEvent('project_start', {
+        career_domain: targetRole.domainId,
+        level: project.difficulty ?? undefined,
+      });
       void logActivity({
         actionType: 'added_project',
         title: 'Added Project',
@@ -4873,6 +4908,32 @@ Skills: ${activeCV.skillsList.join(', ')}
     }
   };
 
+  const markAllNotificationsRead = async () => {
+    try {
+      const refreshed = await markAllNotificationsReadApi();
+      setNotifications(refreshed.map(toUserNotification));
+    } catch (error) {
+      console.error('Failed to mark all notifications read:', error);
+    }
+  };
+
+  const recordNotificationClick = async (id: string): Promise<string | null> => {
+    try {
+      const linkView = await recordNotificationClickApi(id);
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === id
+            ? { ...notification, clicked: true, read: true }
+            : notification
+        )
+      );
+      return linkView;
+    } catch (error) {
+      console.error('Failed to record notification click:', error);
+      return null;
+    }
+  };
+
   const clearNotifications = async () => {
     try {
       await clearNotificationsApi();
@@ -5135,6 +5196,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         notifications,
         visibleNotifications,
         markNotificationRead,
+        markAllNotificationsRead,
+        recordNotificationClick,
         clearNotifications,
         settings,
         updateSettings,

@@ -11,11 +11,19 @@
  *      a Worker `Request` into that Node server. The Express app therefore runs
  *      exactly as it does under `npm run dev` / `npm start` / the test suite.
  *
+ *      The public SEO pages (`/about`, `/careers`, `/learning`,
+ *      `/opportunities`), the sitemap and `robots.txt` are forwarded the same
+ *      way: they are server-rendered from live catalogue data, so they must
+ *      not be a build-time snapshot of the asset binding.
+ *
  *   2. Serve everything else from the Pages static asset binding, falling back
  *      to `index.html` for client-side routes. The SPA uses hash routing
  *      (`/#/dashboard`), so this fallback is only a safety net for stray
  *      path-based links; real asset requests must still 404 rather than
  *      returning HTML.
+ *
+ *   3. Serve the IndexNow key file, which the protocol requires to be
+ *      fetchable at `<host>/<key>.txt`.
  *
  * `dist/_worker.js` is produced by `scripts/build-worker.mjs`, which bundles
  * this file with esbuild and leaves `node:*` / `cloudflare:*` external so the
@@ -23,6 +31,8 @@
  */
 import { handleAsNodeRequest } from 'cloudflare:node';
 import { app } from '../app.ts';
+import { indexNowKey, indexNowKeyPath } from '../server/seo/indexnow.ts';
+import { VERIFICATION_PATH } from '../server/seo/verification.ts';
 
 /** Routing key for the Node HTTP server registered below (not a TCP port). */
 const NODE_PORT = 3000;
@@ -43,6 +53,29 @@ interface Env {
 
 function isApiPath(pathname: string): boolean {
   return pathname === '/api' || pathname.startsWith('/api/');
+}
+
+/**
+ * The public pages, the sitemap and robots.txt.
+ *
+ * These are server-rendered by the shared Express application, so the local
+ * server, the test suite and this worker answer identically. They are
+ * forwarded here rather than served from the static asset binding, because
+ * they are built from live catalogue data and must not be a build-time
+ * snapshot.
+ */
+const PUBLIC_PAGE_PREFIXES = ['/careers', '/learning', '/opportunities'] as const;
+
+function isSeoPath(pathname: string): boolean {
+  if (pathname === '/sitemap.xml' || pathname === '/robots.txt') return true;
+  if (pathname === '/about' || pathname === '/privacy') return true;
+  // The asset binding answers the `.html` path of the verification file with
+  // a permanent redirect. Google asks for that exact path, so the request is
+  // answered by the application instead.
+  if (pathname === VERIFICATION_PATH) return true;
+  return PUBLIC_PAGE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 }
 
 /**
@@ -82,7 +115,20 @@ export default {
 
     const url = new URL(request.url);
 
-    if (isApiPath(url.pathname)) {
+    // The IndexNow key file. The protocol requires it to be fetchable at
+    // `<host>/<key>.txt` and to contain exactly the key, so it is served
+    // here rather than from the asset binding.
+    const keyPath = indexNowKeyPath();
+    if (keyPath && url.pathname === keyPath) {
+      return new Response(indexNowKey() ?? '', {
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'public, max-age=3600',
+        },
+      });
+    }
+
+    if (isApiPath(url.pathname) || isSeoPath(url.pathname)) {
       return handleAsNodeRequest(NODE_PORT, request);
     }
 

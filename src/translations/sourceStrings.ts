@@ -17,6 +17,7 @@
  */
 
 import { adminAr } from './parts/admin.ts';
+import { analyticsAr } from './parts/analytics.ts';
 import { appShellAr } from './parts/appShell.ts';
 import { applicationsAr } from './parts/applications.ts';
 import { commonAr } from './parts/common.ts';
@@ -38,6 +39,7 @@ export const AR_STRINGS: Record<string, string> = {
   ...commonAr,
   ...appShellAr,
   ...adminAr,
+  ...analyticsAr,
   ...discoveryAr,
   ...dashboardAr,
   ...applicationsAr,

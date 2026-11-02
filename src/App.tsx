@@ -14,6 +14,8 @@ import { Skeleton } from './components/ui/Skeleton';
 import { GuidedTour, GUIDES, type GuideDefinition, type GuideKey } from './components/onboarding/GuidedTour';
 import { fetchDismissedGuides } from './lib/personalizationApi';
 import { buildRouteHash, isKnownRoute, parseRouteHash, resolveRouteId } from './lib/routing';
+import { analyticsPathForRoute, trackPageView } from './lib/analytics';
+import { applyRouteMeta, routeMetaFor } from './lib/seo';
 
 /**
  * The authenticated experience is loaded on demand.
@@ -140,6 +142,24 @@ function AppRoutes() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [currentView, setActiveView]);
+
+  // Document metadata and the page view of the current route.
+  //
+  // The application is one document served from one address, so the metadata
+  // is written by the client as the route changes: the landing page may be
+  // indexed, every signed-in view is marked `noindex, nofollow`, and the
+  // canonical link always points at the home page.
+  //
+  // The page view is reported here rather than by the tag's automatic
+  // behaviour, so that exactly one page view is sent per view the visitor
+  // actually opens. The reported path is built from the route, so a public
+  // profile's username never reaches the analytics property.
+  useEffect(() => {
+    const isPublicProfile = Boolean(publicUsername);
+    const meta = routeMetaFor(currentView, { isPublicProfile });
+    applyRouteMeta(meta);
+    trackPageView(analyticsPathForRoute(currentView, publicUsername), meta.title);
+  }, [currentView, publicUsername]);
 
   // Once a session exists, `landing` is no longer a valid in-app view. Leaving
   // it in place made the shell breadcrumb read "Landing" over the dashboard and

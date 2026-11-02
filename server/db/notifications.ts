@@ -29,9 +29,12 @@ export interface NotificationDTO {
   message: string | null;
   type: NotificationType;
   read: boolean;
+  clicked: boolean;
   linkView: string | null;
   /** Set when this notification was delivered by an announcement. */
   announcementId: string | null;
+  /** Announcement priority, so the bell can distinguish a critical notice. */
+  priority: 'normal' | 'important' | 'critical' | null;
   createdAt: string;
 }
 
@@ -48,12 +51,14 @@ interface NotificationRow {
   message: string | null;
   type: string;
   read_at: string | null;
+  clicked_at: string | null;
   link_view: string | null;
   announcement_id: string | null;
   created_at: string;
 }
 
-const COLUMNS = 'id, title, message, type, read_at, link_view, announcement_id, created_at';
+const COLUMNS =
+  'id, title, message, type, read_at, clicked_at, link_view, announcement_id, created_at';
 
 function toNotification(row: NotificationRow): NotificationDTO {
   return {
@@ -64,21 +69,56 @@ function toNotification(row: NotificationRow): NotificationDTO {
     // The frontend's model is a boolean; the database stores the moment it
     // was read (NULL = still unread), which carries more information.
     read: row.read_at !== null,
+    clicked: row.clicked_at !== null,
     linkView: row.link_view,
     announcementId: row.announcement_id,
+    priority: null,
     createdAt: row.created_at,
   };
 }
 
 export async function listNotifications(profileId: string): Promise<NotificationDTO[]> {
-  const { data, error } = await getSupabaseServer()
+  const supabase = getSupabaseServer();
+  const { data, error } = await supabase
     .from('notifications')
     .select(COLUMNS)
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) throw error;
-  return ((data ?? []) as NotificationRow[]).map(toNotification);
+  const notifications = ((data ?? []) as NotificationRow[]).map(toNotification);
+
+  // Announcement priority is not duplicated into every notification row; it is
+  // read from the announcement for the notifications actually returned.
+  const announcementIds = Array.from(
+    new Set(
+      notifications
+        .map((notification) => notification.announcementId)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  if (announcementIds.length > 0) {
+    const { data: announcements, error: announcementError } = await supabase
+      .from('announcements')
+      .select('id, priority')
+      .in('id', announcementIds);
+    if (announcementError) throw announcementError;
+    const priorities = new Map(
+      ((announcements ?? []) as Array<{ id: string; priority: string }>).map((row) => [
+        row.id,
+        row.priority,
+      ])
+    );
+    for (const notification of notifications) {
+      const priority = notification.announcementId
+        ? priorities.get(notification.announcementId)
+        : null;
+      if (priority === 'critical' || priority === 'important' || priority === 'normal') {
+        notification.priority = priority;
+      }
+    }
+  }
+  return notifications;
 }
 
 export async function createNotification(
@@ -105,26 +145,111 @@ export async function markNotificationRead(
   profileId: string,
   notificationId: string
 ): Promise<boolean> {
+  const now = new Date().toISOString();
   const { data, error } = await getSupabaseServer()
     .from('notifications')
-    .update({ read_at: new Date().toISOString() })
+    .update({ read_at: now })
     .eq('profile_id', profileId)
     .eq('id', notificationId)
-    .select('id');
+    .select('id, announcement_id');
   if (error) throw error;
-  return (data ?? []).length > 0;
+  const row = (data ?? [])[0] as
+    | { id: string; announcement_id: string | null }
+    | undefined;
+  if (!row) return false;
+  if (row.announcement_id) {
+    // Keep the delivery ledger and the inbox in agreement. The API is the
+    // only writer, so a read in the drawer is a real delivery read.
+    const { error: deliveryError } = await getSupabaseServer()
+      .from('announcement_deliveries')
+      .update({ read_at: now })
+      .eq('notification_id', row.id)
+      .is('read_at', null);
+    if (deliveryError) throw deliveryError;
+  }
+  return true;
 }
 
 /** Marks every unread notification of the caller as read. */
 export async function markAllNotificationsRead(profileId: string): Promise<number> {
-  const { data, error } = await getSupabaseServer()
+  const now = new Date().toISOString();
+  const supabase = getSupabaseServer();
+  const { data: unread, error: readError } = await supabase
     .from('notifications')
-    .update({ read_at: new Date().toISOString() })
+    .select('id, announcement_id')
+    .eq('profile_id', profileId)
+    .is('read_at', null);
+  if (readError) throw readError;
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .update({ read_at: now })
     .eq('profile_id', profileId)
     .is('read_at', null)
     .select('id');
   if (error) throw error;
+
+  const announcementNotificationIds = (
+    (unread ?? []) as Array<{ id: string; announcement_id: string | null }>
+  )
+    .filter((row) => Boolean(row.announcement_id))
+    .map((row) => row.id);
+  for (let index = 0; index < announcementNotificationIds.length; index += 300) {
+    const { error: deliveryError } = await supabase
+      .from('announcement_deliveries')
+      .update({ read_at: now })
+      .in('notification_id', announcementNotificationIds.slice(index, index + 300))
+      .is('read_at', null);
+    if (deliveryError) throw deliveryError;
+  }
+
   return (data ?? []).length;
+}
+
+/**
+ * Records that the caller followed a notification's CTA.
+ *
+ * Click tracking is part of the delivery ledger; it is never inferred from a
+ * page view. Returns the stored link target so the caller can navigate.
+ */
+export async function recordNotificationClick(
+  profileId: string,
+  notificationId: string
+): Promise<{ found: boolean; linkView: string | null }> {
+  const supabase = getSupabaseServer();
+  const { data: current, error: readError } = await supabase
+    .from('notifications')
+    .select('id, announcement_id, link_view, read_at')
+    .eq('profile_id', profileId)
+    .eq('id', notificationId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) return { found: false, linkView: null };
+
+  const now = new Date().toISOString();
+  // Following a CTA means the notification was seen. Marking it read here keeps
+  // the bell, the ledger and the analytics consistent in a single request.
+  const wasUnread = current.read_at === null;
+  const patch: Record<string, unknown> = { clicked_at: now };
+  if (wasUnread) patch.read_at = now;
+
+  const { error } = await supabase
+    .from('notifications')
+    .update(patch)
+    .eq('profile_id', profileId)
+    .eq('id', notificationId);
+  if (error) throw error;
+
+  if (current.announcement_id) {
+    const deliveryPatch: Record<string, unknown> = { clicked_at: now };
+    if (wasUnread) deliveryPatch.read_at = now;
+    const { error: deliveryError } = await supabase
+      .from('announcement_deliveries')
+      .update(deliveryPatch)
+      .eq('notification_id', notificationId);
+    if (deliveryError) throw deliveryError;
+  }
+  return { found: true, linkView: current.link_view as string | null };
 }
 
 /** Deletes a notification owned by the caller. */

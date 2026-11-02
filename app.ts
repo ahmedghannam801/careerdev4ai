@@ -87,6 +87,7 @@ import {
   createNotification,
   markNotificationRead,
   markAllNotificationsRead,
+  recordNotificationClick,
   deleteNotification,
   clearNotifications,
   NOTIFICATION_TYPES,
@@ -139,8 +140,11 @@ import {
   listAnnouncements,
   listAuditLog,
   logAdminAction,
+  previewAnnouncementAudience,
+  processDueAnnouncements,
   publishAnnouncement,
   removeAdmin,
+  scheduleAnnouncement,
   searchProfiles,
   updateAdmin,
   updateAnnouncement,
@@ -152,8 +156,15 @@ import {
 } from './server/admin/permissions.ts';
 import {
   isAnnouncementAudience,
+  isAnnouncementCategory,
   isAnnouncementPriority,
+  isAnnouncementStatus,
   isAdminRole,
+  normaliseAudienceRules,
+  type AnnouncementCategory,
+  type AnnouncementPriority,
+  type AnnouncementStatus,
+  type AudienceRuleGroup,
 } from './shared/admin.ts';
 import { isLearningResourceType } from './shared/learningResources.ts';
 import {
@@ -326,6 +337,18 @@ import {
   updateCoverLetter,
   deleteCoverLetter,
 } from './server/db/coverLetters.ts';
+import {
+  coursePath,
+  opportunityPath,
+  resolvePublicPage,
+  renderNotFoundPage,
+} from './server/seo/publicPages.ts';
+import { buildSitemapXml, collectSitemapEntries } from './server/seo/sitemap.ts';
+import { buildRobotsTxt } from './server/seo/robots.ts';
+import { PUBLIC_PAGE_CSP } from './server/seo/html.ts';
+import { submitIndexNow } from './server/seo/indexnow.ts';
+import { fetchTrafficReport } from './server/analytics/ga4.ts';
+import { VERIFICATION_PATH, verificationFileBody } from './server/seo/verification.ts';
 
 export const app = express();
 
@@ -468,6 +491,25 @@ app.use((req: Request, res: Response, next: () => void) => {
   if (req.method === 'OPTIONS') {
     // Preflight is answered here; no route handler needs to run.
     return res.status(204).end();
+  }
+  next();
+});
+
+// Server-side scheduler tick.
+//
+// Announcements scheduled for a future time must publish even when no
+// administrator has a browser open. Every isolate checks at most once a minute
+// as API traffic arrives; the explicit process-due endpoint can also be called
+// by an external scheduler. Tests disable the tick so their timing is exact.
+let lastSchedulerTick = 0;
+app.use('/api', (_req: Request, _res: Response, next: () => void) => {
+  if (process.env.ADMIN_SCHEDULER_DISABLED === 'true') return next();
+  const now = Date.now();
+  if (now - lastSchedulerTick > 60_000) {
+    lastSchedulerTick = now;
+    void processDueAnnouncements().catch((error) => {
+      console.error('Scheduled-announcement tick failed:', error);
+    });
   }
   next();
 });
@@ -2919,6 +2961,18 @@ app.patch('/api/notifications/:id', requireAuth, async (req: Request, res: Respo
   }
 });
 
+app.post('/api/notifications/:id/click', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const result = await recordNotificationClick(req.authUser!.id, req.params.id);
+    if (!result.found) return res.status(404).json({ error: 'Notification not found' });
+    return res.json({ success: true, linkView: result.linkView });
+  } catch (error) {
+    console.error('Failed to record notification click:', error);
+    return res.status(500).json({ error: 'Failed to record the notification click' });
+  }
+});
+
 app.post('/api/notifications/read-all', requireAuth, async (req: Request, res: Response) => {
   try {
     const count = await markAllNotificationsRead(req.authUser!.id);
@@ -5295,6 +5349,26 @@ app.get(
   }
 );
 
+// The traffic report. It reads the Google Analytics property through the Data
+// API, which authenticates with a service account held on the server. When
+// those credentials are not configured the endpoint still answers, with
+// `connected: false` and the reason — the dashboard then explains how to
+// connect rather than showing an empty page.
+app.get(
+  '/api/admin/analytics/traffic',
+  requireAuth,
+  requireAdmin,
+  requirePermission('analytics.read'),
+  async (_req: Request, res: Response) => {
+    try {
+      const traffic = await fetchTrafficReport();
+      return res.json({ success: true, traffic });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
 /* ------------------------------ Administrators ---------------------------- */
 
 app.get(
@@ -5412,31 +5486,89 @@ app.get(
   requireAuth,
   requireAdmin,
   requirePermission('announcements.read'),
-  async (_req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      return res.json({ success: true, announcements: await listAnnouncements() });
+      const announcements = await listAnnouncements({
+        status:
+          typeof req.query.status === 'string' && isAnnouncementStatus(req.query.status)
+            ? (req.query.status as AnnouncementStatus)
+            : undefined,
+        category:
+          typeof req.query.category === 'string' && isAnnouncementCategory(req.query.category)
+            ? (req.query.category as AnnouncementCategory)
+            : undefined,
+        priority:
+          typeof req.query.priority === 'string' && isAnnouncementPriority(req.query.priority)
+            ? (req.query.priority as AnnouncementPriority)
+            : undefined,
+        limit: 300,
+      });
+      return res.json({ success: true, announcements });
     } catch (error) {
       return adminFailure(res, error);
     }
   }
 );
 
+function httpUrl(value: unknown, field: string): string | null | undefined {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
+  const text = str(value, 1000);
+  if (!text) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(text);
+  } catch {
+    throw new AdminError(`${field} must be a complete URL`);
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new AdminError(`${field} must use http or https`);
+  }
+  return parsed.toString();
+}
+
+function readRules(value: unknown): AudienceRuleGroup[] | undefined {
+  if (value === undefined) return undefined;
+  try {
+    const rules = normaliseAudienceRules(value);
+    // An explicitly supplied, non-empty rule list that normalises to nothing
+    // (every condition empty or blank) must never silently become "everyone".
+    // That is the one direction a malformed audience must not fail in.
+    if (Array.isArray(value) && value.length > 0 && rules.length === 0) {
+      throw new AdminError('Each targeting group needs at least one non-empty condition');
+    }
+    return rules;
+  } catch (error) {
+    throw new AdminError(
+      error instanceof Error ? error.message : 'Invalid targeting rules'
+    );
+  }
+}
+
 function readAnnouncementInput(body: Record<string, unknown>, partial: boolean) {
   const title = body.title === undefined ? undefined : (str(body.title, 200) ?? undefined);
   const text = body.body === undefined ? undefined : (str(body.body, 5000) ?? undefined);
   const priority =
     body.priority === undefined ? undefined : (str(body.priority, 20) ?? undefined);
+  const category =
+    body.category === undefined ? undefined : (str(body.category, 40) ?? undefined);
   const audienceType =
     body.audienceType === undefined ? undefined : (str(body.audienceType, 40) ?? undefined);
   const audienceValues =
     body.audienceValues === undefined ? undefined : stringList(body.audienceValues, 500, 200);
+  const audienceRules = readRules(body.audienceRules);
   const linkView =
     body.linkView === null ? null : (str(body.linkView, 120) ?? undefined);
 
   if (!partial) {
     if (!title) throw new AdminError('A title is required');
     if (!text) throw new AdminError('A message is required');
-    if (!audienceType || !isAnnouncementAudience(audienceType)) {
+    if (audienceType !== undefined && (!audienceType || !isAnnouncementAudience(audienceType))) {
+      throw new AdminError('A valid audience is required');
+    }
+    if (!audienceRules && (!audienceType || audienceType === 'all')) {
+      // Everyone is a valid audience; no extra value list is needed.
+    } else if (!audienceRules && (!audienceType || !isAnnouncementAudience(audienceType))) {
       throw new AdminError('A valid audience is required');
     }
   } else {
@@ -5453,15 +5585,34 @@ function readAnnouncementInput(body: Record<string, unknown>, partial: boolean) 
   if (priority !== undefined && (!priority || !isAnnouncementPriority(priority))) {
     throw new AdminError('Unknown announcement priority');
   }
+  if (category !== undefined && (!category || !isAnnouncementCategory(category))) {
+    throw new AdminError('Unknown announcement category');
+  }
+
+  const imageUrl = httpUrl(body.imageUrl, 'Image URL');
+  const thumbnailUrl = httpUrl(body.thumbnailUrl, 'Thumbnail URL');
+  const ctaUrl = httpUrl(body.ctaUrl, 'CTA URL');
+  const ctaText = body.ctaText === null ? null : (str(body.ctaText, 80) ?? undefined);
+  const publishAt = body.publishAt === null ? null : (str(body.publishAt, 60) ?? undefined);
+  const expiresAt = body.expiresAt === null ? null : (str(body.expiresAt, 60) ?? undefined);
+
+  for (const [value, label] of [
+    [publishAt, 'Publish date'],
+    [expiresAt, 'Expiration date'],
+  ] as const) {
+    if (value && !Number.isFinite(new Date(value).getTime())) {
+      throw new AdminError(`${label} is not a valid date`);
+    }
+  }
+  if (publishAt && expiresAt && new Date(expiresAt) <= new Date(publishAt)) {
+    throw new AdminError('The expiration date must be after the publish date');
+  }
 
   return {
     title,
     body: text,
-    priority: priority as
-      | 'normal'
-      | 'important'
-      | 'urgent'
-      | undefined,
+    priority: priority as AnnouncementPriority | undefined,
+    category: category as AnnouncementCategory | undefined,
     audienceType: audienceType as
       | 'all'
       | 'users'
@@ -5471,9 +5622,56 @@ function readAnnouncementInput(body: Record<string, unknown>, partial: boolean) 
       | 'country'
       | undefined,
     audienceValues,
+    audienceRules,
     linkView,
+    imageUrl,
+    thumbnailUrl,
+    ctaText,
+    ctaUrl,
+    publishAt,
+    expiresAt,
   };
 }
+
+app.post(
+  '/api/admin/announcements/preview',
+  requireAuth,
+  requireAdmin,
+  requireAnyPermission(['announcements.read', 'announcements.write']),
+  async (req: Request, res: Response) => {
+    try {
+      const input = readAnnouncementInput(req.body ?? {}, true);
+      const preview = await previewAnnouncementAudience({
+        audienceType: input.audienceType,
+        audienceValues: input.audienceValues,
+        audienceRules: input.audienceRules,
+      });
+      return res.json({ success: true, preview });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/announcements/process-due',
+  requireAuth,
+  requireAdmin,
+  requirePermission('announcements.publish'),
+  async (req: Request, res: Response) => {
+    try {
+      const processed = await processDueAnnouncements();
+      await logAdminAction(req.admin!, {
+        action: 'announcement.scheduler_run',
+        entityType: 'announcement',
+        metadata: processed,
+      });
+      return res.json({ success: true, ...processed });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
 
 app.post(
   '/api/admin/announcements',
@@ -5488,9 +5686,17 @@ app.post(
           title: input.title!,
           body: input.body!,
           priority: input.priority,
-          audienceType: input.audienceType!,
+          category: input.category,
+          audienceType: input.audienceType,
           audienceValues: input.audienceValues,
+          audienceRules: input.audienceRules,
           linkView: input.linkView,
+          imageUrl: input.imageUrl,
+          thumbnailUrl: input.thumbnailUrl,
+          ctaText: input.ctaText,
+          ctaUrl: input.ctaUrl,
+          publishAt: input.publishAt,
+          expiresAt: input.expiresAt,
         },
         req.admin!
       );
@@ -5539,12 +5745,37 @@ app.post(
     try {
       const id = str(req.params.id, 80);
       if (!id || !isUuid(id)) return res.status(400).json({ error: 'Invalid announcement id' });
-      const announcement = await publishAnnouncement(id, req.admin!);
+      const announcement = await publishAnnouncement(id);
       await logAdminAction(req.admin!, {
         action: 'announcement.published',
         entityType: 'announcement',
         entityId: announcement.id,
         metadata: { recipients: announcement.recipientCount },
+      });
+      return res.json({ success: true, announcement });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/announcements/:id/schedule',
+  requireAuth,
+  requireAdmin,
+  requirePermission('announcements.publish'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 80);
+      if (!id || !isUuid(id)) return res.status(400).json({ error: 'Invalid announcement id' });
+      const publishAt = str(req.body?.publishAt, 60);
+      if (!publishAt) return res.status(400).json({ error: 'A publish date is required' });
+      const announcement = await scheduleAnnouncement(id, publishAt);
+      await logAdminAction(req.admin!, {
+        action: 'announcement.scheduled',
+        entityType: 'announcement',
+        entityId: announcement.id,
+        metadata: { publishAt: announcement.publishAt },
       });
       return res.json({ success: true, announcement });
     } catch (error) {
@@ -5792,6 +6023,13 @@ app.patch(
         entityId: id,
         metadata: { verificationStatus: opportunity.verificationStatus },
       });
+      // The opportunity has a public page. When it is live, the search
+      // engines are told that the page changed, so they recrawl it instead of
+      // waiting for the next crawl cycle. A failure here never fails the
+      // update: the catalogue change has already been saved.
+      if (opportunity.live) {
+        void submitIndexNow([opportunityPath(id), '/opportunities']);
+      }
       return res.json({ success: true, opportunity });
     } catch (error) {
       return adminFailure(res, error);
@@ -5870,12 +6108,95 @@ app.patch(
         entityId: id,
         metadata: { isFeatured: course.isFeatured, resourceType: course.resourceType },
       });
+      // The course has a public page. The search engines are told that it
+      // changed, so they recrawl it. A failed submission never fails the
+      // update: the catalogue change has already been saved.
+      void submitIndexNow([coursePath(id), '/learning']);
       return res.json({ success: true, course });
     } catch (error) {
       return adminFailure(res, error);
     }
   }
 );
+
+/* -------------------------------------------------------------------------- */
+/* Public SEO pages                                                           */
+/* -------------------------------------------------------------------------- */
+//
+// The application routes by hash (`/#/dashboard`), and a fragment is never
+// sent to the server. Without these routes a crawler would receive the same
+// empty application document for every URL, and there would be nothing to
+// index.
+//
+// The routes below publish the catalogues the platform already owns — the
+// career catalogue, the learning catalogue and the volunteering catalogue —
+// as clean, server-rendered pages with their own title, description, canonical
+// URL, Open Graph tags and structured data.
+//
+// They are registered here, in the shared Express application, so that the
+// local server, the test suite and the deployed Cloudflare Pages worker all
+// serve exactly the same pages.
+const publicPageHandler = async (req: Request, res: Response) => {
+  try {
+    const page = await resolvePublicPage(req.path);
+    if (!page) {
+      // A path that looks like a public page but names nothing. The answer is
+      // a real 404, not the application's home document: a soft 404 would tell
+      // a crawler that the URL exists and put it into the index.
+      res.setHeader('Content-Security-Policy', PUBLIC_PAGE_CSP);
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+      return res.status(404).type('html').send(renderNotFoundPage());
+    }
+    res.setHeader('Content-Security-Policy', PUBLIC_PAGE_CSP);
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    return res.status(page.status).type('html').send(page.html);
+  } catch (error) {
+    console.error('Public page failed to render:', error);
+    return res.status(500).type('html').send(renderNotFoundPage());
+  }
+};
+
+app.get('/about', publicPageHandler);
+app.get('/privacy', publicPageHandler);
+app.get('/careers', publicPageHandler);
+app.get('/careers/:slug', publicPageHandler);
+app.get('/learning', publicPageHandler);
+app.get('/learning/course/:id', publicPageHandler);
+app.get('/learning/category/:slug', publicPageHandler);
+app.get('/opportunities', publicPageHandler);
+app.get('/opportunities/:id', publicPageHandler);
+
+// The sitemap is generated from the same catalogue the pages are built from,
+// so the two can never drift apart.
+app.get('/sitemap.xml', async (_req: Request, res: Response) => {
+  try {
+    const entries = await collectSitemapEntries();
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.type('application/xml').send(buildSitemapXml(entries));
+  } catch (error) {
+    console.error('Sitemap generation failed:', error);
+    return res.status(500).type('text/plain').send('Sitemap unavailable');
+  }
+});
+
+// robots.txt points at the sitemap and keeps the machine-facing surfaces out
+// of the crawler's way. It is a crawl instruction, not an access control —
+// every private area is protected by authentication.
+app.get('/robots.txt', (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.type('text/plain').send(buildRobotsTxt());
+});
+
+// The Search Console verification file.
+//
+// Google asks for the file at a path that ends in `.html`. The Pages asset
+// binding answers that path with a permanent redirect to the same file
+// without the extension, and a verification check that does not follow the
+// redirect would fail. The application answers the exact path instead.
+app.get(VERIFICATION_PATH, (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.type('text/plain').send(verificationFileBody());
+});
 
 // Unknown API routes must not fall through to the SPA.
 //

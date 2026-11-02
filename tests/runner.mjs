@@ -236,6 +236,9 @@ async function main() {
     // The administrative layer: server-enforced roles, announcement delivery
     // to real inboxes and the moderator report in the audit log.
     join(TESTS_DIR, 'admin.test.ts'),
+    // The Admin Center traffic dashboard: the Google credential behind it,
+    // the lifetime of the access token, and the gate the route keeps.
+    join(TESTS_DIR, 'ga4-analytics.test.ts'),
     join(TESTS_DIR, 'security.test.ts'),
     join(TESTS_DIR, 'coverage.test.ts'),
     join(TESTS_DIR, 'restart.test.ts'),
@@ -273,6 +276,10 @@ async function main() {
     // The URL is the state of the application, so a refresh reopens the same
     // page. Pure.
     join(TESTS_DIR, 'routing.test.ts'),
+    // The public SEO surface — the pages a crawler can index, the sitemap,
+    // robots.txt and the metadata of the application — and the privacy rules
+    // the analytics has to keep.
+    join(TESTS_DIR, 'seo.test.ts'),
     // Certificates: what the record holds, and what may be called a
     // certificate. Pure.
     join(TESTS_DIR, 'certificates.test.ts'),
@@ -331,7 +338,10 @@ async function main() {
 
   try {
     log(`starting an isolated server on port ${sharedPort}`);
-    server = await startServer({ port: sharedPort, env });
+    server = await startServer({
+      port: sharedPort,
+      env: { ...env, ADMIN_SCHEDULER_DISABLED: 'true' },
+    });
     activeServer = server;
     log(`server ready at ${server.baseUrl}`);
   } catch (error) {

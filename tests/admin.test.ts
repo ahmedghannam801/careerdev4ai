@@ -32,6 +32,32 @@ let targetUser: TestUser;
 const adminRowIds: string[] = [];
 const announcementIds: string[] = [];
 
+/**
+ * Targeting fixtures.
+ *
+ * The suite runs against the live project, so every value that a test matches
+ * on is suffixed with a per-run marker. A filter therefore resolves only the
+ * identities this file created, never a real user who happens to share a
+ * career or a city with the fixture.
+ */
+const RUN = Math.random().toString(36).slice(2, 8);
+const DATA_ROLE = `ZZ Data Analyst ${RUN}`;
+const HR_ROLE = `ZZ HR ${RUN}`;
+const INDUSTRY = `ZZ Industry ${RUN}`;
+const CITY_A = `ZZ City A ${RUN}`;
+const CITY_B = `ZZ City B ${RUN}`;
+const UNIVERSITY = `ZZ University ${RUN}`;
+const FIELD_OF_STUDY = `ZZ Field ${RUN}`;
+const ROADMAP_TITLE = `ZZ Roadmap ${RUN}`;
+const ROADMAP_STEP = `ZZ SQL Step ${RUN}`;
+const PROJECT_DONE = `ZZ Done Project ${RUN}`;
+const PROJECT_ACTIVE = `ZZ Active Project ${RUN}`;
+/** A real catalog row, so the learning filters resolve a genuine course id. */
+const LEARNING_COURSE_ID = 'edx-cs50x';
+const LEARNING_COURSE_TITLE = 'CS50x: Introduction to Computer Science';
+
+let sqlSkillId = '';
+
 async function makeAdmin(user: TestUser, role: string): Promise<string> {
   const { data, error } = await admin
     .from('admin_users')
@@ -53,6 +79,35 @@ function trackAnnouncement(id: string) {
   announcementIds.push(id);
 }
 
+async function previewAudience(rules: unknown) {
+  return api('POST', '/api/admin/announcements/preview', {
+    token: superAdminUser.token,
+    body: { audienceRules: rules },
+  });
+}
+
+async function createDraft(body: Record<string, unknown>) {
+  const created = await api('POST', '/api/admin/announcements', {
+    token: superAdminUser.token,
+    body,
+  });
+  assert.equal(created.status, 201, created.body?.error);
+  const id = created.body.announcement.id;
+  assert.ok(id);
+  trackAnnouncement(id);
+  return created.body.announcement;
+}
+
+async function statsFor(id: string) {
+  const list = await api('GET', '/api/admin/announcements', {
+    token: superAdminUser.token,
+  });
+  assert.equal(list.status, 200, list.body?.error);
+  const announcement = list.body.announcements.find((row: any) => row.id === id);
+  assert.ok(announcement, 'the announcement is in the administrative history');
+  return announcement.stats;
+}
+
 before(async () => {
   normalUser = await createTestUser('admin-normal');
   superAdminUser = await createTestUser('admin-super');
@@ -65,9 +120,121 @@ before(async () => {
   await makeAdmin(contentAdminUser, 'content_admin');
   await makeAdmin(opportunityAdminUser, 'opportunity_admin');
   await makeAdmin(moderatorUser, 'moderator');
+
+  // ---- targeting fixtures ------------------------------------------------
+  // Two users share a career, so AND/OR semantics and the preview/delivery
+  // parity can be asserted exactly.
+  await admin
+    .from('profiles')
+    .update({
+      target_role: DATA_ROLE,
+      target_industry: INDUSTRY,
+      user_type: 'student',
+      country: 'Egypt',
+      city: CITY_A,
+      location: `${CITY_A}, Egypt`,
+    })
+    .eq('id', normalUser.id);
+  await admin
+    .from('profiles')
+    .update({
+      target_role: DATA_ROLE,
+      user_type: 'fresh_graduate',
+      country: 'Egypt',
+      city: CITY_B,
+      location: `${CITY_B}, Egypt`,
+    })
+    .eq('id', targetUser.id);
+  await admin
+    .from('profiles')
+    .update({
+      target_role: HR_ROLE,
+      user_type: 'working_professional',
+      country: 'Egypt',
+      city: CITY_B,
+    })
+    .eq('id', moderatorUser.id);
+
+  const { data: skill, error: skillError } = await admin
+    .from('skills')
+    .select('id')
+    .eq('name', 'SQL')
+    .maybeSingle();
+  if (skillError || !skill) throw new Error('the SQL skill is missing from the live catalog');
+  sqlSkillId = skill.id;
+
+  await admin.from('user_skills').insert({
+    user_id: normalUser.id,
+    skill_id: sqlSkillId,
+    proficiency: 4,
+  });
+  await admin.from('educations').insert({
+    user_id: targetUser.id,
+    institution: UNIVERSITY,
+    field_of_study: FIELD_OF_STUDY,
+    degree: 'Bachelor',
+    is_current: true,
+  });
+
+  await admin.from('user_learning_items').insert([
+    { profile_id: normalUser.id, course_id: LEARNING_COURSE_ID, status: 'completed' },
+    { profile_id: targetUser.id, course_id: LEARNING_COURSE_ID, status: 'in_progress' },
+  ]);
+
+  const { data: roadmap, error: roadmapError } = await admin
+    .from('roadmaps')
+    .insert({
+      profile_id: normalUser.id,
+      title: ROADMAP_TITLE,
+      status: 'active',
+      is_enrolled: true,
+      target_role_title: DATA_ROLE,
+    })
+    .select('id')
+    .single();
+  if (roadmapError || !roadmap) throw new Error(`could not seed a roadmap: ${roadmapError?.message}`);
+
+  const { data: phase, error: phaseError } = await admin
+    .from('roadmap_phases')
+    .insert({ roadmap_id: roadmap.id, phase_number: 1, title: `Phase ${RUN}` })
+    .select('id')
+    .single();
+  if (phaseError || !phase) throw new Error(`could not seed a phase: ${phaseError?.message}`);
+
+  const { data: milestone, error: milestoneError } = await admin
+    .from('roadmap_milestones')
+    .insert({ phase_id: phase.id, title: `Milestone ${RUN}` })
+    .select('id')
+    .single();
+  if (milestoneError || !milestone) {
+    throw new Error(`could not seed a milestone: ${milestoneError?.message}`);
+  }
+
+  await admin.from('roadmap_tasks').insert({
+    milestone_id: milestone.id,
+    title: `${ROADMAP_STEP} SQL practice`,
+    status: 'in_progress',
+    skill_name: 'SQL',
+  });
+
+  await admin.from('projects').insert([
+    { profile_id: normalUser.id, title: PROJECT_DONE, status: 'completed' },
+    { profile_id: targetUser.id, title: PROJECT_ACTIVE, status: 'active' },
+  ]);
 });
 
 after(async () => {
+  // Target fixtures first: deleting a test user cascades its profile, but the
+  // domain rows are removed explicitly so a failed identity cleanup cannot
+  // leave test data behind.
+  for (const userId of [normalUser?.id, targetUser?.id, moderatorUser?.id]) {
+    if (!userId) continue;
+    await admin.from('user_learning_items').delete().eq('profile_id', userId);
+    await admin.from('projects').delete().eq('profile_id', userId);
+    await admin.from('educations').delete().eq('user_id', userId);
+    await admin.from('user_skills').delete().eq('user_id', userId);
+    await admin.from('roadmaps').delete().eq('profile_id', userId);
+  }
   for (const announcementId of announcementIds) {
     await admin.from('notifications').delete().eq('announcement_id', announcementId);
     await admin.from('announcements').delete().eq('id', announcementId);
@@ -415,5 +582,646 @@ describe('moderation reports', () => {
       body: { entityType: 'opportunity', reason: 'Not my permission' },
     });
     assert.equal(contentAdmin.status, 403, 'only a Moderator-or-above can report');
+  });
+});
+
+describe('audience targeting', () => {
+  test('the preview count is the delivery count', async () => {
+    const rules = [
+      {
+        logic: 'and',
+        conditions: [
+          { field: 'career', values: [DATA_ROLE] },
+          { field: 'skill', values: ['SQL'] },
+        ],
+      },
+    ];
+    const preview = await previewAudience(rules);
+    assert.equal(preview.status, 200, preview.body?.error);
+    assert.equal(preview.body.preview.count, 1, preview.body.preview.summary);
+
+    const draft = await createDraft({
+      title: 'SQL careers',
+      body: 'A message for data analysts who already know SQL.',
+      audienceType: 'all',
+      audienceRules: rules,
+    });
+    const published = await api('POST', `/api/admin/announcements/${draft.id}/publish`, {
+      token: superAdminUser.token,
+    });
+    assert.equal(published.status, 200, published.body?.error);
+    assert.equal(
+      published.body.announcement.recipientCount,
+      preview.body.preview.count,
+      'preview and delivery must resolve the same audience'
+    );
+
+    const { data: deliveries } = await admin
+      .from('announcement_deliveries')
+      .select('profile_id')
+      .eq('announcement_id', draft.id);
+    assert.equal(deliveries?.length, 1);
+    assert.equal(deliveries?.[0].profile_id, normalUser.id);
+  });
+
+  test('AND, OR and combined groups use the declared logic', async () => {
+    const orPreview = await previewAudience([
+      {
+        logic: 'or',
+        conditions: [
+          { field: 'career', values: [DATA_ROLE] },
+          { field: 'career', values: [HR_ROLE] },
+        ],
+      },
+    ]);
+    assert.equal(orPreview.status, 200, orPreview.body?.error);
+    assert.equal(orPreview.body.preview.count, 3, 'two data analysts OR one HR profile');
+
+    const andPreview = await previewAudience([
+      {
+        logic: 'and',
+        conditions: [
+          { field: 'career', values: [DATA_ROLE] },
+          { field: 'user_type', values: ['student'] },
+        ],
+      },
+    ]);
+    assert.equal(andPreview.status, 200, andPreview.body?.error);
+    assert.equal(andPreview.body.preview.count, 1, 'AND narrows to the student');
+
+    const combined = await previewAudience([
+      {
+        logic: 'and',
+        conditions: [{ field: 'career', values: [DATA_ROLE] }],
+      },
+      {
+        logic: 'and',
+        conditions: [{ field: 'country', values: ['Egypt'] }],
+      },
+    ]);
+    assert.equal(combined.status, 200, combined.body?.error);
+    assert.equal(combined.body.preview.count, 2, 'groups are intersected');
+
+    const impossible = await previewAudience([
+      {
+        logic: 'and',
+        conditions: [
+          { field: 'career', values: [HR_ROLE] },
+          { field: 'skill', values: ['SQL'] },
+        ],
+      },
+    ]);
+    assert.equal(impossible.status, 200, impossible.body?.error);
+    assert.equal(impossible.body.preview.count, 0, 'an impossible AND resolves to nobody');
+  });
+
+  test('every stored targeting field resolves real data', async () => {
+    const cases: Array<{ label: string; rules: unknown; expected: number }> = [
+      {
+        label: 'industry',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'industry', values: [INDUSTRY] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'university',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'university', values: [UNIVERSITY] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'field of study',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'field_of_study', values: [FIELD_OF_STUDY] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'degree',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'degree', values: ['Bachelor'] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'city',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'city', values: [CITY_A] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'enrolled roadmap',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'roadmap', values: [DATA_ROLE] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'roadmap step',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'roadmap_stage', values: [ROADMAP_STEP] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'completed project',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'project_completed', values: [PROJECT_DONE] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'active project',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'project_active', values: [PROJECT_ACTIVE] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'completed course',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'learning_completed', values: [LEARNING_COURSE_TITLE] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+      {
+        label: 'course in progress',
+        rules: [
+          {
+            logic: 'and',
+            conditions: [
+              { field: 'career', values: [DATA_ROLE] },
+              { field: 'learning_in_progress', values: [LEARNING_COURSE_TITLE] },
+            ],
+          },
+        ],
+        expected: 1,
+      },
+    ];
+
+    for (const entry of cases) {
+      const preview = await previewAudience(entry.rules);
+      assert.equal(preview.status, 200, `${entry.label}: ${preview.body?.error}`);
+      assert.equal(
+        preview.body.preview.count,
+        entry.expected,
+        `${entry.label} resolved ${preview.body.preview.count} users`
+      );
+    }
+  });
+
+  test('malformed or unsafe targeting is rejected, never widened', async () => {
+    const unknownField = await api('POST', '/api/admin/announcements', {
+      token: superAdminUser.token,
+      body: {
+        title: 'Bad filter',
+        body: 'An unknown field must not be accepted.',
+        audienceRules: [
+          { logic: 'and', conditions: [{ field: 'salary', values: ['1000'] }] },
+        ],
+      },
+    });
+    assert.equal(unknownField.status, 400);
+
+    // An explicit rule list that contains only blanks normalises to nothing.
+    // Treating that as "everyone" would broadcast a malformed message, so the
+    // server rejects it instead.
+    const emptyCondition = await api('POST', '/api/admin/announcements', {
+      token: superAdminUser.token,
+      body: {
+        title: 'Empty filter',
+        body: 'This must not become a platform-wide broadcast.',
+        audienceRules: [
+          { logic: 'and', conditions: [{ field: 'career', values: ['   '] }] },
+        ],
+      },
+    });
+    assert.equal(emptyCondition.status, 400);
+
+    const tooManyGroups = await api('POST', '/api/admin/announcements', {
+      token: superAdminUser.token,
+      body: {
+        title: 'Too many groups',
+        body: 'The server enforces the documented limit.',
+        audienceRules: Array.from({ length: 7 }, () => ({
+          logic: 'and',
+          conditions: [{ field: 'career', values: [DATA_ROLE] }],
+        })),
+      },
+    });
+    assert.equal(tooManyGroups.status, 400);
+  });
+});
+
+describe('delivery ledger and analytics', () => {
+  test('read and click states are written to the delivery ledger', async () => {
+    const draft = await createDraft({
+      title: 'Ledger announcement',
+      body: 'Read and click me.',
+      linkView: 'volunteer',
+      audienceRules: [
+        {
+          logic: 'and',
+          conditions: [{ field: 'career', values: [DATA_ROLE] }],
+        },
+      ],
+    });
+    const published = await api('POST', `/api/admin/announcements/${draft.id}/publish`, {
+      token: superAdminUser.token,
+    });
+    assert.equal(published.status, 200, published.body?.error);
+    assert.equal(published.body.announcement.recipientCount, 2);
+
+    const { data: rows, error } = await admin
+      .from('announcement_deliveries')
+      .select('id, profile_id, notification_id, read_at, clicked_at')
+      .eq('announcement_id', draft.id);
+    assert.equal(error, null);
+    assert.equal(rows?.length, 2, 'one delivery row per recipient');
+
+    const normalRow = rows!.find((row) => row.profile_id === normalUser.id)!;
+    const targetRow = rows!.find((row) => row.profile_id === targetUser.id)!;
+    assert.equal(normalRow.read_at, null);
+    assert.equal(normalRow.clicked_at, null);
+
+    const inbox = await api('GET', '/api/notifications', { token: normalUser.token });
+    const notification = inbox.body.notifications.find(
+      (entry: any) => entry.announcementId === draft.id
+    );
+    assert.ok(notification, 'the recipient sees the delivered announcement');
+    assert.equal(notification.read, false);
+    assert.equal(notification.clicked, false);
+
+    const read = await api('PATCH', `/api/notifications/${notification.id}`, {
+      token: normalUser.token,
+    });
+    assert.equal(read.status, 200, read.body?.error);
+    assert.equal(
+      read.body.notifications.find((entry: any) => entry.id === notification.id).read,
+      true
+    );
+
+    let stats = await statsFor(draft.id);
+    assert.equal(stats.deliveredCount, 2);
+    assert.equal(stats.readCount, 1);
+    assert.equal(stats.clickedCount, 0);
+    assert.equal(stats.readRate, 50);
+
+    const afterRead = await admin
+      .from('announcement_deliveries')
+      .select('read_at')
+      .eq('id', normalRow.id)
+      .single();
+    assert.ok(afterRead.data?.read_at, 'reading the notification marks the delivery read');
+
+    const click = await api('POST', `/api/notifications/${notification.id}/click`, {
+      token: normalUser.token,
+    });
+    assert.equal(click.status, 200, click.body?.error);
+    assert.equal(click.body.linkView, 'volunteer');
+
+    const afterClick = await admin
+      .from('announcement_deliveries')
+      .select('read_at, clicked_at')
+      .eq('id', normalRow.id)
+      .single();
+    assert.ok(afterClick.data?.clicked_at, 'a CTA click marks the delivery clicked');
+    assert.ok(afterClick.data?.read_at, 'a CTA click also implies the message was read');
+
+    stats = await statsFor(draft.id);
+    assert.equal(stats.readCount, 1);
+    assert.equal(stats.clickedCount, 1);
+    assert.equal(stats.clickRate, 50);
+
+    const markAll = await api('POST', '/api/notifications/read-all', {
+      token: targetUser.token,
+    });
+    assert.equal(markAll.status, 200, markAll.body?.error);
+    assert.ok(markAll.body.marked >= 1);
+
+    const targetAfterRead = await admin
+      .from('announcement_deliveries')
+      .select('read_at, clicked_at')
+      .eq('id', targetRow.id)
+      .single();
+    assert.ok(targetAfterRead.data?.read_at, 'mark-all-read reaches the delivery ledger');
+    assert.equal(targetAfterRead.data?.clicked_at, null, 'reading is not clicking');
+
+    stats = await statsFor(draft.id);
+    assert.equal(stats.readCount, 2);
+    assert.equal(stats.clickedCount, 1);
+    assert.equal(stats.readRate, 100);
+  });
+
+  test('one user cannot read or change another user’s delivery', async () => {
+    const draft = await createDraft({
+      title: 'Private ledger',
+      body: 'Only the recipient can see this delivery.',
+      audienceRules: [
+        {
+          logic: 'and',
+          conditions: [{ field: 'career', values: [DATA_ROLE] }],
+        },
+      ],
+    });
+    const published = await api('POST', `/api/admin/announcements/${draft.id}/publish`, {
+      token: superAdminUser.token,
+    });
+    assert.equal(published.status, 200, published.body?.error);
+
+    const { data: targetDelivery } = await admin
+      .from('announcement_deliveries')
+      .select('id, profile_id, read_at')
+      .eq('announcement_id', draft.id)
+      .eq('profile_id', targetUser.id)
+      .single();
+    assert.ok(targetDelivery);
+
+    const { data: targetNotification } = await admin
+      .from('notifications')
+      .select('id')
+      .eq('announcement_id', draft.id)
+      .eq('profile_id', targetUser.id)
+      .single();
+    assert.ok(targetNotification);
+
+    // RLS: the normal user's own session sees only its own delivery row.
+    const ownDeliveries = await normalUser.client
+      .from('announcement_deliveries')
+      .select('id, profile_id')
+      .eq('announcement_id', draft.id);
+    assert.equal(ownDeliveries.error, null);
+    assert.equal(ownDeliveries.data?.length, 1);
+    assert.equal(ownDeliveries.data?.[0].profile_id, normalUser.id);
+
+    const otherNotifications = await normalUser.client
+      .from('notifications')
+      .select('id, profile_id')
+      .eq('profile_id', targetUser.id);
+    assert.equal(otherNotifications.error, null);
+    assert.equal(otherNotifications.data?.length, 0, 'RLS hides another user’s inbox');
+
+    const tamper = await normalUser.client
+      .from('announcement_deliveries')
+      .update({ read_at: new Date().toISOString() })
+      .eq('id', targetDelivery.id)
+      .select('id');
+    assert.equal(tamper.error, null);
+    assert.equal(tamper.data?.length, 0, 'RLS refuses another user’s delivery update');
+
+    const stillUnread = await admin
+      .from('announcement_deliveries')
+      .select('read_at')
+      .eq('id', targetDelivery.id)
+      .single();
+    assert.equal(stillUnread.data?.read_at, null);
+
+    // The API is owner-scoped too, not just the table policy.
+    const forbiddenRead = await api('PATCH', `/api/notifications/${targetNotification.id}`, {
+      token: normalUser.token,
+    });
+    assert.equal(forbiddenRead.status, 404);
+
+    const forbiddenClick = await api(
+      'POST',
+      `/api/notifications/${targetNotification.id}/click`,
+      { token: normalUser.token }
+    );
+    assert.equal(forbiddenClick.status, 404);
+  });
+});
+
+describe('scheduling and expiry', () => {
+  test('a scheduled announcement is published by the server tick', async () => {
+    const draft = await createDraft({
+      title: 'Scheduled announcement',
+      body: 'This is published without an administrator watching.',
+      audienceRules: [
+        {
+          logic: 'and',
+          conditions: [{ field: 'career', values: [DATA_ROLE] }],
+        },
+      ],
+    });
+
+    const future = new Date(Date.now() + 2 * 60_000).toISOString();
+    const scheduled = await api('POST', `/api/admin/announcements/${draft.id}/schedule`, {
+      token: superAdminUser.token,
+      body: { publishAt: future },
+    });
+    assert.equal(scheduled.status, 200, scheduled.body?.error);
+    assert.equal(scheduled.body.announcement.status, 'scheduled');
+    assert.ok(scheduled.body.announcement.publishAt);
+
+    const beforeDue = await admin
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('announcement_id', draft.id);
+    assert.equal(beforeDue.count, 0, 'scheduling delivers nothing immediately');
+
+    const pastAttempt = await api(
+      'POST',
+      `/api/admin/announcements/${draft.id}/schedule`,
+      {
+        token: superAdminUser.token,
+        body: { publishAt: new Date(Date.now() - 60_000).toISOString() },
+      }
+    );
+    assert.equal(pastAttempt.status, 400, 'a schedule in the past is rejected');
+
+    // Simulate time passing without touching any browser state. The server
+    // reads publish_at from the database.
+    await admin
+      .from('announcements')
+      .update({ publish_at: new Date(Date.now() - 60_000).toISOString() })
+      .eq('id', draft.id);
+
+    const processed = await api('POST', '/api/admin/announcements/process-due', {
+      token: superAdminUser.token,
+    });
+    assert.equal(processed.status, 200, processed.body?.error);
+    assert.ok(processed.body.published >= 1, 'the due announcement was published');
+
+    const stored = await admin
+      .from('announcements')
+      .select('status, recipient_count')
+      .eq('id', draft.id)
+      .single();
+    assert.equal(stored.data?.status, 'published');
+    assert.equal(stored.data?.recipient_count, 2);
+
+    const delivered = await admin
+      .from('announcement_deliveries')
+      .select('id', { count: 'exact', head: true })
+      .eq('announcement_id', draft.id);
+    assert.equal(delivered.count, 2, 'the scheduled publish created real deliveries');
+  });
+
+  test('an expired announcement stops being active but keeps its ledger', async () => {
+    const draft = await createDraft({
+      title: 'Expiring announcement',
+      body: 'This becomes expired after its expiry date.',
+      audienceRules: [
+        {
+          logic: 'and',
+          conditions: [{ field: 'career', values: [DATA_ROLE] }],
+        },
+      ],
+    });
+    const published = await api('POST', `/api/admin/announcements/${draft.id}/publish`, {
+      token: superAdminUser.token,
+    });
+    assert.equal(published.status, 200, published.body?.error);
+
+    await admin
+      .from('announcements')
+      .update({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+      .eq('id', draft.id);
+
+    const processed = await api('POST', '/api/admin/announcements/process-due', {
+      token: superAdminUser.token,
+    });
+    assert.equal(processed.status, 200, processed.body?.error);
+    assert.ok(processed.body.expired >= 1, 'the expired announcement was moved to expired');
+
+    const stored = await admin
+      .from('announcements')
+      .select('status')
+      .eq('id', draft.id)
+      .single();
+    assert.equal(stored.data?.status, 'expired');
+
+    const deliveries = await admin
+      .from('announcement_deliveries')
+      .select('id', { count: 'exact', head: true })
+      .eq('announcement_id', draft.id);
+    assert.equal(deliveries.count, 2, 'expiry does not erase the delivery history');
+  });
+});
+
+describe('rich announcement fields', () => {
+  test('images, category, CTA and critical priority survive delivery', async () => {
+    const draft = await createDraft({
+      title: 'Critical security notice',
+      body: 'Rotate your password if you reused it elsewhere.',
+      priority: 'critical',
+      category: 'security',
+      imageUrl: 'https://example.com/banner.png',
+      thumbnailUrl: 'https://example.com/thumb.png',
+      ctaText: 'Review account',
+      ctaUrl: 'https://example.com/security',
+      linkView: 'settings',
+      audienceType: 'users',
+      audienceValues: [normalUser.id],
+    });
+    assert.equal(draft.priority, 'critical');
+    assert.equal(draft.category, 'security');
+    assert.equal(draft.ctaText, 'Review account');
+    assert.equal(draft.imageUrl, 'https://example.com/banner.png');
+
+    const published = await api('POST', `/api/admin/announcements/${draft.id}/publish`, {
+      token: superAdminUser.token,
+    });
+    assert.equal(published.status, 200, published.body?.error);
+
+    const inbox = await api('GET', '/api/notifications', { token: normalUser.token });
+    const notification = inbox.body.notifications.find(
+      (entry: any) => entry.announcementId === draft.id
+    );
+    assert.ok(notification);
+    assert.equal(notification.priority, 'critical');
+    assert.equal(notification.linkView, 'settings');
+
+    const stored = await statsFor(draft.id);
+    assert.equal(stored.deliveredCount, 1);
+  });
+
+  test('invalid URLs, priorities and categories are rejected', async () => {
+    for (const body of [
+      {
+        title: 'Bad image',
+        body: 'No script URLs are accepted.',
+        imageUrl: 'javascript:alert(1)',
+      },
+      {
+        title: 'Bad priority',
+        body: 'The vocabulary is fixed.',
+        priority: 'urgent',
+      },
+      {
+        title: 'Bad category',
+        body: 'The vocabulary is fixed.',
+        category: 'gossip',
+      },
+    ]) {
+      const res = await api('POST', '/api/admin/announcements', {
+        token: superAdminUser.token,
+        body,
+      });
+      assert.equal(res.status, 400, `${body.title} must be rejected`);
+    }
   });
 });
