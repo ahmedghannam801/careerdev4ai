@@ -18,6 +18,7 @@ import {
   createTestUser,
   deleteTestUser,
   admin,
+  anon,
   api,
   apiAnonymous,
   type TestUser,
@@ -380,6 +381,20 @@ describe('a CV version cannot be attached to another user\'s CV (S-3)', () => {
     } finally {
       await deleteTestUser(other);
     }
+  });
+});
+
+describe('profile column exposure', () => {
+  test('the anon key cannot read the profiles table directly', async () => {
+    // RLS on profiles is row-level. A public row must not become a way to
+    // read private columns such as `phone` with the public anon key. The
+    // public profile page is served by the API with the service role, which
+    // returns only the fields it maps.
+    const { error } = await anon
+      .from('profiles')
+      .select('id, full_name, phone')
+      .limit(1);
+    assert.ok(error, 'a direct anon read of profiles must be refused');
   });
 });
 
