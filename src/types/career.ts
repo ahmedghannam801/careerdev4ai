@@ -504,7 +504,7 @@ export interface UserNotification {
   message: string;
   // Mirrors server/db/notifications.ts NOTIFICATION_TYPES. The two lists must
   // stay identical or persisted rows are cast to a type the UI cannot render.
-  type: 'roadmap' | 'interview' | 'application' | 'achievement' | 'system';
+  type: 'roadmap' | 'interview' | 'application' | 'achievement' | 'system' | 'announcement';
   read: boolean;
   timestamp: string;
   linkAction?: string;

@@ -1,16 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
+  ArrowRight,
+  Award,
   BookOpen,
   BookmarkCheck,
   CheckCircle2,
   Filter,
+  GraduationCap,
   Languages,
+  ListVideo,
   PlayCircle,
   RefreshCw,
   Search,
   Sparkles,
   Trophy,
+  Video,
   X,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
@@ -32,6 +37,12 @@ import {
   providerTier,
   type AvailabilityBucket,
 } from '../../../shared/courseProviders';
+import {
+  RESOURCE_TYPES,
+  RESOURCE_TYPE_LABELS,
+  isVideoResource,
+  type LearningResourceType,
+} from '../../../shared/learningResources';
 
 type HubTab = 'recommended' | 'saved' | 'in_progress' | 'completed' | 'catalog';
 
@@ -130,6 +141,7 @@ export const LearningCenterView: React.FC = () => {
   const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
   const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [formatFilter, setFormatFilter] = useState<CourseFormat | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<LearningResourceType | 'all'>('all');
 
   const initialRequest = useRef(false);
   const [aiRequested, setAiRequested] = useState(false);
@@ -224,6 +236,7 @@ export const LearningCenterView: React.FC = () => {
     if (!matchesDuration(course, durationFilter)) return false;
     if (languageFilter !== 'all' && course.language !== languageFilter) return false;
     if (formatFilter !== 'all' && course.format !== formatFilter) return false;
+    if (typeFilter !== 'all' && course.resourceType !== typeFilter) return false;
     return matchesSearch(course, search);
   };
 
@@ -236,6 +249,13 @@ export const LearningCenterView: React.FC = () => {
       learningCatalog
         .filter(matchesExploreFilters)
         .sort((a, b) => {
+          // Video-first: a video resource is a lighter commitment than a long
+          // course, so it leads within the same provider tier. Relevance for
+          // the personalised rails is unchanged and still comes from the
+          // deterministic recommender.
+          const video = Number(isVideoResource(b.resourceType ?? 'course')) -
+            Number(isVideoResource(a.resourceType ?? 'course'));
+          if (video !== 0) return video;
           const tier = providerTier(a.provider) - providerTier(b.provider);
           if (tier !== 0) return tier;
           return a.title.localeCompare(b.title);
@@ -251,6 +271,7 @@ export const LearningCenterView: React.FC = () => {
       durationFilter,
       languageFilter,
       formatFilter,
+      typeFilter,
       search,
     ]
   );
@@ -268,6 +289,143 @@ export const LearningCenterView: React.FC = () => {
   const inProgressItems = itemsByStatus('in_progress');
   const completedItems = itemsByStatus('completed');
 
+  // Sectioned discovery. Every rail is a view over the same real catalogue;
+  // nothing is invented and the full catalogue remains one tab away.
+  const rails = useMemo(() => {
+    const recommendedRank = new Map(
+      learningRecommendations.map((recommendation, index) => [
+        recommendation.course.id,
+        index,
+      ])
+    );
+    const byRecommendation = (a: LearningCourse, b: LearningCourse) => {
+      const ra = recommendedRank.get(a.id);
+      const rb = recommendedRank.get(b.id);
+      if (ra !== undefined && rb !== undefined) return ra - rb;
+      if (ra !== undefined) return -1;
+      if (rb !== undefined) return 1;
+      return (
+        providerTier(a.provider) - providerTier(b.provider) ||
+        a.title.localeCompare(b.title)
+      );
+    };
+    const pick = (
+      predicate: (course: LearningCourse) => boolean,
+      limit = 6
+    ): LearningCourse[] =>
+      learningCatalog
+        .filter(predicate)
+        .sort(byRecommendation)
+        .slice(0, limit);
+
+    const targetRoleCourses = learningCatalog
+      .filter(
+        (course) =>
+          course.roles.some((role) => role.roleSlug === targetRole.id) ||
+          course.roles.some(
+            (role) =>
+              course.roles.length === 1 &&
+              role.roleSlug.toLowerCase() === targetRole.title.toLowerCase()
+          )
+      )
+      .sort((a, b) => {
+        const score = (course: LearningCourse) =>
+          Math.max(
+            0,
+            ...course.roles
+              .filter((role) => role.roleSlug === targetRole.id)
+              .map((role) => role.relevanceScore)
+          );
+        return score(b) - score(a) || byRecommendation(a, b);
+      })
+      .slice(0, 6);
+
+    const skillCourses = learningRecommendations
+      .filter((recommendation) => recommendation.matchedSkills.length > 0)
+      .slice(0, 6)
+      .map((recommendation) => recommendation.course);
+
+    const videoCourses = pick(
+      (course) => isVideoResource(course.resourceType ?? 'course'),
+      6
+    );
+    const freeCourses = pick(
+      (course) => availabilityBucket(course.availability) === 'free',
+      6
+    );
+    const auditCourses = pick(
+      (course) => availabilityBucket(course.availability) === 'free_audit',
+      6
+    );
+    const certificateCourses = pick((course) => Boolean(course.hasCertificate), 6);
+    const newCourses = learningCatalog
+      .filter((course) => Boolean(course.createdAt))
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      )
+      .slice(0, 6);
+    const popularCourses = learningCatalog
+      .filter((course) => (course.popularity ?? 0) > 0)
+      .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
+      .slice(0, 6);
+
+    return {
+      targetRoleCourses,
+      skillCourses,
+      videoCourses,
+      freeCourses,
+      auditCourses,
+      certificateCourses,
+      newCourses,
+      popularCourses,
+    };
+  }, [learningCatalog, learningRecommendations, targetRole.id, targetRole.title]);
+
+  const renderRail = (
+    id: string,
+    title: string,
+    subtitle: string,
+    courses: LearningCourse[],
+    options?: { showProgress?: boolean; onExplore?: () => void }
+  ) => {
+    if (courses.length === 0) return null;
+    return (
+      <section key={id} className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">{t(title)}</h2>
+            <p className="text-[11px] text-[var(--text-muted)]">{subtitle}</p>
+          </div>
+          {options?.onExplore && (
+            <button
+              type="button"
+              onClick={options.onExplore}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent-strong)] hover:underline"
+            >
+              {t('Explore all')} <ArrowRight className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        <Stagger gap={0.05} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {courses.map((course) => (
+            <StaggerItem key={`${id}-${course.id}`} className="h-full">
+              <CourseCard
+                {...cardProps(course, recommendationById.get(course.id))}
+                showProgress={options?.showProgress}
+              />
+            </StaggerItem>
+          ))}
+        </Stagger>
+      </section>
+    );
+  };
+
+  const exploreSection = (type?: LearningResourceType) => {
+    setTypeFilter(type ?? 'all');
+    setTab('catalog');
+  };
+
   const clearFilters = () => {
     setRoleFilter('all');
     setSkillFilter('all');
@@ -277,6 +435,7 @@ export const LearningCenterView: React.FC = () => {
     setDurationFilter('all');
     setLanguageFilter('all');
     setFormatFilter('all');
+    setTypeFilter('all');
     setSearch('');
   };
 
@@ -289,6 +448,7 @@ export const LearningCenterView: React.FC = () => {
     durationFilter !== 'all',
     languageFilter !== 'all',
     formatFilter !== 'all',
+    typeFilter !== 'all',
     search.trim().length > 0,
   ].filter(Boolean).length;
 
@@ -564,6 +724,118 @@ export const LearningCenterView: React.FC = () => {
               ))}
             </Stagger>
           )}
+
+          {inProgressItems.length > 0 &&
+            renderRail(
+              'continue',
+              'Continue Learning',
+              t('Pick up where you left off.'),
+              inProgressItems.map((entry) => entry.course),
+              { showProgress: true }
+            )}
+
+          {renderRail(
+            'target-role',
+            'For Your Target Role',
+            `${roleLabel} · ${t('catalogue resources mapped to this role')}`,
+            rails.targetRoleCourses,
+            { onExplore: () => exploreSection() }
+          )}
+
+          {renderRail(
+            'skills',
+            'Build the Skills You Need',
+            t('Resources that address the gaps in your skill profile.'),
+            rails.skillCourses,
+            { onExplore: () => exploreSection() }
+          )}
+
+          {renderRail(
+            'video',
+            'Video Courses First',
+            t('Watch a practitioner teach the skill, then practise it.'),
+            rails.videoCourses,
+            { onExplore: () => exploreSection('video_course') }
+          )}
+
+          {renderRail(
+            'free',
+            'Free to Learn',
+            t('No payment required to complete the learning.'),
+            rails.freeCourses,
+            { onExplore: () => exploreSection() }
+          )}
+
+          {renderRail(
+            'audit',
+            'Free Audit',
+            t('Audit the course without paying; the certificate is not included.'),
+            rails.auditCourses,
+            { onExplore: () => exploreSection() }
+          )}
+
+          {renderRail(
+            'certificate',
+            'With a Certificate',
+            t('The catalogue records a certificate for these resources.'),
+            rails.certificateCourses,
+            { onExplore: () => exploreSection() }
+          )}
+
+          {renderRail(
+            'new',
+            'New in the Catalogue',
+            t('The most recently added resources.'),
+            rails.newCourses
+          )}
+
+          {renderRail(
+            'popular',
+            'Popular with Learners',
+            t('Ranked by the provider-published learner count.'),
+            rails.popularCourses
+          )}
+
+          <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={14} className="text-[var(--color-accent-strong)]" />
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                {t('Explore All')}
+              </h2>
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+              {t('Jump into the full catalogue with a resource type already applied.')}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {RESOURCE_TYPES.map((type) => {
+                const Icon =
+                  type === 'video_course'
+                    ? Video
+                    : type === 'video_playlist'
+                      ? ListVideo
+                      : type === 'course'
+                        ? GraduationCap
+                        : type === 'lecture'
+                          ? PlayCircle
+                          : type === 'book'
+                            ? BookOpen
+                            : type === 'workshop'
+                              ? Sparkles
+                              : Award;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => exploreSection(type)}
+                    className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-start text-[11px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--text-primary)]"
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--color-accent-strong)]" />
+                    {t(RESOURCE_TYPE_LABELS[type])}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         </section>
       )}
 
@@ -833,6 +1105,24 @@ export const LearningCenterView: React.FC = () => {
                   {FORMAT_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {t(option.label)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                {t('Resource type')}
+                <select
+                  value={typeFilter}
+                  onChange={(event) =>
+                    setTypeFilter(event.target.value as LearningResourceType | 'all')
+                  }
+                  className={filterSelectClass}
+                >
+                  <option value="all">{t('All resource types')}</option>
+                  {RESOURCE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {t(RESOURCE_TYPE_LABELS[type])}
                     </option>
                   ))}
                 </select>

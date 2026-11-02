@@ -15,9 +15,10 @@ export interface NotificationDTO {
   id: string;
   title: string;
   message: string | null;
-  type: 'interview' | 'roadmap' | 'application' | 'achievement' | 'system';
+  type: 'interview' | 'roadmap' | 'application' | 'achievement' | 'system' | 'announcement';
   read: boolean;
   linkView: string | null;
+  announcementId?: string | null;
   createdAt: string;
 }
 

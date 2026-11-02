@@ -26,7 +26,8 @@ import {
   MoreHorizontal,
   LogOut,
   HeartHandshake,
-  GraduationCap
+  GraduationCap,
+  ShieldCheck
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { AiLanguageSelector } from '../ui/AiLanguageSelector';
@@ -37,6 +38,7 @@ import { Logo } from '../brand/Logo';
 import { backdropVariants, drawerLeftVariants, drawerVariants } from '../../lib/motion';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
+import { useAdminAccess } from '../../lib/useAdminAccess';
 
 interface AppShellProps {
   currentView: string;
@@ -46,6 +48,9 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, children }) => {
   const { profile, targetRole, settings, updateSettings, visibleNotifications, currentUser, logout, t, copilotOpen, setCopilotOpen } = useCareer();
+  // The Admin Center entry is only offered to a verified administrator. The
+  // server still re-checks every admin action; this is a navigation hint.
+  const { admin } = useAdminAccess();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -114,7 +119,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       items: [
         { id: 'learning', label: t('navLearn'), icon: BookOpen },
         { id: 'projects', label: t('navProjects'), icon: FolderGit2 },
-        { id: 'volunteer', label: t('navVolunteer'), icon: HeartHandshake },
+        { id: 'volunteer', label: t('navOpportunities'), icon: HeartHandshake },
       ],
     },
     {
@@ -138,6 +143,14 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       ],
     },
   ];
+
+  if (admin && admin.status === 'active') {
+    navGroups.push({
+      id: 'administration',
+      label: t('Administration'),
+      items: [{ id: 'admin', label: t('Admin Center'), icon: ShieldCheck }],
+    });
+  }
 
   const allNavItems = navGroups.flatMap((group) => group.items);
   const handleNavClick = (viewId: string) => {

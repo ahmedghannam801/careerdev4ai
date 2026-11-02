@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Bell, X, Check, Calendar, AlertCircle, Award } from 'lucide-react';
+import { Bell, X, Check, Calendar, AlertCircle, Award, Megaphone } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 
@@ -90,6 +90,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                   {n.type === 'interview' && <Calendar className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />}
                   {n.type === 'roadmap' && <AlertCircle className="w-3.5 h-3.5 text-[var(--color-warning)]" />}
                   {n.type === 'achievement' && <Award className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />}
+                  {n.type === 'announcement' && <Megaphone className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />}
                   <span>{n.title}</span>
                 </div>
                 {!n.read && (

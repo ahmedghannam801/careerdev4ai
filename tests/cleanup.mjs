@@ -65,6 +65,10 @@ const PROFILE_SCOPED_TABLES = [
   { table: 'cover_letters', column: 'profile_id' },
   { table: 'job_bookmarks', column: 'profile_id' },
   { table: 'user_learning_items', column: 'profile_id' },
+  // The administrative layer. An announcement belongs to the profile that
+  // wrote it, so a failed run cannot leave a test announcement behind.
+  { table: 'announcements', column: 'created_by' },
+  { table: 'admin_users', column: 'profile_id' },
 ];
 
 export function createAdminClient(env) {

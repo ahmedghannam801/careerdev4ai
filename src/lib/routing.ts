@@ -39,6 +39,7 @@ export const APP_ROUTES = [
   'activity',
   'progress',
   'settings',
+  'admin',
 ] as const;
 
 /** A view the signed-in application can show. */

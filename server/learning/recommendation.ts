@@ -35,6 +35,7 @@ import {
 } from '../../shared/skillMatching.ts';
 import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
 import { providerTier } from '../../shared/courseProviders.ts';
+import type { LearningResourceType } from '../../shared/learningResources.ts';
 
 export type Availability =
   | 'free'
@@ -90,6 +91,18 @@ export interface LearningCourse {
   ratingCount?: number | null;
   /** An optional branded image. Cards fall back to provider branding. */
   thumbnailUrl?: string | null;
+  /** The learner-facing resource type (video course, article, ...). */
+  resourceType?: LearningResourceType;
+  /** True only when the catalogue already records a certificate. */
+  hasCertificate?: boolean;
+  /** True only when the recorded certificate itself is free. */
+  certificateIncluded?: boolean;
+  /** A curated placement, never inferred from a score. */
+  isFeatured?: boolean;
+  /** Provider-published popularity (rating count); 0 when unknown. */
+  popularity?: number;
+  /** When the catalogue row was added; used for a truthful "new" rail. */
+  createdAt?: string;
   skills: CourseSkill[];
   roles: CourseRole[];
 }

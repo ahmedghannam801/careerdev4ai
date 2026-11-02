@@ -4,6 +4,7 @@
 // auth user id as profile_id; no client-supplied owner is accepted anywhere in
 // this module.
 import { getSupabaseServer } from './supabase';
+import { deriveResourceType, officialThumbnail, isLearningResourceType, type LearningResourceType } from '../../shared/learningResources.ts';
 import type {
   Availability,
   CourseRole,
@@ -33,6 +34,11 @@ interface CourseRow {
   rating: number | string | null;
   rating_count: number | null;
   thumbnail_url: string | null;
+  resource_type: string | null;
+  has_certificate: boolean | null;
+  certificate_included: boolean | null;
+  is_featured: boolean | null;
+  popularity: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +84,16 @@ function toCourse(
   skills: CourseSkill[],
   roles: CourseRole[]
 ): LearningCourse {
+  const resourceType: LearningResourceType =
+    row.resource_type && isLearningResourceType(row.resource_type)
+      ? row.resource_type
+      : deriveResourceType({
+          format: row.format,
+          provider: row.provider,
+          url: row.url,
+          title: row.title,
+        });
+
   return {
     id: row.id,
     title: row.title,
@@ -100,7 +116,13 @@ function toCourse(
     rating:
       row.rating === null || row.rating === undefined ? null : Number(row.rating),
     ratingCount: row.rating_count ?? null,
-    thumbnailUrl: row.thumbnail_url ?? null,
+    thumbnailUrl: officialThumbnail(row.url, row.thumbnail_url),
+    resourceType,
+    hasCertificate: Boolean(row.has_certificate),
+    certificateIncluded: Boolean(row.certificate_included),
+    isFeatured: Boolean(row.is_featured),
+    popularity: row.popularity ?? row.rating_count ?? 0,
+    createdAt: row.created_at,
     skills,
     roles,
   };
@@ -354,4 +376,53 @@ export async function listUserSkillsWithNames(
       currentLevel: row.proficiency ?? 0,
     }))
     .filter((row) => row.name.length > 0);
+}
+
+/** The full catalogue for a Content Admin, including unpublished fields. */
+export async function listCoursesForAdmin(): Promise<LearningCourse[]> {
+  return listCourses();
+}
+
+export interface AdminCoursePatch {
+  resourceType?: LearningResourceType | null;
+  isFeatured?: boolean;
+  thumbnailUrl?: string | null;
+  description?: string | null;
+  hasCertificate?: boolean;
+  certificateIncluded?: boolean;
+}
+
+/**
+ * Updates the curation fields a Content Admin owns. The core catalogue facts
+ * (title, provider, URL, skills) are not editable here: those came from a
+ * verified source and editing them by hand would damage provenance.
+ */
+export async function updateCourseForAdmin(
+  courseId: string,
+  patch: AdminCoursePatch
+): Promise<LearningCourse | null> {
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.resourceType !== undefined) {
+    if (patch.resourceType !== null && !isLearningResourceType(patch.resourceType)) {
+      throw new Error('Unknown resource type');
+    }
+    update.resource_type = patch.resourceType;
+  }
+  if (patch.isFeatured !== undefined) update.is_featured = patch.isFeatured;
+  if (patch.thumbnailUrl !== undefined) update.thumbnail_url = patch.thumbnailUrl;
+  if (patch.description !== undefined) update.description = patch.description;
+  if (patch.hasCertificate !== undefined) update.has_certificate = patch.hasCertificate;
+  if (patch.certificateIncluded !== undefined) {
+    update.certificate_included = patch.certificateIncluded;
+  }
+
+  const { data, error } = await getSupabaseServer()
+    .from('courses')
+    .update(update)
+    .eq('id', courseId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return getCourse(courseId);
 }

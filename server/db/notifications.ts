@@ -18,6 +18,7 @@ export const NOTIFICATION_TYPES = [
   'application',
   'achievement',
   'system',
+  'announcement',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -29,6 +30,8 @@ export interface NotificationDTO {
   type: NotificationType;
   read: boolean;
   linkView: string | null;
+  /** Set when this notification was delivered by an announcement. */
+  announcementId: string | null;
   createdAt: string;
 }
 
@@ -46,10 +49,11 @@ interface NotificationRow {
   type: string;
   read_at: string | null;
   link_view: string | null;
+  announcement_id: string | null;
   created_at: string;
 }
 
-const COLUMNS = 'id, title, message, type, read_at, link_view, created_at';
+const COLUMNS = 'id, title, message, type, read_at, link_view, announcement_id, created_at';
 
 function toNotification(row: NotificationRow): NotificationDTO {
   return {
@@ -61,6 +65,7 @@ function toNotification(row: NotificationRow): NotificationDTO {
     // was read (NULL = still unread), which carries more information.
     read: row.read_at !== null,
     linkView: row.link_view,
+    announcementId: row.announcement_id,
     createdAt: row.created_at,
   };
 }

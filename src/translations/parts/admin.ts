@@ -1,0 +1,126 @@
+/**
+ * Arabic strings for the Admin Center: announcements, the administrator
+ * directory, the moderation panels and the audit log.
+ *
+ * Every entry is keyed by the exact English source string used in the
+ * components. Keep the two identical.
+ */
+
+export const adminAr: Record<string, string> = {
+  'Administration': 'الإدارة',
+  'Admin Center': 'مركز الإدارة',
+
+  // Announcements
+  'Draft updated.': 'تم تحديث المسودة.',
+  'Draft saved. Publish it when it is ready.': 'تم حفظ المسودة. انشرها عندما تكون جاهزة.',
+  'Published to': 'تم النشر إلى',
+  'people': 'أشخاص',
+  'recipients': 'مستلمًا',
+  'Announcement archived.': 'تمت أرشفة الإعلان.',
+  'Delete this announcement? Delivered notifications stay in user inboxes.':
+    'هل تريد حذف هذا الإعلان؟ ستبقى الإشعارات المُسلَّمة في صناديق المستخدمين.',
+  'Announcement deleted.': 'تم حذف الإعلان.',
+  'Why are you reporting this announcement? A Super Admin will review it.':
+    'لماذا تُبلغ عن هذا الإعلان؟ سيراجعه المدير الأعلى.',
+  'Report recorded. A Super Admin can review it in the audit log.':
+    'تم تسجيل البلاغ. يمكن للمدير الأعلى مراجعته في سجل التدقيق.',
+  'Edit announcement': 'تعديل الإعلان',
+  'Compose an announcement': 'إنشاء إعلان',
+  'Cancel edit': 'إلغاء التعديل',
+  'Announcement title': 'عنوان الإعلان',
+  'What do you want every recipient to know?': 'ماذا تريد أن يعرف كل مستلم؟',
+  'Normal': 'عادي',
+  'Important': 'مهم',
+  'Urgent': 'عاجل',
+  'Audience': 'الجمهور',
+  'Everyone': 'الجميع',
+  'Specific users': 'مستخدمون محددون',
+  'Career field': 'المجال المهني',
+  'Account type': 'نوع الحساب',
+  'Country': 'البلد',
+  'Link (optional)': 'رابط (اختياري)',
+  'Search by name, username or target role': 'ابحث بالاسم أو اسم المستخدم أو الوظيفة المستهدفة',
+  'Separate multiple values with commas. The values must match the profile field exactly.':
+    'افصل بين القيم المتعددة بفواصل. يجب أن تطابق القيم حقل الملف الشخصي تمامًا.',
+  'Publish now': 'انشر الآن',
+  'Update draft': 'تحديث المسودة',
+  'Save draft': 'حفظ المسودة',
+  'Communication history': 'سجل التواصل',
+  'No announcements yet. The first one you publish will appear in every targeted inbox.':
+    'لا توجد إعلانات بعد. أول إعلان تنشره سيظهر في كل صندوق مستهدف.',
+  'Publish': 'نشر',
+  'Archive': 'أرشفة',
+  'Report': 'إبلاغ',
+  'Delete announcement': 'حذف الإعلان',
+
+  // Administrators
+  'Administrator added.': 'تمت إضافة مدير.',
+  'Administrator updated.': 'تم تحديث المدير.',
+  'from the administrative team?': 'من فريق الإدارة؟',
+  'Administrator removed.': 'تمت إزالة المدير.',
+  'Account email': 'البريد الإلكتروني للحساب',
+  'Add admin': 'إضافة مدير',
+  'Administrators are identified by their verified account email. Only a Super Admin can change this team.':
+    'يُعرَّف المديرون ببريد حسابهم الموثّق. المدير الأعلى وحده يمكنه تغيير هذا الفريق.',
+  'Loading administrators…': 'جارٍ تحميل المديرين…',
+  'Last active': 'آخر نشاط',
+  'Disable': 'تعطيل',
+  'Enable': 'تمكين',
+  'Remove administrator': 'إزالة المدير',
+
+  // Opportunities moderation
+  'What is wrong with this opportunity? A Super Admin will review it.':
+    'ما المشكلة في هذه الفرصة؟ سيراجعها المدير الأعلى.',
+  'Search organisation, title or tag': 'ابحث عن منظمة أو عنوان أو وسم',
+  'Loading the catalogue…': 'جارٍ تحميل الكتالوج…',
+  'Mode': 'النمط',
+  'Verification': 'التحقق',
+  'Visibility': 'الظهور',
+  'Open source page': 'فتح الصفحة المصدر',
+  'Rolling': 'مفتوح باستمرار',
+  'Activate': 'تفعيل',
+  'Featured': 'مميّزة',
+
+  // Learning moderation
+  'What is wrong with this learning resource? A Super Admin will review it.':
+    'ما المشكلة في هذا المورد التعليمي؟ سيراجعه المدير الأعلى.',
+  'Search title, provider or category': 'ابحث بالعنوان أو المزوّد أو الفئة',
+  'Loading learning resources…': 'جارٍ تحميل الموارد التعليمية…',
+  'Resource': 'المورد',
+  'Certificate': 'الشهادة',
+  'Exists': 'متاحة',
+  'Included free': 'مشمولة مجانًا',
+  'Feature': 'إبراز',
+
+  // Audit log
+  'Loading the audit log…': 'جارٍ تحميل سجل التدقيق…',
+  'When': 'الوقت',
+  'Administrator': 'المدير',
+  'Action': 'الإجراء',
+  'Entity': 'الكيان',
+  'No administrative actions have been recorded yet.': 'لم تُسجَّل أي إجراءات إدارية بعد.',
+
+  // Navigation and access
+  'Overview': 'نظرة عامة',
+  'Communications': 'التواصل',
+  'Administrators': 'المديرون',
+  'Audit log': 'سجل التدقيق',
+  'Checking administrator access…': 'جارٍ التحقق من صلاحيات المدير…',
+  'Administrator access required': 'صلاحية مدير مطلوبة',
+  'This area is available to authorised administrators only. Ask a Super Admin if you believe you should have access.':
+    'هذه المنطقة متاحة للمديرين المصرّح لهم فقط. اطلب من المدير الأعلى منحك الوصول إذا كنت تعتقد أنك تستحقه.',
+  'Admin Communication Center': 'مركز تواصل الإدارة',
+  'Users': 'المستخدمون',
+  'Published announcements': 'الإعلانات المنشورة',
+  'Notifications delivered': 'الإشعارات المُسلَّمة',
+  'Learning resources': 'الموارد التعليمية',
+  'Completed learning': 'التعليم المكتمل',
+  'Live opportunities': 'الفرص المتاحة',
+  'Draft & archived announcements': 'الإعلانات المسودة والمؤرشفة',
+  'Role map': 'خريطة الأدوار',
+  'Loading analytics…': 'جارٍ تحميل التحليلات…',
+  'Your role can manage content but cannot read platform analytics.':
+    'يمكن لدورك إدارة المحتوى لكنه لا يستطيع قراءة تحليلات المنصة.',
+  'Your role has no management permissions yet. A Super Admin can grant them.':
+    'لا يملك دورك أي صلاحيات إدارة بعد. يمكن للمدير الأعلى منحها.',
+};

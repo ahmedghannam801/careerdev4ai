@@ -45,6 +45,7 @@ const PublicProfileView = lazy(() => import('./components/views/PublicProfileVie
 const ProfileView = lazy(() => import('./components/views/ProfileView').then((m) => ({ default: m.ProfileView })));
 const DocumentsView = lazy(() => import('./components/views/DocumentsView').then((m) => ({ default: m.DocumentsView })));
 const ActivityView = lazy(() => import('./components/views/ActivityView').then((m) => ({ default: m.ActivityView })));
+const AdminCenterView = lazy(() => import('./components/views/AdminCenterView').then((m) => ({ default: m.AdminCenterView })));
 
 /**
  * Extracts the username from `#/profile/<username>`. A plain `#/profile` is
@@ -283,6 +284,8 @@ function AppRoutes() {
         return <ProgressView />;
       case 'settings':
         return <SettingsView />;
+      case 'admin':
+        return <AdminCenterView />;
       default:
         return <DashboardView onNavigate={navigateTo} onOpenCopilot={() => setCopilotOpen(true)} />;
     }

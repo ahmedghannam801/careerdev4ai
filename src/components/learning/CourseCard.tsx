@@ -16,18 +16,32 @@ import React, { useMemo, useState } from 'react';
 import {
   BookmarkCheck,
   BookmarkPlus,
+  BookOpen,
   CheckCircle2,
   Clock,
   ExternalLink,
+  FileText,
+  GraduationCap,
   Languages,
+  ListVideo,
   PlayCircle,
+  Presentation,
   Sparkles,
   Star,
   Target,
+  Video,
   X,
+  Award,
+  BookMarked,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { learningActionUrl } from '../../../shared/learningLinks';
+import {
+  RESOURCE_TYPE_LABELS,
+  officialThumbnail,
+  resourceCta,
+  type LearningResourceType,
+} from '../../../shared/learningResources';
 import {
   availabilityBucket,
   availabilityDescription,
@@ -57,6 +71,23 @@ const BUCKET_STYLES: Record<AvailabilityBucket, string> = {
   paid: 'bg-slate-500/15 text-slate-600 border-slate-500/30 dark:text-slate-300',
 };
 
+const RESOURCE_ICONS: Record<LearningResourceType, React.ElementType> = {
+  video_course: Video,
+  video_playlist: ListVideo,
+  course: GraduationCap,
+  article: FileText,
+  documentation: BookOpen,
+  pdf: FileText,
+  book: BookMarked,
+  workshop: Presentation,
+  lecture: PlayCircle,
+};
+
+function resourceLabel(course: LearningCourse): string {
+  const type = course.resourceType;
+  return type ? RESOURCE_TYPE_LABELS[type] : FORMAT_LABELS[course.format];
+}
+
 function hostOf(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
@@ -72,67 +103,104 @@ const Thumbnail: React.FC<{ course: LearningCourse; compact?: boolean }> = ({
   compact = false,
 }) => {
   const brand = useMemo(() => providerBrand(course.provider), [course.provider]);
+  const type = course.resourceType;
+  const Icon = type ? RESOURCE_ICONS[type] : BookOpen;
   const [imageFailed, setImageFailed] = useState(false);
 
-  const imageUrl = useMemo(() => {
-    if (course.thumbnailUrl) return course.thumbnailUrl;
-    const host = hostOf(course.providerUrl);
-    if (!host) return null;
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
-  }, [course.providerUrl, course.thumbnailUrl]);
+  // A real thumbnail is used when the catalogue records one, or when the
+  // resource is a YouTube video (the provider publishes that image). Nothing
+  // is fabricated: without one, the branded panel is drawn instead.
+  const thumbnail = useMemo(
+    () => officialThumbnail(course.url, course.thumbnailUrl),
+    [course.thumbnailUrl, course.url]
+  );
 
-  const showImage = Boolean(imageUrl) && !imageFailed;
+  const favicon = useMemo(() => {
+    const host = hostOf(course.providerUrl);
+    return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128` : null;
+  }, [course.providerUrl]);
+
+  const [faviconFailed, setFaviconFailed] = useState(false);
+  const showThumbnail = Boolean(thumbnail) && !imageFailed;
+  const showFavicon = !showThumbnail && Boolean(favicon) && !faviconFailed;
 
   return (
     <div
       className={`relative flex overflow-hidden ${
-        compact ? 'h-20' : 'h-28'
+        compact ? 'h-20' : 'h-32'
       } items-center justify-center`}
       style={{
         backgroundImage: `linear-gradient(135deg, ${brand.colors[0]} 0%, ${brand.colors[1]} 100%)`,
       }}
     >
-      <div
-        aria-hidden
-        className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10"
-      />
-      <div
-        aria-hidden
-        className="absolute -bottom-10 -left-6 h-24 w-24 rounded-full bg-black/10"
-      />
-
-      {showImage ? (
+      {showThumbnail ? (
         <img
-          src={imageUrl ?? undefined}
+          src={thumbnail ?? undefined}
           alt=""
           aria-hidden
           loading="lazy"
           referrerPolicy="no-referrer"
           onError={() => setImageFailed(true)}
-          className={`relative z-10 rounded-xl bg-white/95 object-contain shadow-sm ${
-            compact ? 'h-8 w-8 p-1' : 'h-12 w-12 p-1.5'
-          }`}
+          className="absolute inset-0 h-full w-full object-cover"
         />
       ) : (
-        <span
-          className={`relative z-10 font-black tracking-tight ${
-            compact ? 'text-xl' : 'text-3xl'
-          }`}
-          style={{ color: brand.textColor }}
-        >
-          {brand.short}
-        </span>
+        <>
+          <div
+            aria-hidden
+            className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10"
+          />
+          <div
+            aria-hidden
+            className="absolute -bottom-10 -left-6 h-24 w-24 rounded-full bg-black/10"
+          />
+          {showFavicon ? (
+            <img
+              src={favicon ?? undefined}
+              alt=""
+              aria-hidden
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={() => setFaviconFailed(true)}
+              className={`relative z-10 rounded-xl bg-white/95 object-contain shadow-sm ${
+                compact ? 'h-8 w-8 p-1' : 'h-12 w-12 p-1.5'
+              }`}
+            />
+          ) : (
+            <span
+              className={`relative z-10 font-black tracking-tight ${
+                compact ? 'text-xl' : 'text-3xl'
+              }`}
+              style={{ color: brand.textColor }}
+            >
+              {brand.short}
+            </span>
+          )}
+        </>
+      )}
+
+      {showThumbnail && (
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"
+        />
       )}
 
       <span
         className={`absolute bottom-2 left-3 z-10 truncate pe-2 font-semibold ${
           compact ? 'text-[10px]' : 'text-[11px]'
         }`}
-        style={{ color: brand.textColor }}
+        style={{ color: showThumbnail ? '#ffffff' : brand.textColor }}
         title={course.provider}
       >
         {brand.name}
       </span>
+
+      {type && (
+        <span className="absolute bottom-2 right-2 z-10 inline-flex items-center gap-1 rounded-full border border-white/30 bg-black/45 px-2 py-0.5 text-[9px] font-semibold text-white backdrop-blur-sm">
+          <Icon className="h-2.5 w-2.5 shrink-0" />
+          {RESOURCE_TYPE_LABELS[type]}
+        </span>
+      )}
     </div>
   );
 };
@@ -220,7 +288,13 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
           <span className="font-semibold text-[var(--text-secondary)]">{course.provider}</span>
           <span aria-hidden>•</span>
-          <span>{t(FORMAT_LABELS[course.format])}</span>
+          <span className="inline-flex items-center gap-1">
+            {course.resourceType && (() => {
+              const Icon = RESOURCE_ICONS[course.resourceType];
+              return <Icon className="h-2.5 w-2.5 shrink-0" />;
+            })()}
+            {t(resourceLabel(course))}
+          </span>
           {brand.tier === 1 && (
             <span className="rounded-full border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/10 px-1.5 py-0.5 text-[9px] font-bold text-[var(--color-primary-text)]">
               {t('Priority provider')}
@@ -263,6 +337,23 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             <Languages className="h-3 w-3 shrink-0" />
             {course.language.toLowerCase().startsWith('ar') ? t('Arabic') : course.language}
           </span>
+          {course.hasCertificate && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
+                course.certificateIncluded
+                  ? 'border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
+                  : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+              }`}
+              title={t(
+                course.certificateIncluded
+                  ? 'The certificate is included at no extra cost.'
+                  : 'A certificate is available for an additional fee.'
+              )}
+            >
+              <Award className="h-3 w-3 shrink-0" />
+              {t(course.certificateIncluded ? 'Free certificate' : 'Paid certificate')}
+            </span>
+          )}
           {isCompleted && (
             <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-success-strong)]">
               <CheckCircle2 className="h-3 w-3 shrink-0" />
@@ -423,7 +514,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                 rel="noopener noreferrer"
                 className="ms-auto inline-flex items-center gap-1 text-[11px] font-medium text-[var(--color-accent-strong)] hover:underline"
               >
-                {t('Open resource')}
+                {course.resourceType ? t(resourceCta(course.resourceType)) : t('Open resource')}
                 <ExternalLink className="h-3 w-3 shrink-0" />
               </a>
             )}

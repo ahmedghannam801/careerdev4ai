@@ -233,6 +233,9 @@ async function main() {
     join(TESTS_DIR, 'roadmap.test.ts'),
     join(TESTS_DIR, 'skills.test.ts'),
     join(TESTS_DIR, 'notifications.test.ts'),
+    // The administrative layer: server-enforced roles, announcement delivery
+    // to real inboxes and the moderator report in the audit log.
+    join(TESTS_DIR, 'admin.test.ts'),
     join(TESTS_DIR, 'security.test.ts'),
     join(TESTS_DIR, 'coverage.test.ts'),
     join(TESTS_DIR, 'restart.test.ts'),

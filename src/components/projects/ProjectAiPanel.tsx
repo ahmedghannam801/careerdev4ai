@@ -26,6 +26,7 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  Clock,
   ExternalLink,
   Lightbulb,
   Loader2,
@@ -54,8 +55,24 @@ const SEVERITY_STYLES: Record<string, string> = {
   low: 'text-[var(--text-muted)]',
 };
 
+/** A planning estimate, labelled as one: it is derived from the plan's own scope. */
+function estimatePlanHours(plan: ProjectPlan): number {
+  const perStep =
+    plan.difficulty === 'Advanced' ? 6 : plan.difficulty === 'Intermediate' ? 4 : 3;
+  return Math.max(perStep, plan.steps.length * perStep);
+}
+
+function planInitials(title: string): string {
+  return title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
 export const ProjectAiPanel: React.FC = () => {
-  const { t, aiPreferences, projects, addProject } = useCareer();
+  const { t, aiPreferences, projects, addProject, targetRole } = useCareer();
   // The AI response language comes from the explicit selector, never from the
   // interface language.
   const language = aiPreferences.preferredLanguage;
@@ -259,8 +276,38 @@ export const ProjectAiPanel: React.FC = () => {
           {plans.map((plan) => (
             <div
               key={plan.id}
-              className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-5 shadow-xs"
+              className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-xs"
             >
+              {/* A designed cover, not a fabricated screenshot: the project's
+                  own initials over the product palette, with its track. */}
+              <div className="relative flex h-28 items-center justify-between gap-4 bg-gradient-to-br from-[var(--accent-primary)]/25 via-[var(--surface-secondary)] to-[var(--accent-secondary)]/20 px-6">
+                <div
+                  aria-hidden
+                  className="absolute -right-6 -top-8 h-28 w-28 rounded-full bg-white/10"
+                />
+                <div className="relative">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-primary-text)]">
+                    {t('Recommended Project')}
+                  </div>
+                  <div className="mt-1 text-2xl font-black tracking-tight text-[var(--color-primary-text)]">
+                    {planInitials(plan.title)}
+                  </div>
+                </div>
+                <div className="relative text-end">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    {t('Track')}
+                  </div>
+                  <div className="max-w-[12rem] truncate text-xs font-bold text-[var(--text-primary)]">
+                    {targetRole.title || t('Your target role')}
+                  </div>
+                  <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                    <Clock className="h-3 w-3" />~
+                    {estimatePlanHours(plan)}h {t('estimated')}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-5 p-6">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div className="space-y-1">
                   <h4 className="text-base font-bold text-[var(--text-primary)]">{plan.title}</h4>
@@ -456,6 +503,7 @@ export const ProjectAiPanel: React.FC = () => {
                   </p>
                 </div>
               )}
+              </div>
             </div>
           ))}
         </div>

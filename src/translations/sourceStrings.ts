@@ -16,12 +16,14 @@
  * without two people editing the same file.
  */
 
+import { adminAr } from './parts/admin.ts';
 import { appShellAr } from './parts/appShell.ts';
 import { applicationsAr } from './parts/applications.ts';
 import { commonAr } from './parts/common.ts';
 import { careerAr } from './parts/career.ts';
 import { cvAr } from './parts/cv.ts';
 import { dashboardAr } from './parts/dashboard.ts';
+import { discoveryAr } from './parts/discovery.ts';
 import { interviewsAr } from './parts/interviews.ts';
 import { learningAr } from './parts/learning.ts';
 import { profileAr } from './parts/profile.ts';
@@ -35,6 +37,8 @@ import { volunteerAr } from './parts/volunteer.ts';
 export const AR_STRINGS: Record<string, string> = {
   ...commonAr,
   ...appShellAr,
+  ...adminAr,
+  ...discoveryAr,
   ...dashboardAr,
   ...applicationsAr,
   ...careerAr,

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Plus, ExternalLink, Github, X, HeartHandshake } from 'lucide-react';
+import { Plus, ExternalLink, Github, X, HeartHandshake, Clock, ListChecks } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { PROJECT_STATUS_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
@@ -16,6 +16,25 @@ const STATUS_LABELS: Record<string, string> = {
   completed: 'Completed',
   published: 'Published',
 };
+
+/**
+ * A planning estimate for a project, labelled as one. It is derived from the
+ * number of recorded tasks and the declared difficulty; it is not a claim
+ * about a third party's schedule.
+ */
+function estimateProjectHours(tasks: string[], difficulty: string): number {
+  const perTask = difficulty === 'Advanced' ? 5 : difficulty === 'Intermediate' ? 3 : 2;
+  return Math.max(perTask, tasks.length * perTask);
+}
+
+function projectInitials(title: string): string {
+  return title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase() ?? '')
+    .join('');
+}
 
 export const ProjectsView: React.FC = () => {
   const { projects, addProject, updateProject, deleteProject, volunteerExperiences, t } = useCareer();
@@ -157,8 +176,38 @@ export const ProjectsView: React.FC = () => {
         {filteredProjects.map((project) => (
           <StaggerItem
             key={project.id}
-            className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 flex flex-col justify-between shadow-xs hover:border-[var(--border-strong)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md"
+            className="overflow-hidden rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] flex flex-col shadow-xs hover:border-[var(--border-strong)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md"
           >
+            {/* A designed cover built from the project's own identity. Nothing
+                is presented as a real screenshot that does not exist. */}
+            <div className="relative flex h-24 items-center justify-between gap-3 bg-gradient-to-br from-[var(--accent-primary)]/25 via-[var(--surface-secondary)] to-[var(--accent-secondary)]/20 px-5">
+              <div
+                aria-hidden
+                className="absolute -right-6 -top-8 h-24 w-24 rounded-full bg-white/10"
+              />
+              <div className="relative">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-primary-text)]">
+                  {project.skills[0] ?? t('Portfolio project')}
+                </div>
+                <div className="mt-1 text-2xl font-black tracking-tight text-[var(--color-primary-text)]">
+                  {projectInitials(project.title)}
+                </div>
+              </div>
+              <div className="relative text-end text-[11px] text-[var(--text-secondary)]">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  {t('Track')}
+                </div>
+                <div className="max-w-[11rem] truncate font-bold text-[var(--text-primary)]">
+                  {project.skills.slice(0, 2).join(' · ') || project.difficulty}
+                </div>
+                <div className="mt-1 inline-flex items-center gap-1">
+                  <Clock className="h-3 w-3" />~
+                  {estimateProjectHours(project.tasks, project.difficulty)}h {t('estimated')}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-1 flex-col justify-between gap-4 p-6">
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -208,6 +257,43 @@ export const ProjectsView: React.FC = () => {
                   ))}
                 </ul>
               </div>
+
+              {/* The persisted task list, shown as a checklist. Task completion
+                  is project-level today, so the checklist reports the project
+                  status rather than inventing per-task state. */}
+              {project.tasks.length > 0 && (
+                <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-[var(--text-muted)] uppercase">
+                    <span className="inline-flex items-center gap-1.5">
+                      <ListChecks className="h-3 w-3" /> {t('Task checklist')}
+                    </span>
+                    <span>
+                      {project.tasks.length} {t('tasks')}
+                    </span>
+                  </div>
+                  <ul className="space-y-1 text-xs text-[var(--text-secondary)]">
+                    {project.tasks.map((task, i) => {
+                      const done =
+                        project.status === 'completed' || project.status === 'published';
+                      return (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <span
+                            aria-hidden
+                            className={`mt-0.5 inline-flex h-3 w-3 shrink-0 items-center justify-center rounded border ${
+                              done
+                                ? 'border-[var(--color-success-strong)] bg-[var(--color-success-strong)] text-white'
+                                : 'border-[var(--border-strong)]'
+                            }`}
+                          >
+                            {done ? '✓' : ''}
+                          </span>
+                          <span className={done ? 'line-through opacity-70' : ''}>{task}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
 
               {/* The volunteering this project is evidence for. */}
               {(volunteeringByProject.get(project.id) ?? []).length > 0 && (
@@ -263,6 +349,7 @@ export const ProjectsView: React.FC = () => {
               >
                 {t('Delete')}
               </button>
+            </div>
             </div>
           </StaggerItem>
         ))}

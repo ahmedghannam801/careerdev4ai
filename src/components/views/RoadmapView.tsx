@@ -21,6 +21,12 @@ import { useCareer } from '../../context/CareerContext';
 import { ROADMAP_STATUS_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { isSafeExternalUrl } from '../../../shared/learningLinks';
+import {
+  RESOURCE_TYPE_LABELS,
+  isVideoResource,
+  officialThumbnail,
+  resourceCta,
+} from '../../../shared/learningResources';
 import { RoadmapTaskStatus } from '../../types/career';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
 
@@ -962,28 +968,84 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                           <BookOpen className="h-3 w-3" />
                           {t('Resources for this stage')}
                         </div>
-                        <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
                           {stage.resources.map((resource) => {
                             const catalogCourse = courseById.get(resource.id);
+                            const thumbnail = officialThumbnail(
+                              resource.url,
+                              catalogCourse?.thumbnailUrl
+                            );
+                            const type = catalogCourse?.resourceType;
+                            const duration =
+                              resource.durationHours ?? catalogCourse?.durationHours ?? null;
+                            const skill = catalogCourse?.skills[0]?.name ?? null;
                             return (
                               <a
                                 key={resource.id}
                                 href={resource.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-start justify-between gap-2 rounded-lg bg-[var(--surface-secondary)]/40 px-2.5 py-2 text-[11px] transition-colors hover:bg-[var(--surface-secondary)]"
+                                className="group flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] transition-colors hover:border-[var(--border-strong)]"
                               >
-                                <span className="min-w-0">
-                                  <span className="block truncate font-medium text-[var(--text-primary)]">
+                                <div className="relative flex h-24 items-center justify-center bg-gradient-to-br from-[var(--accent-primary)]/25 via-[var(--surface-secondary)] to-[var(--accent-secondary)]/20">
+                                  {thumbnail ? (
+                                    <img
+                                      src={thumbnail}
+                                      alt=""
+                                      aria-hidden
+                                      loading="lazy"
+                                      referrerPolicy="no-referrer"
+                                      className="absolute inset-0 h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-xl font-black text-[var(--color-primary-text)]">
+                                      {resource.provider.slice(0, 2).toUpperCase()}
+                                    </span>
+                                  )}
+                                  {thumbnail && (
+                                    <div
+                                      aria-hidden
+                                      className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"
+                                    />
+                                  )}
+                                  {type && (
+                                    <span className="absolute bottom-1.5 end-1.5 z-10 inline-flex items-center gap-1 rounded-full border border-white/30 bg-black/45 px-1.5 py-0.5 text-[9px] font-semibold text-white backdrop-blur-sm">
+                                      {isVideoResource(type) && <PlayCircle className="h-2.5 w-2.5" />}
+                                      {RESOURCE_TYPE_LABELS[type]}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-1 flex-col p-2.5">
+                                  <span className="line-clamp-2 text-[11px] font-semibold leading-snug text-[var(--text-primary)]">
                                     {resource.title}
                                   </span>
-                                  <span className="block text-[10px] text-[var(--text-muted)]">
+                                  <span className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">
                                     {resource.provider}
-                                    {catalogCourse?.language ? ` · ${t(catalogCourse.language)}` : ''}
-                                    {resource.durationHours ? ` · ${resource.durationHours}h` : ''}
+                                    {catalogCourse?.level ? ` · ${t(catalogCourse.level)}` : ''}
                                   </span>
-                                </span>
-                                <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-[var(--text-muted)]" />
+                                  {catalogCourse?.description && (
+                                    <span className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-[var(--text-secondary)]">
+                                      {catalogCourse.description}
+                                    </span>
+                                  )}
+                                  <span className="mt-auto flex items-center justify-between gap-1 pt-1.5 text-[10px] text-[var(--text-muted)]">
+                                    <span className="inline-flex min-w-0 items-center gap-1">
+                                      {duration ? (
+                                        <>
+                                          <Clock className="h-2.5 w-2.5 shrink-0" />
+                                          {duration}h
+                                        </>
+                                      ) : null}
+                                      {skill && <span className="truncate">· {skill}</span>}
+                                    </span>
+                                    <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-[var(--color-primary-text)]">
+                                      {catalogCourse?.resourceType
+                                        ? t(resourceCta(catalogCourse.resourceType))
+                                        : t('Open resource')}
+                                      <ExternalLink className="h-2.5 w-2.5" />
+                                    </span>
+                                  </span>
+                                </div>
                               </a>
                             );
                           })}

@@ -107,6 +107,8 @@ import {
   upsertLearningItem,
   updateLearningItem,
   deleteLearningItem,
+  listCoursesForAdmin,
+  updateCourseForAdmin,
 } from './server/db/learning.ts';
 import { rankCourses, selectNextStep, type LearningFormat, type LearningStatus } from './server/learning/recommendation.ts';
 import { enrichRecommendationsWithAi } from './server/learning/ai.ts';
@@ -122,7 +124,44 @@ import {
   listVolunteerOpportunities,
   saveVolunteerOpportunity,
   unsaveVolunteerOpportunity,
+  listOpportunitiesForAdmin,
+  updateOpportunityForAdmin,
 } from './server/db/volunteerOpportunities.ts';
+import {
+  AdminError,
+  archiveAnnouncement,
+  createAdmin,
+  createAnnouncement,
+  deleteAnnouncement,
+  getAdminAnalytics,
+  getAdminByProfileId,
+  listAdmins,
+  listAnnouncements,
+  listAuditLog,
+  logAdminAction,
+  publishAnnouncement,
+  removeAdmin,
+  searchProfiles,
+  updateAdmin,
+  updateAnnouncement,
+} from './server/db/admin.ts';
+import {
+  requireAdmin,
+  requireAnyPermission,
+  requirePermission,
+} from './server/admin/permissions.ts';
+import {
+  isAnnouncementAudience,
+  isAnnouncementPriority,
+  isAdminRole,
+} from './shared/admin.ts';
+import { isLearningResourceType } from './shared/learningResources.ts';
+import {
+  isOpportunityAudience,
+  isOpportunityKind,
+  isOpportunityVerificationStatus,
+  isParticipationMode,
+} from './shared/opportunities.ts';
 import { buildCvFromProfile } from './server/cv/buildCv.ts';
 import {
   generateCvAssistText,
@@ -5217,6 +5256,626 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
     return res.status(500).json({ error: 'Failed to generate learning recommendations' });
   }
 });
+
+/* ========================================================================== */
+/* Admin hierarchy and Admin Communication Center                             */
+/* ========================================================================== */
+
+function adminFailure(res: Response, error: unknown) {
+  if (error instanceof AdminError) {
+    return res.status(error.status).json({ error: error.message });
+  }
+  console.error('Admin request failed:', error);
+  return res.status(500).json({ error: 'The administrative request failed' });
+}
+
+// The signed-in caller's own admin row. A normal user gets `admin: null`; this
+// is what the shell uses to decide whether the Admin Center exists for them.
+app.get('/api/admin/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const admin = await getAdminByProfileId(req.authUser!.id);
+    return res.json({ success: true, admin });
+  } catch (error) {
+    return adminFailure(res, error);
+  }
+});
+
+app.get(
+  '/api/admin/analytics',
+  requireAuth,
+  requireAdmin,
+  requirePermission('analytics.read'),
+  async (_req: Request, res: Response) => {
+    try {
+      const analytics = await getAdminAnalytics();
+      return res.json({ success: true, analytics });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+/* ------------------------------ Administrators ---------------------------- */
+
+app.get(
+  '/api/admin/admins',
+  requireAuth,
+  requireAdmin,
+  requirePermission('admin.manage'),
+  async (_req: Request, res: Response) => {
+    try {
+      return res.json({ success: true, admins: await listAdmins() });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/admins',
+  requireAuth,
+  requireAdmin,
+  requirePermission('admin.manage'),
+  async (req: Request, res: Response) => {
+    try {
+      const body = req.body ?? {};
+      const email = str(body.email, 320);
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: 'A valid email address is required' });
+      }
+      const role = str(body.role, 40);
+      if (!role || !isAdminRole(role)) {
+        return res.status(400).json({ error: 'Unknown admin role' });
+      }
+      const permissions = stringList(body.permissions, 30, 60);
+      const admin = await createAdmin(
+        { email, role, permissions },
+        req.admin?.profileId ?? null
+      );
+      await logAdminAction(req.admin!, {
+        action: 'admin.created',
+        entityType: 'admin_user',
+        entityId: admin.id,
+        metadata: { email: admin.email, role: admin.role },
+      });
+      return res.status(201).json({ success: true, admin });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/admins/:id',
+  requireAuth,
+  requireAdmin,
+  requirePermission('admin.manage'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 80);
+      if (!id || !isUuid(id)) return res.status(400).json({ error: 'Invalid administrator id' });
+      const body = req.body ?? {};
+
+      const role = body.role === undefined ? undefined : str(body.role, 40);
+      if (role !== undefined && (!role || !isAdminRole(role))) {
+        return res.status(400).json({ error: 'Unknown admin role' });
+      }
+      const status = body.status === undefined ? undefined : str(body.status, 20);
+      if (status !== undefined && status !== 'active' && status !== 'disabled') {
+        return res.status(400).json({ error: 'Unknown admin status' });
+      }
+      const permissions =
+        body.permissions === undefined ? undefined : stringList(body.permissions, 30, 60);
+      const fullName =
+        body.fullName === null ? null : (str(body.fullName, 160) ?? undefined);
+
+      const admin = await updateAdmin(id, { role, status, permissions, fullName });
+      await logAdminAction(req.admin!, {
+        action: 'admin.updated',
+        entityType: 'admin_user',
+        entityId: admin.id,
+        metadata: { role: admin.role, status: admin.status },
+      });
+      return res.json({ success: true, admin });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.delete(
+  '/api/admin/admins/:id',
+  requireAuth,
+  requireAdmin,
+  requirePermission('admin.manage'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 80);
+      if (!id || !isUuid(id)) return res.status(400).json({ error: 'Invalid administrator id' });
+      await removeAdmin(id);
+      await logAdminAction(req.admin!, {
+        action: 'admin.removed',
+        entityType: 'admin_user',
+        entityId: id,
+      });
+      return res.json({ success: true });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+/* ------------------------- Announcement delivery -------------------------- */
+
+app.get(
+  '/api/admin/announcements',
+  requireAuth,
+  requireAdmin,
+  requirePermission('announcements.read'),
+  async (_req: Request, res: Response) => {
+    try {
+      return res.json({ success: true, announcements: await listAnnouncements() });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+function readAnnouncementInput(body: Record<string, unknown>, partial: boolean) {
+  const title = body.title === undefined ? undefined : (str(body.title, 200) ?? undefined);
+  const text = body.body === undefined ? undefined : (str(body.body, 5000) ?? undefined);
+  const priority =
+    body.priority === undefined ? undefined : (str(body.priority, 20) ?? undefined);
+  const audienceType =
+    body.audienceType === undefined ? undefined : (str(body.audienceType, 40) ?? undefined);
+  const audienceValues =
+    body.audienceValues === undefined ? undefined : stringList(body.audienceValues, 500, 200);
+  const linkView =
+    body.linkView === null ? null : (str(body.linkView, 120) ?? undefined);
+
+  if (!partial) {
+    if (!title) throw new AdminError('A title is required');
+    if (!text) throw new AdminError('A message is required');
+    if (!audienceType || !isAnnouncementAudience(audienceType)) {
+      throw new AdminError('A valid audience is required');
+    }
+  } else {
+    if (body.title !== undefined && !title) throw new AdminError('A title is required');
+    if (body.body !== undefined && !text) throw new AdminError('A message is required');
+    if (
+      audienceType !== undefined &&
+      (!audienceType || !isAnnouncementAudience(audienceType))
+    ) {
+      throw new AdminError('A valid audience is required');
+    }
+  }
+
+  if (priority !== undefined && (!priority || !isAnnouncementPriority(priority))) {
+    throw new AdminError('Unknown announcement priority');
+  }
+
+  return {
+    title,
+    body: text,
+    priority: priority as
+      | 'normal'
+      | 'important'
+      | 'urgent'
+      | undefined,
+    audienceType: audienceType as
+      | 'all'
+      | 'users'
+      | 'target_role'
+      | 'target_industry'
+      | 'user_type'
+      | 'country'
+      | undefined,
+    audienceValues,
+    linkView,
+  };
+}
+
+app.post(
+  '/api/admin/announcements',
+  requireAuth,
+  requireAdmin,
+  requirePermission('announcements.write'),
+  async (req: Request, res: Response) => {
+    try {
+      const input = readAnnouncementInput(req.body ?? {}, false);
+      const announcement = await createAnnouncement(
+        {
+          title: input.title!,
+          body: input.body!,
+          priority: input.priority,
+          audienceType: input.audienceType!,
+          audienceValues: input.audienceValues,
+          linkView: input.linkView,
+        },
+        req.admin!
+      );
+      await logAdminAction(req.admin!, {
+        action: 'announcement.created',
+        entityType: 'announcement',
+        entityId: announcement.id,
+        metadata: { audienceType: announcement.audienceType },
+      });
+      return res.status(201).json({ success: true, announcement });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/announcements/:id',
+  requireAuth,
+  requireAdmin,
+  requirePermission('announcements.write'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 80);
+      if (!id || !isUuid(id)) return res.status(400).json({ error: 'Invalid announcement id' });
+      const input = readAnnouncementInput(req.body ?? {}, true);
+      const announcement = await updateAnnouncement(id, input);
+      await logAdminAction(req.admin!, {
+        action: 'announcement.updated',
+        entityType: 'announcement',
+        entityId: announcement.id,
+      });
+      return res.json({ success: true, announcement });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/announcements/:id/publish',
+  requireAuth,
+  requireAdmin,
+  requirePermission('announcements.publish'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 80);
+      if (!id || !isUuid(id)) return res.status(400).json({ error: 'Invalid announcement id' });
+      const announcement = await publishAnnouncement(id, req.admin!);
+      await logAdminAction(req.admin!, {
+        action: 'announcement.published',
+        entityType: 'announcement',
+        entityId: announcement.id,
+        metadata: { recipients: announcement.recipientCount },
+      });
+      return res.json({ success: true, announcement });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.post(
+  '/api/admin/announcements/:id/archive',
+  requireAuth,
+  requireAdmin,
+  requirePermission('announcements.publish'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 80);
+      if (!id || !isUuid(id)) return res.status(400).json({ error: 'Invalid announcement id' });
+      const announcement = await archiveAnnouncement(id);
+      await logAdminAction(req.admin!, {
+        action: 'announcement.archived',
+        entityType: 'announcement',
+        entityId: announcement.id,
+      });
+      return res.json({ success: true, announcement });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.delete(
+  '/api/admin/announcements/:id',
+  requireAuth,
+  requireAdmin,
+  requirePermission('announcements.write'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 80);
+      if (!id || !isUuid(id)) return res.status(400).json({ error: 'Invalid announcement id' });
+      await deleteAnnouncement(id);
+      await logAdminAction(req.admin!, {
+        action: 'announcement.deleted',
+        entityType: 'announcement',
+        entityId: id,
+      });
+      return res.json({ success: true });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+/* ------------------------- Targeting and audit ---------------------------- */
+
+app.get(
+  '/api/admin/users',
+  requireAuth,
+  requireAdmin,
+  requireAnyPermission(['users.read', 'announcements.write']),
+  async (req: Request, res: Response) => {
+    try {
+      const query = typeof req.query.query === 'string' ? req.query.query.slice(0, 100) : '';
+      return res.json({ success: true, users: await searchProfiles(query) });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.get(
+  '/api/admin/audit',
+  requireAuth,
+  requireAdmin,
+  requirePermission('audit.read'),
+  async (req: Request, res: Response) => {
+    try {
+      const limitRaw = Number(req.query.limit ?? 100);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 100;
+      return res.json({ success: true, entries: await listAuditLog(limit) });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+// A moderator can report content they reviewed. The report is a real,
+// persisted audit entry: it is not a client-side flag, and a Super Admin can
+// read it in the audit tab. No report can modify the content itself.
+const REPORT_ENTITY_TYPES = ['announcement', 'opportunity', 'course', 'profile', 'other'];
+
+app.post(
+  '/api/admin/reports',
+  requireAuth,
+  requireAdmin,
+  requirePermission('moderation.write'),
+  async (req: Request, res: Response) => {
+    try {
+      const body = req.body ?? {};
+      const entityType = str(body.entityType, 40);
+      if (!entityType || !REPORT_ENTITY_TYPES.includes(entityType)) {
+        return res.status(400).json({ error: 'Unknown report entity type' });
+      }
+      const reason = str(body.reason, 1000);
+      if (!reason) return res.status(400).json({ error: 'A reason is required' });
+      const entityId =
+        body.entityId === undefined || body.entityId === null
+          ? undefined
+          : (str(body.entityId, 120) ?? undefined);
+
+      await logAdminAction(req.admin!, {
+        action: 'moderation.reported',
+        entityType,
+        entityId,
+        metadata: { reason },
+      });
+      return res.status(201).json({ success: true });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+/* -------------------------- Opportunity review ---------------------------- */
+
+app.get(
+  '/api/admin/opportunities',
+  requireAuth,
+  requireAdmin,
+  requirePermission('opportunities.read'),
+  async (_req: Request, res: Response) => {
+    try {
+      return res.json({
+        success: true,
+        opportunities: await listOpportunitiesForAdmin(),
+      });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/opportunities/:id',
+  requireAuth,
+  requireAdmin,
+  requirePermission('opportunities.write'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 120);
+      if (!id) return res.status(400).json({ error: 'Invalid opportunity id' });
+      const body = req.body ?? {};
+
+      if (
+        body.verificationStatus !== undefined &&
+        (!str(body.verificationStatus, 40) ||
+          !isOpportunityVerificationStatus(String(body.verificationStatus)))
+      ) {
+        return res.status(400).json({ error: 'Unknown verification status' });
+      }
+      if (body.kind !== undefined && !isOpportunityKind(String(body.kind))) {
+        return res.status(400).json({ error: 'Unknown opportunity kind' });
+      }
+      if (
+        body.participationMode !== undefined &&
+        !isParticipationMode(String(body.participationMode))
+      ) {
+        return res.status(400).json({ error: 'Unknown participation mode' });
+      }
+      if (body.deadline !== undefined && body.deadline !== null) {
+        const deadline = str(body.deadline, 10);
+        if (!deadline || !isIsoDate(deadline)) {
+          return res.status(400).json({ error: 'deadline must be an ISO date or null' });
+        }
+      }
+
+      const audiences =
+        body.audiences === undefined
+          ? undefined
+          : stringList(body.audiences, 10, 40).filter(isOpportunityAudience);
+      const tags =
+        body.tags === undefined ? undefined : stringList(body.tags, 20, 40);
+
+      const verificationStatus =
+        body.verificationStatus === undefined
+          ? undefined
+          : (String(body.verificationStatus) as
+              | 'http'
+              | 'pending'
+              | 'verified'
+              | 'rejected');
+
+      const patch = {
+        isActive: typeof body.isActive === 'boolean' ? body.isActive : undefined,
+        verificationStatus,
+        verifiedAt:
+          verificationStatus === 'verified' && body.verifiedAt === undefined
+            ? new Date().toISOString()
+            : body.verifiedAt === null
+              ? null
+              : (str(body.verifiedAt, 40) ?? undefined),
+        isFeatured:
+          typeof body.isFeatured === 'boolean' ? body.isFeatured : undefined,
+        deadline: body.deadline === null ? null : (str(body.deadline, 10) ?? undefined),
+        kind: body.kind as
+          | 'volunteering'
+          | 'student_activity'
+          | 'youth_program'
+          | 'career_development'
+          | 'competition'
+          | 'entrepreneurship'
+          | 'fellowship'
+          | 'internship'
+          | 'academic'
+          | 'technology'
+          | undefined,
+        participationMode: body.participationMode as
+          | 'onsite'
+          | 'online'
+          | 'hybrid'
+          | undefined,
+        audiences,
+        eligibility:
+          body.eligibility === null ? null : (str(body.eligibility, 1000) ?? undefined),
+        sourceUrl:
+          body.sourceUrl === null ? null : (str(body.sourceUrl, 500) ?? undefined),
+        thumbnailUrl:
+          body.thumbnailUrl === null ? null : (str(body.thumbnailUrl, 500) ?? undefined),
+        organizationType:
+          body.organizationType === null
+            ? null
+            : (str(body.organizationType, 80) ?? undefined),
+        tags,
+        title: str(body.title, 200) ?? undefined,
+        description: str(body.description, 2000) ?? undefined,
+        location: str(body.location, 200) ?? undefined,
+        commitment:
+          body.commitment === null ? null : (str(body.commitment, 200) ?? undefined),
+      };
+
+      const opportunity = await updateOpportunityForAdmin(id, patch);
+      if (!opportunity) return res.status(404).json({ error: 'Opportunity not found' });
+      await logAdminAction(req.admin!, {
+        action: 'opportunity.updated',
+        entityType: 'opportunity',
+        entityId: id,
+        metadata: { verificationStatus: opportunity.verificationStatus },
+      });
+      return res.json({ success: true, opportunity });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+/* ----------------------------- Learning review ---------------------------- */
+
+app.get(
+  '/api/admin/learning',
+  requireAuth,
+  requireAdmin,
+  requirePermission('learning.read'),
+  async (_req: Request, res: Response) => {
+    try {
+      return res.json({ success: true, courses: await listCoursesForAdmin() });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/learning/:id',
+  requireAuth,
+  requireAdmin,
+  requirePermission('learning.write'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 120);
+      if (!id) return res.status(400).json({ error: 'Invalid course id' });
+      const body = req.body ?? {};
+
+      if (
+        body.resourceType !== undefined &&
+        body.resourceType !== null &&
+        !isLearningResourceType(String(body.resourceType))
+      ) {
+        return res.status(400).json({ error: 'Unknown resource type' });
+      }
+
+      const course = await updateCourseForAdmin(id, {
+        resourceType:
+          body.resourceType === null
+            ? null
+            : body.resourceType === undefined
+              ? undefined
+              : (String(body.resourceType) as
+                  | 'video_course'
+                  | 'video_playlist'
+                  | 'course'
+                  | 'article'
+                  | 'documentation'
+                  | 'pdf'
+                  | 'book'
+                  | 'workshop'
+                  | 'lecture'),
+        isFeatured:
+          typeof body.isFeatured === 'boolean' ? body.isFeatured : undefined,
+        thumbnailUrl:
+          body.thumbnailUrl === null ? null : (str(body.thumbnailUrl, 500) ?? undefined),
+        description:
+          body.description === null ? null : (str(body.description, 2000) ?? undefined),
+        hasCertificate:
+          typeof body.hasCertificate === 'boolean' ? body.hasCertificate : undefined,
+        certificateIncluded:
+          typeof body.certificateIncluded === 'boolean'
+            ? body.certificateIncluded
+            : undefined,
+      });
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      await logAdminAction(req.admin!, {
+        action: 'learning.updated',
+        entityType: 'course',
+        entityId: id,
+        metadata: { isFeatured: course.isFeatured, resourceType: course.resourceType },
+      });
+      return res.json({ success: true, course });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
 
 // Unknown API routes must not fall through to the SPA.
 //

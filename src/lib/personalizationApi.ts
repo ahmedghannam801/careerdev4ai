@@ -6,6 +6,11 @@
 // depends on are declared once.
 
 import { apiRequest } from './apiClient';
+import type {
+  OpportunityAudience,
+  OpportunityKind,
+  ParticipationMode,
+} from '../../shared/opportunities';
 
 /** A skill the user still needs to close for their target role. */
 export interface SkillGapEntry {
@@ -155,10 +160,20 @@ export interface VolunteerOpportunity {
   languages: string[];
   opportunityType: string;
   deadline: string | null;
+  kind: OpportunityKind;
+  participationMode: ParticipationMode;
+  audiences: OpportunityAudience[];
+  eligibility: string | null;
+  sourceUrl: string | null;
+  thumbnailUrl: string | null;
+  organizationType: string | null;
+  tags: string[];
+  isFeatured: boolean;
   relevance: number;
   relevanceReason: string | null;
   closesGap: boolean;
   saved: boolean;
+  live: boolean;
 }
 
 export interface VolunteerOpportunitiesResponse {

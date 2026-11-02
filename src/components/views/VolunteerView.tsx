@@ -211,13 +211,13 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">{t('COMMUNITY IMPACT &amp; VOLUNTEERING')}</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('COMMUNITY IMPACT, ACTIVITIES & OPPORTUNITIES')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5 flex items-center gap-2">
             <HeartHandshake className="w-5 h-5 text-[var(--color-primary-text)]" />
-            {t('Volunteer Experience')}
+            {t('Opportunities & Activities')}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1.5 max-w-2xl">
-            {t('Record the organisations you volunteered for, what you were responsible for and the skills it gave you — and link the projects that prove it.')}
+            {t('Discover volunteering, student activities, youth programmes, competitions, fellowships and internships — then record what you took part in and the skills it gave you.')}
           </p>
         </div>
 
@@ -253,7 +253,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
-          {t('My volunteering')} ({volunteerExperiences.length})
+          {t('My activities')} ({volunteerExperiences.length})
         </button>
       </div>
 
