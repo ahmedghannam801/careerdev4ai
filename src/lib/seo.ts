@@ -25,8 +25,26 @@
 
 const SITE_ORIGIN = 'https://careerdev4ai.pages.dev';
 
+/**
+ * The canonical address of the home page.
+ *
+ * The trailing slash is the form the canonical link, `og:url` and the
+ * `WebSite` schema all carry, so the site is never described under two
+ * different addresses.
+ */
+const SITE_URL = `${SITE_ORIGIN}/`;
+
 /** The name of the product, used in the document metadata. */
 const SITE_NAME = 'CareerDev4AI';
+
+/**
+ * The other written forms of the same name.
+ *
+ * These are spellings of this product, not other products, and they are the
+ * ones a search engine needs in order to show the site under the name a
+ * person actually typed.
+ */
+const SITE_ALTERNATE_NAMES = ['Career Dev 4AI', 'CareerDev4AI Career Platform'];
 
 /** The image used for link previews. */
 const OG_IMAGE = `${SITE_ORIGIN}/brand/og-image-1200x630.png`;
@@ -201,7 +219,7 @@ export function routeMetaFor(
   return {
     title,
     description,
-    canonical: `${SITE_ORIGIN}/`,
+    canonical: SITE_URL,
     robots: isPublic ? 'index, follow, max-image-preview:large' : 'noindex, nofollow',
     jsonLd: isPublic ? buildPublicJsonLd(view, title, description) : undefined,
   };
@@ -213,7 +231,8 @@ function buildPublicJsonLd(view: string, title: string, description: string): un
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: SITE_NAME,
-    url: SITE_ORIGIN,
+    alternateName: SITE_ALTERNATE_NAMES,
+    url: SITE_URL,
     logo: { '@type': 'ImageObject', url: `${SITE_ORIGIN}/brand/icon-512.png` },
     image: `${SITE_ORIGIN}/brand/og-image-1200x630.png`,
     description,
@@ -229,17 +248,28 @@ function buildPublicJsonLd(view: string, title: string, description: string): un
       '@context': 'https://schema.org',
       '@type': 'WebSite',
       name: SITE_NAME,
-      url: SITE_ORIGIN,
+      alternateName: SITE_ALTERNATE_NAMES,
+      url: SITE_URL,
       inLanguage: 'en',
-      publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_ORIGIN },
+      publisher: {
+        '@type': 'Organization',
+        name: SITE_NAME,
+        alternateName: SITE_ALTERNATE_NAMES,
+        url: SITE_URL,
+      },
     },
     {
       '@context': 'https://schema.org',
       '@type': 'WebPage',
       name: title,
       description,
-      url: `${SITE_ORIGIN}/`,
-      isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: SITE_ORIGIN },
+      url: SITE_URL,
+      isPartOf: {
+        '@type': 'WebSite',
+        name: SITE_NAME,
+        alternateName: SITE_ALTERNATE_NAMES,
+        url: SITE_URL,
+      },
       inLanguage: 'en',
     },
   ];

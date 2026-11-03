@@ -13,6 +13,7 @@
  */
 
 import { CAREER_ROLES } from '../../shared/careerRoles.ts';
+import { hasApprovedTerms } from '../../shared/legal.ts';
 import { absoluteUrl } from './config.ts';
 import { escapeHtml } from './html.ts';
 import {
@@ -59,6 +60,11 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
     { path: '/learning', priority: 0.9, changefreq: 'weekly' },
     { path: '/opportunities', priority: 0.8, changefreq: 'daily' },
     { path: '/privacy', priority: 0.3, changefreq: 'yearly' },
+    // The Terms are listed only once they are published. An unpublished legal
+    // document must never be offered to a crawler.
+    ...(hasApprovedTerms()
+      ? [{ path: '/terms', priority: 0.3, changefreq: 'yearly' as const }]
+      : []),
   ];
 
   for (const role of CAREER_ROLES) {

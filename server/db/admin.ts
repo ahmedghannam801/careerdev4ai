@@ -1104,33 +1104,40 @@ export async function publishAnnouncement(id: string): Promise<AnnouncementDTO> 
   const batchSize = 500;
   for (let index = 0; index < missing.length; index += batchSize) {
     const batch = missing.slice(index, index + batchSize);
-    const { data: inserted, error } = await supabase
-      .from('notifications')
-      .insert(
-        batch.map((profileId) => ({
-          profile_id: profileId,
-          title: announcement.title,
-          message: announcement.body,
-          type: 'announcement',
-          link_view: announcement.linkView,
-          announcement_id: announcement.id,
-        }))
-      )
-      .select('id, profile_id, created_at');
-    if (error) throw error;
-    notifications.push(
-      ...((inserted ?? []) as Array<{
-        id: string;
-        profile_id: string;
-        created_at: string;
-      }>)
+    // The unique index on (announcement_id, profile_id) is the final arbiter:
+    // a publish that races another publish (or the scheduler tick) inserts
+    // nothing for recipients the other run already reached.
+    const { error } = await supabase.from('notifications').upsert(
+      batch.map((profileId) => ({
+        profile_id: profileId,
+        title: announcement.title,
+        message: announcement.body,
+        type: 'announcement',
+        link_view: announcement.linkView,
+        announcement_id: announcement.id,
+      })),
+      { onConflict: 'announcement_id,profile_id', ignoreDuplicates: true }
     );
+    if (error) throw error;
   }
+
+  // Read the notifications back instead of trusting what this request
+  // inserted, so the ledger always points at the row the database kept even
+  // when a concurrent publish won the race.
+  const { data: delivered, error: deliveredError } = await supabase
+    .from('notifications')
+    .select('id, profile_id, created_at')
+    .eq('announcement_id', id);
+  if (deliveredError) throw deliveredError;
 
   // One delivery row per distinct recipient, even if an earlier attempt left
   // duplicate notifications behind.
   const byProfile = new Map<string, { id: string; created_at: string }>();
-  for (const row of notifications) {
+  for (const row of (delivered ?? []) as Array<{
+    id: string;
+    profile_id: string;
+    created_at: string;
+  }>) {
     if (!byProfile.has(row.profile_id)) {
       byProfile.set(row.profile_id, { id: row.id, created_at: row.created_at });
     }

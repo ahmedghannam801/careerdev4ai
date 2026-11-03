@@ -19,7 +19,14 @@
  *   - `Event` — an opportunity page.
  */
 
-import { SITE_NAME, SITE_TAGLINE, absoluteUrl, ogImageUrl, siteOrigin } from './config.ts';
+import {
+  SITE_ALTERNATE_NAMES,
+  SITE_NAME,
+  SITE_TAGLINE,
+  absoluteUrl,
+  ogImageUrl,
+  siteUrl,
+} from './config.ts';
 
 /** The organisation behind the product. */
 export function organizationSchema(): Record<string, unknown> {
@@ -27,7 +34,8 @@ export function organizationSchema(): Record<string, unknown> {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: SITE_NAME,
-    url: siteOrigin(),
+    alternateName: [...SITE_ALTERNATE_NAMES],
+    url: siteUrl(),
     logo: {
       '@type': 'ImageObject',
       url: ogImageUrl(),
@@ -40,19 +48,28 @@ export function organizationSchema(): Record<string, unknown> {
   };
 }
 
-/** The site itself. */
+/**
+ * The site itself.
+ *
+ * This is the schema that decides the name a search engine shows for the
+ * site, so its `name` is the brand and its `url` is the canonical home page
+ * address — the same address the canonical link and `og:url` carry. The
+ * `alternateName` covers the other written forms of the same name.
+ */
 export function websiteSchema(): Record<string, unknown> {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: SITE_NAME,
-    url: siteOrigin(),
+    alternateName: [...SITE_ALTERNATE_NAMES],
+    url: siteUrl(),
     description: SITE_TAGLINE,
     inLanguage: 'en',
     publisher: {
       '@type': 'Organization',
       name: SITE_NAME,
-      url: siteOrigin(),
+      alternateName: [...SITE_ALTERNATE_NAMES],
+      url: siteUrl(),
       logo: {
         '@type': 'ImageObject',
         url: ogImageUrl(),
@@ -108,7 +125,8 @@ export function webPageSchema(input: {
     isPartOf: {
       '@type': 'WebSite',
       name: SITE_NAME,
-      url: siteOrigin(),
+      alternateName: [...SITE_ALTERNATE_NAMES],
+      url: siteUrl(),
     },
     inLanguage: 'en',
   };

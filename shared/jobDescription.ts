@@ -29,6 +29,9 @@
 import { skillMatchConfidence } from './skillMatching.ts';
 import type { AiLanguageCode } from './aiLanguages.ts';
 
+/** Minimum readable source text accepted for an uploaded/pasted job description. */
+export const MIN_JOB_DESCRIPTION_TEXT_LENGTH = 20;
+
 // ---------------------------------------------------------------------------
 // The job description analysis
 // ---------------------------------------------------------------------------

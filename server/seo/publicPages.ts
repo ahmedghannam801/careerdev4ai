@@ -23,6 +23,7 @@
  */
 
 import { CAREER_DOMAINS, getCareerDomain } from '../../shared/careerDomains.ts';
+import { hasApprovedTerms, TERMS_DOCUMENT } from '../../shared/legal.ts';
 import { CAREER_ROLES } from '../../shared/careerRoles.ts';
 import type { TargetRole } from '../../shared/careerTypes.ts';
 import { getSupabaseServer } from '../db/supabase.ts';
@@ -400,6 +401,34 @@ function buildPrivacyPage(): PublicPage {
       { name: 'Home', path: '/' },
       { name: 'Privacy', path: path },
     ],
+  };
+}
+
+/**
+ * Terms page shell. It never substitutes generated copy for the legal document.
+ * Until the operator adds and approves the actual text, the route is noindex and
+ * reports 503 so signup cannot be mistaken for being legally ready.
+ */
+function buildTermsPage(): PublicPage {
+  const path = '/terms';
+  const available = hasApprovedTerms();
+  const description = available
+    ? 'The current approved Terms & Conditions for CareerDev4AI: account use, acceptable use, AI-generated content, your documents, liability and contact details.'
+    : 'Terms & Conditions are not published yet. Registration and protected platform use remain unavailable until approved legal content is supplied.';
+  const content = available
+    ? TERMS_DOCUMENT.sections
+        .map((section) => `<section><h2>${escapeHtml(section.heading)}</h2><p>${escapeHtml(section.body).replace(/\r?\n/g, '<br>')}</p></section>`)
+        .join('\n')
+    : `<section class="hero"><h1>Terms &amp; Conditions</h1><p class="lede">Terms &amp; Conditions have not been published. The operator must supply and approve the document before registration or protected platform use is enabled.</p><p lang="ar" dir="rtl">لم تُنشر الشروط والأحكام بعد. يجب على المشغّل توفير النص القانوني واعتماده قبل تفعيل التسجيل أو استخدام المنصة.</p></section>`;
+
+  return {
+    path,
+    title: `Terms & Conditions | ${SITE_NAME}`,
+    description,
+    body: available
+      ? `<section class="hero"><h1>Terms &amp; Conditions</h1></section>${content}`
+      : content,
+    noindex: !available,
   };
 }
 
@@ -1032,6 +1061,8 @@ export async function resolvePublicPage(pathname: string): Promise<PublicPageRes
 
   if (path === '/about') {
     page = buildAboutPage();
+  } else if (path === '/terms') {
+    page = buildTermsPage();
   } else if (path === '/privacy') {
     page = buildPrivacyPage();
   } else if (path === '/careers') {
@@ -1067,7 +1098,7 @@ export async function resolvePublicPage(pathname: string): Promise<PublicPageRes
 
   return {
     html: renderPublicPage(page),
-    status: 200,
+    status: page.path === '/terms' && !hasApprovedTerms() ? 503 : 200,
     contentType: 'text/html; charset=utf-8',
   };
 }

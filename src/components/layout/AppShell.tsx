@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { 
   Home, 
@@ -31,14 +31,33 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { AiLanguageSelector } from '../ui/AiLanguageSelector';
-import { GlobalSearchModal } from './GlobalSearchModal';
-import { CopilotDrawer } from '../copilot/CopilotDrawer';
-import { NotificationsDrawer } from '../notifications/NotificationsDrawer';
 import { Logo } from '../brand/Logo';
 import { backdropVariants, drawerLeftVariants, drawerVariants } from '../../lib/motion';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
 import { useAdminAccess } from '../../lib/useAdminAccess';
+
+const GlobalSearchModal = lazy(() =>
+  import('./GlobalSearchModal').then((module) => ({ default: module.GlobalSearchModal }))
+);
+const CopilotDrawer = lazy(() =>
+  import('../copilot/CopilotDrawer').then((module) => ({ default: module.CopilotDrawer }))
+);
+const NotificationsDrawer = lazy(() =>
+  import('../notifications/NotificationsDrawer').then((module) => ({ default: module.NotificationsDrawer }))
+);
+
+const OverlayChunkFallback: React.FC<{ label: string }> = ({ label }) => (
+  <div
+    className="pointer-events-none fixed inset-0 z-[100] flex items-start justify-center p-6"
+    role="status"
+    aria-live="polite"
+  >
+    <span className="rounded-lg bg-[var(--surface-main)] px-3 py-2 text-xs text-[var(--text-secondary)] shadow-lg">
+      {label}
+    </span>
+  </div>
+);
 
 interface AppShellProps {
   currentView: string;
@@ -588,24 +607,36 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       </nav>
 
       {/* Global Modals & Drawers */}
-      <GlobalSearchModal
-        isOpen={searchModalOpen}
-        onClose={() => setSearchModalOpen(false)}
-        onNavigate={onNavigate}
-        onOpenCopilot={openCopilot}
-      />
+      {searchModalOpen && (
+        <Suspense fallback={<OverlayChunkFallback label={t('Loading…')} />}>
+          <GlobalSearchModal
+            isOpen
+            onClose={() => setSearchModalOpen(false)}
+            onNavigate={onNavigate}
+            onOpenCopilot={openCopilot}
+          />
+        </Suspense>
+      )}
 
-      <CopilotDrawer
-        isOpen={copilotOpen}
-        onClose={closeCopilot}
-        onNavigate={onNavigate}
-      />
+      {copilotOpen && (
+        <Suspense fallback={<OverlayChunkFallback label={t('Loading…')} />}>
+          <CopilotDrawer
+            isOpen
+            onClose={closeCopilot}
+            onNavigate={onNavigate}
+          />
+        </Suspense>
+      )}
 
-      <NotificationsDrawer
-        isOpen={notificationsOpen}
-        onClose={() => setNotificationsOpen(false)}
-        onNavigate={onNavigate}
-      />
+      {notificationsOpen && (
+        <Suspense fallback={<OverlayChunkFallback label={t('Loading…')} />}>
+          <NotificationsDrawer
+            isOpen
+            onClose={() => setNotificationsOpen(false)}
+            onNavigate={onNavigate}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

@@ -94,6 +94,15 @@ import {
   type NotificationType,
 } from './server/db/notifications.ts';
 import { getProfileDto, updateProfileDto } from './server/db/profile.ts';
+import { isOnboardingStatus } from './shared/onboarding.ts';
+import { recordConsent, resolveConsentState } from './server/db/consents.ts';
+import {
+  createApplicationPackage,
+  listApplicationPackages,
+  updateApplicationPackage,
+} from './server/db/applicationPackages.ts';
+import { PRIVACY_VERSION, TERMS_VERSION } from './shared/legal.ts';
+import { hasServerTermsApproval } from './server/legal.ts';
 import { resolveTargetRoleWrite } from './server/targetRole.ts';
 import { getPreferences, upsertPreferences } from './server/db/preferences.ts';
 import {
@@ -198,7 +207,7 @@ import {
   buildProjectRecommendationContext,
 } from './server/projects/recommendation.ts';
 import { analyzeProjects } from './server/projects/analysis.ts';
-import type { JobDescriptionAnalysis } from './shared/jobDescription.ts';
+import { MIN_JOB_DESCRIPTION_TEXT_LENGTH, type JobDescriptionAnalysis } from './shared/jobDescription.ts';
 import {
   listDismissedGuides,
   dismissGuide,
@@ -502,8 +511,12 @@ app.use((req: Request, res: Response, next: () => void) => {
 // as API traffic arrives; the explicit process-due endpoint can also be called
 // by an external scheduler. Tests disable the tick so their timing is exact.
 let lastSchedulerTick = 0;
-app.use('/api', (_req: Request, _res: Response, next: () => void) => {
+app.use('/api', (req: Request, _res: Response, next: () => void) => {
   if (process.env.ADMIN_SCHEDULER_DISABLED === 'true') return next();
+  // The explicit endpoint runs the tick itself (and reports its counts), so
+  // running it here as well would schedule the same announcement twice per
+  // request. One tick per request is enough.
+  if (req.originalUrl.startsWith('/api/admin/announcements/process-due')) return next();
   const now = Date.now();
   if (now - lastSchedulerTick > 60_000) {
     lastSchedulerTick = now;
@@ -518,6 +531,12 @@ app.use('/api', (_req: Request, _res: Response, next: () => void) => {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+// Job ads are parsed from memory only and capped below the general CV limit.
+const jobDescriptionUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 // Accepted CV upload formats.
@@ -1334,6 +1353,55 @@ function respondAiFailure(
 // Gemini is used only for the optional ATS diagnostic on the already-parsed CV.
 // It is never the parser of record, so a provider failure cannot lose or invent
 // the user's CV data. The route still carries the AI limiter for the ATS call.
+const parseJobDescriptionUpload = (req: Request, res: Response, next: (error?: unknown) => void) => {
+  jobDescriptionUpload.single('file')(req, res, (error: unknown) => {
+    if (!error) return next();
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'Job description files must be 5 MB or smaller.', code: 'FILE_TOO_LARGE' });
+    }
+    return res.status(400).json({ error: 'The uploaded file could not be accepted.', code: 'INVALID_UPLOAD' });
+  });
+};
+
+app.post('/api/job-descriptions/extract', requireAuth, aiRateLimit, parseJobDescriptionUpload, async (req: Request, res: Response) => {
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: 'Choose a TXT, PDF or DOCX file.', code: 'FILE_REQUIRED' });
+
+  const extension = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+  const acceptedTypes: Record<string, string[]> = {
+    '.txt': ['text/plain'],
+    '.pdf': ['application/pdf'],
+    '.docx': [
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/zip',
+      'application/octet-stream',
+      'application/x-zip-compressed',
+    ],
+  };
+  const format = extension.slice(1);
+  const mimeTypes = acceptedTypes[extension];
+  if (!mimeTypes || !mimeTypes.includes(file.mimetype.toLowerCase())) {
+    return res.status(400).json({ error: 'Choose a valid TXT, PDF or DOCX file.', code: 'UNSUPPORTED_FILE_TYPE' });
+  }
+
+  try {
+    const extraction = await extractDocument(file.buffer, format as DocumentFormat);
+    const text = extraction.text.trim();
+    if (extraction.status !== 'ok' || text.length < MIN_JOB_DESCRIPTION_TEXT_LENGTH) {
+      return res.status(422).json({
+        error: 'No readable job description text was found in this file. Try another file or paste the text.',
+        code: extraction.status === 'scanned' ? 'SCANNED_DOCUMENT' : 'NO_READABLE_TEXT',
+      });
+    }
+    if (text.length > 200_000) {
+      return res.status(413).json({ error: 'The extracted description exceeds 200,000 characters.', code: 'TEXT_TOO_LONG' });
+    }
+    return res.json({ success: true, text, format, characterCount: text.length });
+  } catch {
+    return res.status(422).json({ error: 'The job description file could not be parsed.', code: 'DOCUMENT_PARSE_FAILED' });
+  }
+});
+
 app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'), async (req: Request, res: Response) => {
   try {
     let extraction: DocumentExtraction | null = null;
@@ -2705,6 +2773,12 @@ app.post('/api/account/change-password', requireAuth, accountRateLimit, async (r
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current and new password required' });
     }
+    // The project's own minimum, enforced here as well as by Supabase Auth, so
+    // a weak password is rejected with a clear reason even when the hosted
+    // leaked-password protection is not available on the project's plan.
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ error: 'The new password must be at least 8 characters long' });
+    }
 
     const result = await changePassword(req.authUser!.id, currentPassword, newPassword);
     if (!result.ok) {
@@ -2751,6 +2825,67 @@ app.post('/api/account/delete', requireAuth, accountRateLimit, async (req: Reque
     return res.json({ success: true, message: 'Account and associated career data deleted successfully' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
+// ============================================================
+// Versioned legal consent.
+//
+// These two routes are the only protected endpoints reachable without a
+// current acceptance (see server/auth/require-auth.ts). They are what the
+// consent screen uses to discover the current versions and to record an
+// acceptance. The server decides the version; a client cannot name its own.
+// ============================================================
+
+app.get('/api/consent', requireAuth, async (req: Request, res: Response) => {
+  try {
+    // The resolver also honours an acceptance carried in the user's metadata
+    // by a registration that required email confirmation.
+    const consent = await resolveConsentState(req.authUser!.id);
+    return res.json({ success: true, consent });
+  } catch (error) {
+    console.error('Failed to read consent state:', error);
+    return res.status(500).json({ error: 'Failed to load consent status' });
+  }
+});
+
+app.post('/api/consent', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { accepted, termsVersion, privacyVersion, source } = req.body ?? {};
+
+    if (!hasServerTermsApproval()) {
+      return res.status(503).json({
+        error: 'Approved Terms content is not available. Consent cannot be recorded yet.',
+        code: 'LEGAL_CONTENT_UNAVAILABLE',
+      });
+    }
+
+    if (accepted !== true) {
+      return res.status(400).json({
+        error: 'You must accept the Terms & Conditions and Privacy Policy to continue',
+        code: 'CONSENT_NOT_ACCEPTED',
+      });
+    }
+
+    if (termsVersion !== TERMS_VERSION || privacyVersion !== PRIVACY_VERSION) {
+      return res.status(409).json({
+        error: 'The Terms & Conditions or Privacy Policy changed. Please review and accept the current versions.',
+        code: 'CONSENT_VERSION_MISMATCH',
+        termsVersion: TERMS_VERSION,
+        privacyVersion: PRIVACY_VERSION,
+      });
+    }
+
+    const allowedSources = new Set(['registration', 'reconsent', 'settings']);
+    await recordConsent(req.authUser!.id, {
+      source: allowedSources.has(source) ? source : 'reconsent',
+    });
+
+    const consent = await resolveConsentState(req.authUser!.id);
+    return res.json({ success: true, consent });
+  } catch (error) {
+    console.error('Failed to record consent:', error);
+    return res.status(500).json({ error: 'Failed to record consent' });
   }
 });
 
@@ -3527,6 +3662,116 @@ app.delete('/api/cv-versions/:id', requireAuth, async (req: Request, res: Respon
   } catch (error) {
     console.error('Failed to delete CV version:', error);
     return res.status(500).json({ error: 'Failed to delete CV version' });
+  }
+});
+
+// ---- Saved job application packages ----
+// A package keeps the advertisement, its analysis, the deterministic match
+// report and links to the user's own CV versions together. User ownership is
+// always taken from the verified Supabase token, never from the request body.
+app.get('/api/application-packages', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const packages = await listApplicationPackages(req.authUser!.id);
+    return res.json({ success: true, packages });
+  } catch (error) {
+    console.error('Failed to list application packages:', error);
+    return res.status(500).json({ error: 'Failed to load saved applications' });
+  }
+});
+
+app.post('/api/application-packages', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const jobDescription = str(body.jobDescription, 40000);
+    if (!jobDescription || jobDescription.trim().length < 20) {
+      return res.status(400).json({ error: 'A job description of at least 20 characters is required' });
+    }
+    if (!body.analysis || typeof body.analysis !== 'object' || Array.isArray(body.analysis)) {
+      return res.status(400).json({ error: 'A valid job analysis is required' });
+    }
+    if (!body.matchAnalysis || typeof body.matchAnalysis !== 'object' || Array.isArray(body.matchAnalysis)) {
+      return res.status(400).json({ error: 'A valid match analysis is required' });
+    }
+    const matchScore = Number(body.matchScore);
+    if (!Number.isInteger(matchScore) || matchScore < 0 || matchScore > 100) {
+      return res.status(400).json({ error: 'Match score must be an integer from 0 to 100' });
+    }
+
+    const sourceCvId = body.sourceCvId == null ? null : str(body.sourceCvId, 40);
+    if (sourceCvId && (!isUuid(sourceCvId) || !(await getCv(req.authUser!.id, sourceCvId)))) {
+      return res.status(404).json({ error: 'Source CV not found' });
+    }
+    const tailoredCvVersionId = body.tailoredCvVersionId == null ? null : str(body.tailoredCvVersionId, 40);
+    if (tailoredCvVersionId && (!isUuid(tailoredCvVersionId) || !(await getCvVersion(req.authUser!.id, tailoredCvVersionId)))) {
+      return res.status(404).json({ error: 'Tailored CV version not found' });
+    }
+    const coverLetterId = body.coverLetterId == null ? null : str(body.coverLetterId, 40);
+    if (coverLetterId && (!isUuid(coverLetterId) || !(await getCoverLetter(req.authUser!.id, coverLetterId)))) {
+      return res.status(404).json({ error: 'Cover letter not found' });
+    }
+
+    const saved = await createApplicationPackage(req.authUser!.id, {
+      jobTitle: str(body.jobTitle, 200),
+      company: str(body.company, 200),
+      jobDescription,
+      analysis: body.analysis,
+      matchAnalysis: body.matchAnalysis,
+      matchScore,
+      language: str(body.language, 12),
+      sourceCvId,
+      tailoredCvVersionId,
+      coverLetterId,
+    });
+    return res.status(201).json({ success: true, package: saved });
+  } catch (error) {
+    console.error('Failed to save application package:', error);
+    return res.status(500).json({ error: 'Failed to save this application' });
+  }
+});
+
+app.patch('/api/application-packages/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const body = req.body ?? {};
+    const updates: Record<string, unknown> = {};
+    if (body.jobTitle !== undefined) updates.jobTitle = body.jobTitle === null ? null : str(body.jobTitle, 200);
+    if (body.company !== undefined) updates.company = body.company === null ? null : str(body.company, 200);
+    if (body.language !== undefined) updates.language = body.language === null ? null : str(body.language, 12);
+    if (body.matchScore !== undefined) {
+      const score = Number(body.matchScore);
+      if (!Number.isInteger(score) || score < 0 || score > 100) return res.status(400).json({ error: 'Invalid match score' });
+      updates.matchScore = score;
+    }
+    if (body.analysis !== undefined) updates.analysis = body.analysis;
+    if (body.matchAnalysis !== undefined) updates.matchAnalysis = body.matchAnalysis;
+
+    const sourceCvId = body.sourceCvId == null ? body.sourceCvId : str(body.sourceCvId, 40);
+    if (sourceCvId !== undefined) {
+      if (sourceCvId !== null && (!isUuid(sourceCvId) || !(await getCv(req.authUser!.id, sourceCvId)))) {
+        return res.status(404).json({ error: 'Source CV not found' });
+      }
+      updates.sourceCvId = sourceCvId;
+    }
+    const tailoredCvVersionId = body.tailoredCvVersionId == null ? body.tailoredCvVersionId : str(body.tailoredCvVersionId, 40);
+    if (tailoredCvVersionId !== undefined) {
+      if (tailoredCvVersionId !== null && (!isUuid(tailoredCvVersionId) || !(await getCvVersion(req.authUser!.id, tailoredCvVersionId)))) {
+        return res.status(404).json({ error: 'Tailored CV version not found' });
+      }
+      updates.tailoredCvVersionId = tailoredCvVersionId;
+    }
+    const coverLetterId = body.coverLetterId == null ? body.coverLetterId : str(body.coverLetterId, 40);
+    if (coverLetterId !== undefined) {
+      if (coverLetterId !== null && (!isUuid(coverLetterId) || !(await getCoverLetter(req.authUser!.id, coverLetterId)))) {
+        return res.status(404).json({ error: 'Cover letter not found' });
+      }
+      updates.coverLetterId = coverLetterId;
+    }
+    const saved = await updateApplicationPackage(req.authUser!.id, req.params.id, updates);
+    if (!saved) return res.status(404).json({ error: 'Application package not found' });
+    return res.json({ success: true, package: saved });
+  } catch (error) {
+    console.error('Failed to update application package:', error);
+    return res.status(500).json({ error: 'Failed to update this application' });
   }
 });
 
@@ -4932,6 +5177,17 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
       userType: (userType ?? undefined) as string | undefined,
       onboardingCompleted:
         typeof body.onboardingCompleted === 'boolean' ? body.onboardingCompleted : undefined,
+      // The status is validated against the shared vocabulary rather than
+      // stored verbatim, so an unknown value can never reach the database.
+      onboardingStatus: isOnboardingStatus(body.onboardingStatus)
+        ? body.onboardingStatus
+        : undefined,
+      onboardingStep:
+        typeof body.onboardingStep === 'number' &&
+        Number.isFinite(body.onboardingStep) &&
+        body.onboardingStep >= 0
+          ? Math.floor(body.onboardingStep)
+          : undefined,
       isPublic: typeof body.isPublic === 'boolean' ? body.isPublic : undefined,
       // The professional links are a keyed set (linkedin, github, ...); they
       // are replaced as a whole so a removed link is actually removed.
@@ -6148,7 +6404,11 @@ const publicPageHandler = async (req: Request, res: Response) => {
       return res.status(404).type('html').send(renderNotFoundPage());
     }
     res.setHeader('Content-Security-Policy', PUBLIC_PAGE_CSP);
-    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.setHeader(
+      'Cache-Control',
+      page.status === 503 ? 'no-store' : 'public, max-age=0, must-revalidate'
+    );
+    if (page.status === 503) res.setHeader('Retry-After', '86400');
     return res.status(page.status).type('html').send(page.html);
   } catch (error) {
     console.error('Public page failed to render:', error);
@@ -6157,6 +6417,7 @@ const publicPageHandler = async (req: Request, res: Response) => {
 };
 
 app.get('/about', publicPageHandler);
+app.get('/terms', publicPageHandler);
 app.get('/privacy', publicPageHandler);
 app.get('/careers', publicPageHandler);
 app.get('/careers/:slug', publicPageHandler);

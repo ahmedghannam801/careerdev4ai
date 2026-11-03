@@ -16,15 +16,39 @@ import { apiUrl } from './native';
  * The error thrown when the API answers with a non-2xx status.
  *
  * It carries the HTTP status so a caller can tell a rejected request from a
- * missing record without parsing the message.
+ * missing record without parsing the message, and the server's own machine
+ * readable `code` when there is one — `CONSENT_REQUIRED` is the code the
+ * application uses to know it has to show the consent screen rather than an
+ * error.
  */
 export class ApiRequestError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** The server's machine-readable error code, when it sent one. */
+  readonly code: string | null;
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
+    this.code = code;
   }
+}
+
+/** The code the server sends when the caller has not accepted the current terms. */
+export const CONSENT_REQUIRED_CODE = 'CONSENT_REQUIRED';
+
+/**
+ * True when the failure was caused by a missing legal acceptance.
+ *
+ * The gate lives on the server, so a client that ignored it would only see
+ * this as a stream of unexplained failures. Reading the code here lets the
+ * application show the right screen.
+ */
+export function isConsentRequiredError(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    error.status === 403 &&
+    error.code === CONSENT_REQUIRED_CODE
+  );
 }
 
 /**
@@ -36,8 +60,9 @@ export class ApiRequestError extends Error {
  */
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await getAccessToken();
+  const isFormDataBody = typeof FormData !== 'undefined' && init?.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormDataBody ? {} : { 'Content-Type': 'application/json' }),
     ...((init?.headers as Record<string, string>) ?? {}),
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -57,11 +82,15 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   }
 
   if (!res.ok) {
+    const payloadObject =
+      payload && typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : null;
     const message =
-      payload && typeof payload === 'object' && payload !== null && 'error' in payload
-        ? String((payload as { error: unknown }).error)
+      payloadObject && 'error' in payloadObject
+        ? String(payloadObject.error)
         : `Request failed with status ${res.status}`;
-    throw new ApiRequestError(res.status, message);
+    const code =
+      payloadObject && typeof payloadObject.code === 'string' ? payloadObject.code : null;
+    throw new ApiRequestError(res.status, message, code);
   }
   return payload as T;
 }

@@ -120,7 +120,14 @@ export async function startServer({ port, env, timeoutMs = 120_000 } = {}) {
   const loader = resolveTsxLoaderUrl();
   const child = spawn(process.execPath, ['--import', loader, 'server.ts'], {
     cwd: REPO_ROOT,
-    env: { ...process.env, ...env, PORT: String(port), NODE_ENV: 'production' },
+    env: {
+      ...process.env,
+      ...env,
+      CAREERDEV_TEST_SERVER: 'true',
+      CAREERDEV_TEST_TERMS_FIXTURE: 'approved-test-fixture-only',
+      PORT: String(port),
+      NODE_ENV: 'production',
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });

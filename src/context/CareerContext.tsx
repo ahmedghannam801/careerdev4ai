@@ -64,6 +64,16 @@ import {
   type AtsAnalysisFailure,
 } from '../../shared/atsAnalysis';
 import {
+  PRIVACY_VERSION,
+  TERMS_VERSION,
+  type ConsentSource,
+  type ConsentState,
+} from '../../shared/legal';
+import {
+  acceptConsent as acceptConsentApi,
+  fetchConsentState,
+} from '../lib/consentApi';
+import {
   fetchActivities,
   postActivity,
   fetchSecondaryGoals,
@@ -212,6 +222,8 @@ export interface UserProfile {
   careerGoal: CareerGoal;
   customGoalText?: string;
   onboardingCompleted: boolean;
+  onboardingStatus: 'not_started' | 'started' | 'completed' | 'skipped';
+  onboardingStep: number;
   education: UserEducationEntry[];
   experiences: UserExperienceEntry[];
   certifications: UserCertificationEntry[];
@@ -245,6 +257,8 @@ const emptyProfile: UserProfile = {
   careerState: 'working_professional',
   careerGoal: 'get_promoted',
   onboardingCompleted: false,
+  onboardingStatus: 'not_started',
+  onboardingStep: 0,
   education: [],
   experiences: [],
   certifications: [],
@@ -281,9 +295,33 @@ interface CareerContextType {
   authRedirectError: string | null;
   clearAuthRedirectError: () => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    consent?: { accepted: boolean }
+  ) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   /**
+   * The legal consent state of the signed-in user, or null while it is being
+   * read. The server decides which versions are current and refuses every
+   * protected route until a current acceptance exists.
+   */
+  consentState: ConsentState | null;
+  /** True when the user must accept the current terms before using the platform. */
+  consentRequired: boolean;
+  /** Why the consent state could not be read, when it could not be read. */
+  consentError: string | null;
+  /** Records an acceptance of the current terms and unlocks the platform. */
+  acceptConsent: (source?: ConsentSource) => Promise<void>;
+  /**
+   * Re-reads the consent state from the server.
+   *
+   * It resolves to the new state, or to null when the state could not be
+   * read — which is not the same as "not accepted" and is reported as an
+   * error rather than as a prompt.
+   */
+  refreshConsent: () => Promise<ConsentState | null>;  /**
    * True while the browser holds a Supabase recovery session created by the
    * password-reset email link. The app must ask for a new password before the
    * user continues, because the recovery session is not a normal sign-in.
@@ -298,7 +336,7 @@ interface CareerContextType {
   setCareerState: (state: CareerState) => Promise<void>;
   setCareerGoal: (goal: CareerGoal, customText?: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
-  suggestAiSummary: () => Promise<string>;
+  suggestAiSummary: (signal?: AbortSignal) => Promise<string>;
   validateUsername: (username: string) => Promise<{ available: boolean; message: string }>;
   profileCompleteness: ProfileCompletenessBreakdown;
 
@@ -336,9 +374,9 @@ interface CareerContextType {
   documents: CareerDocument[];
   deleteDocument: (id: string) => Promise<void>;
   coverLetters: CoverLetter[];
-  saveCoverLetter: (cl: Omit<CoverLetter, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<void>;
+  saveCoverLetter: (cl: Omit<CoverLetter, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<string>;
   deleteCoverLetter: (id: string) => Promise<void>;
-  generateAiCoverLetter: (company: string, jobTitle: string, jobDesc: string, tone?: string) => Promise<{ coverLetter: string; keyHighlights: string[] }>;
+  generateAiCoverLetter: (company: string, jobTitle: string, jobDesc: string, tone?: string, signal?: AbortSignal) => Promise<{ coverLetter: string; keyHighlights: string[] }>;
 
   // Skills
   skills: UserSkill[];
@@ -362,7 +400,7 @@ interface CareerContextType {
   dailyActions: DailyCareerAction[];
   toggleDailyAction: (actionId: string) => void;
   weeklyReview: WeeklyCareerReview;
-  refreshAiAnalysis: () => Promise<void>;
+  refreshAiAnalysis: (signal?: AbortSignal) => Promise<void>;
   isAnalyzing: boolean;
 
   // Roadmap
@@ -433,11 +471,15 @@ interface CareerContextType {
   /** Re-reads the profile links and updates the document projection. */
   refreshProfileLinks: () => Promise<ProfileLinkDTO[]>;
   loadCVFromMyData: () => void;
-  saveCVVersion: (name: string) => void;
+  saveCVVersion: (name: string, profileSnapshot?: CVProfile) => Promise<CVVersion>;
   duplicateCVVersion: (versionId: string) => void;
   renameCVVersion: (versionId: string, newName: string) => void;
   deleteCVVersion: (versionId: string) => void;
-  runAiCvOptimization: () => Promise<void>;
+  runAiCvOptimization: (options?: {
+    signal?: AbortSignal;
+    /** Reports the phase of the work; the save phase is not cancellable. */
+    setPhase?: (stage: string, cancellable?: boolean) => void;
+  }) => Promise<void>;
   isOptimizingCV: boolean;
   cvAnalysisError: AtsAnalysisFailure | null;
   dismissCvAnalysisError: () => void;
@@ -1059,6 +1101,15 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
 
+  // The legal consent state.
+  //
+  // It is read before anything else is loaded, because the server refuses
+  // every protected route until the user has accepted the current terms. A
+  // user without an acceptance would otherwise see a wall of failed loads
+  // instead of the one screen that can actually help them.
+  const [consentState, setConsentState] = useState<ConsentState | null>(null);
+  const [consentError, setConsentError] = useState<string | null>(null);
+
   // The identity the in-memory career state belongs to. When the Supabase
   // session changes to a different user (or disappears) without going through
   // the explicit logout button, the old user's data must be cleared before the
@@ -1132,11 +1183,85 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reads the legal consent state for the signed-in user.
+  //
+  // This runs before the hydration below, and the hydration waits for it. The
+  // server refuses every protected route until a current acceptance exists, so
+  // loading the career data first would produce nothing but failures for a
+  // user who has not accepted yet.
+  const refreshConsent = useCallback(async () => {
+    try {
+      const state = await fetchConsentState();
+      setConsentState(state);
+      setConsentError(null);
+      return state;
+    } catch (error) {
+      // The state could not be read. That is not the same as "not accepted",
+      // and it must not be reported as either: the screen asks the user to
+      // try again rather than showing them a prompt for a check that failed.
+      setConsentError(
+        error instanceof Error
+          ? error.message
+          : 'Your consent status could not be checked. Please try again.'
+      );
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authToken) {
+      setConsentState(null);
+      setConsentError(null);
+      return;
+    }
+    let cancelled = false;
+    void refreshConsent().then((state) => {
+      if (cancelled) return;
+      if (!state) {
+        // The check failed. The gate is not shown, because the user has not
+        // been told anything false — but the application cannot load either.
+        setConsentState(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken, refreshConsent]);
+
+  // Records an acceptance of the current terms.
+  //
+  // The versions that are sent back are the ones the server published when it
+  // was read. The server compares them with its own current release, so an
+  // acceptance of text that has since been replaced is refused rather than
+  // silently recorded.
+  const acceptConsent = useCallback(async (source: ConsentSource = 'reconsent') => {
+    if (!consentState) {
+      throw new Error('The current terms have not been read yet.');
+    }
+    if (!consentState.termsAvailable) {
+      throw new Error('Approved Terms are not published yet. Consent cannot be recorded.');
+    }
+    const state = await acceptConsentApi(
+      {
+        termsVersion: consentState.termsVersion,
+        privacyVersion: consentState.privacyVersion,
+      },
+      source
+    );
+    setConsentState(state);
+    setConsentError(null);
+  }, [consentState]);
+
   // B.3.6 — Backend hydration for the persisted domains.
   // Runs whenever an authenticated session is present. The database is the
   // source of truth; localStorage is not consulted for these domains.
   useEffect(() => {
     if (!authToken) return;
+    // The data load waits for the consent check. Until the server says the
+    // user has accepted the current terms, every protected route answers
+    // 403 CONSENT_REQUIRED, so there is nothing to hydrate.
+    if (!consentState) return;
+    if (!consentState.accepted) return;
     let cancelled = false;
 
     const hydrate = async () => {
@@ -1260,6 +1385,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             careerState: (profileRecord.userType as UserProfile['careerState']) ?? prev.careerState,
             yearsOfExperience: profileRecord.yearsOfExperience ?? prev.yearsOfExperience,
             onboardingCompleted: profileRecord.onboardingCompleted,
+            onboardingStatus: profileRecord.onboardingStatus ?? (profileRecord.onboardingCompleted ? 'completed' : 'not_started'),
+            onboardingStep: profileRecord.onboardingStep ?? 0,
             certifications: profileRecord.certifications.map(c => ({
               id: c.id,
               name: c.name,
@@ -1400,7 +1527,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => {
       cancelled = true;
     };
-  }, [authToken]);
+    // `consentState` is a dependency because the load must start again once
+    // the user accepts: before the acceptance there was nothing to load.
+  }, [authToken, consentState]);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authRedirectError, setAuthRedirectError] = useState<string | null>(null);
@@ -1780,6 +1909,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           applicationId: cl.applicationId,
         });
         setCoverLetters(prev => prev.map(item => (item.id === cl.id ? toCoverLetter(dto) : item)));
+        return dto.id;
       } else {
         const dto = await postCoverLetter({
           title: cl.title,
@@ -1798,6 +1928,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           subtitle: `${cl.role} at ${cl.company}`,
           linkView: 'documents'
         });
+        return dto.id;
       }
     } catch (error) {
       console.error('Failed to save cover letter:', error);
@@ -1905,7 +2036,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const generateAiCoverLetter = async (company: string, jobTitle: string, jobDesc: string, tone = 'Professional & Confident') => {
+  const generateAiCoverLetter = async (
+    company: string,
+    jobTitle: string,
+    jobDesc: string,
+    tone = 'Professional & Confident',
+    signal?: AbortSignal
+  ) => {
     try {
       const token = await getAccessToken();
       const res = await fetch(apiUrl('/api/generate-cover-letter'), {
@@ -1924,7 +2061,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           projects: projects.map(p => ({ title: p.title, description: p.description, skills: p.skills })),
           tone,
           language: aiPreferences.preferredLanguage
-        })
+        }),
+        signal
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1937,45 +2075,44 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         keyHighlights: data.keyHighlights || []
       };
     } catch (e) {
-      // Never substitute an invented letter for a failed model call.
-      console.error('Error generating cover letter:', e);
+      // Never substitute an invented letter for a failed model call. Cancellation
+      // is an expected user action and is not a model/network failure.
+      if (!(e instanceof DOMException && e.name === 'AbortError')) {
+        console.error('Error generating cover letter:', e);
+      }
       return { coverLetter: '', keyHighlights: [] };
     }
   };
 
   // AI Summary Assistant
-  const suggestAiSummary = async (): Promise<string> => {
-    try {
-      const token = await getAccessToken();
-      const res = await fetch(apiUrl('/api/suggest-summary'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          name: profile.name,
-          targetRoleTitle: targetRole.title,
-          careerState: profile.careerState,
-          yearsExperience: profile.yearsOfExperience,
-          skills: skills.map(s => s.name),
-          keyAchievements: profile.experiences.flatMap(e => e.achievements).slice(0, 3),
-          language: aiPreferences.preferredLanguage
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(
-          typeof data?.error === 'string' ? data.error : 'Summary generation failed'
-        );
-      }
-      return data.suggestedSummary || '';
-    } catch (e) {
-      // Returning a canned paragraph (or silently reusing the existing
-      // summary) would look like a generated suggestion. Return nothing.
-      console.error('Error generating summary suggestion:', e);
-      return '';
+  const suggestAiSummary = async (signal?: AbortSignal): Promise<string> => {
+    const token = await getAccessToken();
+    const res = await fetch(apiUrl('/api/suggest-summary'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        name: profile.name,
+        targetRoleTitle: targetRole.title,
+        careerState: profile.careerState,
+        yearsExperience: profile.yearsOfExperience,
+        skills: skills.map(s => s.name),
+        keyAchievements: profile.experiences.flatMap(e => e.achievements).slice(0, 3),
+        language: aiPreferences.preferredLanguage
+      }),
+      signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        typeof data?.error === 'string' ? data.error : 'Summary generation failed'
+      );
     }
+    const suggested = typeof data?.suggestedSummary === 'string' ? data.suggestedSummary : '';
+    if (!suggested.trim()) throw new Error('The AI could not create a summary. Please try again.');
+    return suggested;
   };
 
   // Username validation
@@ -2750,18 +2887,54 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  /**
+   * Creates an account.
+   *
+   * The acceptance of the Terms & Conditions and the Privacy Policy travels
+   * with the registration itself. Supabase's `signUp` returns no session
+   * until the address is confirmed, so a client cannot call the
+   * authenticated consent endpoint at that moment; the accepted versions are
+   * therefore carried in the user's metadata, and the server turns them into
+   * a real consent record the first time the user authenticates. The server
+   * checks the versions against the current release, so a stale or forged
+   * value simply leaves the platform gated.
+   */
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    consent?: { accepted: boolean }
+  ) => {
     try {
       if (!isSupabaseConfigured) {
         return { success: false, error: 'Authentication is not configured' };
       }
+      // The project rejects weak passwords through Supabase Auth's own policy.
+      // The same minimum is enforced here so a candidate gets a clear reason
+      // instead of a generic failure, and so the rule holds even when the
+      // project's leaked-password protection is not available on its plan.
+      if (typeof password === 'string' && password.length < 8) {
+        return { success: false, error: 'PASSWORD_TOO_SHORT' };
+      }
+      // The form does not let an account be created without the acceptance,
+      // and the metadata is only written when it was actually given.
+      const consentAccepted = consent?.accepted === true;
       const { data, error } = await getBrowserSupabase().auth.signUp({
         email,
         password,
         options: {
           // Display name is carried in user metadata; the authoritative id is
           // always auth.users.id (== public.profiles.id).
-          data: { name },
+          data: {
+            name,
+            ...(consentAccepted
+              ? {
+                  consent_accepted: true,
+                  terms_version: TERMS_VERSION,
+                  privacy_version: PRIVACY_VERSION,
+                }
+              : {}),
+          },
           // Send the confirmation link back to the deployed origin instead of
           // relying on the project's dashboard default. This works for the
           // Cloudflare Pages URL, preview deployments and localhost, provided
@@ -2854,6 +3027,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setPendingAiAction(null);
     setCopilotOpen(false);
     setActiveView('dashboard');
+    // The consent state belongs to the session. A different user must not
+    // inherit the previous one's answer.
+    setConsentState(null);
+    setConsentError(null);
     setIsHydrated(false);
     setPasswordRecovery(false);
   }
@@ -3068,6 +3245,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
     if (updates.onboardingCompleted !== undefined)
       payload.onboardingCompleted = updates.onboardingCompleted;
+    if (updates.onboardingStatus !== undefined) payload.onboardingStatus = updates.onboardingStatus;
+    if (updates.onboardingStep !== undefined) payload.onboardingStep = updates.onboardingStep;
 
     // Experiences and education are collections: they are owned by their own
     // endpoints, NOT by the profile PATCH and NOT by the aggregate endpoint.
@@ -3123,6 +3302,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             },
             isPublic: saved.isPublic,
             onboardingCompleted: saved.onboardingCompleted,
+            onboardingStatus: saved.onboardingStatus,
+            onboardingStep: saved.onboardingStep,
           }));
           return;
         }
@@ -3492,7 +3673,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const refreshAiAnalysis = async () => {
+  const refreshAiAnalysis = async (signal?: AbortSignal) => {
     setIsAnalyzing(true);
     try {
       const token = await getAccessToken();
@@ -3507,8 +3688,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           userSkills: skills,
           careerState: profile.careerState,
           language: aiPreferences.preferredLanguage,
-        })
+        }),
+        signal,
       });
+      if (signal?.aborted) return;
       if (res.ok) {
         const data = await res.json();
         setAnalysis(data);
@@ -3522,6 +3705,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         );
       }
     } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
       console.error('Failed to run AI analysis:', e);
     } finally {
       setIsAnalyzing(false);
@@ -4028,7 +4212,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
   };
 
-  const saveCVVersion = async (name: string) => {
+  const saveCVVersion = async (name: string, profileSnapshot?: CVProfile): Promise<CVVersion> => {
     try {
       // A version belongs to a CV. A user who has never created one still
       // gets a snapshot: the CV row is created first, and its REAL id is
@@ -4043,10 +4227,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         cvId,
         name,
         targetRoleTitle: targetRole.title,
-        profileJson: activeCV,
+        profileJson: profileSnapshot ?? activeCV,
         atsAnalysis: cvVersions[0]?.atsAnalysis,
       });
-      setCvVersions(prev => [toCVVersion(dto), ...prev]);
+      const savedVersion = toCVVersion(dto);
+      setCvVersions(prev => [savedVersion, ...prev]);
+      return savedVersion;
     } catch (error) {
       console.error('Failed to save CV version:', error);
       throw error;
@@ -4537,7 +4723,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return { success: failed === 0, imported, skipped, failed, sections, errors };
   };
 
-  const runAiCvOptimization = async () => {
+  const runAiCvOptimization = async (options?: {
+    signal?: AbortSignal;
+    setPhase?: (stage: string, cancellable?: boolean) => void;
+  }) => {
     setIsOptimizingCV(true);
     setCvAnalysisError(null);
     try {
@@ -4561,7 +4750,8 @@ Skills: ${activeCV.skillsList.join(', ')}
           targetRoleTitle: targetRole.title,
           targetRoleSkills: targetRole.requiredSkills.map(s => s.name),
           language: aiPreferences.preferredLanguage
-        })
+        }),
+        signal: options?.signal,
       });
 
       if (!res.ok) {
@@ -4577,6 +4767,11 @@ Skills: ${activeCV.skillsList.join(', ')}
 
       const result = await res.json();
       const latest = cvVersions[0];
+
+      // The audit is saved to a real CV version from here on. The write cannot
+      // be abandoned halfway, so the request is no longer cancellable and the
+      // interface says so instead of pretending the save can be stopped.
+      options?.setPhase?.(t('Saving the analysis to this CV…'), false);
 
       // Persist the result against a real version so a reload cannot bring
       // back an older analysis for a different role. If persistence fails the
@@ -4645,6 +4840,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         return updated;
       });
     } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
       console.error('Failed to optimize CV:', e);
       setCvAnalysisError({
         message:
@@ -4743,6 +4939,9 @@ Skills: ${activeCV.skillsList.join(', ')}
       });
     } catch (error) {
       console.error('Failed to save interview session:', error);
+      // The caller decides how to tell the candidate. The session really was
+      // not saved, so the failure is reported instead of being swallowed.
+      throw error;
     }
   };
 
@@ -5082,6 +5281,11 @@ Skills: ${activeCV.skillsList.join(', ')}
         login,
         register,
         logout,
+        consentState,
+        consentRequired: consentState !== null && (!consentState.termsAvailable || !consentState.accepted),
+        consentError,
+        acceptConsent,
+        refreshConsent,
         passwordRecovery,
         completePasswordReset,
         dismissPasswordRecovery,

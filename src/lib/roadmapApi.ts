@@ -1,6 +1,7 @@
 // The shared client: the same Bearer header, JSON parsing and non-OK
 // handling every API module uses.
 import { apiRequest as request } from './apiClient';
+import type { OnboardingStatus } from '../../shared/onboarding';
 
 // Typed client for the B.3.7.1 roadmap and profile endpoints.
 // Every call is authenticated with the current Supabase access token.
@@ -167,6 +168,8 @@ export interface ProfileDTO {
   targetRoleDomain: string | null;
   userType: string | null;
   onboardingCompleted: boolean;
+  onboardingStatus: OnboardingStatus;
+  onboardingStep: number;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;

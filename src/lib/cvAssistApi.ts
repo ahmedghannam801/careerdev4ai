@@ -69,10 +69,14 @@ export interface CvHeadlineSuggestionsRequestBody {
  * Throws an ApiRequestError when the server declines, so the caller can show
  * the server's own reason rather than a generic failure.
  */
-export async function assistCvField(body: CvAssistRequestBody): Promise<CvAssistPayload> {
+export async function assistCvField(
+  body: CvAssistRequestBody,
+  options: { signal?: AbortSignal } = {}
+): Promise<CvAssistPayload> {
   const response = await apiRequest<Partial<CvAssistPayload>>('/api/cv/ai-assist', {
     method: 'POST',
     body: JSON.stringify(body),
+    signal: options.signal,
   });
   return {
     success: response.success ?? true,

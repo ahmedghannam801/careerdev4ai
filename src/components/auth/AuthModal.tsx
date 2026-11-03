@@ -10,6 +10,7 @@ import { Logo } from '../brand/Logo';
 import { backdropVariants, dialogVariants } from '../../lib/motion';
 import { useDismissOnEscape, useFocusTrap, useScrollLock } from '../../lib/overlay';
 import { trackEvent } from '../../lib/analytics';
+import { hasApprovedTerms, PRIVACY_PATH, TERMS_PATH } from '../../../shared/legal';
 
 type OAuthProvider = 'google' | 'linkedin_oidc' | 'github';
 
@@ -44,6 +45,14 @@ export const AuthModal: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // The acceptance of the Terms & Conditions and the Privacy Policy.
+  //
+  // It is a separate piece of state, not a derived value, because it has to
+  // be an explicit act by the person registering: the account cannot be
+  // created until it has been given, and the acceptance travels with the
+  // registration so the server can record it.
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const termsAvailable = hasApprovedTerms();
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -84,6 +93,10 @@ export const AuthModal: React.FC = () => {
     setMode(next);
     setError(null);
     setSuccessMsg(null);
+    // The acceptance belongs to the registration attempt. Leaving it ticked
+    // when the person switches to signing in — and back — would let an
+    // account be created without a fresh, deliberate act.
+    if (next !== 'register') setConsentAccepted(false);
     clearAuthRedirectError();
   };
 
@@ -100,6 +113,10 @@ export const AuthModal: React.FC = () => {
    * native bridge listens on.
    */
   const handleOAuth = async (provider: OAuthProvider) => {
+    if (mode === 'register' && !termsAvailable) {
+      setError('Registration is paused until approved Terms & Conditions are published.');
+      return;
+    }
     setError(null);
     setSuccessMsg(null);
     clearAuthRedirectError();
@@ -166,12 +183,25 @@ export const AuthModal: React.FC = () => {
         setError(res.error || 'Failed to authenticate');
       }
     } else if (mode === 'register') {
+      if (!termsAvailable) {
+        setError('Registration is paused until approved Terms & Conditions are published.');
+        setLoading(false);
+        return;
+      }
       if (!name.trim()) {
         setError('Please enter your full name');
         setLoading(false);
         return;
       }
-      const res = await register(name, email, password);
+      // The acceptance is checked again here, not only by the disabled button:
+      // a disabled button is a convenience, and the server must never receive
+      // a registration that claims an acceptance that was not given.
+      if (!consentAccepted) {
+        setError('Please accept the Terms & Conditions and the Privacy Policy to continue.');
+        setLoading(false);
+        return;
+      }
+      const res = await register(name, email, password, { accepted: true });
       setLoading(false);
       if (res.success) {
         // The account was created, whether or not the session is confirmed
@@ -188,7 +218,11 @@ export const AuthModal: React.FC = () => {
           close();
         }
       } else {
-        setError(res.error || 'Registration failed');
+        setError(
+          res.error === 'PASSWORD_TOO_SHORT'
+            ? t('Your password must be at least 8 characters long.')
+            : res.error || 'Registration failed'
+        );
       }
     } else if (mode === 'forgot') {
       try {
@@ -365,10 +399,52 @@ export const AuthModal: React.FC = () => {
               </div>
             )}
 
+            {mode === 'register' && (
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+                <label className="flex cursor-pointer items-start gap-2.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={consentAccepted}
+                    disabled={!termsAvailable}
+                    onChange={(event) => setConsentAccepted(event.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--accent-primary)] disabled:cursor-not-allowed"
+                  />
+                  <span>
+                    {t('I have read and accept the')}{' '}
+                    <a
+                      href={TERMS_PATH}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                      className="font-semibold text-[var(--color-primary-text)] hover:underline"
+                    >
+                      {t('Terms & Conditions')}
+                    </a>{' '}
+                    {t('and the')}{' '}
+                    <a
+                      href={PRIVACY_PATH}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                      className="font-semibold text-[var(--color-primary-text)] hover:underline"
+                    >
+                      {t('Privacy Policy')}
+                    </a>
+                    .
+                  </span>
+                </label>
+                {!termsAvailable && (
+                  <p role="status" className="mt-2 text-[11px] leading-relaxed text-[var(--color-warning)]">
+                    {t('Registration is paused until the operator supplies and approves the Terms & Conditions.')}
+                  </p>
+                )}
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] font-semibold flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50"
+              disabled={loading || (mode === 'register' && (!termsAvailable || !consentAccepted))}
+              className="w-full py-2.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] font-semibold flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>{loading ? 'Processing...' : mode === 'login' ? 'Sign In' : mode === 'register' ? 'Create Account' : 'Send Reset Link'}</span>
               <ArrowRight className="w-4 h-4 rtl:rotate-180" />

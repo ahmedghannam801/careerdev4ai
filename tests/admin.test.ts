@@ -506,6 +506,46 @@ describe('announcement delivery', () => {
     assert.equal(afterCount.count, before.count, 'a second publish inserts nothing');
   });
 
+  test('two concurrent publishes still deliver once per recipient', async () => {
+    const created = await api('POST', '/api/admin/announcements', {
+      token: superAdminUser.token,
+      body: {
+        title: 'Concurrent publish',
+        body: 'A manual publish may race the server-side scheduler tick.',
+        audienceType: 'users',
+        audienceValues: [normalUser.id, targetUser.id],
+      },
+    });
+    assert.equal(created.status, 201, created.body?.error);
+    const announcementId = created.body.announcement.id;
+    trackAnnouncement(announcementId);
+
+    const [first, second] = await Promise.all([
+      api('POST', `/api/admin/announcements/${announcementId}/publish`, {
+        token: superAdminUser.token,
+      }),
+      api('POST', `/api/admin/announcements/${announcementId}/publish`, {
+        token: superAdminUser.token,
+      }),
+    ]);
+    assert.equal(first.status, 200, first.body?.error);
+    assert.equal(second.status, 200, second.body?.error);
+
+    const { count, error } = await admin
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('announcement_id', announcementId);
+    assert.equal(error, null);
+    assert.equal(count, 2, 'the database keeps one notification per recipient');
+
+    const { count: ledgerCount, error: ledgerError } = await admin
+      .from('announcement_deliveries')
+      .select('id', { count: 'exact', head: true })
+      .eq('announcement_id', announcementId);
+    assert.equal(ledgerError, null);
+    assert.equal(ledgerCount, 2, 'one delivery per recipient');
+  });
+
   test('an archived announcement cannot be published again', async () => {
     const announcementId = announcementIds[0];
     const archived = await api('POST', `/api/admin/announcements/${announcementId}/archive`, {

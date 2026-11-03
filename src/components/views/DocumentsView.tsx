@@ -15,6 +15,7 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { DOCUMENT_TABS, DOCUMENT_TYPE_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
+import { useAIProcessing } from '../../lib/useAIProcessing';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
@@ -45,6 +46,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [newCvName, setNewCvName] = useState('');
+  const { run: runAIProcessing, isRunning: isGeneratingCl, modal: aiProcessingModal } = useAIProcessing();
 
   // Cover Letter Generator Studio Form
   const [clForm, setClForm] = useState({
@@ -53,7 +55,6 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
     jobDescription: '',
     tone: 'Professional & Confident'
   });
-  const [isGeneratingCl, setIsGeneratingCl] = useState(false);
   const [activeClDraft, setActiveClDraft] = useState<string | null>(null);
   const [clHighlights, setClHighlights] = useState<string[]>([]);
   const [selectedAppForCl, setSelectedAppForCl] = useState<string>('');
@@ -75,34 +76,30 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
   };
 
   const handleGenerateCoverLetter = async () => {
-    if (!clForm.company || !clForm.jobTitle) return;
-    setIsGeneratingCl(true);
+    if (!clForm.company || !clForm.jobTitle || isGeneratingCl) return;
     setClSaveMsg(null);
-    try {
-      const res = await generateAiCoverLetter(
-        clForm.company,
-        clForm.jobTitle,
-        clForm.jobDescription,
-        clForm.tone
-      );
-      if (!res.coverLetter.trim()) {
-        setClSaveMsg({
-          success: false,
-          text: 'The AI service did not return a cover letter. Check the AI configuration and try again.',
-        });
-        return;
-      }
-      setActiveClDraft(res.coverLetter);
-      setClHighlights(res.keyHighlights);
-    } catch (e) {
-      console.error(e);
-      setClSaveMsg({
-        success: false,
-        text: 'The cover letter could not be generated. Check the AI configuration and try again.',
-      });
-    } finally {
-      setIsGeneratingCl(false);
-    }
+    const taskError = t('The cover letter could not be generated. Please try again.');
+    await runAIProcessing({
+      title: t('Cover Letter'),
+      stage: t('Generate cover letter'),
+      failureMessage: taskError,
+      timeoutMessage: t('Cover letter generation timed out. Check your connection and try again.'),
+      run: async (signal) => {
+        const result = await generateAiCoverLetter(
+          clForm.company,
+          clForm.jobTitle,
+          clForm.jobDescription,
+          clForm.tone,
+          signal
+        );
+        if (!result.coverLetter.trim()) throw new Error(taskError);
+        return result;
+      },
+      onSuccess: (result) => {
+        setActiveClDraft(result.coverLetter);
+        setClHighlights(result.keyHighlights);
+      },
+    });
   };
 
   const handleSaveActiveCoverLetter = async () => {
@@ -599,6 +596,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           </div>
         </div>
       )}
+      {aiProcessingModal}
     </Reveal>
   );
 };

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CareerDev4AI — Your Personal Career Operating System</title>
+    <title>CareerDev4AI — Turn Your Ambition Into a Career Plan</title>
     <meta
       name="description"
       content="CareerDev4AI is an AI-powered career development platform for students and young professionals: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace."
@@ -14,7 +14,7 @@
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href="https://careerdev4ai.pages.dev/" />
     <meta property="og:site_name" content="CareerDev4AI" />
-    <meta property="og:title" content="CareerDev4AI — Your Personal Career Operating System" />
+    <meta property="og:title" content="CareerDev4AI — Turn Your Ambition Into a Career Plan" />
     <meta
       property="og:description"
       content="An AI-powered career development platform for students and young professionals: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace."
@@ -29,12 +29,75 @@
       content="The CareerDev4AI logo: an orange orbital arrow mark with a white orbit and star."
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="CareerDev4AI — Your Personal Career Operating System" />
+    <meta name="twitter:title" content="CareerDev4AI — Turn Your Ambition Into a Career Plan" />
     <meta
       name="twitter:description"
       content="An AI-powered career development platform for students and young professionals."
     />
     <meta name="twitter:image" content="https://careerdev4ai.pages.dev/brand/og-image-1200x630.png" />
+
+    <!--
+      The structured data of the home page.
+
+      It is in the static document on purpose: a crawler that does not run
+      JavaScript still has to find the WebSite schema, because that schema is
+      what decides the name the site is listed under in a search result.
+
+      `data-app-jsonld` marks these blocks as the application's own. The
+      client replaces every block carrying that attribute when the route
+      changes, so the document never ends up holding two WebSite schemas that
+      could disagree about the name. The content below is the same as what
+      the client publishes — `tests/seo.test.ts` fails if the two drift.
+    -->
+    <script type="application/ld+json" data-app-jsonld="true">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "CareerDev4AI",
+        "alternateName": ["Career Dev 4AI", "CareerDev4AI Career Platform"],
+        "url": "https://careerdev4ai.pages.dev/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://careerdev4ai.pages.dev/brand/icon-512.png"
+        },
+        "image": "https://careerdev4ai.pages.dev/brand/og-image-1200x630.png",
+        "description": "CareerDev4AI is an AI-powered career development platform for students and young professionals: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace."
+      }
+    </script>
+    <script type="application/ld+json" data-app-jsonld="true">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "CareerDev4AI",
+        "alternateName": ["Career Dev 4AI", "CareerDev4AI Career Platform"],
+        "url": "https://careerdev4ai.pages.dev/",
+        "description": "Your personal career operating system",
+        "inLanguage": "en",
+        "publisher": {
+          "@type": "Organization",
+          "name": "CareerDev4AI",
+          "alternateName": ["Career Dev 4AI", "CareerDev4AI Career Platform"],
+          "url": "https://careerdev4ai.pages.dev/"
+        }
+      }
+    </script>
+    <script type="application/ld+json" data-app-jsonld="true">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "CareerDev4AI — Turn Your Ambition Into a Career Plan",
+        "description": "CareerDev4AI is an AI-powered career operating system for students and young professionals: goals, skills, roadmaps, CVs, job applications, interview practice and volunteering opportunities in one bilingual workspace.",
+        "url": "https://careerdev4ai.pages.dev/",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "CareerDev4AI",
+          "alternateName": ["Career Dev 4AI", "CareerDev4AI Career Platform"],
+          "url": "https://careerdev4ai.pages.dev/"
+        },
+        "inLanguage": "en"
+      }
+    </script>
+
     <meta name="theme-color" content="#B94736" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

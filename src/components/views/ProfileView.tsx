@@ -33,6 +33,7 @@ import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { PROFILE_SECTIONS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar, AvatarSelector } from '../ui/CareerPilotAvatars';
+import { useAIProcessing } from '../../lib/useAIProcessing';
 
 export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const {
@@ -68,6 +69,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   const [editBasicOpen, setEditBasicOpen] = useState(false);
   const [editSummaryOpen, setEditSummaryOpen] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const { run: runAIProcessing, isRunning: isAiSummaryRunning, modal: aiProcessingModal } = useAIProcessing();
   const [aiSummaryDraft, setAiSummaryDraft] = useState('');
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -218,12 +220,16 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   };
 
   const handleGenerateSummary = async () => {
+    if (isAiSummaryRunning) return;
     setAiSummaryLoading(true);
     try {
-      const suggested = await suggestAiSummary();
-      setAiSummaryDraft(suggested);
-    } catch (e) {
-      console.error(e);
+      await runAIProcessing({
+        title: t('Professional Summary'),
+        stage: t('Writing a summary from your profile…'),
+        failureMessage: t('The summary could not be generated. Please try again.'),
+        run: (signal) => suggestAiSummary(signal),
+        onSuccess: (suggested) => setAiSummaryDraft(suggested),
+      });
     } finally {
       setAiSummaryLoading(false);
     }
@@ -2033,6 +2039,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
         </div>
       )}
+      {aiProcessingModal}
     </Reveal>
   );
 };

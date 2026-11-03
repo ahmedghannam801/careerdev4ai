@@ -57,12 +57,13 @@ export async function fetchProjectRecommendations(body: {
   jobDescription?: string;
   language?: AiLanguageCode;
   limit?: number;
-}): Promise<ProjectRecommendationPayload> {
+}, options: { signal?: AbortSignal } = {}): Promise<ProjectRecommendationPayload> {
   const response = await apiRequest<Partial<ProjectRecommendationPayload>>(
     '/api/projects/recommendations',
     {
       method: 'POST',
       body: JSON.stringify(body),
+      signal: options.signal,
     }
   );
 
@@ -87,12 +88,14 @@ export async function fetchProjectRecommendations(body: {
 }
 
 /** Checks the projects the candidate already has. */
-export async function fetchProjectHealth(body: {
-  language?: AiLanguageCode;
-}): Promise<ProjectHealthPayload> {
+export async function fetchProjectHealth(
+  body: { language?: AiLanguageCode },
+  options: { signal?: AbortSignal } = {}
+): Promise<ProjectHealthPayload> {
   const response = await apiRequest<Partial<ProjectHealthPayload>>('/api/projects/analyze', {
     method: 'POST',
     body: JSON.stringify(body),
+    signal: options.signal,
   });
 
   return {

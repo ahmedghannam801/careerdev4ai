@@ -7,6 +7,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { CareerProvider, useCareer } from './context/CareerContext';
 import { AppShell } from './components/layout/AppShell';
 import { AuthModal } from './components/auth/AuthModal';
+import { ConsentGate } from './components/auth/ConsentGate';
 import { PasswordRecoveryModal } from './components/auth/PasswordRecoveryModal';
 import { LandingView } from './components/views/LandingView';
 import { Logo } from './components/brand/Logo';
@@ -87,6 +88,8 @@ function AppRoutes() {
     isAuthReady,
     hydrationError,
     isHydrated,
+    consentRequired,
+    consentError,
     setAuthModalOpen,
     setCopilotOpen, t,} = useCareer();
   const [currentView, setCurrentView] = useState<string>(() => {
@@ -242,6 +245,22 @@ function AppRoutes() {
           onExploreRoles={() => setAuthModalOpen(true)}
           onOpenDashboard={() => setAuthModalOpen(true)}
         />
+        <AuthModal />
+      </>
+    );
+  }
+
+  // The consent gate.
+  //
+  // The server refuses every protected route until the user has accepted the
+  // current Terms & Conditions and Privacy Policy, so there is nothing behind
+  // this screen that could work. It replaces the application rather than
+  // sitting over it, and it is shown before the onboarding flow, because
+  // onboarding is a protected screen too.
+  if (consentRequired || consentError) {
+    return (
+      <>
+        <ConsentGate />
         <AuthModal />
       </>
     );

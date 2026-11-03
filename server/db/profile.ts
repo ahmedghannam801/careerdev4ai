@@ -17,6 +17,7 @@ import {
   type CareerIdentityDTO,
 } from './profileExtensions';
 import { resolveTargetRole } from '../../shared/targetRoleSelection.ts';
+import type { OnboardingStatus } from '../../shared/onboarding.ts';
 
 export interface ProfileDTO {
   id: string;
@@ -56,6 +57,16 @@ export interface ProfileDTO {
   targetRoleDomain: string | null;
   userType: string | null;
   onboardingCompleted: boolean;
+  /**
+   * The authoritative first-time onboarding state.
+   *
+   * The legacy boolean above is kept in sync for older clients, but this is
+   * what distinguishes "never started" from "skipped".
+   */
+  onboardingStatus: OnboardingStatus;
+  /** The step the user reached, so a resumed flow reopens where it stopped. */
+  onboardingStep: number;
+  onboardingUpdatedAt: string | null;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
@@ -88,6 +99,8 @@ export interface UpdateProfileInput {
   targetIndustry?: string;
   userType?: string;
   onboardingCompleted?: boolean;
+  onboardingStatus?: OnboardingStatus;
+  onboardingStep?: number;
   isPublic?: boolean;
   /** The professional links, in the shape the frontend already uses. */
   links?: Record<string, string | undefined>;
@@ -117,13 +130,16 @@ interface ProfileRow {
   target_industry: string | null;
   user_type: string | null;
   onboarding_completed: boolean;
+  onboarding_status: OnboardingStatus | null;
+  onboarding_step: number | null;
+  onboarding_updated_at: string | null;
   is_public: boolean;
   created_at: string;
   updated_at: string;
 }
 
 const SELECT_COLUMNS =
-  'id, full_name, preferred_name, username, avatar_url, phone, location, city, country, timezone, current_title, current_position, current_company, years_of_experience, headline, bio, professional_summary, career_goal, custom_goal_text, target_role, target_industry, user_type, onboarding_completed, is_public, created_at, updated_at';
+  'id, full_name, preferred_name, username, avatar_url, phone, location, city, country, timezone, current_title, current_position, current_company, years_of_experience, headline, bio, professional_summary, career_goal, custom_goal_text, target_role, target_industry, user_type, onboarding_completed, onboarding_status, onboarding_step, onboarding_updated_at, is_public, created_at, updated_at';
 
 /** The profile row + its extension rows, as one typed DTO. */
 export async function getProfileDto(profileId: string): Promise<ProfileDTO | null> {
@@ -174,6 +190,9 @@ export async function getProfileDto(profileId: string): Promise<ProfileDTO | nul
     targetRoleDomain: targetRole?.domainId ?? null,
     userType: row.user_type,
     onboardingCompleted: row.onboarding_completed,
+    onboardingStatus: row.onboarding_status ?? (row.onboarding_completed ? 'completed' : 'not_started'),
+    onboardingStep: row.onboarding_step ?? 0,
+    onboardingUpdatedAt: row.onboarding_updated_at,
     isPublic: row.is_public,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -218,6 +237,17 @@ export async function updateProfileDto(
   }
   if (input.onboardingCompleted !== undefined) {
     patch.onboarding_completed = input.onboardingCompleted;
+  }
+  if (input.onboardingStatus !== undefined) {
+    patch.onboarding_status = input.onboardingStatus;
+    // Keep the legacy boolean consistent so an older client (or a direct
+    // query) sees the same answer the status gives.
+    patch.onboarding_completed = input.onboardingStatus === 'completed';
+    patch.onboarding_updated_at = new Date().toISOString();
+  }
+  if (input.onboardingStep !== undefined) {
+    patch.onboarding_step = Math.max(0, Math.floor(input.onboardingStep));
+    patch.onboarding_updated_at = new Date().toISOString();
   }
   if (input.isPublic !== undefined) patch.is_public = input.isPublic;
 

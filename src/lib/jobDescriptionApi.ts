@@ -55,16 +55,38 @@ export interface ClientCvSnapshot {
   skillsList?: string[];
 }
 
+/** Extracts a TXT, PDF or DOCX job description in memory on the authenticated server. */
+export async function extractJobDescriptionFile(
+  file: File,
+  options: { signal?: AbortSignal } = {}
+): Promise<{ text: string; format: 'txt' | 'pdf' | 'docx'; characterCount: number }> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const response = await apiRequest<{
+    success: boolean;
+    text: string;
+    format: 'txt' | 'pdf' | 'docx';
+    characterCount: number;
+  }>('/api/job-descriptions/extract', {
+    method: 'POST',
+    body: form,
+    signal: options.signal,
+  });
+  if (!response.text?.trim()) throw new Error('The file did not contain readable job-description text.');
+  return response;
+}
+
 /** Reads a job description and reports what it asks for. */
-export async function analyzeJobDescription(body: {
-  jobDescription: string;
-  language?: AiLanguageCode;
-}): Promise<JobDescriptionAnalysisPayload> {
+export async function analyzeJobDescription(
+  body: { jobDescription: string; language?: AiLanguageCode },
+  options: { signal?: AbortSignal } = {}
+): Promise<JobDescriptionAnalysisPayload> {
   const response = await apiRequest<Partial<JobDescriptionAnalysisPayload>>(
     '/api/cv/job-description/analyze',
     {
       method: 'POST',
       body: JSON.stringify(body),
+      signal: options.signal,
     }
   );
 
@@ -101,17 +123,21 @@ export async function analyzeJobDescription(body: {
 }
 
 /** Writes the CV for a job description. */
-export async function generateJobDescriptionCv(body: {
-  jobDescription: string;
-  language?: AiLanguageCode;
-  /** The candidate's current document, so the result improves it. */
-  cv?: ClientCvSnapshot | null;
-}): Promise<JobDescriptionCvPayload> {
+export async function generateJobDescriptionCv(
+  body: {
+    jobDescription: string;
+    language?: AiLanguageCode;
+    /** The candidate's current document, so the result improves it. */
+    cv?: ClientCvSnapshot | null;
+  },
+  options: { signal?: AbortSignal } = {}
+): Promise<JobDescriptionCvPayload> {
   const response = await apiRequest<Partial<JobDescriptionCvPayload>>(
     '/api/cv/job-description/generate',
     {
       method: 'POST',
       body: JSON.stringify(body),
+      signal: options.signal,
     }
   );
 

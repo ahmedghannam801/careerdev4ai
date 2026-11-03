@@ -12,6 +12,7 @@ import {
   Target,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { useAIProcessing } from '../../lib/useAIProcessing';
 import { getAccessToken } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import {
@@ -58,11 +59,13 @@ export const InterviewsView: React.FC = () => {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answer, setAnswer] = useState('');
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isEvaluating, setIsEvaluating] = useState(false);
+  const { run: runAIProcessing, isRunning: isEvaluating, modal: aiProcessingModal } = useAIProcessing();
   const [showTransition, setShowTransition] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
+  // Set when the feedback was produced but the session could not be written to
+  // the candidate's history, so the record is never implied to exist.
+  const [sessionSaveError, setSessionSaveError] = useState<string | null>(null);
 
   const completedTraining = useMemo(() => {
     const courseById = new Map(learningCatalog.map((course) => [course.id, course]));
@@ -104,7 +107,6 @@ export const InterviewsView: React.FC = () => {
     setQuestionIndex(0);
     setAnswer('');
     setFeedback(null);
-    setError(null);
     setShowTransition(false);
     setCompleted(false);
     setAnswered([]);
@@ -116,82 +118,89 @@ export const InterviewsView: React.FC = () => {
     setQuestionIndex(nextIndex);
     setAnswer('');
     setFeedback(null);
-    setError(null);
   };
 
-  const handleEvaluate = async () => {
+  const handleEvaluate = () => {
     if (!currentQuestion || !answer.trim() || isEvaluating) return;
-    setIsEvaluating(true);
-    setError(null);
-    setFeedback(null);
+    const question = currentQuestion;
+    const userAnswer = answer.trim();
 
-    try {
-      const token = await getAccessToken();
-      const res = await fetch(apiUrl('/api/mock-interview'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          roleTitle: targetRole.title,
-          interviewType: currentQuestion.category,
-          question: currentQuestion.question,
-          userAnswer: answer.trim(),
-          language: aiPreferences.preferredLanguage,
-        }),
-      });
+    void runAIProcessing({
+      title: t('Evaluating your interview answer'),
+      stage: t('Reviewing your answer and preparing feedback…'),
+      run: async (signal, setPhase) => {
+        const token = await getAccessToken();
+        const res = await fetch(apiUrl('/api/mock-interview'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            roleTitle: targetRole.title,
+            interviewType: question.category,
+            question: question.question,
+            userAnswer,
+            language: aiPreferences.preferredLanguage,
+          }),
+          signal,
+        });
 
-      if (res.ok) {
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(
+            body?.error ??
+              t('The interviewer is unavailable right now. No feedback was generated — please try again shortly.')
+          );
+        }
         const result = (await res.json()) as InterviewFeedback;
+
+        // The session is written to the candidate's record from here on. The
+        // write cannot be abandoned halfway, so the request stops being
+        // cancellable and the interface says so.
+        setPhase(t('Saving the interview session…'), false);
+        let saved = true;
+        try {
+          await saveInterviewSession({
+            roleTitle: targetRole.title,
+            type: question.category,
+            question: question.question,
+            userAnswer,
+            aiFeedback: {
+              score: typeof result.score === 'number' ? result.score : 0,
+              strengths: result.strengths ?? [],
+              improvements: result.improvements ?? [],
+              starEvaluation: result.starEvaluation
+                ? {
+                    situation: result.starEvaluation.situation ?? '',
+                    task: result.starEvaluation.task ?? '',
+                    action: result.starEvaluation.action ?? '',
+                    result: result.starEvaluation.result ?? '',
+                  }
+                : undefined,
+              suggestedAnswer: result.suggestedAnswer ?? '',
+            },
+          });
+        } catch {
+          // The feedback itself is real, so it is still shown. What failed is
+          // the save, and the candidate is told that it did.
+          saved = false;
+        }
+        return { result, saved };
+      },
+      onSuccess: ({ result, saved }) => {
         setFeedback(result);
+        setSessionSaveError(saved ? null : t('The feedback is shown, but this session could not be saved to your history.'));
         setAnswered((prev) => [
           ...prev,
           {
-            question: currentQuestion.question,
-            stage: currentQuestion.stage,
+            question: question.question,
+            stage: question.stage,
             score: typeof result.score === 'number' ? result.score : null,
           },
         ]);
-        void saveInterviewSession({
-          roleTitle: targetRole.title,
-          type: currentQuestion.category,
-          question: currentQuestion.question,
-          userAnswer: answer.trim(),
-          aiFeedback: {
-            score: typeof result.score === 'number' ? result.score : 0,
-            strengths: result.strengths ?? [],
-            improvements: result.improvements ?? [],
-            starEvaluation: result.starEvaluation
-              ? {
-                  situation: result.starEvaluation.situation ?? '',
-                  task: result.starEvaluation.task ?? '',
-                  action: result.starEvaluation.action ?? '',
-                  result: result.starEvaluation.result ?? '',
-                }
-              : undefined,
-            suggestedAnswer: result.suggestedAnswer ?? '',
-          },
-        });
-      } else {
-        const body = await res.json().catch(() => null);
-        setError(
-          body?.error ??
-            t(
-              'The interviewer is unavailable right now. No feedback was generated — please try again shortly.'
-            )
-        );
-      }
-    } catch (requestError) {
-      console.error(requestError);
-      setError(
-        t(
-          'The interviewer is unreachable right now, so your answer was not evaluated. Your answer is kept below — please try again shortly.'
-        )
-      );
-    } finally {
-      setIsEvaluating(false);
-    }
+      },
+    });
   };
 
   const handleNext = () => {
@@ -488,31 +497,19 @@ export const InterviewsView: React.FC = () => {
             )}
           </div>
 
-          {error && (
-            <div className="rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-main)] p-4">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
-                <AlertCircle className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
-                {t('No feedback was generated')}
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
-                {error}
-              </p>
-              <button
-                type="button"
-                onClick={() => void handleEvaluate()}
-                disabled={isEvaluating}
-                className="mt-2 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
-              >
-                {t('Try again')}
-              </button>
-            </div>
-          )}
-
           {feedback && (
             <Reveal
               delay={0.06}
               className="space-y-5 rounded-2xl border border-[var(--accent-primary)]/40 bg-[var(--surface-main)] p-6 shadow-xs"
             >
+              {sessionSaveError && (
+                <p
+                  role="alert"
+                  className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 p-3 text-xs text-[var(--text-secondary)]"
+                >
+                  {sessionSaveError}
+                </p>
+              )}
               <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">
@@ -605,6 +602,7 @@ export const InterviewsView: React.FC = () => {
           )}
         </section>
       )}
+      {aiProcessingModal}
     </Reveal>
   );
 };

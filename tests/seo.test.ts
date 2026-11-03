@@ -25,7 +25,8 @@ import { join } from 'node:path';
 
 import { CAREER_ROLES } from '../shared/careerRoles.ts';
 import { ANALYTICS_EVENTS } from '../shared/analyticsEvents.ts';
-import { absoluteUrl, clampDescription, siteOrigin, slugify } from '../server/seo/config.ts';
+import { absoluteUrl, clampDescription, siteOrigin, siteUrl, slugify } from '../server/seo/config.ts';
+import { websiteSchema } from '../server/seo/jsonld.ts';
 import { escapeHtml, escapeJsonLd } from '../server/seo/html.ts';
 import { DISALLOWED_PATHS, buildRobotsTxt } from '../server/seo/robots.ts';
 import { buildSitemapXml, collectSitemapEntries } from '../server/seo/sitemap.ts';
@@ -47,7 +48,7 @@ import { routeMetaFor } from '../src/lib/seo.ts';
 const REPO_ROOT = join(import.meta.dirname, '..');
 
 /** The public pages that must exist and must be indexable. */
-const STATIC_PAGES = ['/about', '/privacy'];
+const STATIC_PAGES = ['/about', '/privacy', '/terms'];
 
 describe('the public pages', () => {
   it('serves the static pages', async () => {
@@ -241,6 +242,27 @@ describe('the Search Console verification file', () => {
 });
 
 describe('the document metadata of the application', () => {
+  it('publishes the CareerDev4AI site name in static homepage structured data', () => {
+    const html = readFileSync(join(REPO_ROOT, 'index.html'), 'utf-8');
+    const blocks = [
+      ...html.matchAll(
+        /<script type="application\/ld\+json" data-app-jsonld="true">([\s\S]*?)<\/script>/g
+      ),
+    ];
+    const schemas = blocks.map((block) => JSON.parse(block[1]));
+    const website = schemas.find((schema) => schema['@type'] === 'WebSite');
+    assert.ok(website, 'the static homepage must contain WebSite structured data');
+    assert.equal(website.name, 'CareerDev4AI');
+    assert.deepEqual(website.alternateName, ['Career Dev 4AI', 'CareerDev4AI Career Platform']);
+    assert.equal(website.url, 'https://careerdev4ai.pages.dev/');
+    assert.equal(websiteSchema().name, website.name);
+    assert.equal(websiteSchema().url, website.url);
+    assert.equal(websiteSchema().alternateName[0], website.alternateName[0]);
+    assert.match(html, /<link rel="canonical" href="https:\/\/careerdev4ai\.pages\.dev\/"\s*\/>/);
+    assert.match(html, /<meta property="og:site_name" content="CareerDev4AI"\s*\/>/);
+    assert.match(html, /<title>CareerDev4AI — Turn Your Ambition Into a Career Plan<\/title>/);
+  });
+
   it('indexes the landing page and hides the signed-in views', () => {
     assert.match(routeMetaFor('landing').robots, /^index, follow/);
     assert.equal(routeMetaFor('dashboard').robots, 'noindex, nofollow');

@@ -11,6 +11,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
 import { loadTestEnv } from './env.mjs';
 import { deleteTestIdentity } from './cleanup.mjs';
+import { PRIVACY_VERSION, TERMS_VERSION } from '../shared/legal.ts';
 
 // The environment must be loaded before the clients are constructed: the
 // module-level createClient calls below need the credentials immediately.
@@ -42,32 +43,117 @@ export interface TestUser {
   client: SupabaseClient;
 }
 
-export async function createTestUser(label: string): Promise<TestUser> {
+export interface CreateTestUserOptions {
+  /**
+   * Whether to record a current Terms & Privacy acceptance for the user.
+   *
+   * Defaults to true, because almost every test exercises a signed-in feature
+   * and the consent gate would otherwise answer 403 for every request. The
+   * consent/access tests pass `false` to exercise the gate itself.
+   */
+  consent?: boolean;
+  termsVersion?: string;
+  privacyVersion?: string;
+}
+
+/**
+ * Records a consent row for a test user straight through the service role.
+ *
+ * This is the same row the API writes; the test asserts behaviour against it,
+ * so the shape must match.
+ */
+export async function grantConsent(
+  userId: string,
+  options: { termsVersion?: string; privacyVersion?: string; status?: string; source?: string } = {}
+): Promise<void> {
+  const { error } = await admin.from('user_consents').insert({
+    user_id: userId,
+    terms_version: options.termsVersion ?? TERMS_VERSION,
+    privacy_version: options.privacyVersion ?? PRIVACY_VERSION,
+    status: options.status ?? 'accepted',
+    source: options.source ?? 'registration',
+  });
+  if (error) throw new Error(`grantConsent failed: ${error.message}`);
+}
+
+/** Reads a user's consent rows straight from the database. */
+export async function readConsentRows(userId: string): Promise<any[]> {
+  const { data, error } = await admin
+    .from('user_consents')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as any[];
+}
+
+/**
+ * Runs an operation again when the platform answers with a transient error.
+ *
+ * The suite creates its own Supabase Auth identities, and the hosted Auth
+ * service throttles identity creation when a full run creates many of them in
+ * a short window. A throttled or momentarily unavailable platform is not a
+ * defect in the product, so the harness waits and tries again instead of
+ * failing the run. A genuine failure (a wrong password, a rejected row) is
+ * reported straight away.
+ */
+async function withTransientRetry<T>(label: string, operation: () => Promise<T>): Promise<T> {
+  const transient = ['429', 'rate limit', 'timeout', 'timed out', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', '500', '502', '503', '504'];
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (!transient.some((marker) => message.includes(marker))) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
+    }
+  }
+  throw new Error(`${label} failed after retries: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+}
+
+export async function createTestUser(
+  label: string,
+  options: CreateTestUserOptions = {}
+): Promise<TestUser> {
   const email = `cp-test-${label}-${randomBytes(6).toString('hex')}@example.invalid`;
   const password = `Tst-${randomBytes(12).toString('hex')}Aa1!`;
 
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  });
+  const { data, error } = await withTransientRetry('createTestUser', () =>
+    admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    })
+  );
   if (error || !data?.user) throw new Error(`createTestUser failed: ${error?.message}`);
 
   // The profile row is created by a database trigger on auth signup; create it
   // defensively in case the trigger is absent.
-  await admin
-    .from('profiles')
-    .upsert({ id: data.user.id, full_name: `Test ${label}` }, { onConflict: 'id' });
+  await withTransientRetry('createTestUser profile', () =>
+    admin
+      .from('profiles')
+      .upsert({ id: data.user.id, full_name: `Test ${label}` }, { onConflict: 'id' })
+  );
+
+  if (options.consent !== false) {
+    await withTransientRetry('grantConsent', () =>
+      grantConsent(data.user.id, {
+        termsVersion: options.termsVersion,
+        privacyVersion: options.privacyVersion,
+      })
+    );
+  }
 
   // A dedicated client per user: signing one user out must not affect
   // another user's session.
   const client = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data: session, error: signInError } = await client.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { data: session, error: signInError } = await withTransientRetry('signIn', () =>
+    client.auth.signInWithPassword({ email, password })
+  );
   if (signInError || !session?.session) {
     throw new Error(`signIn failed: ${signInError?.message}`);
   }

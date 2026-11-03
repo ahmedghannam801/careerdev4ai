@@ -36,6 +36,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { useAIProcessing } from '../../lib/useAIProcessing';
 import {
   fetchProjectHealth,
   fetchProjectRecommendations,
@@ -80,49 +81,52 @@ export const ProjectAiPanel: React.FC = () => {
   const [jobDescription, setJobDescription] = useState('');
   const [plans, setPlans] = useState<ProjectPlan[] | null>(null);
   const [reports, setReports] = useState<ProjectHealthReport[] | null>(null);
-  const [isRecommending, setIsRecommending] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [activeOperation, setActiveOperation] = useState<'recommend' | 'analyze' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aiOutcome, setAiOutcome] = useState<{ aiUsed: boolean; reason: string | null } | null>(null);
+  const { run: runAIProcessing, isRunning, modal: aiProcessingModal } = useAIProcessing();
+  const isRecommending = isRunning && activeOperation === 'recommend';
+  const isAnalyzing = isRunning && activeOperation === 'analyze';
   const [createdTitles, setCreatedTitles] = useState<string[]>([]);
   const [creatingTitle, setCreatingTitle] = useState<string | null>(null);
 
   const handleRecommend = async () => {
-    if (isRecommending || isAnalyzing) return;
+    if (isRunning) return;
     setError(null);
-    setIsRecommending(true);
-    try {
-      const result = await fetchProjectRecommendations({
-        language,
-        jobDescription: jobDescription.trim() || undefined,
-      });
-      setPlans(result.plans);
-    } catch (recommendError) {
-      setError(
-        recommendError instanceof Error
-          ? recommendError.message
-          : t('Projects could not be recommended right now.')
-      );
-    } finally {
-      setIsRecommending(false);
-    }
+    setAiOutcome(null);
+    setActiveOperation('recommend');
+    await runAIProcessing({
+      title: t('AI Project Advisor'),
+      stage: t('Finding projects…'),
+      failureMessage: t('Projects could not be recommended right now.'),
+      run: (signal) => fetchProjectRecommendations(
+        { language, jobDescription: jobDescription.trim() || undefined },
+        { signal }
+      ),
+      onSuccess: (result) => {
+        setPlans(result.plans);
+        setAiOutcome({ aiUsed: result.aiUsed, reason: result.aiFallbackReason });
+      },
+    });
+    setActiveOperation(null);
   };
 
   const handleAnalyze = async () => {
-    if (isAnalyzing || isRecommending) return;
+    if (isRunning) return;
     setError(null);
-    setIsAnalyzing(true);
-    try {
-      const result = await fetchProjectHealth({ language });
-      setReports(result.reports);
-    } catch (analyzeError) {
-      setError(
-        analyzeError instanceof Error
-          ? analyzeError.message
-          : t('Your projects could not be analysed right now.')
-      );
-    } finally {
-      setIsAnalyzing(false);
-    }
+    setAiOutcome(null);
+    setActiveOperation('analyze');
+    await runAIProcessing({
+      title: t('AI Project Advisor'),
+      stage: t('Checking your projects…'),
+      failureMessage: t('Your projects could not be analysed right now.'),
+      run: (signal) => fetchProjectHealth({ language }, { signal }),
+      onSuccess: (result) => {
+        setReports(result.reports);
+        setAiOutcome({ aiUsed: result.aiUsed, reason: result.aiFallbackReason });
+      },
+    });
+    setActiveOperation(null);
   };
 
   /**
@@ -253,6 +257,25 @@ export const ProjectAiPanel: React.FC = () => {
         >
           <AlertCircle className="w-4 h-4 text-[var(--color-warning)] shrink-0 mt-0.5" />
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed flex-1">{error}</p>
+        </div>
+      )}
+
+      {/* The deterministic answer is shown as it is: the plans are never
+          discarded because the model was unavailable, and the reason for that
+          is never hidden either. */}
+      {aiOutcome && !aiOutcome.aiUsed && (
+        <div
+          role="status"
+          className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]"
+        >
+          <p className="text-xs font-semibold text-[var(--text-primary)]">
+            {t('AI explanations were not available; the deterministic reasons are shown.')}
+          </p>
+          {aiOutcome.reason && (
+            <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+              {aiOutcome.reason}
+            </p>
+          )}
         </div>
       )}
 
@@ -611,6 +634,7 @@ export const ProjectAiPanel: React.FC = () => {
           ))}
         </div>
       )}
+      {aiProcessingModal}
     </div>
   );
 };

@@ -16,6 +16,7 @@ import { CVImportModal } from '../cv/CVImportModal';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
 import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
+import { useAIProcessing } from '../../lib/useAIProcessing';
 
 export const CVStudioView: React.FC = () => {
   const {
@@ -46,12 +47,31 @@ export const CVStudioView: React.FC = () => {
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionName, setVersionName] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const { run: runAIProcessing, isRunning: isAtsAuditRunning, modal: aiProcessingModal } = useAIProcessing();
+
+  /**
+   * Runs the ATS audit through the shared request lifecycle: the request can be
+   * stopped while the model is working, and the save phase reports itself so
+   * the interface never claims a cancelled save stopped.
+   */
+  const handleRunAtsAudit = async () => {
+    if (isAtsAuditRunning || isOptimizingCV) return;
+    await runAIProcessing({
+      title: t('ATS Audit'),
+      stage: t('Comparing your CV with the role requirements…'),
+      failureMessage: t('The ATS audit could not be completed. Please try again.'),
+      timeoutMessage: t('The ATS audit timed out. Check your connection and try again.'),
+      run: (signal, setPhase) => runAiCvOptimization({ signal, setPhase }),
+      onSuccess: () => undefined,
+    });
+  };
 
   // The job description and its analysis live here rather than inside the
   // panel, so a trip to the editor tab does not throw away the advertisement
   // the candidate pasted or the result they already read.
   const [jobDescriptionState, setJobDescriptionState] = useState<JobDescriptionPanelState>({
     jobDescription: '',
+    company: '',
     analysis: null,
     match: null,
     generated: null,
@@ -59,6 +79,7 @@ export const CVStudioView: React.FC = () => {
     isGenerating: false,
     error: null,
     applied: false,
+    packageId: null,
   });
 
   const latestVersion = cvVersions[0];
@@ -136,7 +157,7 @@ export const CVStudioView: React.FC = () => {
           </button>
 
           <button
-            onClick={runAiCvOptimization}
+            onClick={handleRunAtsAudit}
             disabled={isOptimizingCV || !aiWritingEnabled}
             title={
               aiWritingEnabled
@@ -315,7 +336,7 @@ export const CVStudioView: React.FC = () => {
                 {t('. The score below has not been applied to your current readiness.')}
               </div>
               <button
-                onClick={runAiCvOptimization}
+                onClick={handleRunAtsAudit}
                 disabled={isOptimizingCV || !aiWritingEnabled}
                 title={
                   aiWritingEnabled
@@ -427,7 +448,7 @@ export const CVStudioView: React.FC = () => {
             {targetRole.title}.
           </p>
           <button
-            onClick={runAiCvOptimization}
+            onClick={handleRunAtsAudit}
             disabled={isOptimizingCV || !aiWritingEnabled}
             title={
               aiWritingEnabled
@@ -522,6 +543,7 @@ export const CVStudioView: React.FC = () => {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
       />
+      {aiProcessingModal}
     </Reveal>
   );
 };

@@ -134,6 +134,38 @@ describe('B.4 — the profile persona and the goal persist', () => {
     assert.equal(data?.target_role, 'Frontend Engineer');
   });
 
+  test('the onboarding step and skip state persist across reloads', async () => {
+    const progress = await api('PATCH', '/api/profile', {
+      token: user.token,
+      body: { onboardingStatus: 'started', onboardingStep: 7, onboardingCompleted: false },
+    });
+    assert.equal(progress.status, 200);
+
+    const started = await admin
+      .from('profiles')
+      .select('onboarding_status, onboarding_step, onboarding_completed')
+      .eq('id', user.id)
+      .single();
+    assert.equal(started.data?.onboarding_status, 'started');
+    assert.equal(started.data?.onboarding_step, 7);
+    assert.equal(started.data?.onboarding_completed, false);
+
+    const skipped = await api('PATCH', '/api/profile', {
+      token: user.token,
+      body: { onboardingStatus: 'skipped', onboardingStep: 7, onboardingCompleted: true },
+    });
+    assert.equal(skipped.status, 200);
+    const resumed = await admin
+      .from('profiles')
+      .select('onboarding_status, onboarding_step, onboarding_completed')
+      .eq('id', user.id)
+      .single();
+    assert.equal(resumed.data?.onboarding_status, 'skipped');
+    assert.equal(resumed.data?.onboarding_step, 7);
+    // Skipping is persisted separately from completion; the legacy flag stays false.
+    assert.equal(resumed.data?.onboarding_completed, false);
+  });
+
   test('the target role, the years of experience and the headline persist', async () => {
     // years_of_experience is a real `text` column in the live schema, but
     // it was never selected, so it could not be read back.
@@ -334,7 +366,7 @@ describe('B.4 — a CV snapshot can be created by a user with no CV row', () => 
       token: user.token,
       body: { cvId, name: 'v1', profileJson: { fullName: 'B4' }, atsAnalysis: { overallScore: 91 } },
     });
-    assert.equal(version.status, 201);
+    assert.equal(version.status, 201, JSON.stringify(version.body));
     assert.equal(version.body?.version?.cvId, cvId);
 
     const { data } = await admin
@@ -384,7 +416,7 @@ describe('B.4 — a roadmap task added from the UI reaches the database', () => 
         ],
       },
     });
-    assert.equal(roadmap.status, 201);
+    assert.equal(roadmap.status, 201, JSON.stringify(roadmap.body));
     const phaseId = roadmap.body?.roadmap?.phases?.[0]?.id;
     const milestoneId = roadmap.body?.roadmap?.phases?.[0]?.milestones?.[0]?.id;
 

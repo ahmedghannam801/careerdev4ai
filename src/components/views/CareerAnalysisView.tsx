@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { Reveal } from '../motion/Motion';
+import { useAIProcessing } from '../../lib/useAIProcessing';
 
 interface CareerAnalysisViewProps {
   onNavigate: (view: string) => void;
@@ -28,6 +29,23 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
     privacyPreferences, t,} = useCareer();
   const aiAnalysisEnabled =
     aiPreferences.recommendationsEnabled && privacyPreferences.shareAnalyticsWithAi;
+  const { run: runAIProcessing, isRunning: isAnalysisRunning, modal: aiProcessingModal } = useAIProcessing();
+
+  /**
+   * The gap analysis reads the candidate's records and answers with an
+   * analysis. It writes nothing, so the request can be stopped while the
+   * model is working and a late answer is discarded.
+   */
+  const handleRunAnalysis = async () => {
+    if (isAnalysisRunning || isAnalyzing) return;
+    await runAIProcessing({
+      title: t('Career Analysis'),
+      stage: t('Comparing your current state with the target role…'),
+      failureMessage: t('The career analysis could not be completed. Please try again.'),
+      run: (signal) => refreshAiAnalysis(signal),
+      onSuccess: () => undefined,
+    });
+  };
 
   return (
     <Reveal className="space-y-8">
@@ -42,7 +60,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
 
         <div className="flex items-center gap-3">
           <button
-            onClick={refreshAiAnalysis}
+            onClick={handleRunAnalysis}
             disabled={isAnalyzing || !aiAnalysisEnabled}
             title={
               aiAnalysisEnabled
@@ -234,6 +252,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
           </div>
         </div>
       </div>
+      {aiProcessingModal}
     </Reveal>
   );
 };

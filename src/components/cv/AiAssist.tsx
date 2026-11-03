@@ -111,9 +111,17 @@ export const AiAssist: React.FC<AiAssistProps> = ({
   const [tone, setTone] = useState<CvAssistTone>('professional');
   const [length, setLength] = useState<CvAssistLength>('medium');
   const attemptRef = useRef(0);
+  // The request that is currently in flight, so closing the panel really
+  // stops it instead of only hiding the answer.
+  const controllerRef = useRef<AbortController | null>(null);
+  const attemptRunRef = useRef(0);
 
   const run = useCallback(
     async (attempt: number) => {
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      attemptRunRef.current = attempt;
       setIsWorking(true);
       setError(null);
       try {
@@ -128,11 +136,16 @@ export const AiAssist: React.FC<AiAssistProps> = ({
           length,
           language: aiPreferences.preferredLanguage,
           attempt,
-        });
+        }, { signal: controller.signal });
+        // A late answer from a request the candidate already replaced or
+        // cancelled never reaches the field.
+        if (attemptRunRef.current !== attempt || controller.signal.aborted) return;
         setDraft(response.text);
         setDraftBullets(response.bullets);
         setGroundingNote(response.groundingNote);
       } catch (requestError) {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        if (attemptRunRef.current !== attempt) return;
         // The server's own message is shown. Nothing is written, and the
         // candidate is not left with a blank field wondering what happened.
         setDraft('');
@@ -144,7 +157,10 @@ export const AiAssist: React.FC<AiAssistProps> = ({
             : t('The AI assistant is unavailable right now. Nothing was written.')
         );
       } finally {
-        setIsWorking(false);
+        if (controllerRef.current === controller) {
+          controllerRef.current = null;
+          setIsWorking(false);
+        }
       }
     },
     [
@@ -183,7 +199,13 @@ export const AiAssist: React.FC<AiAssistProps> = ({
   };
 
   const handleCancel = () => {
+    // Closing the panel stops the request that is still running, so a late
+    // answer cannot appear the next time the panel is opened.
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    attemptRunRef.current += 1;
     setIsOpen(false);
+    setIsWorking(false);
     setDraft('');
     setDraftBullets([]);
     setGroundingNote(null);

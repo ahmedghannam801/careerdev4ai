@@ -273,6 +273,9 @@ async function main() {
     // The project advisor: what it recommends and what it finds wrong with
     // the projects the candidate already has. Pure.
     join(TESTS_DIR, 'project-recommendation.test.ts'),
+    // The advisor's two AI requests: the abort signal they carry and the
+    // deterministic answer with its fallback reason. Pure.
+    join(TESTS_DIR, 'project-advisor-ai.test.ts'),
     // The URL is the state of the application, so a refresh reopens the same
     // page. Pure.
     join(TESTS_DIR, 'routing.test.ts'),
@@ -303,6 +306,17 @@ async function main() {
     // The same two tools against the running API: a real user's headline
     // options and a link that survives a reload.
     join(TESTS_DIR, 'career-tools.test.ts'),
+    // Saved application packages are persisted as owner-scoped records.
+    join(TESTS_DIR, 'application-packages.test.ts'),
+    // Persisted onboarding status distinguishes resumable, skipped and completed.
+    join(TESTS_DIR, 'onboarding.test.ts'),
+    // The public legal document versions and the server's acceptance predicate.
+    // Pure; the user-provided legal copy remains an operator TODO.
+    join(TESTS_DIR, 'legal.test.ts'),
+    // The shared AI request lifecycle: a late answer never reaches the
+    // interface, a save that started is not cancelled, and a failed save is
+    // reported. Pure.
+    join(TESTS_DIR, 'ai-processing-contract.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length
@@ -340,7 +354,10 @@ async function main() {
     log(`starting an isolated server on port ${sharedPort}`);
     server = await startServer({
       port: sharedPort,
-      env: { ...env, ADMIN_SCHEDULER_DISABLED: 'true' },
+      env: {
+        ...env,
+        ADMIN_SCHEDULER_DISABLED: 'true',
+      },
     });
     activeServer = server;
     log(`server ready at ${server.baseUrl}`);

@@ -16,6 +16,15 @@ const DEFAULT_SITE_ORIGIN = 'https://careerdev4ai.pages.dev';
 
 export const SITE_NAME = 'CareerDev4AI';
 
+/**
+ * The other written forms of the name, for the `alternateName` property.
+ *
+ * A search engine that has seen "Career Dev 4AI" in a query needs to be able to
+ * match it to this site. The list holds only spellings of the same product —
+ * never a different product, and never a name the site does not use.
+ */
+export const SITE_ALTERNATE_NAMES = ['Career Dev 4AI', 'CareerDev4AI Career Platform'] as const;
+
 /** The one-line description of the product, used where no better one exists. */
 export const SITE_TAGLINE = 'Your personal career operating system';
 
@@ -41,6 +50,19 @@ export function siteOrigin(): string {
   const configured = (process.env.SITE_ORIGIN ?? '').trim();
   const origin = configured.length > 0 ? configured : DEFAULT_SITE_ORIGIN;
   return origin.replace(/\/+$/, '');
+}
+
+/**
+ * The canonical address of the site's home page, with its trailing slash.
+ *
+ * The home page is the one URL that is written with a trailing slash, so this
+ * is the form used by the canonical link, by `og:url` and by the `url` of the
+ * `WebSite` schema. Using one form everywhere is what stops a search engine
+ * from treating `https://host` and `https://host/` as two different addresses
+ * for the same site — and from showing the site name under either one.
+ */
+export function siteUrl(): string {
+  return `${siteOrigin()}/`;
 }
 
 /**

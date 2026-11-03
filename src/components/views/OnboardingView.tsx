@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Sparkles, Target, BarChart3, BookOpen, FolderGit2, HeartHandshake, FileText, ArrowRight, Loader2 } from 'lucide-react';
+import { Check, Sparkles, Target, BarChart3, BookOpen, FolderGit2, HeartHandshake, FileText, ArrowRight, Loader2, Search, Send, Bot, TrendingUp, Settings } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CareerState, CareerGoal } from '../../types/career';
 import { Reveal } from '../motion/Motion';
@@ -29,6 +29,11 @@ const STEPS = [
   { id: 'learning', title: 'Learning', icon: BookOpen },
   { id: 'projects', title: 'Projects & volunteering', icon: FolderGit2 },
   { id: 'cv', title: 'Your CV', icon: FileText },
+  { id: 'jobs', title: 'Find jobs', icon: Search },
+  { id: 'applications', title: 'Applications and cover letters', icon: Send },
+  { id: 'assistant', title: 'AI assistant', icon: Bot },
+  { id: 'progress', title: 'Progress and next actions', icon: TrendingUp },
+  { id: 'settings', title: 'Notifications, settings and help', icon: Settings },
 ] as const;
 
 const PERSONAS = [
@@ -75,7 +80,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     t,
   } = useCareer();
 
-  const [step, setStep] = useState<number>(0);
+  const [step, setStep] = useState<number>(() => Math.min(profile.onboardingStep ?? 0, STEPS.length - 1));
   const [selectedPersona, setSelectedPersona] = useState<CareerState>(profile.careerState || 'working_professional');
   const [currentTitle, setCurrentTitle] = useState(profile.currentTitle || '');
   const [location, setLocation] = useState(profile.location || '');
@@ -96,6 +101,20 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   // The step index is the single source of truth for the progress bar.
   const stepCount = STEPS.length;
   const current = STEPS[Math.min(step, stepCount - 1)];
+
+  // The server is the source of truth for first-run progress. This makes the
+  // flow resumable across reloads and devices; a reopened tour can start at
+  // step zero by resetting this same persisted step.
+  useEffect(() => {
+    void updateProfile({
+      onboardingStatus: 'started',
+      onboardingStep: step,
+    }).catch(() => {
+      // The actual Continue action reports persistence errors. This best-effort
+      // write keeps back-navigation and reloads resumable without trapping the
+      // person on an informational step.
+    });
+  }, [step]);
 
   // The gap analysis, computed with the same engine the server uses.
   const gapAnalysis = useMemo(() => {
@@ -187,7 +206,11 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
       } else if (step < stepCount - 1) {
         setStep(step + 1);
       } else {
-        await updateProfile({ onboardingCompleted: true });
+        await updateProfile({
+          onboardingCompleted: true,
+          onboardingStatus: 'completed',
+          onboardingStep: stepCount - 1,
+        });
         onComplete();
       }
     } catch (error) {
@@ -200,6 +223,29 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
 
   const handleBack = () => {
     if (!isSaving && step > 0) setStep(step - 1);
+  };
+
+  const handleSkip = async () => {
+    if (isSaving) return;
+    const confirmed = window.confirm(
+      t('Skip the getting-started tour? You can restart it later from Settings.')
+    );
+    if (!confirmed) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await updateProfile({
+        onboardingCompleted: true,
+        onboardingStatus: 'skipped',
+        onboardingStep: step,
+      });
+      onComplete();
+    } catch (error) {
+      console.error('Onboarding skip could not be saved:', error);
+      setSaveError(t('We could not save this choice. Check your connection and try again.'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -644,6 +690,35 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
           </Reveal>
         )}
 
+        {step >= 10 && (
+          <Reveal onMount delay={0.04} className="space-y-5">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+                {t(current.title)}
+              </h2>
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t([
+                  'Browse the Jobs area for opportunities that fit your target role. Save roles you want to return to and compare them against your skills and CV.',
+                  'Track each application in Applications, and create a cover letter for a specific role. Keep the job description with the application so you can revisit your preparation.',
+                  'Use the AI assistant from the Copilot button when you want help planning, understanding a skill gap, or preparing career materials. Review its suggestions before using them.',
+                  'Your Dashboard and Progress views help you see completed roadmap tasks, current priorities, and practical next actions. Update progress as you build evidence.',
+                  'Notifications keep important account updates visible. Settings is where you can manage preferences and reopen this tour using “Show me around again”.',
+                ][step - 10])}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-4 text-xs text-[var(--text-secondary)]">
+              <span className="font-semibold text-[var(--text-primary)]">{t('Where to go:')}</span>{' '}
+              {t([
+                'Open Jobs from the main navigation.',
+                'Open Applications from the main navigation; cover letters are available in the application workflow.',
+                'Use the Copilot button in the app shell.',
+                'Start at Dashboard, then open Roadmap or Progress for the detailed view.',
+                'Open Notifications or Settings from the app navigation.',
+              ][step - 10])}
+            </div>
+          </Reveal>
+        )}
+
         {saveError && (
           <div className="rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/8 px-3.5 py-2.5 text-xs text-[var(--color-danger)]">
             {saveError}
@@ -660,14 +735,24 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         >
           {t('Back')}
         </button>
-        <button
-          onClick={handleNext}
-          disabled={isSaving}
-          className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
-        >
-          {isSaving ? 'Saving…' : step === stepCount - 1 ? 'Finish setup' : 'Continue'}
-          <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSkip()}
+            disabled={isSaving}
+            className="rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-secondary)] disabled:opacity-50"
+          >
+            {t('Skip tour')}
+          </button>
+          <button
+            onClick={handleNext}
+            disabled={isSaving}
+            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
+          >
+            {isSaving ? t('Saving…') : step === stepCount - 1 ? t('Finish setup') : t('Continue')}
+            <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
+          </button>
+        </div>
       </div>
     </div>
   );
