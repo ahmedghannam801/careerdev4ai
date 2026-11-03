@@ -168,7 +168,15 @@ describe('deterministic PDF parsing', () => {
     assert.equal(pdf.cv.projects.length, 1);
     assert.equal(pdf.cv.projects[0].title, 'Customer Churn Dashboard');
     assert.deepEqual(pdf.cv.projects[0].technologies, ['Python', 'SQL', 'Power BI']);
-    assert.equal(pdf.cv.projects[0].bullets.length, 1);
+    // The fixture is laid out with the host's own font, so the description may
+    // occupy one line or wrap into two depending on the platform's metrics.
+    // What the contract holds on every platform is that the description is
+    // carried as the project's bullet, not that it is one line long.
+    assert.ok(pdf.cv.projects[0].bullets.length >= 1);
+    assert.match(
+      pdf.cv.projects[0].bullets.join(' '),
+      /top three churn drivers/i
+    );
 
     assert.ok(pdf.cv.skillsList.includes('SQL'));
     assert.ok(pdf.cv.skillsList.includes('Python'));

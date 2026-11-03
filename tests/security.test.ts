@@ -399,10 +399,24 @@ describe('profile column exposure', () => {
 });
 
 describe('the CV upload format check (S-4, S-5)', () => {
+  // A dedicated identity for these checks. The upload route shares the AI
+  // request budget, and the rate-limit test above deliberately exhausts that
+  // budget for the shared user. A fresh identity starts with a fresh budget,
+  // so what is under test here is the format check and not the limiter.
+  let uploadUser: TestUser;
+
+  before(async () => {
+    uploadUser = await createTestUser('security-upload');
+  });
+
+  after(async () => {
+    await deleteTestUser(uploadUser);
+  });
+
   test('a legacy .doc upload is rejected', async () => {
     // Legacy binary .doc format is rejected; modern .docx or .pdf is required.
     const res = await uploadCv(
-      user.token,
+      uploadUser.token,
       'cv.doc',
       'application/msword'
     );
@@ -411,13 +425,13 @@ describe('the CV upload format check (S-4, S-5)', () => {
   });
 
   test('a file whose MIME type does not match its extension is rejected', async () => {
-    const res = await uploadCv(user.token, 'cv.pdf', 'text/plain');
+    const res = await uploadCv(uploadUser.token, 'cv.pdf', 'text/plain');
     assert.equal(res.status, 400);
     assert.match(res.body?.error ?? '', /Unsupported file type/);
   });
 
   test('an unknown extension is rejected', async () => {
-    const res = await uploadCv(user.token, 'cv.exe', 'application/octet-stream');
+    const res = await uploadCv(uploadUser.token, 'cv.exe', 'application/octet-stream');
     assert.equal(res.status, 400);
     assert.match(res.body?.error ?? '', /Unsupported file type/);
   });
