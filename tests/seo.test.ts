@@ -143,6 +143,42 @@ describe('the public pages', () => {
   });
 });
 
+describe('the public pages in production', () => {
+  it('forwards every public page to the application', () => {
+    // The Pages worker serves the static asset binding for every path it
+    // does not forward, and the binding answers an unknown path with the SPA
+    // shell. A public page that is registered in the application but not
+    // forwarded would therefore be published as the application shell instead
+    // of the page itself. The two lists have to stay in step.
+    const application = readFileSync(join(REPO_ROOT, 'app.ts'), 'utf-8');
+    const worker = readFileSync(join(REPO_ROOT, 'worker', 'index.ts'), 'utf-8');
+
+    const registered = [
+      ...application.matchAll(/app\.get\('([^']+)',\s*publicPageHandler\)/g),
+    ].map((match) => match[1]);
+
+    assert.ok(registered.length >= 8, `expected the public page routes to be found, found ${registered.length}`);
+
+    for (const route of registered) {
+      // A parameterised route is covered by its prefix in the worker.
+      const prefix = route.split('/')[1];
+      assert.ok(
+        worker.includes(`'${route}'`) || worker.includes(`'/${prefix}'`),
+        `the Pages worker does not forward the public page ${route}`
+      );
+    }
+
+    // The published legal documents are forwarded by name, so a document that
+    // is published must not be answered with the application shell.
+    for (const legalPath of ['/privacy', '/terms']) {
+      assert.ok(
+        worker.includes(`'${legalPath}'`),
+        `the Pages worker does not forward ${legalPath}`
+      );
+    }
+  });
+});
+
 describe('the sitemap', () => {
   it('lists only public URLs', async () => {
     const entries = await collectSitemapEntries();

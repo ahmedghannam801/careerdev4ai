@@ -12,9 +12,10 @@
  *      exactly as it does under `npm run dev` / `npm start` / the test suite.
  *
  *      The public SEO pages (`/about`, `/careers`, `/learning`,
- *      `/opportunities`), the sitemap and `robots.txt` are forwarded the same
- *      way: they are server-rendered from live catalogue data, so they must
- *      not be a build-time snapshot of the asset binding.
+ *      `/opportunities`), the legal documents (`/privacy`, `/terms`), the
+ *      sitemap and `robots.txt` are forwarded the same way: they are
+ *      server-rendered from live catalogue data, so they must not be a
+ *      build-time snapshot of the asset binding.
  *
  *   2. Serve everything else from the Pages static asset binding, falling back
  *      to `index.html` for client-side routes. The SPA uses hash routing
@@ -68,7 +69,11 @@ const PUBLIC_PAGE_PREFIXES = ['/careers', '/learning', '/opportunities'] as cons
 
 function isSeoPath(pathname: string): boolean {
   if (pathname === '/sitemap.xml' || pathname === '/robots.txt') return true;
-  if (pathname === '/about' || pathname === '/privacy') return true;
+  // The legal and policy documents are server-rendered like every other
+  // public page. The published Terms must be reachable at their own address:
+  // a request that falls through to the asset binding would answer with the
+  // SPA shell instead of the document.
+  if (pathname === '/about' || pathname === '/privacy' || pathname === '/terms') return true;
   // The asset binding answers the `.html` path of the verification file with
   // a permanent redirect. Google asks for that exact path, so the request is
   // answered by the application instead.
