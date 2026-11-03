@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   BookOpen,
   Briefcase,
@@ -80,10 +81,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     careerHealth,
     cvVersions,
     learningRecommendations,
+    visibleNotifications,
+    markNotificationRead,
+    recordNotificationClick,
     t,
   } = useCareer();
 
   const [showDetails, setShowDetails] = useState(false);
+
+  // A critical announcement is the one communication that may step in front of
+  // the dashboard. It is derived from the real inbox (and respects the device's
+  // in-app notification preference), and it disappears once it is read.
+  const criticalNotice = visibleNotifications.find(
+    (notification) => !notification.read && notification.priority === 'critical'
+  );
 
   const allTasks = roadmapPhases.flatMap((phase) =>
     phase.milestones.flatMap((milestone) => milestone.tasks)
@@ -165,6 +176,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
   return (
     <div className="space-y-6">
+      {/* A critical announcement is the only thing allowed above the greeting. */}
+      {criticalNotice && (
+        <section
+          role="alert"
+          aria-labelledby="dashboard-critical-announcement"
+          className="flex flex-col gap-3 rounded-2xl border border-[var(--color-danger)]/40 bg-[var(--color-danger)]/5 p-4 sm:flex-row sm:items-start sm:justify-between"
+        >
+          <div className="flex min-w-0 items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-danger)]" />
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-danger)]">
+                {t('Critical announcement')}
+              </div>
+              <h2
+                id="dashboard-critical-announcement"
+                className="mt-0.5 text-sm font-bold text-[var(--text-primary)]"
+              >
+                {criticalNotice.title}
+              </h2>
+              {criticalNotice.message && (
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {criticalNotice.message}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {criticalNotice.linkAction && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await recordNotificationClick(criticalNotice.id);
+                  onNavigate(criticalNotice.linkAction!);
+                }}
+                className="inline-flex items-center gap-1 rounded-lg bg-[var(--color-danger)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+              >
+                {t('See details')}
+                <ArrowRight className="h-3 w-3 rtl:rotate-180" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => markNotificationRead(criticalNotice.id)}
+              className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              {t('Dismiss')}
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Greeting: one sentence, one target. */}
       <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>

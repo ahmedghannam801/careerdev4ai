@@ -152,6 +152,7 @@ export const commonAr: Record<string, string> = {
 
   // Priorities
   'Critical': 'حرج',
+  'Critical announcement': 'إعلان حرج',
   'High': 'مرتفع',
   'Medium': 'متوسط',
   'Low': 'منخفض',
