@@ -20,6 +20,7 @@ import { adminAr } from './parts/admin.ts';
 import { analyticsAr } from './parts/analytics.ts';
 import { appShellAr } from './parts/appShell.ts';
 import { applicationsAr } from './parts/applications.ts';
+import { backgroundJobsAr } from './parts/backgroundJobs.ts';
 import { applicationWorkflowAr } from './parts/applicationWorkflow.ts';
 import { commonAr } from './parts/common.ts';
 import { careerAr } from './parts/career.ts';
@@ -47,6 +48,7 @@ export const AR_STRINGS: Record<string, string> = {
   ...dashboardAr,
   ...landingAr,
   ...applicationsAr,
+  ...backgroundJobsAr,
   ...applicationWorkflowAr,
   ...careerAr,
   ...roadmapAr,

@@ -25,6 +25,13 @@ import {
   type DocumentFormat,
 } from './server/cv/documentExtraction.ts';
 import { parseStructuredCv } from './server/cv/parseStructuredCv.ts';
+// The ATS evaluation lives in its own module because the background task runs
+// the same code. One implementation means the score shown in CV Studio and the
+// score stored on the version can never drift apart.
+import { runAtsAnalysis, validateAtsPayload } from './server/cv/atsAnalysis.ts';
+import { registerBackgroundJobRoutes } from './server/trigger/routes.ts';
+import { boundedList } from './server/ai/boundedList.ts';
+import { generateCoverLetter } from './server/cv/coverLetter.ts';
 
 // Express request augmentation.
 //
@@ -515,6 +522,13 @@ app.use((req: Request, res: Response, next: () => void) => {
   next();
 });
 
+// Background jobs (Trigger.dev).
+//
+// The feature is a coherent unit — the API that starts a task, the durable
+// record of the job and the client that talks to the platform — so it lives in
+// its own module and is mounted here.
+registerBackgroundJobRoutes(app);
+
 // Server-side scheduler tick.
 //
 // Announcements scheduled for a future time must publish even when no
@@ -732,43 +746,6 @@ function isNumberInRange(value: unknown, min = 0, max = 100): value is number {
   );
 }
 
-function validateAtsPayload(value: unknown): string[] {
-  if (!isJsonObject(value)) return ['response is not an object'];
-  const errors: string[] = [];
-  if (!isNumberInRange(value.overallScore)) errors.push('overallScore');
-  if (!isJsonObject(value.breakdown)) {
-    errors.push('breakdown');
-  } else {
-    for (const key of [
-      'keywordsMatch',
-      'impactAndMetrics',
-      'formattingStructure',
-      'experienceRelevance',
-    ]) {
-      if (!isNumberInRange(value.breakdown[key])) errors.push(`breakdown.${key}`);
-    }
-  }
-  for (const key of ['matchedKeywords', 'missingKeywords']) {
-    if (!isStringArray(value[key])) errors.push(key);
-  }
-  if (!Array.isArray(value.actionableImprovements)) {
-    errors.push('actionableImprovements');
-  } else {
-    value.actionableImprovements.forEach((entry, index) => {
-      if (!isJsonObject(entry)) {
-        errors.push(`actionableImprovements[${index}]`);
-        return;
-      }
-      for (const key of ['section', 'currentText', 'suggestedText', 'reason']) {
-        if (typeof entry[key] !== 'string') {
-          errors.push(`actionableImprovements[${index}].${key}`);
-        }
-      }
-    });
-  }
-  return errors;
-}
-
 function validateCareerAnalysisPayload(value: unknown): string[] {
   if (!isJsonObject(value)) return ['response is not an object'];
   const errors: string[] = [];
@@ -846,16 +823,6 @@ function validateSummaryPayload(value: unknown): string[] {
     return ['suggestedSummary'];
   }
   return [];
-}
-
-function validateCoverLetterPayload(value: unknown): string[] {
-  if (!isJsonObject(value)) return ['response is not an object'];
-  const errors: string[] = [];
-  if (typeof value.coverLetter !== 'string' || value.coverLetter.trim().length < 100) {
-    errors.push('coverLetter');
-  }
-  if (!isStringArray(value.keyHighlights)) errors.push('keyHighlights');
-  return errors;
 }
 
 // Health Check
@@ -1531,33 +1498,10 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
       )
     );
 
-    // Run ATS diagnostic
-    const atsPrompt = `Evaluate this parsed CV for the target role "${targetRoleTitle}".
-JSON Schema:
-{
-  "overallScore": number (0-100),
-  "breakdown": {
-    "keywordsMatch": number,
-    "impactAndMetrics": number,
-    "formattingStructure": number,
-    "experienceRelevance": number
-  },
-  "matchedKeywords": [string],
-  "missingKeywords": [string],
-  "actionableImprovements": [
-    {
-      "section": string,
-      "currentText": string,
-      "suggestedText": string,
-      "reason": string
-    }
-  ]
-}
-Parsed CV:
-${JSON.stringify(parsedCV)}
-${groundingRules()}
-Return only valid JSON.`;
-
+    // Run ATS diagnostic.
+    //
+    // The evaluation itself lives in server/cv/atsAnalysis.ts because the
+    // background task runs the same code.
     let atsAnalysis: any = null;
     // The ATS pass draws its own unit from the daily budget. When the
     // allowance is spent, the provider is unavailable or the provider returns
@@ -1566,21 +1510,16 @@ Return only valid JSON.`;
     // real retry through /api/optimize-cv.
     const atsBudget = tryConsumeAiBudget(req.authUser!.id);
     if (process.env.GEMINI_API_KEY && atsBudget) {
-      try {
-        const atsRes = await ai.models.generateContent({
-          model: getGeminiModel(),
-          contents: atsPrompt,
-          config: { responseMimeType: 'application/json' },
-        });
-        atsAnalysis = JSON.parse(atsRes.text || '{}');
-        const atsErrors = validateAtsPayload(atsAnalysis);
-        if (atsErrors.length > 0) {
-          throw new Error(`Invalid ATS payload: ${atsErrors.join(', ')}`);
-        }
-      } catch (e) {
-        console.warn('ATS analysis unavailable:', e);
-        if (isQuotaError(e)) refundDailyAiBudget(req.authUser!.id);
-        atsAnalysis = null;
+      const outcome = await runAtsAnalysis({
+        parsedCv: parsedCV,
+        targetRoleTitle,
+        ai,
+        model: getGeminiModel(),
+      });
+      atsAnalysis = outcome.analysis;
+      if (!atsAnalysis) {
+        console.warn('ATS analysis unavailable:', outcome.reason);
+        if (isQuotaError(outcome.error)) refundDailyAiBudget(req.authUser!.id);
       }
     }
 
@@ -2139,34 +2078,7 @@ ${groundingRules()}
 app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { company, jobTitle, jobDescription, candidateName, experiences, skills, projects, tone } = req.body;
-    // Everything that reaches the model is bounded.
-    const safeCompany = str(company, 200) ?? 'the company';
-    const safeJobTitle = str(jobTitle, 200) ?? 'the role';
-    const safeJobDescription = str(jobDescription, 4000) ?? 'Standard requirements';
-    const safeCandidateName = str(candidateName, 200) ?? 'Candidate';
-    const safeTone = str(tone, 80) ?? 'Professional & Confident';
-    const safeExperiences = boundedList(experiences, 20, 400);
-    const safeSkills = boundedList(skills, 40, 120);
-    const safeProjects = boundedList(projects, 20, 400);
     const language = normalizeAiLanguage(req.body?.language);
-    const prompt = `Write a tailored, compelling cover letter for:
-Candidate: ${safeCandidateName}
-${aiLanguageInstruction(language)}
-Company: ${safeCompany}
-Role: ${safeJobTitle}
-Tone: ${safeTone}
-Job Requirements/Context: ${safeJobDescription}
-Candidate Relevant Background:
-- Experiences: ${JSON.stringify(safeExperiences)}
-- Core Skills: ${JSON.stringify(safeSkills)}
-- Key Projects: ${JSON.stringify(safeProjects)}
-
-Rules:
-1. Ground every claim strictly in candidate's provided experiences and projects.
-2. Structure: Strong hook expressing excitement for ${safeCompany}, high-relevance achievement showcase directly matching the job, and proactive closing.
-3. Keep it under 350 words.
-${groundingRules()}
-4. Return JSON: { "coverLetter": string, "keyHighlights": [string] }`;
 
     // No model on this server means no cover letter can be produced. This is
     // checked before the daily budget is touched, so a missing key is never
@@ -2179,37 +2091,46 @@ ${groundingRules()}
     if (blocked) return blocked;
 
     try {
-      const response = await ai.models.generateContent({
+      // The letter is written by the shared module, which is also what the
+      // background task uses. One implementation means the letter the button
+      // produces and the letter the task produces are the same letter.
+      const result = await generateCoverLetter({
+        userId: req.authUser!.id,
+        candidate: {
+          company,
+          jobTitle,
+          jobDescription,
+          candidateName,
+          experiences,
+          skills,
+          projects,
+          tone,
+          language,
+        },
+        ai,
         model: getGeminiModel(),
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
       });
-      const payload = JSON.parse(response.text || '{}');
-      const payloadErrors = validateCoverLetterPayload(payload);
-      if (payloadErrors.length > 0) {
-        console.error('Cover letter returned an invalid payload:', payloadErrors);
-        return res.status(503).json({
-          error:
-            'Cover letter generation returned an invalid response. No cover letter was accepted; please try again shortly.',
-        });
+
+      if (!result.ok) {
+        if (result.reason === 'invalid_response') {
+          return res.status(503).json({
+            error:
+              'Cover letter generation returned an invalid response. No cover letter was accepted; please try again shortly.',
+          });
+        }
+        return respondAiFailure(
+          res,
+          new Error('The model did not produce a cover letter.'),
+          'Cover letter generation is temporarily unavailable. No cover letter was generated; please try again shortly.',
+          req.authUser!.id
+        );
       }
 
-      // A cover letter is written to be sent to an employer, so a claim the
-      // candidate cannot stand behind is removed before the user ever sees
-      // it, and they are told it happened.
-      if (typeof payload.coverLetter === 'string') {
-        const grounding = await buildGroundingProfileForUser(req.authUser!.id);
-        const result = stripUngroundedSentences(payload.coverLetter, grounding);
-        if (result.removed.length > 0) {
-          payload.coverLetter = result.text;
-          payload.groundingNotes = {
-            removedSuggestions: result.removed.map((claim) => claim.claim),
-            message:
-              'Part of the letter mentioned details that are not in your profile and was removed. Add the detail to your profile first if you want it used.',
-          };
-        }
-      }
-      return res.json(payload);
+      return res.json({
+        coverLetter: result.coverLetter,
+        keyHighlights: result.keyHighlights,
+        ...(result.groundingNotes ? { groundingNotes: result.groundingNotes } : {}),
+      });
     } catch (e) {
       // A cover letter full of claims the candidate never supplied is the most
       // dangerous fallback in the product: it could be sent to an employer.
@@ -2932,29 +2853,6 @@ const uuidList = (v: unknown, maxItems: number): string[] =>
   Array.isArray(v)
     ? v.filter((item): item is string => typeof item === 'string' && isUuid(item)).slice(0, maxItems)
     : [];
-
-/**
- * Bounds a list that is about to be embedded in an AI prompt.
- *
- * The count and each entry's length are both capped, so a single request
- * cannot push an unbounded payload into the model's context and consume the
- * project's daily quota.
- */
-const boundedList = (value: unknown, maxItems: number, maxItemLength: number): unknown[] => {
-  if (!Array.isArray(value)) return [];
-  return value.slice(0, maxItems).map((entry) => {
-    if (typeof entry === 'string') return entry.slice(0, maxItemLength);
-    if (entry && typeof entry === 'object') {
-      // Keep the shape but bound every string inside it.
-      const bounded: Record<string, unknown> = {};
-      for (const [key, item] of Object.entries(entry as Record<string, unknown>)) {
-        bounded[key] = typeof item === 'string' ? item.slice(0, maxItemLength) : item;
-      }
-      return bounded;
-    }
-    return entry;
-  });
-};
 
 /**
  * Accepts only absolute http(s) URLs for fields that are rendered as links.

@@ -342,6 +342,11 @@ async function main() {
     join(TESTS_DIR, 'career-tools.test.ts'),
     // Saved application packages are persisted as owner-scoped records.
     join(TESTS_DIR, 'application-packages.test.ts'),
+    // Background jobs: a request without a session is refused, a job belongs
+    // to the candidate who asked for it, the same request twice is one job, a
+    // job that could not start says why, and a finished job survives a
+    // refresh.
+    join(TESTS_DIR, 'background-jobs.test.ts'),
     // Persisted onboarding status distinguishes resumable, skipped and completed.
     join(TESTS_DIR, 'onboarding.test.ts'),
     // The public legal document versions and the server's acceptance predicate.

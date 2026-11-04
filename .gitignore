@@ -27,3 +27,5 @@ local_db/
 
 # Local Supabase CLI state (project ref, pooler URL — machine specific)
 supabase/.temp/
+
+.trigger

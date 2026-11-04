@@ -17,6 +17,7 @@ import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAna
 import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
+import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
 
 export const CVStudioView: React.FC = () => {
   const {
@@ -184,6 +185,11 @@ export const CVStudioView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* The background jobs of this candidate. The list is read back from the
+          server, so a CV that finished while the tab was closed is still
+          here when the studio is opened again. */}
+      <BackgroundJobsPanel />
 
       {/* A failed audit is shown where the user started it, with the real
           provider reason and any retry window. It is never only logged. */}
