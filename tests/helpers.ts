@@ -10,7 +10,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
 import { loadTestEnv } from './env.mjs';
-import { deleteTestIdentity } from './cleanup.mjs';
+import { deleteTestIdentity, runEmailPrefix } from './cleanup.mjs';
 import { PRIVACY_VERSION, TERMS_VERSION } from '../shared/legal.ts';
 
 // The environment must be loaded before the clients are constructed: the
@@ -117,7 +117,9 @@ export async function createTestUser(
   label: string,
   options: CreateTestUserOptions = {}
 ): Promise<TestUser> {
-  const email = `cp-test-${label}-${randomBytes(6).toString('hex')}@example.invalid`;
+  // The identity belongs to this run's namespace, so a run never removes the
+  // data of a run that is executing at the same time.
+  const email = `${runEmailPrefix()}${label}-${randomBytes(6).toString('hex')}@example.invalid`;
   const password = `Tst-${randomBytes(12).toString('hex')}Aa1!`;
 
   const { data, error } = await withTransientRetry('createTestUser', () =>

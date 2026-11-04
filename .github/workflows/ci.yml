@@ -5,6 +5,20 @@ on:
     branches: [main, master, 'audit/**']
   pull_request:
 
+# One run at a time.
+#
+# The suite runs against the shared Supabase project, and the tables it writes
+# to — announcements, the delivery ledger, the scheduler and the rate limits —
+# are the same ones for every run. Two runs that overlap disturb each other
+# there, and the second one fails for reasons that have nothing to do with the
+# commit under test. That is what made four consecutive pushes red.
+#
+# `cancel-in-progress: false` queues a run instead of starting it alongside the
+# previous one, so a run never leaves half its work behind.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   verify:
     runs-on: ubuntu-latest

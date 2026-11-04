@@ -21,12 +21,15 @@
 //
 // One run at a time, on every machine:
 //
-//   The suite runs against the shared Supabase project, and two runs overlap
-//   whether they are on the same machine or not — a local run and a CI run at
-//   the same time write to the same announcement, delivery-ledger, scheduler
-//   and rate-limit tables. The second run then fails for reasons that have
-//   nothing to do with the code under test. Wait for a run to finish before
-//   starting the next one.
+//   The suite runs against the shared Supabase project. Every identity this
+//   run creates carries this run's id, so two runs can never remove each
+//   other's identities — the failure that used to make an overlapping CI run
+//   fail for reasons that had nothing to do with the commit under test.
+//
+//   The tables the suite writes to — announcements, the delivery ledger, the
+//   scheduler and the rate limits — are still shared, so two runs can still
+//   disturb each other there. The workflow serialises its own runs, and a
+//   local run should wait for a CI run to finish before it starts.
 //
 // This file is plain ESM JavaScript: it must be runnable before any TypeScript
 // tooling is known to be healthy, so that a loader problem is reported as a
@@ -35,13 +38,17 @@
 import { spawn } from 'child_process';
 import { readFileSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
+import { randomBytes } from 'crypto';
 import { setTimeout as sleep } from 'timers/promises';
 import { loadTestEnv, REPO_ROOT } from './env.mjs';
 import { startServer, findFreePort, resolveTsxLoaderUrl } from './server-harness.mjs';
 import {
   createAdminClient,
   deleteAllTestIdentities,
+  deleteTestIdentities,
   listTestIdentities,
+  listForeignTestIdentities,
+  listStaleTestIdentities,
   deleteSkillsById,
   listSkillIds,
   removeTestStorageFolders,
@@ -205,12 +212,26 @@ async function main() {
 
   admin = createAdminClient(env);
 
-  // A previous run may have been interrupted. Sweep before starting so the
-  // suite starts from a clean slate.
+  // This run's namespace. Every identity the run creates carries it, so two
+  // runs against the same database cannot remove each other's data.
+  //
+  // The id is set before anything reads it, and it is inherited by the test
+  // files this run spawns, so the runner and the tests agree on the namespace.
+  if (!process.env.TEST_RUN_ID) {
+    process.env.TEST_RUN_ID = randomBytes(4).toString('hex');
+  }
+  log(`run namespace ${process.env.TEST_RUN_ID}`);
+
+  // A previous run may have been interrupted and left identities behind. Only
+  // the ones that no live run can be using are swept: an identity that is
+  // younger than the maximum run length may belong to a run that is executing
+  // right now, and removing it would break that run.
   try {
-    const stale = await listTestIdentities(admin);
+    const stale = await listStaleTestIdentities(admin);
     if (stale.length > 0) {
-      log(`sweeping ${stale.length} leftover test identit${stale.length === 1 ? 'y' : 'ies'} from an earlier run`);
+      log(`sweeping ${stale.length} abandoned test identit${stale.length === 1 ? 'y' : 'ies'} from an interrupted run`);
+      const removedIds = await deleteTestIdentities(admin, stale);
+      createdUserIds.push(...removedIds);
     }
     skillIdsBefore = await listSkillIds(admin);
     const removedIds = await deleteAllTestIdentities(admin);
@@ -449,6 +470,9 @@ async function main() {
   // Give a just-deleted identity a moment to disappear from the auth list.
   await sleep(500);
   try {
+    // Only this run's own identities are checked. An identity that belongs to
+    // another run is that run's business: it may be in the middle of a test
+    // there, and deleting it or failing because of it would break that run.
     let remaining = await listTestIdentities(admin);
     if (remaining.length > 0) {
       // One more sweep before the run is failed: an identity can survive the
@@ -464,6 +488,16 @@ async function main() {
       exitCode = exitCode === 0 ? 1 : exitCode;
     } else {
       log('no test identities remain');
+    }
+
+    // Identities from another run are reported, never deleted. An abandoned
+    // one is swept at the start of a later run; a live one belongs to a run
+    // that is executing right now.
+    const foreign = await listForeignTestIdentities(admin);
+    if (foreign.length > 0) {
+      log(
+        `${foreign.length} test identit${foreign.length === 1 ? 'y' : 'ies'} belong to another run and were left untouched`
+      );
     }
 
     // A bucket folder whose owner no longer exists is unreachable by any

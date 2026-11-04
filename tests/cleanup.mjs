@@ -30,9 +30,46 @@
 //                            after the run.
 
 import { createClient } from '@supabase/supabase-js';
+import { randomBytes } from 'node:crypto';
 
 /** Prefix every test identity's email carries. Nothing else is ever removed. */
 export const TEST_EMAIL_PREFIX = 'cp-test-';
+
+/**
+ * How long an identity may exist before it is treated as abandoned residue.
+ *
+ * A run that is still going on cannot have created an identity older than
+ * this: the workflow gives a run twenty minutes, and a local run finishes in
+ * about ten. So anything older belongs to a run that was interrupted, and an
+ * identity younger than this may still belong to a run that is in progress.
+ */
+export const STALE_IDENTITY_AGE_MS = 60 * 60 * 1000;
+
+/**
+ * The namespace of the run that is executing right now.
+ *
+ * Every identity this run creates carries the run id, so two runs against the
+ * same database can never remove each other's data. That matters: the suite
+ * deletes the identities it finds at the end of a run, and before this
+ * existed, two runs that overlapped — two CI runs, or a CI run and a local
+ * run — deleted each other's identities in the middle of their own tests.
+ * The result was a red CI with failures that had nothing to do with the
+ * commit under test.
+ *
+ * The id is read from the environment when there is one, so the runner's own
+ * process and the test files it spawns agree on it.
+ */
+export function testRunId() {
+  if (!process.env.TEST_RUN_ID) {
+    process.env.TEST_RUN_ID = randomBytes(4).toString('hex');
+  }
+  return process.env.TEST_RUN_ID;
+}
+
+/** The email prefix of the current run's identities. */
+export function runEmailPrefix() {
+  return `${TEST_EMAIL_PREFIX}${testRunId()}-`;
+}
 
 /** The CV storage bucket the application uses. */
 const CV_BUCKET = 'cv-files';
@@ -78,11 +115,15 @@ export function createAdminClient(env) {
 }
 
 /**
- * Lists every Supabase Auth identity whose email carries the test prefix.
+ * Lists the Supabase Auth identities whose email carries a prefix.
  *
  * Pagination is handled: the list is not capped at one page.
+ *
+ * The prefix defaults to the current run's namespace, so a run only ever sees
+ * the identities it created. `created_at` is returned so a caller can tell an
+ * abandoned identity from one a concurrent run is still using.
  */
-export async function listTestIdentities(admin) {
+export async function listTestIdentities(admin, prefix = runEmailPrefix()) {
   const found = [];
   let page = 1;
   let sawFullPage;
@@ -94,8 +135,8 @@ export async function listTestIdentities(admin) {
     }
     const users = data?.users ?? [];
     for (const user of users) {
-      if (!user.email || !user.email.startsWith(TEST_EMAIL_PREFIX)) continue;
-      found.push({ id: user.id, email: user.email });
+      if (!user.email || !user.email.startsWith(prefix)) continue;
+      found.push({ id: user.id, email: user.email, createdAt: user.created_at ?? null });
     }
     sawFullPage = users.length === 200;
     page += 1;
@@ -105,11 +146,46 @@ export async function listTestIdentities(admin) {
 }
 
 /**
- * Deletes every test identity and everything it owns.
+ * Lists the test identities that belong to some OTHER run.
+ *
+ * They are never deleted by a run that did not create them: a concurrent run
+ * may still be using them. They are reported so that residue is visible
+ * rather than silent.
+ */
+export async function listForeignTestIdentities(admin) {
+  const mine = runEmailPrefix();
+  const all = await listTestIdentities(admin, TEST_EMAIL_PREFIX);
+  return all.filter((identity) => !identity.email.startsWith(mine));
+}
+
+/**
+ * Lists the identities that belong to no live run: they were left behind by
+ * a run that was interrupted.
+ *
+ * An identity is only treated as abandoned when it is older than
+ * `STALE_IDENTITY_AGE_MS`. Anything younger may belong to a run that is still
+ * going on, and removing it would break that run.
+ */
+export async function listStaleTestIdentities(admin, maxAgeMs = STALE_IDENTITY_AGE_MS) {
+  const cutoff = Date.now() - maxAgeMs;
+  const foreign = await listForeignTestIdentities(admin);
+  return foreign.filter((identity) => {
+    if (!identity.createdAt) return false;
+    const created = new Date(identity.createdAt).getTime();
+    return Number.isFinite(created) && created < cutoff;
+  });
+}
+
+/**
+ * Deletes the test identities that carry a prefix, and everything they own.
  *
  * Order matters: the storage objects and the explicitly-keyed rows are removed
  * while the profile still exists, then the auth identity goes last so that the
  * database cascade can take the remaining profile-scoped rows with it.
+ *
+ * The prefix defaults to the current run's namespace. A run must never delete
+ * an identity another run created: that identity may be in the middle of a
+ * test in that other run.
  *
  * One identity that cannot be removed must not stop the sweep of the others,
  * so a failure is retried and then reported by the runner's final verification,
@@ -117,8 +193,21 @@ export async function listTestIdentities(admin) {
  *
  * Returns the ids that were removed.
  */
-export async function deleteAllTestIdentities(admin) {
-  const identities = await listTestIdentities(admin);
+export async function deleteAllTestIdentities(admin, prefix = runEmailPrefix()) {
+  const identities = await listTestIdentities(admin, prefix);
+  return deleteTestIdentities(admin, identities);
+}
+
+/**
+ * Deletes a specific set of test identities, and everything they own.
+ *
+ * One identity that cannot be removed must not stop the removal of the
+ * others, so a failure is retried and then reported by the runner's final
+ * verification, which fails the run if anything was left behind.
+ *
+ * Returns the ids that were removed.
+ */
+export async function deleteTestIdentities(admin, identities) {
   const removedIds = [];
   for (const { id } of identities) {
     try {

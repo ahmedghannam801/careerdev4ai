@@ -304,6 +304,12 @@ own `cp-test-*` identities and rows. It never truncates tables, but the
 service-role key gives full access, so use a project that is safe to hold test
 data — never production credentials.
 
+Every identity a run creates carries that run's id, so a run never removes the
+data of a run that is executing at the same time. The tables the suite writes to
+— announcements, the delivery ledger, the scheduler and the rate limits — are
+still shared, so the CI workflow runs one job at a time, and a local run
+should wait for a CI run to finish before it starts.
+
 ## Personalisation architecture
 
 The product personalises from one thing: the career the user selected and the
