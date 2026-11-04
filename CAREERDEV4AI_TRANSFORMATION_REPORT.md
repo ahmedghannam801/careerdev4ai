@@ -320,7 +320,7 @@ Unrelated changes were preserved, not overwritten. The secret scan was run over
 every new and changed file. **No force-push was used.**
 
 **Push status:** **pushed and verified.** `origin/main` reads
-`3849f8d3e21eb53c6856611a3cf357cf60b6e955`, identical to the local `HEAD`,
+`44329f80f0d3ddf5d9ec2564359b620d7eef55ea`, identical to the local `HEAD`,
 and `git status` reports `main...origin/main` with no divergence.
 
 ---
@@ -331,10 +331,10 @@ and `git status` reports `main...origin/main` with no divergence.
 |---|---|
 | Provider | Cloudflare Pages (`wrangler.jsonc`, project `careerdev4ai`) |
 | Production URL | `https://careerdev4ai.pages.dev` |
-| Deployment id | `013b0f8a-174e-46ab-ae33-2e93aefb0d87` |
-| Deployment URL | `https://013b0f8a.careerdev4ai.pages.dev` |
+| Deployment id | `70cbf5ac-9108-4218-a314-1c1db9ec9ffe` |
+| Deployment URL | `https://70cbf5ac.careerdev4ai.pages.dev` |
 | Command | `npm run cf:deploy` → `npm run build && wrangler pages deploy dist --project-name careerdev4ai --branch main` |
-| **Deployed commit** | **`3849f8d`** — identical to local `main` and to `origin/main` |
+| **Deployed commit** | **`44329f8`** — identical to local `main` and to `origin/main` |
 | Verified | the deployment's `Source` field was read back from the Pages API and compared with the local hash; the deployed bundle was then fetched and searched for the new strings |
 
 ### Production verification
@@ -354,16 +354,17 @@ and `git status` reports `main...origin/main` with no divergence.
 
 ### The auto-deploy failure
 
-Cloudflare Pages is connected to GitHub and started its own build when `main`
-was pushed (deployment `56bc4e78`, status **Failure**). The same pattern
-appears for every earlier commit — one failed auto-deployment followed by one
-successful manual deployment — so this is a long-standing condition of the
-project's Git integration, not something this work introduced. The manual
-path in `package.json` (`npm run cf:deploy`) is the one that succeeds, and it
-is the path used here. **The failed auto-build is a live issue for the
-operator to resolve in the Cloudflare dashboard** (build command and output
-directory for the Git-connected build); it does not affect the running
-production site, which serves commit `3849f8d`.
+Cloudflare Pages is connected to GitHub and starts its own build when `main`
+is pushed. That build **fails on every commit** — deployment `56bc4e78` for
+`3849f8d` and `c42a067e` for `44329f8` both failed, and the same pattern
+appears for every earlier commit in the project's history (one failed
+auto-deployment followed by one successful manual deployment). This is a
+long-standing condition of the project's Git integration, not something this
+work introduced. The manual path in `package.json` (`npm run cf:deploy`) is
+the one that succeeds, and it is the path used here. **The failed auto-build
+is a live issue for the operator to resolve in the Cloudflare dashboard**
+(the build command and output directory of the Git-connected build); it does
+not affect the running production site, which serves commit `44329f8`.
 
 **Rollback:** revert the code commits and redeploy. Every schema change in this
 period is additive, so an older application build keeps working against the
