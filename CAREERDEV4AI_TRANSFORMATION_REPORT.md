@@ -319,7 +319,9 @@ Four commits, each meaningful and independently reviewable:
 Unrelated changes were preserved, not overwritten. The secret scan was run over
 every new and changed file. **No force-push was used.**
 
-**Push status:** see §20 — pushed and verified.
+**Push status:** **pushed and verified.** `origin/main` reads
+`3849f8d3e21eb53c6856611a3cf357cf60b6e955`, identical to the local `HEAD`,
+and `git status` reports `main...origin/main` with no divergence.
 
 ---
 
@@ -329,13 +331,49 @@ every new and changed file. **No force-push was used.**
 |---|---|
 | Provider | Cloudflare Pages (`wrangler.jsonc`, project `careerdev4ai`) |
 | Production URL | `https://careerdev4ai.pages.dev` |
-| Deployment | `npm run build && npx wrangler pages deploy dist --project-name careerdev4ai --branch main` |
-| Deployed commit | see §20 |
-| Verification | the live commit hash was read back from the deployment and compared with the local `main` |
+| Deployment id | `013b0f8a-174e-46ab-ae33-2e93aefb0d87` |
+| Deployment URL | `https://013b0f8a.careerdev4ai.pages.dev` |
+| Command | `npm run cf:deploy` → `npm run build && wrangler pages deploy dist --project-name careerdev4ai --branch main` |
+| **Deployed commit** | **`3849f8d`** — identical to local `main` and to `origin/main` |
+| Verified | the deployment's `Source` field was read back from the Pages API and compared with the local hash; the deployed bundle was then fetched and searched for the new strings |
+
+### Production verification
+
+| Check | Result |
+|---|---|
+| `/api/health` | 200 — `{"status":"ok","modelConfigured":true,"modelName":"gemini-3.6-flash"}` |
+| `/terms`, `/privacy`, `/about`, `/careers`, `/learning`, `/opportunities`, `/robots.txt`, `/sitemap.xml`, `/` | **all 200** |
+| Deployed bundle contains the new code | **yes** — `assets/index-D0ZvAZ1G.js` carries the live preview, the mentor evidence panel, the recent-activity panel, the skip link and the preview caption |
+| Browser console errors | **0** across light, dark and Arabic RTL |
+| Failed network requests | **0** |
+| Horizontal overflow | **0** in all three modes |
+| All five new sections present | **yes** (`#preview`, `#features`, `#trust`, `#faq`, `#contact`) |
+| Footer links | **all seven resolve to real destinations** |
+| The preview re-plans live in production | **yes** — selecting *HR Specialist* re-runs the engine and returns an HR plan (4 phases, 14 tasks, 200 h, 6 gaps, next action "Learn Confidentiality & Data Handling", with the reason "…is at 0/5 and this role expects 4/5 — blocks the role") |
+| A real sign-up against production | **succeeds** and lands on the onboarding wizard |
+
+### The auto-deploy failure
+
+Cloudflare Pages is connected to GitHub and started its own build when `main`
+was pushed (deployment `56bc4e78`, status **Failure**). The same pattern
+appears for every earlier commit — one failed auto-deployment followed by one
+successful manual deployment — so this is a long-standing condition of the
+project's Git integration, not something this work introduced. The manual
+path in `package.json` (`npm run cf:deploy`) is the one that succeeds, and it
+is the path used here. **The failed auto-build is a live issue for the
+operator to resolve in the Cloudflare dashboard** (build command and output
+directory for the Git-connected build); it does not affect the running
+production site, which serves commit `3849f8d`.
 
 **Rollback:** revert the code commits and redeploy. Every schema change in this
 period is additive, so an older application build keeps working against the
 current database.
+
+### Post-deployment cleanup
+
+The account created by the production smoke test was deleted. The live project
+was verified afterwards: **0 QA profiles, 0 QA activities**, with production
+data intact (37 CVs, 55 roadmaps, 83 profiles).
 
 ---
 
