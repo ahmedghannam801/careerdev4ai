@@ -178,6 +178,7 @@ job that spins for ever.
 | `TRIGGER_PROJECT_REF` | Labelling runs | Optional. |
 | `TRIGGER_API_URL` | Pointing at another endpoint | Optional; defaults to `https://api.trigger.dev`. |
 | `GEMINI_API_KEY` | The model calls | Already used by the synchronous routes. |
+| `JSEARCH_RAPIDAPI_KEY` | The live job search (`match-jobs`) | Falls back to `RAPIDAPI_KEY`. Without either, the search reports *"Live job search is not configured on this server."* |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Reading and writing the job row | The task has no end-user session, so it uses the service role and checks ownership itself. |
 
 In Cloudflare Pages, `TRIGGER_SECRET_KEY` is a **secret** environment variable
@@ -246,5 +247,14 @@ npx trigger.dev@latest env set GEMINI_API_KEY <value> --env prod --secret
 
 The `--secret` flag matters: it stores the value so it cannot be read back
 through the API.
+
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` are already set
+in the Production environment, so a Production deployment can run the moment
+the organisation allows one. The job search needs one more credential, which
+this machine and this deployment do not have: `JSEARCH_RAPIDAPI_KEY` (or
+`RAPIDAPI_KEY`). It has to be added to the Pages environment and to the
+Trigger.dev environment. Until it is, the `match-jobs` workflow reaches the
+task and then reports *"Live job search is not configured on this server."* —
+which is honest, but it means that one workflow cannot produce vacancies.
 
 
