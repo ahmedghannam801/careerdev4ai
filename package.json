@@ -24,7 +24,8 @@
     "cf:dev": "wrangler pages dev dist",
     "cf:deploy": "npm run build && wrangler pages deploy dist --project-name careerdev4ai --branch main",
     "cf:preview": "npm run build && wrangler pages deploy dist --project-name careerdev4ai --branch preview",
-    "cf:deployments": "wrangler pages deployment list --project-name careerdev4ai"
+    "cf:deployments": "wrangler pages deployment list --project-name careerdev4ai",
+    "cf:env": "node scripts/set-pages-env.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

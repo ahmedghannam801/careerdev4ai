@@ -36,6 +36,7 @@ import { fetchLiveJobs, type JobQuota, type JobSearchFilters, type MatchedJob } 
 import { ApiRequestError } from '../../lib/apiClient';
 import {
   JOB_COUNTRIES,
+  JOB_COUNTRY_LABELS,
   JOB_DATE_POSTED_OPTIONS,
   JOB_EMPLOYMENT_TYPES,
   JOB_LOCATION_SUGGESTIONS,
@@ -60,24 +61,49 @@ const EMPLOYMENT_LABELS: Record<string, string> = {
   INTERN: 'Internship',
 };
 
-/** The country names the screen offers, ordered for an Egypt-first product. */
-const COUNTRY_LABELS: Record<string, string> = {
-  eg: 'Egypt',
-  sa: 'Saudi Arabia',
-  ae: 'United Arab Emirates',
-  qa: 'Qatar',
-  kw: 'Kuwait',
-  bh: 'Bahrain',
-  om: 'Oman',
-  jo: 'Jordan',
-  gb: 'United Kingdom',
-  de: 'Germany',
-  us: 'United States',
-};
-
 interface JobsViewProps {
   onNavigate: (view: string) => void;
 }
+
+/**
+ * The sentence shown when a provider search fails.
+ *
+ * The server sends a developer-facing message with the failure code. Showing
+ * that message verbatim would put an English sentence into the Arabic
+ * interface, so each failure code is given a sentence of its own here and the
+ * server's text is left to the logs and the network panel.
+ *
+ * The kinds of failure stay distinct on screen: a missing credential and a
+ * rejected credential are the owner's to fix, a rate limit is the user's to
+ * wait out, and an unreachable provider is neither.
+ */
+const providerFailureMessage = (
+  code: string | null,
+  t: (key: string) => string,
+): string => {
+  switch (code) {
+    case 'not_configured':
+      return t(
+        'The job provider is not configured on this server yet. The owner has to add the provider credential before live vacancies appear here.',
+      );
+    case 'invalid_credential':
+      return t(
+        'The job provider rejected this server’s credential. The owner has to replace it before live vacancies appear here.',
+      );
+    case 'rate_limited':
+      return t(
+        'The provider is limiting how often this server may search. Wait a moment and try again.',
+      );
+    case 'upstream_unavailable':
+      return t('The job provider is not answering right now. Try again in a few minutes.');
+    case 'upstream_timeout':
+      return t('The job provider took too long to answer. Try again in a few minutes.');
+    case 'bad_response':
+      return t('The job provider sent an answer this server could not read. Try again in a few minutes.');
+    default:
+      return t('Live jobs could not be loaded.');
+  }
+};
 
 export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const {
@@ -101,7 +127,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const [quota, setQuota] = useState<JobQuota | null>(null);
   const [source, setSource] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<{ message: string; code: string | null } | null>(null);
+  const [error, setError] = useState<{ code: string | null } | null>(null);
   const [sort, setSort] = useState<SortOrder>('match');
   const [trackingId, setTrackingId] = useState<string | null>(null);
   /** The outcome of the last application the user tracked from this screen. */
@@ -119,17 +145,15 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       setQuota(response.quota);
       setSource(response.source);
     } catch (caught) {
-      const message =
-        caught instanceof ApiRequestError
-          ? caught.message
-          : t('Live jobs could not be loaded.');
+      // The failure code is kept; the server's English sentence is not shown
+      // to the user, because the interface has its own sentence per code.
       const code = caught instanceof ApiRequestError ? caught.code : null;
       setResults([]);
-      setError({ message, code });
+      setError({ code });
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, []);
 
   // The first search waits for the profile so the target role can seed it.
   useEffect(() => {
@@ -309,7 +333,9 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             />
             <datalist id="job-location-suggestions">
               {JOB_LOCATION_SUGGESTIONS.map((entry) => (
-                <option key={entry.value} value={entry.value} />
+                <option key={entry.value} value={entry.value}>
+                  {t(entry.label)}
+                </option>
               ))}
             </datalist>
           </div>
@@ -334,7 +360,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             >
               {JOB_COUNTRIES.map((code) => (
                 <option key={code} value={code}>
-                  {COUNTRY_LABELS[code] ?? code.toUpperCase()}
+                  {t(JOB_COUNTRY_LABELS[code] ?? code.toUpperCase())}
                 </option>
               ))}
             </select>
@@ -457,21 +483,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             <p className="font-semibold text-[var(--text-primary)]">
               {t('Live jobs could not be loaded.')}
             </p>
-            <p>{error.message}</p>
-            {error.code === 'not_configured' && (
-              <p>
-                {t(
-                  'The job provider is not configured on this server yet. The owner has to add the provider credential before live vacancies appear here.'
-                )}
-              </p>
-            )}
-            {error.code === 'rate_limited' && (
-              <p>
-                {t(
-                  'The provider is limiting how often this server may search. Wait a moment and try again.'
-                )}
-              </p>
-            )}
+            <p>{providerFailureMessage(error.code, t)}</p>
             <button
               type="button"
               onClick={() => void runSearch(filters)}

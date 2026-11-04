@@ -48,8 +48,16 @@ export const jobsAr: Record<string, string> = {
   'Live jobs could not be loaded.': 'تعذّر تحميل الوظائف المباشرة.',
   'The job provider is not configured on this server yet. The owner has to add the provider credential before live vacancies appear here.':
     'لم يتم إعداد مزوّد الوظائف على هذا الخادم بعد. على المالك إضافة بيانات المزوّد قبل ظهور الوظائف المباشرة هنا.',
+  'The job provider rejected this server’s credential. The owner has to replace it before live vacancies appear here.':
+    'رفض مزوّد الوظائف بيانات اعتماد هذا الخادم. على المالك استبدالها قبل ظهور الوظائف المباشرة هنا.',
   'The provider is limiting how often this server may search. Wait a moment and try again.':
     'المزوّد يحدّ من عدد عمليات البحث التي يمكن للخادم تنفيذها. انتظر قليلًا ثم أعد المحاولة.',
+  'The job provider is not answering right now. Try again in a few minutes.':
+    'مزوّد الوظائف لا يستجيب حاليًا. أعد المحاولة بعد بضع دقائق.',
+  'The job provider took too long to answer. Try again in a few minutes.':
+    'استغرق مزوّد الوظائف وقتًا طويلًا للإجابة. أعد المحاولة بعد بضع دقائق.',
+  'The job provider sent an answer this server could not read. Try again in a few minutes.':
+    'أرسل مزوّد الوظائف إجابة تعذّر على هذا الخادم قراءتها. أعد المحاولة بعد بضع دقائق.',
 
   // Empty
   'No live vacancies matched this search':
@@ -78,4 +86,29 @@ export const jobsAr: Record<string, string> = {
   'Tracked in your applications': 'تم تسجيله ضمن طلباتك',
   'This application could not be saved. Try again.':
     'تعذّر حفظ هذا الطلب. حاول مرة أخرى.',
+
+  // Countries
+  'Egypt': 'مصر',
+  'Saudi Arabia': 'السعودية',
+  'United Arab Emirates': 'الإمارات العربية المتحدة',
+  'Qatar': 'قطر',
+  'Kuwait': 'الكويت',
+  'Bahrain': 'البحرين',
+  'Oman': 'عُمان',
+  'Jordan': 'الأردن',
+  'United Kingdom': 'المملكة المتحدة',
+  'Germany': 'ألمانيا',
+  'United States': 'الولايات المتحدة',
+
+  // Location suggestions
+  'Cairo, Egypt': 'القاهرة، مصر',
+  'Alexandria, Egypt': 'الإسكندرية، مصر',
+  'Giza, Egypt': 'الجيزة، مصر',
+  'Riyadh, Saudi Arabia': 'الرياض، السعودية',
+  'Dubai, United Arab Emirates': 'دبي، الإمارات العربية المتحدة',
+  'Doha, Qatar': 'الدوحة، قطر',
+  'Kuwait City, Kuwait': 'مدينة الكويت، الكويت',
+  'Manama, Bahrain': 'المنامة، البحرين',
+  'Muscat, Oman': 'مسقط، عُمان',
+  'Amman, Jordan': 'عمّان، الأردن',
 };

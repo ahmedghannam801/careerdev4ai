@@ -454,3 +454,24 @@ export const JOB_LOCATION_SUGGESTIONS: Array<{ label: string; value: string; cou
   { label: 'Muscat, Oman', value: 'Muscat', country: 'om' },
   { label: 'Amman, Jordan', value: 'Amman', country: 'jo' },
 ];
+
+/**
+ * The country names the screen offers, ordered for an Egypt-first product.
+ *
+ * These are display labels only — the provider is always given the two-letter
+ * code. The interface translates them, so the Arabic screen never shows an
+ * English country name next to an Arabic label.
+ */
+export const JOB_COUNTRY_LABELS: Record<string, string> = {
+  eg: 'Egypt',
+  sa: 'Saudi Arabia',
+  ae: 'United Arab Emirates',
+  qa: 'Qatar',
+  kw: 'Kuwait',
+  bh: 'Bahrain',
+  om: 'Oman',
+  jo: 'Jordan',
+  gb: 'United Kingdom',
+  de: 'Germany',
+  us: 'United States',
+};

@@ -150,6 +150,7 @@ Use the npm scripts, which encode the same targets:
 | `npm run cf:preview` | Preview (`--branch preview`) — alias `preview.careerdev4ai.pages.dev` |
 | `npm run cf:dev` | Local Pages runtime on `http://localhost:8788` |
 | `npm run cf:deployments` | List deployments for the project |
+| `npm run cf:env` | Apply the environment variables below to Pages, from `.env` |
 
 Preview URLs are public by default and carry `X-Robots-Tag: noindex`.
 
@@ -166,6 +167,30 @@ Configure these in the Pages project (Settings → Environment variables) for
 | `GEMINI_API_KEY` | server | AI routes return `503` without it |
 | `GEMINI_MODEL` | server | optional |
 | `ALLOWED_ORIGINS` | server | optional, comma-separated |
+
+### Changing the environment variables safely
+
+The Cloudflare API never returns the value of a secret: a secret always comes
+back as an empty string. A PATCH that re-sends `value: ""` for a secret
+therefore **erases** it while keeping its name, and the variable still shows up
+in the dashboard while the deployed worker runs with an empty value. The
+symptom is a site that loads and then quietly fails every route that needs
+that secret.
+
+Because of that, do not edit the environment variables by patching them one at
+a time from the dashboard or the API. Apply the whole set from `.env` instead:
+
+```bash
+npm run cf:env     # sends every variable, with its real value, to both environments
+npm run cf:deploy  # a redeploy is required: bindings are captured per deployment
+```
+
+`scripts/set-pages-env.mjs` refuses to send a blank value, prints only names
+and types, and never prints a secret. It needs `CLOUDFLARE_API_TOKEN`, or a
+`npx wrangler login` session on this machine.
+
+The job feed adds one more server variable, `JSEARCH_RAPIDAPI_KEY`. See
+[LIVE_JOBS_RAPIDAPI.md](LIVE_JOBS_RAPIDAPI.md).
 
 Supabase Auth must also be configured (Authentication → URL Configuration):
 

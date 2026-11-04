@@ -28,6 +28,9 @@ import {
   dedupeLiveJobs,
   matchJobToSkills,
   normalizeLiveJob,
+  JOB_COUNTRY_LABELS,
+  JOB_COUNTRIES,
+  JOB_LOCATION_SUGGESTIONS,
   type LiveJob,
 } from '../shared/jobs.ts';
 import {
@@ -36,6 +39,7 @@ import {
   getJobDetails,
   searchJobs,
 } from '../server/jsearch/client.ts';
+import { AR_STRINGS } from '../src/translations/sourceStrings.ts';
 import { api, apiAnonymous, createTestUser, deleteTestUser, type TestUser } from './helpers.ts';
 
 let user: TestUser;
@@ -478,7 +482,76 @@ describe('the provider client', () => {
 /* The route                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The Arabic interface.
+ *
+ * The live jobs screen shows country names and city names that come from a
+ * table, not from a literal in the component, so the localisation test — which
+ * reads `t('...')` calls — cannot see them. This suite checks them directly,
+ * because an English country name sitting in an Arabic form is exactly the
+ * kind of half-translated product this project refuses to ship.
+ */
+describe('the live jobs screen in Arabic', () => {
+  test('every country the screen offers has an Arabic name', () => {
+    const missing = JOB_COUNTRIES.filter(
+      (code) => !AR_STRINGS[JOB_COUNTRY_LABELS[code] ?? ''],
+    );
+    assert.deepEqual(
+      missing,
+      [],
+      `these countries have no Arabic name:\n${missing
+        .map((code) => `  - ${code} (${JOB_COUNTRY_LABELS[code]})`)
+        .join('\n')}`,
+    );
+  });
+
+  test('every location suggestion has an Arabic name', () => {
+    const missing = JOB_LOCATION_SUGGESTIONS.filter(
+      (entry) => !AR_STRINGS[entry.label],
+    );
+    assert.deepEqual(
+      missing,
+      [],
+      `these location suggestions have no Arabic name:\n${missing
+        .map((entry) => `  - ${entry.label}`)
+        .join('\n')}`,
+    );
+  });
+
+  test('every provider failure the server can report has its own Arabic sentence', () => {
+    // The server's failure codes, each of which the screen explains in its
+    // own words. A missing sentence would leave the Arabic interface with an
+    // English explanation or with no explanation at all.
+    const codes = [
+      'not_configured',
+      'invalid_credential',
+      'rate_limited',
+      'upstream_unavailable',
+      'upstream_timeout',
+      'bad_response',
+    ];
+    const sentences = [
+      'The job provider is not configured on this server yet. The owner has to add the provider credential before live vacancies appear here.',
+      'The job provider rejected this server’s credential. The owner has to replace it before live vacancies appear here.',
+      'The provider is limiting how often this server may search. Wait a moment and try again.',
+      'The job provider is not answering right now. Try again in a few minutes.',
+      'The job provider took too long to answer. Try again in a few minutes.',
+      'The job provider sent an answer this server could not read. Try again in a few minutes.',
+    ];
+    const missing = sentences.filter((sentence) => !AR_STRINGS[sentence]);
+    assert.deepEqual(
+      missing,
+      [],
+      `these provider failures have no Arabic sentence:\n${missing
+        .map((sentence) => `  - ${sentence}`)
+        .join('\n')}`,
+    );
+    assert.equal(codes.length, sentences.length);
+  });
+});
+
 describe('the live jobs route', () => {
+
   test('an anonymous caller cannot reach the feed', async () => {
     const res = await apiAnonymous('GET', '/api/jobs/search');
     assert.equal(res.status, 401);
