@@ -111,14 +111,27 @@ export async function listTestIdentities(admin) {
  * while the profile still exists, then the auth identity goes last so that the
  * database cascade can take the remaining profile-scoped rows with it.
  *
+ * One identity that cannot be removed must not stop the sweep of the others,
+ * so a failure is retried and then reported by the runner's final verification,
+ * which fails the run if anything was left behind.
+ *
  * Returns the ids that were removed.
  */
 export async function deleteAllTestIdentities(admin) {
   const identities = await listTestIdentities(admin);
   const removedIds = [];
   for (const { id } of identities) {
-    await deleteTestIdentity(admin, id);
-    removedIds.push(id);
+    try {
+      await deleteTestIdentity(admin, id);
+      removedIds.push(id);
+    } catch (error) {
+      try {
+        await deleteTestIdentity(admin, id);
+        removedIds.push(id);
+      } catch (retryError) {
+        console.warn(`Could not remove the test identity ${id}: ${retryError.message}`);
+      }
+    }
   }
   return removedIds;
 }
@@ -131,11 +144,30 @@ export async function deleteTestIdentity(admin, userId) {
   await deleteProfileScopedRows(admin, userId);
   await admin.from('profiles').delete().eq('id', userId);
 
-  const { error } = await admin.auth.admin.deleteUser(userId);
+  const { error } = await deleteAuthUser(admin, userId);
   if (error && !/not found/i.test(error.message)) {
     // A missing identity is not a failure; anything else is worth surfacing.
     throw new Error(`Could not delete auth identity ${userId}: ${error.message}`);
   }
+}
+
+/**
+ * Deletes an auth identity, retrying a momentarily failing platform.
+ *
+ * The hosted Auth service throttles and occasionally fails a deletion while a
+ * run is still creating and removing identities. A retry keeps a platform
+ * hiccup from leaving a test account behind.
+ */
+async function deleteAuthUser(admin, userId) {
+  const transient = ['429', 'rate limit', 'timeout', 'timed out', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', '500', '502', '503', '504'];
+  let last = { error: null };
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    last = await admin.auth.admin.deleteUser(userId);
+    if (!last.error) return last;
+    if (!transient.some((marker) => last.error.message.includes(marker))) return last;
+    await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1)));
+  }
+  return last;
 }
 
 /**

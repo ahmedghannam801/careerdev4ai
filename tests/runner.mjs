@@ -423,7 +423,15 @@ async function main() {
   // Give a just-deleted identity a moment to disappear from the auth list.
   await sleep(500);
   try {
-    const remaining = await listTestIdentities(admin);
+    let remaining = await listTestIdentities(admin);
+    if (remaining.length > 0) {
+      // One more sweep before the run is failed: an identity can survive the
+      // first removal when the hosted Auth service throttles the deletion.
+      // A leak that is still there after this sweep is a real leak.
+      await deleteAllTestIdentities(admin);
+      await sleep(500);
+      remaining = await listTestIdentities(admin);
+    }
     if (remaining.length > 0) {
       fail(`${remaining.length} test identity/identities still exist after cleanup:`);
       for (const { email } of remaining) fail(`  - ${email}`);
