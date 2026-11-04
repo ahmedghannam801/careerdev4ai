@@ -117,17 +117,30 @@ export async function startServer({ port, env, timeoutMs = 120_000 } = {}) {
     );
   }
 
+  const serverEnv = {
+    ...process.env,
+    ...env,
+    CAREERDEV_TEST_SERVER: 'true',
+    CAREERDEV_TEST_TERMS_FIXTURE: 'approved-test-fixture-only',
+    PORT: String(port),
+    NODE_ENV: 'production',
+  };
+
+  // The server loads `.env` for itself, so the Trigger.dev credential of this
+  // machine would otherwise reach the test server. It must not: the suite
+  // covers the contract that does not depend on the Trigger.dev account being
+  // reachable, and a test must never start a real run on the live project.
+  // Such a run consumes the platform's quota and, when no development worker
+  // is connected, stays queued for ever — which would then make the deployed
+  // site believe that no runner is available.
+  for (const key of Object.keys(serverEnv)) {
+    if (key.startsWith('TRIGGER_')) delete serverEnv[key];
+  }
+
   const loader = resolveTsxLoaderUrl();
   const child = spawn(process.execPath, ['--import', loader, 'server.ts'], {
     cwd: REPO_ROOT,
-    env: {
-      ...process.env,
-      ...env,
-      CAREERDEV_TEST_SERVER: 'true',
-      CAREERDEV_TEST_TERMS_FIXTURE: 'approved-test-fixture-only',
-      PORT: String(port),
-      NODE_ENV: 'production',
-    },
+    env: serverEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
