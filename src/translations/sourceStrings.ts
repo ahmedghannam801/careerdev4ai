@@ -27,6 +27,7 @@ import { cvAr } from './parts/cv.ts';
 import { dashboardAr } from './parts/dashboard.ts';
 import { discoveryAr } from './parts/discovery.ts';
 import { interviewsAr } from './parts/interviews.ts';
+import { landingAr } from './parts/landing.ts';
 import { learningAr } from './parts/learning.ts';
 import { profileAr } from './parts/profile.ts';
 import { projectsAr } from './parts/projects.ts';
@@ -43,6 +44,7 @@ export const AR_STRINGS: Record<string, string> = {
   ...analyticsAr,
   ...discoveryAr,
   ...dashboardAr,
+  ...landingAr,
   ...applicationsAr,
   ...applicationWorkflowAr,
   ...careerAr,

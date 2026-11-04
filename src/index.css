@@ -51,6 +51,34 @@
     --color-danger-hover: #8E1E18;
     --color-info: #5F6B70;
 
+    /* ------------------------------------------------------------------
+     * AI accent
+     * ------------------------------------------------------------------
+     * The brand primary stays terracotta everywhere. AI-assisted surfaces
+     * (the mentor, the generation flows, the AI processing modal) get one
+     * restrained violet so a visitor can tell "the assistant is doing this"
+     * from "the platform is showing you your own record". It is an accent
+     * role, never a second brand colour: it is never used for a primary
+     * call to action.
+     */
+    --color-ai: #5F4F86;
+    --color-ai-text: #5F4F86;
+    --color-ai-surface: #F1EEF8;
+    --color-ai-border: #D6CDE9;
+
+    /* ------------------------------------------------------------------
+     * Elevation
+     * ------------------------------------------------------------------
+     * One scale, three steps, so a card, a raised panel and an overlay all
+     * read as belonging to the same surface hierarchy instead of each
+     * component inventing its own shadow.
+     */
+    --shadow-card: 0 1px 2px color-mix(in srgb, var(--color-text) 6%, transparent),
+      0 1px 3px color-mix(in srgb, var(--color-text) 4%, transparent);
+    --shadow-raised: 0 4px 12px -2px color-mix(in srgb, var(--color-text) 10%, transparent),
+      0 2px 4px -2px color-mix(in srgb, var(--color-text) 6%, transparent);
+    --shadow-overlay: 0 12px 32px -8px color-mix(in srgb, var(--color-text) 22%, transparent);
+
     /* Fixed colours for the printed-CV paper preview (it stays paper-white in both modes). */
     --color-print-primary: #B94736;
 
@@ -116,6 +144,13 @@
     --color-danger: #F08C82;
     --color-danger-hover: #F6A69E;
     --color-info: #A7B3B2;
+
+    /* The AI accent keeps the same role in dark mode: a violet that reads
+     * as "the assistant" against the charcoal surfaces. */
+    --color-ai: #A893D4;
+    --color-ai-text: #B7A5DE;
+    --color-ai-surface: #2A2535;
+    --color-ai-border: #3E3552;
 
     --color-on-primary: #1C201E;
 
@@ -379,6 +414,29 @@
    * is used sparingly — behind the hero and the final call to action —
    * so the interface stays calm rather than colourful.
    */
+  /* ------------------------------------------------------------------
+   * Icon tile highlight
+   * ------------------------------------------------------------------
+   * A card's icon tile reads as a raised surface rather than a flat
+   * rectangle when it carries a one-pixel inset highlight along its top
+   * edge. It is the same trick as a physical bevel, it costs nothing, and
+   * it is applied from the token layer so every tile looks the same.
+   */
+  .cp-icon-tile {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cp-icon-tile::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 1px;
+    background: color-mix(in srgb, var(--color-text) 18%, transparent);
+    pointer-events: none;
+  }
+
   .cp-brand-wash {
     background-image:
       radial-gradient(

@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ArrowRight, CheckCircle2, Sparkles, ArrowUpRight, Target, Route, GraduationCap, FileBadge2, Menu, X } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Sparkles, ArrowUpRight, Target, Route, GraduationCap, FileBadge2, Menu, X, Languages } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { TARGET_ROLES } from '../../data/rolesData';
+import { SUPPORT_EMAIL, PUBLIC_PATHS, OPERATOR_LINKEDIN_URL } from '../../../shared/contact.ts';
 import { Logo } from '../brand/Logo';
 import { CareerJourneyVisual } from '../brand/CareerJourneyVisual';
+import { ProductPreview } from '../landing/ProductPreview';
+import { FeatureGrid } from '../landing/FeatureGrid';
+import { TrustSection } from '../landing/TrustSection';
+import { FaqSection } from '../landing/FaqSection';
+import { ContactSection } from '../landing/ContactSection';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
 /**
@@ -120,15 +126,22 @@ const AI_PROMISES = [
 ];
 
 export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onExploreRoles, onOpenDashboard }) => {
-  const { profile, t} = useCareer();
+  const { profile, t, settings, updateSettings } = useCareer();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const reduced = useReducedMotion() ?? false;
 
-  const navLinks = [
-    { href: '#how-it-works', label: 'How It Works' },
-    { href: '#ai-guidance', label: 'AI Guidance' },
-    { href: '#personas', label: 'Personas' },
-    { href: '#roles', label: 'Target Roles' },
+  // The navigation labels are literal translation calls rather than plain
+// strings: a plain label would render correctly in English and stay
+// English in Arabic, and the localisation audit only reads literal calls,
+// so the gap would never be reported.
+const navLinks = [
+    { href: '#how-it-works', label: t('How It Works') },
+    { href: '#preview', label: t('Preview') },
+    { href: '#features', label: t('Features') },
+    { href: '#ai-guidance', label: t('AI Guidance') },
+    { href: '#personas', label: t('Personas') },
+    { href: '#roles', label: t('Target Roles') },
+    { href: '#faq', label: t('FAQ') },
   ];
 
   const closeMobileNav = () => setMobileNavOpen(false);
@@ -145,7 +158,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
             </span>
           </div>
 
-          <nav className="hidden items-center gap-6 text-sm font-medium text-[var(--text-secondary)] md:flex">
+          {/* The full navigation needs room. Below the large breakpoint the
+              seven links do not fit beside the logo and the call to action,
+              so the panel menu carries them instead. */}
+          <nav className="hidden min-w-0 items-center gap-5 text-sm font-medium text-[var(--text-secondary)] lg:flex xl:gap-6">
             {navLinks.map((link) => (
               <a
                 key={link.href}
@@ -163,7 +179,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
               aria-expanded={mobileNavOpen}
               aria-controls="landing-mobile-nav"
               aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
-              className="rounded-lg border border-[var(--color-border)] p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-secondary)] hover:text-[var(--text-primary)] md:hidden"
+              className="rounded-lg border border-[var(--color-border)] p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-secondary)] hover:text-[var(--text-primary)] lg:hidden"
             >
               {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
@@ -186,7 +202,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: reduced ? 0 : -8 }}
               transition={{ duration: reduced ? 0.01 : 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="border-t border-[var(--color-border)] bg-[var(--surface-main)] px-6 py-3 md:hidden"
+              className="border-t border-[var(--color-border)] bg-[var(--surface-main)] px-6 py-3 lg:hidden"
             >
               <nav className="flex flex-col">
                 {navLinks.map((link) => (
@@ -394,7 +410,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
               {AI_PROMISES.map((promise) => (
                 <StaggerItem key={promise.title}>
                   <div className="h-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
-                    <div className="mb-3 h-1 w-8 rounded-full bg-[var(--color-accent)]" />
+                    <div className="mb-3 h-1 w-8 rounded-full bg-[var(--color-ai)]" />
                     <h3 className="text-sm font-bold text-[var(--text-primary)]">{promise.title}</h3>
                     <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">{promise.body}</p>
                   </div>
@@ -555,6 +571,134 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
         </div>
       </section>
 
+      {/* Interactive product preview — the real planning engine, running live */}
+      <section id="preview" className="scroll-mt-24 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]/40 px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('Product preview')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('Try it on a real role. Right now.')}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t(
+                  'This is not a screenshot. Pick a role and the platform’s own planning engine builds the roadmap, the skill gaps and the next step in front of you.',
+                )}
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.08} distance="soft">
+            <div className="mx-auto mt-10 max-w-4xl">
+              <ProductPreview />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Features — every capability named here is implemented */}
+      <section id="features" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('What you get')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('One workspace, ten connected capabilities.')}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t(
+                  'Each one is a real part of the signed-in product, and each one feeds the next. Nothing here is a promise about a feature that does not exist.',
+                )}
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.08} distance="soft">
+            <div className="mt-10">
+              <FeatureGrid />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Trust and transparency */}
+      <section id="trust" className="scroll-mt-24 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]/40 px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('Trust and transparency')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('How the platform reaches its conclusions.')}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t(
+                  'A platform that tells you what you are missing should be equally clear about how it knows, and honest about what it cannot know.',
+                )}
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.08} distance="soft">
+            <div className="mt-10">
+              <TrustSection />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('Questions')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('Frequently asked questions')}
+              </h2>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.08} distance="soft">
+            <div className="mx-auto mt-10 max-w-3xl">
+              <FaqSection />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Contact and legal */}
+      <section id="contact" className="scroll-mt-24 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]/40 px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('Contact')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('Talk to the people who build it.')}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t('The same support address, the same published legal documents, and the same operator the Terms name.')}
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.08} distance="soft">
+            <div className="mt-10">
+              <ContactSection />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="relative overflow-hidden px-6 py-20">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 cp-brand-wash-strong" />
@@ -591,7 +735,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
               <span>
                 Developed by{' '}
                 <a
-                  href="https://www.linkedin.com/in/ahmed-ebrahim2"
+                  href={OPERATOR_LINKEDIN_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] underline transition-colors"
@@ -600,11 +744,53 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
                 </a>
               </span>
             </div>
-            <div className="flex items-center gap-6">
-              <span>{t('Privacy')}</span>
-              <span>{t('Terms')}</span>
-              <span>{t('Status')}</span>
-              <span>{t('English / العربية')}</span>
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-end">
+              <a
+                href={PUBLIC_PATHS.terms}
+                className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Terms')}
+              </a>
+              <a
+                href={PUBLIC_PATHS.privacy}
+                className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Privacy')}
+              </a>
+              <a
+                href={PUBLIC_PATHS.about}
+                className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('About')}
+              </a>
+              <a
+                href={PUBLIC_PATHS.careers}
+                className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Career roles')}
+              </a>
+              <a
+                href={PUBLIC_PATHS.learning}
+                className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Learning')}
+              </a>
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Contact')}
+              </a>
+              {/* The language switch is a real control, not a label. */}
+              <button
+                type="button"
+                onClick={() => updateSettings({ language: settings.language === 'en' ? 'ar' : 'en' })}
+                aria-label={t('Switch interface language')}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-2 py-1 font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--color-border-strong)] hover:text-[var(--text-primary)]"
+              >
+                <Languages className="h-3 w-3" />
+                {settings.language === 'en' ? 'العربية' : 'English'}
+              </button>
             </div>
           </div>
         </div>

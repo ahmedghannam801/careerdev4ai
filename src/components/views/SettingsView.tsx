@@ -27,6 +27,7 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
+import { SUPPORT_EMAIL } from '../../../shared/contact.ts';
 
 /**
  * A short, honest description of the browser this session is running in.
@@ -855,7 +856,7 @@ export const SettingsView: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <a
-                  href="mailto:ahmedghannam801@gmail.com"
+                  href={`mailto:${SUPPORT_EMAIL}`}
                   className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] hover:border-[var(--color-primary-text)]/30 transition-all flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -865,7 +866,7 @@ export const SettingsView: React.FC = () => {
                     <div className="min-w-0">
                       <div className="font-semibold text-[var(--text-primary)]">{t('Email')}</div>
                       <div className="text-[11px] text-[var(--text-secondary)] truncate">
-                        ahmedghannam801@gmail.com
+                        {SUPPORT_EMAIL}
                       </div>
                     </div>
                   </div>
