@@ -255,6 +255,43 @@ describe('background jobs', () => {
     });
     assert.equal(attempt.status, 403);
   });
+
+  test('a workflow whose source record is optional is accepted without one', async () => {
+    // The tailored CV and the AI mentor can work from the candidate's own
+    // record, so a request without a CV is a legitimate request — not a
+    // missing record. It must not be refused as "not found".
+    const tailored = await api('POST', '/api/background-jobs', {
+      token: owner.token,
+      body: {
+        kind: 'generate-targeted-cv',
+        jobDescription:
+          'We are hiring a Data Analyst in Cairo to build reporting pipelines in SQL and Python and own our Power BI dashboards.',
+      },
+    });
+    assert.ok(
+      tailored.status === 202 || tailored.status === 503,
+      `unexpected status ${tailored.status}: ${JSON.stringify(tailored.body)}`,
+    );
+    assert.notEqual(
+      tailored.status,
+      404,
+      'a workflow with an optional source must not be refused as a missing record',
+    );
+
+    const mentor = await api('POST', '/api/background-jobs', {
+      token: owner.token,
+      body: { kind: 'process-ai-mentor-workflow', question: 'How do I write a cover letter?' },
+    });
+    assert.ok(
+      mentor.status === 202 || mentor.status === 503,
+      `unexpected status ${mentor.status}: ${JSON.stringify(mentor.body)}`,
+    );
+    assert.notEqual(
+      mentor.status,
+      404,
+      'a workflow with an optional source must not be refused as a missing record',
+    );
+  });
 });
 
 describe('the background-job service reports what it can do', () => {

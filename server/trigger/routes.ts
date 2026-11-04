@@ -343,7 +343,12 @@ export function registerBackgroundJobRoutes(app: Express): void {
 
       // The record has to belong to the caller. A record that belongs to
       // somebody else is reported as missing.
-      if (!(await sourceIsOwned(profileId, spec.sourceType, sourceId))) {
+      //
+      // A workflow whose source record is optional is checked only when one
+      // was named. The CV of `generate-targeted-cv` and of the AI mentor is
+      // optional: the work can be done from the candidate's own record, and a
+      // request without one is a legitimate request, not a missing record.
+      if (sourceId && !(await sourceIsOwned(profileId, spec.sourceType, sourceId))) {
         return res.status(404).json({ error: 'Not found', code: 'not_found' });
       }
 
