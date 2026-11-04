@@ -126,6 +126,9 @@ npm run deploy:trigger
 The API needs `TRIGGER_SECRET_KEY` to start a job. Without it the
 background-job routes answer 503 and the rest of the application is
 unaffected — the server still boots, and the platform still runs the tasks.
+The request that could not be started is still recorded as a failed job with
+the reason on it, so the candidate sees *why* nothing happened instead of a
+job that spins for ever.
 
 ## Configuration
 
@@ -139,3 +142,39 @@ unaffected — the server still boots, and the platform still runs the tasks.
 
 In Cloudflare Pages, `TRIGGER_SECRET_KEY` is a **secret** environment variable
 on the production environment. It is never exposed to the browser.
+
+## Where it is running
+
+The API is live on `https://careerdev4ai.pages.dev` with `TRIGGER_SECRET_KEY`
+set as a Pages secret. The tasks are running in the Trigger.dev **Development**
+environment (`tr_dev_sk_…`), because Production deployments are not enabled on
+the organisation — `trigger deploy --prod` uploads the build and then refuses
+it with *"Deployments are not available for this organization."*
+
+A Development run needs a worker to pick it up, so `npm run dev:trigger` has to
+be running for a job started by the live site to execute. That is the one
+operational difference from Production: with a Production deployment the
+platform runs the tasks on its own, and nothing has to be kept alive locally.
+
+The live chain was verified end to end with a throwaway identity: a job started
+on the deployed site reached `completed` with a real roadmap (4 phases, 18
+steps) in its result, the same request a second time was answered with the job
+the first one created, a record belonging to another candidate was answered
+with `404 Not found`, and the candidate's own record was accepted with `202`.
+
+## What the owner still has to do
+
+**Rotate the secret key.** The Development key was pasted into a conversation,
+so it should be treated as exposed. A replacement is set with:
+
+```bash
+npx wrangler pages secret put TRIGGER_SECRET_KEY --project-name careerdev4ai
+```
+
+and the same value in the local `.env`. The old key is then revoked in the
+Trigger.dev dashboard.
+
+**Enable Production deployments** on the organisation, if the tasks should run
+without a local worker. After that, `npm run deploy:trigger` publishes to
+Production and the live site needs a `tr_prod_sk_…` key instead.
+
