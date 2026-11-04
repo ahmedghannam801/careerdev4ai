@@ -19,6 +19,15 @@
 //   * The restart test needs a port of its own; it is given a second, separate
 //     free port so restarting it never collides with the shared server.
 //
+// One run at a time, on every machine:
+//
+//   The suite runs against the shared Supabase project, and two runs overlap
+//   whether they are on the same machine or not — a local run and a CI run at
+//   the same time write to the same announcement, delivery-ledger, scheduler
+//   and rate-limit tables. The second run then fails for reasons that have
+//   nothing to do with the code under test. Wait for a run to finish before
+//   starting the next one.
+//
 // This file is plain ESM JavaScript: it must be runnable before any TypeScript
 // tooling is known to be healthy, so that a loader problem is reported as a
 // loader problem and not as a mysterious test failure.
