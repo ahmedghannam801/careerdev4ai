@@ -335,10 +335,10 @@ remote after the push and is identical to the local `HEAD`, and
 | **Deployed commit** | **the head of `main` at the time of the final deployment** — the deployment's `Source` field is read back from the Pages API and compared with the local hash, so the running site is verified to serve the same commit that is on GitHub |
 | Verification | the deployed bundle is then fetched from `careerdev4ai.pages.dev` and searched for the new strings, so "deployed" means the new code is what the server actually serves |
 
-The deployment id and the hash it carries are recorded at the end of this
-report, after the final deployment, so that the report and the deployment
-cannot disagree. The check that matters is the one recorded in the
-verification table below.
+The deployment id and the hash it carries are read back from the Pages API
+after the final deployment and recorded in the verification table below, so
+that the report and the deployment cannot disagree. The check that matters is
+the one recorded there.
 
 ### Production verification
 
@@ -378,7 +378,10 @@ current database.
 
 The account created by the production smoke test was deleted. The live project
 was verified afterwards: **0 QA profiles, 0 QA activities**, with production
-data intact (37 CVs, 55 roadmaps, 83 profiles).
+data intact — the CVs, roadmaps, user skills, applications, consents and
+activity records that existed before this work are unchanged, and the profile
+count moved only by real registrations made against the live site while this
+work was running.
 
 ---
 
