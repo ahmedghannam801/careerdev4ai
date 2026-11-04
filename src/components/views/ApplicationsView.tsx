@@ -38,7 +38,9 @@ export const ApplicationsView: React.FC = () => {
   // When the application was made. An application is often added after the
   // fact, so the date is editable rather than fixed to today.
   const [appliedDate, setAppliedDate] = useState(todayIsoDate());
-  const [salaryDiscussed] = useState('$145,000');
+  // The salary is written in the private notes, which is where the form
+  // says it belongs. Nothing is invented here: an application that has no
+  // salary yet carries no salary.
   const [notes, setNotes] = useState('');
 
   // Edit details form inside modal
@@ -69,7 +71,6 @@ export const ApplicationsView: React.FC = () => {
       appliedDate: appliedDate || todayIsoDate(),
       nextAction: nextAction.trim() || undefined,
       nextActionDate: nextActionDate || undefined,
-      salaryDiscussed: salaryDiscussed || undefined,
       notes: notes.trim()
     });
 

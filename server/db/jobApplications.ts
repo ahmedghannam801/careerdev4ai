@@ -138,24 +138,31 @@ export async function createJobApplication(
   profileId: string,
   input: CreateJobApplicationInput
 ): Promise<JobApplicationDTO> {
+  const row: Record<string, unknown> = {
+    profile_id: profileId,
+    job_id: input.jobId ?? null,
+    company: input.company,
+    role: input.role,
+    location: input.location ?? null,
+    work_mode: input.workMode ?? null,
+    stage: input.stage ?? 'saved',
+    applied_date: input.appliedDate ?? null,
+    last_updated: new Date().toISOString().split('T')[0],
+    next_action: input.nextAction ?? null,
+    next_action_date: input.nextActionDate ?? null,
+    notes: input.notes ?? null,
+    interview_stage_details: input.interviewStageDetails ?? null,
+  };
+  // `salary_discussed` is NOT NULL with a default of 'false'. Writing an
+  // explicit null for it fails the insert, so the column is left out when
+  // the user has not answered it and the database default — "not discussed" —
+  // applies instead.
+  if (input.salaryDiscussed !== undefined && input.salaryDiscussed !== null) {
+    row.salary_discussed = input.salaryDiscussed;
+  }
   const { data, error } = await getSupabaseServer()
     .from('job_applications')
-    .insert({
-      profile_id: profileId,
-      job_id: input.jobId ?? null,
-      company: input.company,
-      role: input.role,
-      location: input.location ?? null,
-      work_mode: input.workMode ?? null,
-      stage: input.stage ?? 'saved',
-      applied_date: input.appliedDate ?? null,
-      last_updated: new Date().toISOString().split('T')[0],
-      next_action: input.nextAction ?? null,
-      next_action_date: input.nextActionDate ?? null,
-      notes: input.notes ?? null,
-      salary_discussed: input.salaryDiscussed ?? null,
-      interview_stage_details: input.interviewStageDetails ?? null,
-    })
+    .insert(row)
     .select(SELECT_COLUMNS)
     .single();
   if (error) throw error;
@@ -179,8 +186,10 @@ export async function updateJobApplication(
   if (updates.nextActionDate !== undefined)
     patch.next_action_date = updates.nextActionDate ?? null;
   if (updates.notes !== undefined) patch.notes = updates.notes ?? null;
-  if (updates.salaryDiscussed !== undefined)
-    patch.salary_discussed = updates.salaryDiscussed ?? null;
+  // The same constraint as on create: `salary_discussed` is NOT NULL, so it
+  // is never set to null. A cleared value is left to the database default.
+  if (updates.salaryDiscussed !== undefined && updates.salaryDiscussed !== null)
+    patch.salary_discussed = updates.salaryDiscussed;
   if (updates.interviewStageDetails !== undefined)
     patch.interview_stage_details = updates.interviewStageDetails ?? null;
   // Remove keys whose value is undefined — the Supabase client would otherwise

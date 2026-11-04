@@ -174,6 +174,57 @@ describe('domain CRUD', () => {
     assert.equal(identity.body.identity.whoYouAre, 'builder');
   });
 
+  test('an application without a salary still persists the date and the notes', async () => {
+    // `salary_discussed` is NOT NULL in the database. An application that
+    // carries no salary — which is every application the Live Jobs screen
+    // tracks, and every application the user adds without a salary — used to
+    // fail the insert with a 500, because the server sent an explicit null.
+    // The column must be left to its default instead.
+    const application = await api('POST', '/api/job-applications', {
+      token: userA.token,
+      body: {
+        company: 'Nile Digital',
+        role: 'Frontend Engineer',
+        stage: 'saved',
+        appliedDate: '2026-11-03',
+        notes: 'Applied from the live jobs screen.',
+      },
+    });
+    assert.equal(application.status, 201, 'an application without a salary must be created');
+    const row = application.body.application;
+    track('job_applications', row.id);
+    assert.equal(row.appliedDate, '2026-11-03', 'the application date must survive');
+    assert.equal(
+      row.notes,
+      'Applied from the live jobs screen.',
+      'the notes must survive',
+    );
+
+    // The record is readable through the list endpoint as well.
+    const list = await api('GET', '/api/job-applications', { token: userA.token });
+    assert.equal(list.status, 200);
+    const found = (list.body.applications ?? []).find((item) => item.id === row.id);
+    assert.ok(found, 'the new application must be listed');
+    assert.equal(found.appliedDate, '2026-11-03');
+    assert.equal(found.notes, 'Applied from the live jobs screen.');
+  });
+
+  test('an application can also be created with a salary', async () => {
+    const application = await api('POST', '/api/job-applications', {
+      token: userA.token,
+      body: {
+        company: 'Acme',
+        role: 'Dev',
+        stage: 'applied',
+        salaryDiscussed: '$145,000',
+      },
+    });
+    assert.equal(application.status, 201);
+    const row = application.body.application;
+    track('job_applications', row.id);
+    assert.equal(row.salaryDiscussed, '$145,000', 'a salary that was given must survive');
+  });
+
   test('saved role, job application and interview session round-trip', async () => {
     const role = await api('POST', '/api/saved-roles', {
       token: userA.token,
