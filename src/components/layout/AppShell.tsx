@@ -26,7 +26,6 @@ import {
   MoreHorizontal,
   LogOut,
   HeartHandshake,
-  GraduationCap,
   ShieldCheck
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
@@ -146,7 +145,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       label: t('Career Tools'),
       items: [
         { id: 'cv-studio', label: t('navCV'), icon: FileText },
-        { id: 'jobs', label: t('navJobs'), icon: GraduationCap },
+        { id: 'jobs', label: t('navJobs'), icon: Briefcase },
         { id: 'applications', label: t('navApplications'), icon: Calendar },
         { id: 'interviews', label: t('navInterviews'), icon: Target },
         { id: 'documents', label: t('My Documents'), icon: FolderClosed },

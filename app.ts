@@ -358,6 +358,17 @@ import { PUBLIC_PAGE_CSP } from './server/seo/html.ts';
 import { submitIndexNow } from './server/seo/indexnow.ts';
 import { fetchTrafficReport } from './server/analytics/ga4.ts';
 import { VERIFICATION_PATH, verificationFileBody } from './server/seo/verification.ts';
+import {
+  searchJobs,
+  getJobDetails,
+  isJobSearchConfigured,
+  JobSearchError,
+} from './server/jsearch/client.ts';
+import {
+  JOB_SOURCE_LABEL,
+  matchJobToSkills,
+  type LiveJob,
+} from './shared/jobs.ts';
 
 export const app = express();
 
@@ -5273,11 +5284,116 @@ app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) =
   }
 });
 
+// ---- Live job vacancies ----
+//
+// Real postings, aggregated from public job boards by the job provider. The
+// provider credential stays on this server and is never sent to the browser.
+//
+// Every vacancy is returned with a match against the candidate's own verified
+// skills, so the interface can explain the fit rather than assert it. A
+// vacancy whose posting lists no comparable skill returns no score at all
+// instead of a flattering default.
+const jobSearchRateLimit = rateLimit(20, 60_000, 'jobs');
+
+/** The candidate's own skill names, used to explain a match. */
+async function loadCandidateSkillNames(userId: string): Promise<string[]> {
+  try {
+    const rows = await getUserSkills(userId);
+    return rows
+      .map((row) => row.skill?.name)
+      .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
+  } catch (error) {
+    // A failure to read the candidate's skills must not fail the search: the
+    // vacancies are still real, only the explanation is missing.
+    console.error('Failed to load candidate skills for job matching:', error);
+    return [];
+  }
+}
+
+/** Answers a provider failure with a state the interface can explain. */
+function sendJobSearchError(res: Response, error: JobSearchError): void {
+  if (error.retryAfterSeconds !== null) {
+    res.setHeader('Retry-After', String(error.retryAfterSeconds));
+  }
+  res.status(error.status).json({
+    success: false,
+    error: error.message,
+    code: error.code,
+    retryAfterSeconds: error.retryAfterSeconds,
+  });
+}
+
+app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
+  try {
+    if (!isJobSearchConfigured()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Live job search is not configured on this server.',
+        code: 'not_configured',
+      });
+    }
+
+    const result = await searchJobs({ ...(req.query as Record<string, unknown>) });
+    const candidateSkills = await loadCandidateSkillNames(req.authUser!.id);
+
+    const jobs = result.jobs.map((job: LiveJob) => ({
+      job,
+      match: matchJobToSkills(job, candidateSkills, CATALOG_SKILL_NAMES),
+    }));
+
+    return res.json({
+      success: true,
+      jobs,
+      quota: result.quota,
+      cached: result.cached,
+      source: JOB_SOURCE_LABEL,
+    });
+  } catch (error) {
+    if (error instanceof JobSearchError) {
+      return sendJobSearchError(res, error);
+    }
+    console.error('Failed to search live jobs:', error);
+    return res.status(500).json({ error: 'Failed to search live jobs' });
+  }
+});
+
+// The provider's identifier for one vacancy.
+app.get('/api/jobs/:jobId', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
+  try {
+    if (!isJobSearchConfigured()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Live job search is not configured on this server.',
+        code: 'not_configured',
+      });
+    }
+
+    const jobId = str(req.params.jobId, 120);
+    if (!jobId) return res.status(400).json({ error: 'Invalid job id' });
+
+    const job = await getJobDetails(jobId);
+    if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
+
+    const candidateSkills = await loadCandidateSkillNames(req.authUser!.id);
+    return res.json({
+      success: true,
+      job,
+      match: matchJobToSkills(job, candidateSkills, CATALOG_SKILL_NAMES),
+      source: JOB_SOURCE_LABEL,
+    });
+  } catch (error) {
+    if (error instanceof JobSearchError) {
+      return sendJobSearchError(res, error);
+    }
+    console.error('Failed to load job details:', error);
+    return res.status(500).json({ error: 'Failed to load job details' });
+  }
+});
+
 // ---- Job bookmarks ----
 //
-// A bookmark stores only an opaque external job id. The current release has
-// no live job feed, so a normal client has no bookmarks; the endpoint remains
-// for a future provider. The owner is always the verified user id.
+// A bookmark stores only an opaque external job id, taken from the live feed.
+// The owner is always the verified user id.
 app.get('/api/bookmarks', requireAuth, async (req: Request, res: Response) => {
   try {
     const bookmarks = await listBookmarks(req.authUser!.id);

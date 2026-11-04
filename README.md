@@ -5,9 +5,9 @@ learning, projects, evidence, CVs, job applications, and interview practice in
 one workspace. State is stored in PostgreSQL (Supabase) and scoped to the
 signed-in Supabase Auth user.
 
-The Jobs view does not ship a live vacancy feed. It launches real searches on
-public job boards and keeps the roles you choose to pursue in the persisted
-Applications pipeline.
+The Live Jobs view shows real vacancies returned by the job provider (JSearch),
+matched against the skills in the signed-in user's own profile, and keeps the
+roles you choose to pursue in the persisted Applications pipeline.
 
 ## Stack
 
@@ -390,9 +390,12 @@ capacitor.config.ts       The native configuration
 
 ## Release scope and external dependencies
 
-- **No live job feed.** The Jobs view builds searches on LinkedIn, Indeed,
-  Google Jobs and Wellfound. The application does not invent listings or
-  application links.
+- **Live job feed.** The Live Jobs view shows real postings returned by JSearch,
+  an aggregate over public job boards. Live vacancies, the platform's own
+  curated opportunities and its learning resources are three separate
+  categories and are never mixed. The application does not invent listings or
+  application links. The provider credential is a server secret — see
+  `LIVE_JOBS_RAPIDAPI.md`.
 - **Branding assets** are integrated. The approved logo files live in
   `src/assets/brand/official/` and are the single source of truth. `npm run brand`
   regenerates every derivative from them (`src/assets/brand/*.png` for the UI,

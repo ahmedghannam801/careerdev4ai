@@ -257,6 +257,10 @@ async function main() {
     join(TESTS_DIR, 'cv-pipeline.test.ts'),
     join(TESTS_DIR, 'target-role.test.ts'),
     join(TESTS_DIR, 'volunteer.test.ts'),
+    // Live job vacancies: what the provider record becomes, what the fit
+    // explanation says, how the provider's failures are answered, and that the
+    // route is private and fails safely without a credential.
+    join(TESTS_DIR, 'jobs.test.ts'),
     // The personalisation engine, the grounding validator and the
     // localisation catalogue. These are pure: they need no database, but
     // they run in the same process as the rest of the suite so a regression

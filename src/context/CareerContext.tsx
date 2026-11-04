@@ -498,7 +498,7 @@ interface CareerContextType {
   bookmarkedJobIds: string[];
   toggleBookmarkJob: (jobId: string) => void;
   applications: JobApplication[];
-  addApplication: (application: Omit<JobApplication, 'id' | 'lastUpdated'>) => void;
+  addApplication: (application: Omit<JobApplication, 'id' | 'lastUpdated'>) => Promise<boolean>;
   updateApplicationStage: (id: string, stage: ApplicationStage) => void;
   updateApplicationNotes: (id: string, notes: string, nextAction?: string, nextActionDate?: string) => void;
   deleteApplication: (id: string) => void;
@@ -1758,11 +1758,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // and the interviews with a fabricated mock-interview session. A brand-new
   // user saw other people's career activity. Both lists now start empty and
   // are filled from PostgreSQL.
-  // There is no live job feed integration in this release. The previous
-  // static catalogue contained fabricated employers and `.example.com`
-  // application links, so it has been removed rather than presented as live
-  // matches. The Jobs view now links to real job-board searches, and job
-  // applications are still tracked in PostgreSQL.
+  // The static catalogue that used to live here contained fabricated employers
+  // and `.example.com` application links, so it was removed rather than
+  // presented as live matches. Live vacancies now come from the job provider
+  // through `/api/jobs/search`; this list stays empty because a vacancy is
+  // only ever shown when the provider returned it. Job applications are still
+  // tracked in PostgreSQL.
   const jobs: JobListing[] = [];
   const [applications, setApplications] = useState<JobApplication[]>([]);
 
@@ -4859,9 +4860,16 @@ Skills: ${activeCV.skillsList.join(', ')}
     }
   };
 
+  /**
+   * Records an application.
+   *
+   * The result says whether the record was actually written. A caller that
+   * shows the user a confirmation must use it: the interface must never claim
+   * an application the database does not have.
+   */
   const addApplication = async (
     application: Omit<JobApplication, 'id' | 'lastUpdated'>
-  ) => {
+  ): Promise<boolean> => {
     try {
       const dto = await postJobApplication({
         jobId: application.jobId,
@@ -4884,8 +4892,10 @@ Skills: ${activeCV.skillsList.join(', ')}
         subtitle: application.role,
         linkView: 'applications',
       });
+      return true;
     } catch (error) {
       console.error('Failed to create job application:', error);
+      return false;
     }
   };
 
