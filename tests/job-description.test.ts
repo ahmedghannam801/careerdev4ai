@@ -117,6 +117,55 @@ describe('the job description contract', () => {
     const empty = emptyJobDescriptionAnalysis();
     assert.equal(empty.jobTitle, null);
     assert.deepEqual(empty.requiredSkills, []);
+    // An advertisement that states none of the optional details leaves them
+    // empty rather than filled in with a plausible-looking value.
+    assert.equal(empty.company, null);
+    assert.equal(empty.seniority, null);
+    assert.equal(empty.location, null);
+    assert.equal(empty.workArrangement, null);
+    assert.deepEqual(empty.preferredSkills, []);
+    assert.deepEqual(empty.softSkills, []);
+    assert.deepEqual(empty.educationRequirements, []);
+    assert.deepEqual(empty.certifications, []);
+    assert.deepEqual(empty.atsTerms, []);
+  });
+
+  it('reads the details an advertisement actually states', () => {
+    const parsed = parseJobDescriptionAnalysis({
+      jobTitle: 'Senior Frontend Engineer',
+      company: 'Acme Corporation',
+      requiredSkills: ['React'],
+      preferredSkills: ['GraphQL'],
+      technicalSkills: ['TypeScript'],
+      softSkills: ['Communication'],
+      keywords: ['accessibility'],
+      responsibilities: ['Build interfaces'],
+      experienceRequirements: ['5 years'],
+      educationRequirements: ['BSc Computer Science'],
+      certifications: ['AWS Certified Developer'],
+      qualifications: ['Work permit'],
+      seniority: 'Senior',
+      location: 'Cairo, Egypt',
+      workArrangement: 'Hybrid',
+      atsTerms: ['React', 'TypeScript'],
+    });
+
+    assert.ok(parsed);
+    assert.equal(parsed.company, 'Acme Corporation');
+    assert.deepEqual(parsed.preferredSkills, ['GraphQL']);
+    assert.deepEqual(parsed.softSkills, ['Communication']);
+    assert.deepEqual(parsed.educationRequirements, ['BSc Computer Science']);
+    assert.deepEqual(parsed.certifications, ['AWS Certified Developer']);
+    assert.equal(parsed.seniority, 'Senior');
+    assert.equal(parsed.location, 'Cairo, Egypt');
+    assert.equal(parsed.workArrangement, 'Hybrid');
+    assert.deepEqual(parsed.atsTerms, ['React', 'TypeScript']);
+  });
+
+  it('rejects a single-valued detail that is not a string', () => {
+    assert.ok(validateJobDescriptionAnalysis({ company: 42 }).length > 0);
+    assert.ok(validateJobDescriptionAnalysis({ workArrangement: ['Remote'] }).length > 0);
+    assert.ok(validateJobDescriptionAnalysis({ seniority: { level: 'Senior' } }).length > 0);
   });
 });
 
@@ -171,6 +220,66 @@ describe('grounding the analysis against the pasted text', () => {
     );
     assert.equal(grounded.jobTitle, null);
   });
+
+  it('keeps the stated details and never invents the ones the text lacks', () => {
+    const text = [
+      'Senior Frontend Engineer',
+      'Company: Acme',
+      'Location: Cairo, Egypt',
+      'Hybrid role, with React and teamwork.',
+      'Bachelor degree in Computer Science.',
+      'AWS Certified Developer.',
+    ].join('\n');
+
+    const grounded = groundJobDescriptionAnalysis(
+      {
+        ...emptyJobDescriptionAnalysis(),
+        jobTitle: 'Senior Frontend Engineer',
+        company: 'Acme Corporation',
+        seniority: 'Senior',
+        location: 'Cairo, Egypt',
+        workArrangement: 'Hybrid',
+        requiredSkills: ['React'],
+        softSkills: ['Teamwork'],
+        educationRequirements: ['Bachelor degree in Computer Science'],
+        certifications: ['AWS Certified Developer'],
+        atsTerms: ['React'],
+        // None of these are in the pasted text.
+        preferredSkills: ['Rust'],
+        keywords: ['Kubernetes'],
+      },
+      text
+    );
+
+    assert.equal(grounded.company, 'Acme Corporation', 'a named employer survives');
+    assert.equal(grounded.seniority, 'Senior');
+    assert.equal(grounded.location, 'Cairo, Egypt');
+    assert.equal(grounded.workArrangement, 'Hybrid');
+    assert.deepEqual(grounded.softSkills, ['Teamwork']);
+    assert.deepEqual(grounded.educationRequirements, ['Bachelor degree in Computer Science']);
+    assert.deepEqual(grounded.certifications, ['AWS Certified Developer']);
+    assert.deepEqual(grounded.atsTerms, ['React']);
+    assert.deepEqual(grounded.preferredSkills, []);
+    assert.deepEqual(grounded.keywords, []);
+  });
+
+  it('drops a company, a place or an arrangement the text does not name', () => {
+    const grounded = groundJobDescriptionAnalysis(
+      {
+        ...emptyJobDescriptionAnalysis(),
+        company: 'Globex',
+        location: 'Berlin, Germany',
+        seniority: 'Principal',
+        workArrangement: 'On-site',
+      },
+      jd
+    );
+
+    assert.equal(grounded.company, null);
+    assert.equal(grounded.location, null);
+    assert.equal(grounded.seniority, null);
+    assert.equal(grounded.workArrangement, null);
+  });
 });
 
 describe('the ATS match', () => {
@@ -224,15 +333,57 @@ describe('the ATS match', () => {
     assert.equal(report.score, 100);
   });
 
-  it('raises the score when the candidate covers more', () => {
-    const before = buildAtsMatchReport(analysis, facts).score;
-    const after = buildAtsMatchReport(
+  it('counts a preferred skill and the other stated details', () => {
+    const report = buildAtsMatchReport(
       {
-        ...analysis,
-        requiredSkills: ['React', 'GraphQL', 'TypeScript'],
+        ...emptyJobDescriptionAnalysis(),
+        preferredSkills: ['React'],
+        softSkills: ['Communication'],
+        educationRequirements: ['BSc Computer Science'],
+        certifications: ['AWS Certified Developer'],
+      },
+      {
+        skills: [{ name: 'React', level: 4 }],
+        sources: [
+          {
+            label: 'BSc Computer Science',
+            text: 'BSc Computer Science. Communication. AWS Certified Developer.',
+          },
+        ],
+      }
+    );
+
+    assert.ok(report.matched.some((item) => item.requirement === 'React'));
+    assert.ok(report.missing.some((item) => item.requirement === 'Communication') === false);
+    assert.ok(report.matched.some((item) => item.requirement === 'BSc Computer Science'));
+    assert.ok(report.matched.some((item) => item.requirement === 'AWS Certified Developer'));
+  });
+
+  it('counts a term the advertisement repeats only once', () => {
+    const report = buildAtsMatchReport(
+      {
+        ...emptyJobDescriptionAnalysis(),
+        requiredSkills: ['React'],
+        technicalSkills: ['React'],
+        atsTerms: ['React'],
+        keywords: ['React'],
       },
       facts
-    ).score;
+    );
+
+    assert.equal(report.matched.length, 1);
+    assert.equal(report.missing.length, 0);
+    assert.equal(report.score, 100);
+  });
+
+  it('raises the score when the candidate covers more', () => {
+    const before = buildAtsMatchReport(analysis, facts).score;
+    const after = buildAtsMatchReport(analysis, {
+      ...facts,
+      // GraphQL is in the advertisement and missing from the record before
+      // this point. Covering it has to help.
+      skills: [...facts.skills, { name: 'GraphQL', level: 4 }],
+    }).score;
     assert.ok(after > before, 'covering GraphQL too would have to help');
   });
 
@@ -469,7 +620,45 @@ describe('reading a job description without a model', () => {
     assert.ok(analysis.technicalSkills.length > 0);
     assert.ok(analysis.responsibilities.length > 0);
     assert.ok(analysis.experienceRequirements.length > 0);
-    assert.ok(analysis.qualifications.length > 0);
+    assert.ok(analysis.educationRequirements!.length > 0);
+  });
+
+  it('reads the stated company, place, seniority and arrangement', () => {
+    const analysis = extractDeterministicJobDescription(
+      [
+        'Senior Frontend Engineer',
+        'Company: Acme Corporation',
+        'Location: Cairo, Egypt',
+        'Work arrangement: Hybrid',
+        '- React and TypeScript are required.',
+        '- GraphQL experience is preferred.',
+        '- Excellent communication skills.',
+        '- Bachelor degree in Computer Science.',
+        '- AWS Certified Developer.',
+        '- You will build accessible user interfaces.',
+      ].join('\n')
+    );
+
+    assert.equal(analysis.company, 'Acme Corporation');
+    assert.equal(analysis.location, 'Cairo, Egypt');
+    assert.equal(analysis.workArrangement, 'Hybrid');
+    assert.equal(analysis.seniority, 'Senior');
+    assert.deepEqual(analysis.preferredSkills, ['GraphQL experience is preferred.']);
+    assert.deepEqual(analysis.softSkills, ['Excellent communication skills.']);
+    assert.deepEqual(analysis.educationRequirements, ['Bachelor degree in Computer Science.']);
+    assert.deepEqual(analysis.certifications, ['AWS Certified Developer.']);
+    // The deterministic reader cannot identify an ATS filter term on its own,
+    // so it reports none rather than presenting its own guess as extraction.
+    assert.deepEqual(analysis.atsTerms, []);
+  });
+
+  it('leaves the details empty when the advertisement states none', () => {
+    const analysis = extractDeterministicJobDescription('Frontend Engineer\nReact required.');
+    assert.equal(analysis.company, null);
+    assert.equal(analysis.location, null);
+    assert.equal(analysis.seniority, null);
+    assert.equal(analysis.workArrangement, null);
+    assert.deepEqual(analysis.atsTerms, []);
   });
 
   it('returns an empty analysis for an empty advertisement', () => {
@@ -480,20 +669,30 @@ describe('reading a job description without a model', () => {
 });
 
 describe('the prompts', () => {
-  it('asks for the seven things and says not to invent any', () => {
+  it('asks for every field and says not to invent any', () => {
     const prompt = buildJobDescriptionPrompt('Some job description text.', { language: 'ar' });
     for (const field of [
       'jobTitle',
+      'company',
       'requiredSkills',
+      'preferredSkills',
       'technicalSkills',
+      'softSkills',
       'keywords',
       'responsibilities',
       'experienceRequirements',
+      'educationRequirements',
+      'certifications',
       'qualifications',
+      'seniority',
+      'location',
+      'workArrangement',
+      'atsTerms',
     ]) {
       assert.match(prompt, new RegExp(field), `the prompt asks for ${field}`);
     }
     assert.match(prompt, /Do not add a requirement it does not state/);
+    assert.match(prompt, /Never guess a company/);
     assert.match(prompt, /Arabic/);
   });
 

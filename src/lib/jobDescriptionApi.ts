@@ -14,10 +14,11 @@
  */
 
 import { apiRequest } from './apiClient';
-import type {
-  AtsCvContent,
-  AtsMatchReport,
-  JobDescriptionAnalysis,
+import {
+  emptyJobDescriptionAnalysis,
+  type AtsCvContent,
+  type AtsMatchReport,
+  type JobDescriptionAnalysis,
 } from '../../shared/jobDescription';
 import type { AiLanguageCode } from '../../shared/aiLanguages';
 
@@ -92,15 +93,7 @@ export async function analyzeJobDescription(
 
   return {
     success: response.success ?? true,
-    analysis: (response.analysis ?? {
-      jobTitle: null,
-      requiredSkills: [],
-      technicalSkills: [],
-      keywords: [],
-      responsibilities: [],
-      experienceRequirements: [],
-      qualifications: [],
-    }) as JobDescriptionAnalysis,
+    analysis: (response.analysis ?? emptyJobDescriptionAnalysis()) as JobDescriptionAnalysis,
     match: (response.match ?? {
       score: 0,
       breakdown: {

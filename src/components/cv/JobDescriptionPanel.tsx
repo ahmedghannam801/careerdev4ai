@@ -32,6 +32,8 @@ import {
   Save,
   Download,
   Mail,
+  Copy,
+  RotateCcw,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { AIProcessingModal, type AIProcessingStatus } from '../ai/AIProcessingModal';
@@ -47,6 +49,7 @@ import {
   type AtsCvContent,
   type AtsMatchReport,
   type JobDescriptionAnalysis,
+  type JobDescriptionListField,
 } from '../../../shared/jobDescription';
 
 /**
@@ -76,16 +79,21 @@ export interface JobDescriptionPanelProps {
   setState: React.Dispatch<React.SetStateAction<JobDescriptionPanelState>>;
 }
 
-/** The seven things a job description is read for, in the order they are shown. */
+/** The list-valued things a job description is read for, in the order they are shown. */
 const ANALYSIS_SECTIONS: Array<{
-  key: keyof Omit<JobDescriptionAnalysis, 'jobTitle'>;
+  key: JobDescriptionListField;
   label: string;
 }> = [
   { key: 'requiredSkills', label: 'Required Skills' },
+  { key: 'preferredSkills', label: 'Preferred Skills' },
   { key: 'technicalSkills', label: 'Technical Skills & Tools' },
+  { key: 'softSkills', label: 'Soft Skills' },
   { key: 'keywords', label: 'Keywords' },
+  { key: 'atsTerms', label: 'ATS Terms' },
   { key: 'responsibilities', label: 'Responsibilities' },
   { key: 'experienceRequirements', label: 'Experience Requirements' },
+  { key: 'educationRequirements', label: 'Education Requirements' },
+  { key: 'certifications', label: 'Certifications' },
   { key: 'qualifications', label: 'Qualifications' },
 ];
 
@@ -100,6 +108,7 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
   const [coverLetterId, setCoverLetterId] = useState<string | null>(null);
   const [coverLetterHighlights, setCoverLetterHighlights] = useState<string[]>([]);
   const [coverLetterSaving, setCoverLetterSaving] = useState(false);
+  const [coverLetterCopied, setCoverLetterCopied] = useState(false);
   const [coverLetterError, setCoverLetterError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -430,6 +439,39 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
     anchor.download = `cover-letter-${(state.company || analysis?.jobTitle || 'application').replace(/[^a-z0-9-]+/gi, '-').toLowerCase()}.txt`;
     anchor.click();
     URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Copies the letter exactly as it is shown.
+   *
+   * The clipboard API is only available in a secure context, so a fallback
+   * selects the text through a temporary textarea. A failed copy reports
+   * itself instead of claiming success: the button label is the only feedback
+   * and it must be true.
+   */
+  const handleCopyCoverLetter = async () => {
+    const text = coverLetterDraft;
+    if (!text.trim()) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(area);
+        if (!copied) throw new Error('Copy failed');
+      }
+      setCoverLetterCopied(true);
+      window.setTimeout(() => setCoverLetterCopied(false), 2000);
+    } catch {
+      setCoverLetterError(t('The letter could not be copied. Select it and copy it manually.'));
+    }
   };
 
   const handleJobDescriptionFile = async (file: File) => {
@@ -779,10 +821,40 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
             {t('What This Job Asks For')}
           </h3>
 
+          {/* The facts that sit around the requirements. A field the
+              advertisement did not state is shown as not stated: the panel
+              never fills one in to look complete. */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Company', value: analysis.company },
+              { label: 'Seniority', value: analysis.seniority },
+              { label: 'Location', value: analysis.location },
+              { label: 'Work arrangement', value: analysis.workArrangement },
+            ].map((fact) => (
+              <div
+                key={fact.label}
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3"
+              >
+                <div className="text-[11px] font-semibold uppercase text-[var(--text-muted)]">
+                  {t(fact.label)}
+                </div>
+                <div
+                  className={`mt-0.5 text-xs ${
+                    fact.value
+                      ? 'font-medium text-[var(--text-primary)]'
+                      : 'text-[var(--text-muted)]'
+                  }`}
+                >
+                  {fact.value ? fact.value : t('Not specified')}
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {ANALYSIS_SECTIONS.map((section) => {
-              const items = analysis[section.key];
-              if (!items || items.length === 0) return null;
+              const items = analysis[section.key] ?? [];
+              if (items.length === 0) return null;
               return (
                 <div key={section.key} className="space-y-1.5">
                   <div className="text-[11px] font-semibold text-[var(--text-muted)] uppercase">
@@ -949,14 +1021,24 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
               type="button"
               onClick={() => void handleGenerateCoverLetter()}
               disabled={!state.company.trim() || !analysis.jobTitle || !!processing || coverLetterSaving}
-              className="rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-50"
-            >{t('Generate cover letter')}</button>
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              {coverLetterDraft ? t('Regenerate cover letter') : t('Generate cover letter')}
+            </button>
             <button
               type="button"
               onClick={() => void handleSaveCoverLetter()}
               disabled={!coverLetterDraft.trim() || coverLetterSaving}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:opacity-50"
             ><Save className="h-3.5 w-3.5" />{coverLetterSaving ? t('Saving…') : coverLetterId ? t('Save changes') : t('Save cover letter')}</button>
+            <button
+              type="button"
+              onClick={() => void handleCopyCoverLetter()}
+              disabled={!coverLetterDraft.trim()}
+              aria-live="polite"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:opacity-50"
+            ><Copy className="h-3.5 w-3.5" />{coverLetterCopied ? t('Copied') : t('Copy')}</button>
             <button
               type="button"
               onClick={handleExportCoverLetter}

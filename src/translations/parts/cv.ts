@@ -197,6 +197,17 @@ export const cvAr: Record<string, string> = {
   'Retry only creates the records that are still missing. Rows that already succeeded are skipped, so nothing is duplicated.':
     'إعادة المحاولة تنشئ السجلات الناقصة فقط. تُتجاهل السطور التي نجحت سابقًا، فلا يتكرر شيء.',
   'Not specified': 'غير محدَّد',
+  'Still working. Larger analyses can take a minute.':
+    'لا يزال العمل جاريًا. قد تستغرق التحليلات الكبيرة دقيقة.',
+  'Regenerate cover letter': 'إعادة إنشاء خطاب التقديم',
+  'The letter could not be copied. Select it and copy it manually.':
+    'تعذّر نسخ الخطاب. حدّده وانسخه يدويًا.',
+  'Preferred Skills': 'المهارات المفضّلة',
+  'Soft Skills': 'المهارات الشخصية',
+  'ATS Terms': 'مصطلحات أنظمة التتبع',
+  'Education Requirements': 'متطلبات التعليم',
+  'Seniority': 'المستوى الوظيفي',
+  'Work arrangement': 'نمط العمل',
   'Extracting text and structure…': 'جارٍ استخراج النص والبنية…',
   'Extract CV Information': 'استخراج معلومات السيرة الذاتية',
   'Importing Data…': 'جارٍ استيراد البيانات…',

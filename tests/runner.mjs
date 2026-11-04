@@ -322,10 +322,19 @@ async function main() {
     // The public legal document versions and the server's acceptance predicate.
     // Pure; the user-provided legal copy remains an operator TODO.
     join(TESTS_DIR, 'legal.test.ts'),
+    // The consent gate against the running API: a protected route is refused
+    // until the current documents are accepted, an old acceptance is not
+    // current, one user's acceptance cannot unlock another, and the history
+    // survives a version change.
+    join(TESTS_DIR, 'consent-gate.test.ts'),
     // The shared AI request lifecycle: a late answer never reaches the
     // interface, a save that started is not cancelled, and a failed save is
     // reported. Pure.
     join(TESTS_DIR, 'ai-processing-contract.test.ts'),
+    // The public website: the interactive product preview runs the real
+    // planning engine, the legal and contact links reach their real
+    // destinations, and the new copy is fully translated. Pure.
+    join(TESTS_DIR, 'public-site.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

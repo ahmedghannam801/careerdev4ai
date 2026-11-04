@@ -21,9 +21,15 @@ export const SITE_NAME = 'CareerDev4AI';
  *
  * A search engine that has seen "Career Dev 4AI" in a query needs to be able to
  * match it to this site. The list holds only spellings of the same product —
- * never a different product, and never a name the site does not use.
+ * never a different product, and never a name the site does not use. The
+ * canonical name is included as well: it is the exact string a search engine
+ * should attach to this site when the two schema blocks are reconciled.
  */
-export const SITE_ALTERNATE_NAMES = ['Career Dev 4AI', 'CareerDev4AI Career Platform'] as const;
+export const SITE_ALTERNATE_NAMES = [
+  'CareerDev4AI',
+  'Career Dev 4AI',
+  'CareerDev4AI Career Platform',
+] as const;
 
 /** The one-line description of the product, used where no better one exists. */
 export const SITE_TAGLINE = 'Your personal career operating system';

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw, Sparkles, X } from 'lucide-react';
 import { useDismissOnEscape, useFocusTrap, useScrollLock } from '../../lib/overlay';
 import { useCareer } from '../../context/CareerContext';
@@ -41,6 +41,19 @@ export const AIProcessingModal: React.FC<AIProcessingModalProps> = ({
 }) => {
   const { t } = useCareer();
   const panelRef = useRef<HTMLDivElement>(null);
+  // A request that is taking longer than usual says so in plain words. It is
+  // not a progress estimate and it is not a pretend step: the only claim is
+  // that the work has not finished yet.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!open || status !== 'processing') {
+      setSlow(false);
+      return;
+    }
+    setSlow(false);
+    const timer = window.setTimeout(() => setSlow(true), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [open, status]);
   useScrollLock(open);
   useFocusTrap(open, panelRef);
   useDismissOnEscape(open && status !== 'processing', onClose);
@@ -97,6 +110,11 @@ export const AIProcessingModal: React.FC<AIProcessingModalProps> = ({
             <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
               <div className="h-full w-2/5 animate-pulse rounded-full bg-[var(--accent-primary)] motion-reduce:animate-none" />
             </div>
+            {slow && (
+              <p className="text-[11px] font-medium text-[var(--color-primary-text)]" role="status" aria-live="polite">
+                {t('Still working. Larger analyses can take a minute.')}
+              </p>
+            )}
             <p className="text-[11px] text-[var(--text-muted)]">
               {canCancel
                 ? t('Stopping waiting discards late results; the AI service may continue processing.')

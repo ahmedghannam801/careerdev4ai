@@ -186,21 +186,32 @@ export function buildJobDescriptionPrompt(
   parts.push('');
   parts.push('Extract the following, and nothing else:');
   parts.push('- jobTitle: the role the advertisement is for, or null if it names no role.');
+  parts.push('- company: the employer it names, or null if it names none.');
   parts.push('- requiredSkills: the skills the advertisement lists as required.');
+  parts.push('- preferredSkills: the skills it lists as preferred, desirable, a plus or a bonus.');
   parts.push('- technicalSkills: the tools, languages, frameworks and platforms it names.');
+  parts.push('- softSkills: the interpersonal qualities it asks for.');
   parts.push('- keywords: the terms an applicant filter is likely to scan for.');
   parts.push('- responsibilities: what the person in the role is expected to do.');
   parts.push('- experienceRequirements: the experience it asks for.');
-  parts.push('- qualifications: the credentials and formal requirements it asks for.');
+  parts.push('- educationRequirements: the education it asks for.');
+  parts.push('- certifications: the certifications, licences or accreditations it asks for.');
+  parts.push('- qualifications: the other formal requirements it asks for.');
+  parts.push('- seniority: the seniority it states (intern, junior, mid-level, senior, lead, principal, director), or null if it states none.');
+  parts.push('- location: the place the work is in, or null if it states none.');
+  parts.push('- workArrangement: Remote, Hybrid or On-site, but only when the advertisement states it; otherwise null.');
+  parts.push('- atsTerms: the exact terms an applicant tracking system is likely to filter on, copied from the advertisement.');
   parts.push('');
   parts.push('Rules:');
   parts.push('- Copy the wording from the advertisement. Do not add a requirement it does not state.');
   parts.push('- Do not paraphrase a skill into a different technology.');
+  parts.push('- A field the advertisement does not state must be null for a single value or [] for a list. Never guess a company, a place, a seniority or an arrangement.');
   parts.push('- Keep each item to one short line, with no bullet characters.');
   if (options.language === 'ar') {
     parts.push('- The advertisement may be in Arabic. Write the extracted items in the advertisement\'s own language.');
-  }  parts.push('- Return JSON only, with those seven keys.');
-  parts.push('- Example of the shape: {"jobTitle": "...", "requiredSkills": ["..."], "technicalSkills": ["..."], "keywords": ["..."], "responsibilities": ["..."], "experienceRequirements": ["..."], "qualifications": ["..."]}');
+  }
+  parts.push('- Return JSON only, with those keys.');
+  parts.push('- Example of the shape: {"jobTitle": "...", "company": "...", "requiredSkills": ["..."], "preferredSkills": ["..."], "technicalSkills": ["..."], "softSkills": ["..."], "keywords": ["..."], "responsibilities": ["..."], "experienceRequirements": ["..."], "educationRequirements": ["..."], "certifications": ["..."], "qualifications": ["..."], "seniority": "...", "location": "...", "workArrangement": "...", "atsTerms": ["..."]}');
 
   return parts.join('\n');
 }
@@ -301,11 +312,29 @@ export function buildAtsCvPrompt(input: {
     .map((item) => item.requirement);
 
   parts.push('You are rewriting ONE candidate\'s CV so that it is aimed at ONE specific job description.');
+  if (input.analysis.jobTitle || input.analysis.company) {
+    parts.push('');
+    parts.push(
+      `The role: ${[input.analysis.jobTitle, input.analysis.company].filter(Boolean).join(' at ')}.`
+    );
+  }
+  const roleFacts = [
+    input.analysis.seniority ? `Seniority: ${input.analysis.seniority}` : '',
+    input.analysis.location ? `Location: ${input.analysis.location}` : '',
+    input.analysis.workArrangement ? `Work arrangement: ${input.analysis.workArrangement}` : '',
+  ].filter(Boolean);
+  if (roleFacts.length > 0) {
+    for (const fact of roleFacts) parts.push(`- ${fact}`);
+  }
   parts.push('');
   parts.push('The job description\'s requirements:');
   for (const item of input.analysis.requiredSkills) parts.push(`- Required skill: ${item}`);
+  for (const item of input.analysis.preferredSkills ?? []) parts.push(`- Preferred skill: ${item}`);
   for (const item of input.analysis.technicalSkills) parts.push(`- Tool or technology: ${item}`);
+  for (const item of input.analysis.softSkills ?? []) parts.push(`- Soft skill: ${item}`);
   for (const item of input.analysis.experienceRequirements) parts.push(`- Experience: ${item}`);
+  for (const item of input.analysis.educationRequirements ?? []) parts.push(`- Education: ${item}`);
+  for (const item of input.analysis.certifications ?? []) parts.push(`- Certification: ${item}`);
   for (const item of input.analysis.qualifications) parts.push(`- Qualification: ${item}`);
   for (const item of input.analysis.responsibilities) parts.push(`- Responsibility: ${item}`);
   parts.push('');

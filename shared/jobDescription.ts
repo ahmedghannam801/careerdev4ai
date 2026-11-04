@@ -59,46 +59,101 @@ export type JdRequirementKind =
  */
 export type JdRequirementImportance = 'core' | 'preferred' | 'mention';
 
-/** The seven things a job description is read for. */
+/**
+ * Everything a job description is read for.
+ *
+ * The original fields are the core reading the score has always been built
+ * from. The rest are the details an application usually turns on — the company,
+ * the seniority, the arrangement, the preferred and soft skills, the education
+ * and certifications — and they are optional because an advertisement that
+ * does not state one must leave it empty rather than guess it.
+ */
 export interface JobDescriptionAnalysis {
   /** The role the advertisement is for, when the text names one. */
   jobTitle: string | null;
+  /** The employer, when the advertisement names it. */
+  company?: string | null;
   /** The skills the advertisement lists as required. */
   requiredSkills: string[];
+  /** The skills it lists as preferred, desirable or a plus. */
+  preferredSkills?: string[];
   /** The tools, languages and platforms it names. */
   technicalSkills: string[];
+  /** The interpersonal qualities it asks for. */
+  softSkills?: string[];
   /** The terms an applicant filter is likely to scan for. */
   keywords: string[];
   /** What the person in the role is expected to do. */
   responsibilities: string[];
   /** How much experience the advertisement asks for. */
   experienceRequirements: string[];
-  /** The credentials it asks for. */
+  /** The education it asks for. */
+  educationRequirements?: string[];
+  /** The certifications, licences or accreditations it asks for. */
+  certifications?: string[];
+  /** The credentials and formal requirements it asks for. */
   qualifications: string[];
+  /** The seniority the advertisement states. */
+  seniority?: string | null;
+  /** The place the work is in, when the advertisement states one. */
+  location?: string | null;
+  /** Remote, hybrid or on-site, when the advertisement states one. */
+  workArrangement?: string | null;
+  /** The exact terms an applicant tracking system is likely to filter on. */
+  atsTerms?: string[];
 }
 
-/** The keys of `JobDescriptionAnalysis`, in the order the UI shows them. */
+/** The list-valued keys of `JobDescriptionAnalysis`, in the order the UI shows them. */
 export const JOB_DESCRIPTION_LIST_FIELDS = [
   'requiredSkills',
+  'preferredSkills',
   'technicalSkills',
+  'softSkills',
   'keywords',
   'responsibilities',
   'experienceRequirements',
+  'educationRequirements',
+  'certifications',
   'qualifications',
+  'atsTerms',
 ] as const;
 
 export type JobDescriptionListField = (typeof JOB_DESCRIPTION_LIST_FIELDS)[number];
+
+/**
+ * The single-valued keys of `JobDescriptionAnalysis`.
+ *
+ * They are held to the same contract as `jobTitle`: a string, or null when the
+ * advertisement does not state them.
+ */
+export const JOB_DESCRIPTION_TEXT_FIELDS = [
+  'company',
+  'seniority',
+  'location',
+  'workArrangement',
+] as const;
+
+export type JobDescriptionTextField = (typeof JOB_DESCRIPTION_TEXT_FIELDS)[number];
 
 /** An empty analysis, used as the starting point and as the fallback shape. */
 export function emptyJobDescriptionAnalysis(): JobDescriptionAnalysis {
   return {
     jobTitle: null,
+    company: null,
     requiredSkills: [],
+    preferredSkills: [],
     technicalSkills: [],
+    softSkills: [],
     keywords: [],
     responsibilities: [],
     experienceRequirements: [],
+    educationRequirements: [],
+    certifications: [],
     qualifications: [],
+    seniority: null,
+    location: null,
+    workArrangement: null,
+    atsTerms: [],
   };
 }
 
@@ -167,6 +222,12 @@ export function validateJobDescriptionAnalysis(payload: unknown): string[] {
   if (record.jobTitle !== undefined && record.jobTitle !== null && typeof record.jobTitle !== 'string') {
     errors.push('jobTitle must be a string or null.');
   }
+  for (const field of JOB_DESCRIPTION_TEXT_FIELDS) {
+    const value = record[field];
+    if (value !== undefined && value !== null && typeof value !== 'string') {
+      errors.push(`${field} must be a string or null.`);
+    }
+  }
   for (const field of JOB_DESCRIPTION_LIST_FIELDS) {
     const value = record[field];
     if (value === undefined || value === null) continue;
@@ -197,12 +258,21 @@ export function parseJobDescriptionAnalysis(payload: unknown): JobDescriptionAna
   const title = coerceItem(record.jobTitle);
   return {
     jobTitle: title,
+    company: coerceItem(record.company),
     requiredSkills: coerceRequirementList(record.requiredSkills),
+    preferredSkills: coerceRequirementList(record.preferredSkills),
     technicalSkills: coerceRequirementList(record.technicalSkills),
+    softSkills: coerceRequirementList(record.softSkills),
     keywords: coerceRequirementList(record.keywords),
     responsibilities: coerceRequirementList(record.responsibilities),
     experienceRequirements: coerceRequirementList(record.experienceRequirements),
+    educationRequirements: coerceRequirementList(record.educationRequirements),
+    certifications: coerceRequirementList(record.certifications),
     qualifications: coerceRequirementList(record.qualifications),
+    seniority: coerceItem(record.seniority),
+    location: coerceItem(record.location),
+    workArrangement: coerceItem(record.workArrangement),
+    atsTerms: coerceRequirementList(record.atsTerms),
   };
 }
 
@@ -395,20 +465,43 @@ export function groundJobDescriptionAnalysis(
   const keepList = (items: string[], minimumCoverage: number): string[] =>
     items.filter((item) => supported(item, minimumCoverage));
 
+  const keepText = (value: string | null | undefined, minimumCoverage: number): string | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return supported(trimmed, minimumCoverage) ? trimmed : null;
+  };
+
   const title = analysis.jobTitle;
   const groundedTitle = title && supported(title, 0.6) ? title : null;
 
   return {
     jobTitle: groundedTitle,
+    // A company or a place is a proper name: half of its words is enough,
+    // because the advertisement may write "Acme" where the model wrote
+    // "Acme Corporation". A value that shares nothing with the text is still
+    // dropped.
+    company: keepText(analysis.company, 0.5),
     // A skill must be recognisably present in the text.
     requiredSkills: keepList(analysis.requiredSkills, 0.8),
+    preferredSkills: keepList(analysis.preferredSkills ?? [], 0.8),
     technicalSkills: keepList(analysis.technicalSkills, 0.8),
+    // A soft skill is usually a phrase, and the advertisement may have written
+    // it as a sentence.
+    softSkills: keepList(analysis.softSkills ?? [], 0.5),
     // A keyword may be a single common word, so it is held to a lower bar.
     keywords: keepList(analysis.keywords, 0.6),
     // A responsibility is a sentence, so most of its words must be there.
     responsibilities: keepList(analysis.responsibilities, 0.5),
     experienceRequirements: keepList(analysis.experienceRequirements, 0.5),
+    educationRequirements: keepList(analysis.educationRequirements ?? [], 0.5),
+    // A certificate is a name, so it must appear almost exactly.
+    certifications: keepList(analysis.certifications ?? [], 0.6),
     qualifications: keepList(analysis.qualifications, 0.5),
+    seniority: keepText(analysis.seniority, 0.5),
+    location: keepText(analysis.location, 0.5),
+    workArrangement: keepText(analysis.workArrangement, 0.5),
+    atsTerms: keepList(analysis.atsTerms ?? [], 0.6),
   };
 }
 
@@ -610,6 +703,11 @@ export function collectJobRequirements(
     kind: JdRequirementKind;
     importance: JdRequirementImportance;
   }> = [];
+  // An advertisement often repeats the same term in two places ("React" as a
+  // required skill and again in the keyword list). Counting it twice would
+  // make the score depend on how often the employer repeated themselves, so a
+  // term is scored once, under the most important heading that mentioned it.
+  const seen = new Set<string>();
 
   const add = (
     items: string[],
@@ -617,16 +715,25 @@ export function collectJobRequirements(
     importance: JdRequirementImportance
   ): void => {
     for (const requirement of items) {
-      if (!requirement.trim()) continue;
-      requirements.push({ requirement: requirement.trim(), kind, importance });
+      const trimmed = requirement.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      requirements.push({ requirement: trimmed, kind, importance });
     }
   };
 
   add(analysis.requiredSkills, 'required_skill', 'core');
+  add(analysis.preferredSkills ?? [], 'required_skill', 'preferred');
   add(analysis.technicalSkills, 'technical_skill', 'core');
+  add(analysis.softSkills ?? [], 'keyword', 'preferred');
   add(analysis.experienceRequirements, 'experience', 'core');
+  add(analysis.educationRequirements ?? [], 'qualification', 'preferred');
+  add(analysis.certifications ?? [], 'qualification', 'preferred');
   add(analysis.qualifications, 'qualification', 'preferred');
   add(analysis.responsibilities, 'responsibility', 'preferred');
+  add(analysis.atsTerms ?? [], 'keyword', 'mention');
   add(analysis.keywords, 'keyword', 'mention');
 
   return requirements;
@@ -1063,12 +1170,54 @@ export function applyAtsCvToDocument<T extends AtsCvDocument>(
 // ---------------------------------------------------------------------------
 
 /**
+ * Reads a `Label: value` line from the top of an advertisement.
+ *
+ * Only an explicit label is trusted. Inferring a company from the way a title
+ * was written would be a guess, and an invented employer on an application is
+ * worse than an empty field.
+ */
+function readLabelledValue(lines: string[], labels: readonly string[]): string | null {
+  const pattern = new RegExp(`^(?:${labels.join('|')})\\s*[:\\-–—]\\s*(.+)$`, 'i');
+  for (const line of lines.slice(0, 20)) {
+    const match = pattern.exec(line);
+    const value = match?.[1]?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+/** The arrangement the advertisement states, in its own wording. */
+function inferWorkArrangement(text: string): string | null {
+  const lower = text.toLowerCase();
+  if (/\bhybrid\b/.test(lower)) return 'Hybrid';
+  if (/\b(on-?site|in-?office|office[- ]based)\b/.test(lower)) return 'On-site';
+  if (/\b(fully remote|remote|work from home|telecommut\w*)\b/.test(lower)) return 'Remote';
+  return null;
+}
+
+/** The seniority an advertisement states in its title or first lines. */
+function inferSeniority(text: string): string | null {
+  const match = /\b(intern|internship|entry[- ]level|junior|mid[- ]level|senior|staff|lead|principal|director|head of [a-z]+|manager)\b/i.exec(
+    text
+  );
+  if (!match) return null;
+  return match[1];
+}
+
+const METADATA_LABEL_PATTERN =
+  /^(company|employer|organisation|organization|location|work location|office|city|seniority|experience level|job level|level|work arrangement|work mode|arrangement|mode|remote)\s*[:\-–—]/i;
+
+/**
  * Reads a job description without a model.
  *
  * When the model is unavailable, the candidate still gets an analysis and an
  * ATS score: the advertisement's own bullet lines are read and classified by
  * the words they use. The result is coarser than a model's, and it is
  * labelled as such, but the CV studio keeps working.
+ *
+ * Anything the advertisement does not state stays empty. A deterministic
+ * reader has no way to identify an ATS filter term separately from the words
+ * the employer wrote, so it reports none instead of presenting its own guess.
  */
 export function extractDeterministicJobDescription(jdText: string): JobDescriptionAnalysis {
   const analysis = emptyJobDescriptionAnalysis();
@@ -1093,13 +1242,48 @@ export function extractDeterministicJobDescription(jdText: string): JobDescripti
     analysis.jobTitle = firstLine;
   }
 
+  analysis.company = readLabelledValue(lines, [
+    'company',
+    'employer',
+    'organisation',
+    'organization',
+  ]);
+  analysis.location = readLabelledValue(lines, [
+    'location',
+    'work location',
+    'office',
+    'city',
+  ]);
+  analysis.seniority =
+    readLabelledValue(lines, ['seniority', 'experience level', 'job level', 'level']) ??
+    inferSeniority(lines.slice(0, 3).join(' '));
+  analysis.workArrangement =
+    readLabelledValue(lines, [
+      'work arrangement',
+      'work mode',
+      'arrangement',
+      'mode',
+      'remote',
+    ]) ?? inferWorkArrangement(lines.slice(0, 5).join(' '));
+
   for (let index = 1; index < entries.length; index += 1) {
     const entry = entries[index];
     const line = entry.text;
     if (line.length <= 2) continue;
+    // A labelled detail is metadata, not a requirement, and repeating it as a
+    // keyword would count it twice in the score.
+    if (METADATA_LABEL_PATTERN.test(line)) continue;
     const lower = line.toLowerCase();
 
-    if (/(must have|required|requirement|strong knowledge|proficiency|proficient|solid|expert)/.test(lower)) {
+    if (/(preferred|nice to have|desirable|a plus|bonus|advantage)/.test(lower)) {
+      analysis.preferredSkills!.push(line);
+    } else if (
+      /(communication skills|teamwork|interpersonal|leadership skills|problem[- ]solving|time management|attention to detail|adaptability|collaboration skills|soft skills)/.test(
+        lower
+      )
+    ) {
+      analysis.softSkills!.push(line);
+    } else if (/(must have|required|requirement|strong knowledge|proficiency|proficient|solid|expert)/.test(lower)) {
       analysis.requiredSkills.push(line);
     } else if (/(technolog|tools?|stack|software|framework|platform|language|proficien)/.test(lower)) {
       analysis.technicalSkills.push(line);
@@ -1107,7 +1291,11 @@ export function extractDeterministicJobDescription(jdText: string): JobDescripti
       analysis.responsibilities.push(line);
     } else if (/(years|experience|background|proven track record)/.test(lower)) {
       analysis.experienceRequirements.push(line);
-    } else if (/(degree|bachelor|master|certif|qualification|diploma|phd|graduat)/.test(lower)) {
+    } else if (/(degree|bachelor|master|phd|doctorate|university|education|graduat|diploma)/.test(lower)) {
+      analysis.educationRequirements!.push(line);
+    } else if (/(certif|licen[cs]e|accredit|credential)/.test(lower)) {
+      analysis.certifications!.push(line);
+    } else if (/(qualification)/.test(lower)) {
       analysis.qualifications.push(line);
     } else if (entry.isBullet || line.length < 120) {
       analysis.keywords.push(line);
@@ -1118,9 +1306,13 @@ export function extractDeterministicJobDescription(jdText: string): JobDescripti
   const classified = new Set(
     [
       ...analysis.requiredSkills,
+      ...analysis.preferredSkills!,
       ...analysis.technicalSkills,
+      ...analysis.softSkills!,
       ...analysis.responsibilities,
       ...analysis.experienceRequirements,
+      ...analysis.educationRequirements!,
+      ...analysis.certifications!,
       ...analysis.qualifications,
     ].map((line) => line.toLowerCase())
   );

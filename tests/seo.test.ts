@@ -289,7 +289,11 @@ describe('the document metadata of the application', () => {
     const website = schemas.find((schema) => schema['@type'] === 'WebSite');
     assert.ok(website, 'the static homepage must contain WebSite structured data');
     assert.equal(website.name, 'CareerDev4AI');
-    assert.deepEqual(website.alternateName, ['Career Dev 4AI', 'CareerDev4AI Career Platform']);
+    assert.deepEqual(website.alternateName, [
+      'CareerDev4AI',
+      'Career Dev 4AI',
+      'CareerDev4AI Career Platform',
+    ]);
     assert.equal(website.url, 'https://careerdev4ai.pages.dev/');
     assert.equal(websiteSchema().name, website.name);
     assert.equal(websiteSchema().url, website.url);

@@ -17,6 +17,7 @@ import { fetchDismissedGuides } from './lib/personalizationApi';
 import { buildRouteHash, isKnownRoute, parseRouteHash, resolveRouteId } from './lib/routing';
 import { analyticsPathForRoute, trackPageView } from './lib/analytics';
 import { applyRouteMeta, routeMetaFor } from './lib/seo';
+import { shouldForceOnboarding } from '../shared/onboarding';
 
 /**
  * The authenticated experience is loaded on demand.
@@ -171,6 +172,17 @@ function AppRoutes() {
   // The onboarding decision waits for hydration: the pre-hydration profile is
   // empty, so acting on `onboardingCompleted` immediately would flash the
   // onboarding wizard in front of an existing user.
+  //
+  // The status, not the legacy boolean, decides. A skipped tour stores
+  // `onboarding_completed = false` on purpose, because skipping is not
+  // completion; using the boolean here would drag the user back into the tour
+  // on every sign-in. `shouldForceOnboarding` treats completed and skipped as
+  // "do not force", and started or never-started as "resume".
+  const forceOnboarding = shouldForceOnboarding({
+    status: profile.onboardingStatus,
+    completed: profile.onboardingCompleted,
+  });
+
   useEffect(() => {
     if (!currentUser || currentView === 'onboarding') return;
 
@@ -183,7 +195,7 @@ function AppRoutes() {
       return;
     }
 
-    if (!profile.onboardingCompleted) {
+    if (forceOnboarding) {
       setCurrentView('onboarding');
       setActiveView('onboarding');
       window.location.hash = buildRouteHash('onboarding');
@@ -192,7 +204,7 @@ function AppRoutes() {
       setActiveView('dashboard');
       window.location.hash = buildRouteHash('dashboard');
     }
-  }, [currentUser, isHydrated, profile.onboardingCompleted, currentView, setActiveView]);
+  }, [currentUser, isHydrated, forceOnboarding, currentView, setActiveView]);
 
   // B.4 finding C-1 (session gate).
   //

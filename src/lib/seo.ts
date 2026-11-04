@@ -44,7 +44,11 @@ const SITE_NAME = 'CareerDev4AI';
  * ones a search engine needs in order to show the site under the name a
  * person actually typed.
  */
-const SITE_ALTERNATE_NAMES = ['Career Dev 4AI', 'CareerDev4AI Career Platform'];
+const SITE_ALTERNATE_NAMES = [
+  'CareerDev4AI',
+  'Career Dev 4AI',
+  'CareerDev4AI Career Platform',
+];
 
 /** The image used for link previews. */
 const OG_IMAGE = `${SITE_ORIGIN}/brand/og-image-1200x630.png`;
