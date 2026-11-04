@@ -20,6 +20,7 @@ import {
   retryBackgroundJob,
   startBackgroundJob,
   type BackgroundJob,
+  type BackgroundJobAvailability,
   type StartJobInput,
 } from './backgroundJobs';
 
@@ -29,6 +30,12 @@ const POLL_INTERVAL_MS = 3000;
 export interface UseBackgroundJobs {
   /** The candidate's jobs, newest first. */
   jobs: BackgroundJob[];
+  /**
+   * What the background-job service can do right now.
+   *
+   * `null` while it has not been read yet, or when the server could not say.
+   */
+  availability: BackgroundJobAvailability | null;
   /** True while the first read is in flight. */
   loading: boolean;
   /** The last failure of the list itself, when there was one. */
@@ -49,6 +56,7 @@ export interface UseBackgroundJobs {
 
 export function useBackgroundJobs(): UseBackgroundJobs {
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
+  const [availability, setAvailability] = useState<BackgroundJobAvailability | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,7 +69,8 @@ export function useBackgroundJobs(): UseBackgroundJobs {
   const refresh = useCallback(async () => {
     try {
       const next = await listBackgroundJobs();
-      setJobs(next);
+      setJobs(next.jobs);
+      setAvailability(next.availability);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The background jobs could not be read.');
@@ -71,6 +80,10 @@ export function useBackgroundJobs(): UseBackgroundJobs {
   }, []);
 
   // The first read, and the poll while something is running.
+  //
+  // The poll keeps running while a job is queued, because a queued job is
+  // exactly the state where something can go wrong: a runner that never picks
+  // it up. The server gives up on such a job and says so.
   useEffect(() => {
     void refresh();
 
@@ -126,5 +139,5 @@ export function useBackgroundJobs(): UseBackgroundJobs {
 
   const activeJobs = jobs.filter(isJobActive);
 
-  return { jobs, loading, error, busy, refresh, start, retry, cancel, activeJobs };
+  return { jobs, availability, loading, error, busy, refresh, start, retry, cancel, activeJobs };
 }

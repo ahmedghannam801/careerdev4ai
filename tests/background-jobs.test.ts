@@ -256,3 +256,105 @@ describe('background jobs', () => {
     assert.equal(attempt.status, 403);
   });
 });
+
+describe('the background-job service reports what it can do', () => {
+  test('the availability of the service is readable, and needs a session', async () => {
+    const anonymous = await apiAnonymous('GET', '/api/background-jobs/availability');
+    assert.equal(anonymous.status, 401);
+
+    const availability = await api('GET', '/api/background-jobs/availability', { token: owner.token });
+    assert.equal(availability.status, 200);
+
+    const state = availability.body?.availability;
+    assert.ok(state, 'the response must carry the state of the service');
+    assert.ok(
+      ['ready', 'degraded', 'unavailable', 'unconfigured', 'unknown'].includes(state.status),
+      `unexpected status ${state.status}`,
+    );
+    assert.ok(
+      ['production', 'development', 'unknown'].includes(state.environment),
+      `unexpected environment ${state.environment}`,
+    );
+    assert.equal(typeof state.message, 'string');
+    assert.ok(state.message.length > 0, 'the service must always be able to explain itself');
+
+    // The runner is either there or it is not — never claimed without evidence.
+    if (state.runnerAvailable !== null) {
+      assert.equal(typeof state.runnerAvailable, 'boolean');
+    }
+  });
+
+  test('the job list carries the state of the service as well', async () => {
+    const list = await api('GET', '/api/background-jobs', { token: owner.token });
+    assert.equal(list.status, 200);
+    const state = list.body?.availability;
+    assert.ok(state, 'the list must say what the service can do');
+    assert.equal(state.environment, list.body?.availability?.environment);
+  });
+
+  test('a job that never started is given up on rather than left queued for ever', async () => {
+    // A job that was queued a long time ago and never started. Nothing is
+    // going to pick it up, so it must not sit queued with no explanation.
+    const createdAt = new Date(Date.now() - 60 * 60_000).toISOString();
+    const { data: inserted, error } = await admin
+      .from('background_jobs')
+      .insert({
+        profile_id: owner.id,
+        task_id: 'match-jobs',
+        kind: 'match-jobs',
+        status: 'queued',
+        stage: 'queued',
+        idempotency_key: `stale-queued-${owner.id}-${Date.now()}`,
+        attempt: 1,
+        created_at: createdAt,
+        updated_at: createdAt,
+      })
+      .select('id')
+      .single();
+    assert.equal(error, null);
+    assert.ok(inserted?.id);
+
+    const list = await api('GET', '/api/background-jobs', { token: owner.token });
+    assert.equal(list.status, 200);
+    const jobs = (list.body?.jobs ?? []) as Array<{
+      id: string;
+      status: string;
+      errorCode: string | null;
+      errorMessage: string | null;
+    }>;
+    const stale = jobs.find((job) => job.id === inserted!.id);
+    assert.ok(stale, 'the job must still be listed');
+    assert.equal(stale!.status, 'failed', 'a job that never started must not stay queued for ever');
+    assert.equal(stale!.errorCode, 'no_runner_available');
+    assert.ok(stale!.errorMessage, 'the candidate must be told why it did not run');
+
+    await admin.from('background_jobs').delete().eq('id', inserted!.id);
+  });
+
+  test('a job that has just been queued is left alone', async () => {
+    const { data: inserted, error } = await admin
+      .from('background_jobs')
+      .insert({
+        profile_id: owner.id,
+        task_id: 'match-jobs',
+        kind: 'match-jobs',
+        status: 'queued',
+        stage: 'queued',
+        idempotency_key: `fresh-queued-${owner.id}-${Date.now()}`,
+        attempt: 1,
+      })
+      .select('id')
+      .single();
+    assert.equal(error, null);
+
+    const read = await api('GET', `/api/background-jobs/${inserted!.id}`, { token: owner.token });
+    assert.equal(read.status, 200);
+    assert.equal(
+      read.body?.job?.status,
+      'queued',
+      'a job that has only just been queued must not be given up on',
+    );
+
+    await admin.from('background_jobs').delete().eq('id', inserted!.id);
+  });
+});

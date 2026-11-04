@@ -201,3 +201,53 @@ export async function getRun(runId: string): Promise<TriggerRun> {
 export async function cancelRun(runId: string): Promise<void> {
   await triggerFetch(`/api/v1/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST' });
 }
+
+/** A run as the platform lists it. */
+export interface TriggerRunSummary {
+  id: string;
+  status: TriggerRunStatus;
+  taskIdentifier?: string;
+  /** The environment the run belongs to. `dev` or `prod`. */
+  env?: { id?: string; name?: string };
+  /** The version of the tasks that executed it. */
+  version?: string | null;
+  createdAt?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+}
+
+/**
+ * Lists the most recent runs of the environment the secret key addresses.
+ *
+ * A `tr_dev_sk_…` key sees the Development runs and a `tr_prod_sk_…` key sees
+ * the Production runs, so the list always describes the environment the jobs
+ * of this server actually go to.
+ *
+ * The environment secret key is enough to read this. A personal access token
+ * is not needed, so the deployed Worker can answer the question with the one
+ * credential it already holds.
+ */
+export async function listRuns(limit = 10): Promise<TriggerRunSummary[]> {
+  const response = await triggerFetch(`/api/v1/runs?limit=${limit}`, { method: 'GET' });
+  const parsed = (await response.json().catch(() => null)) as
+    | { data?: TriggerRunSummary[] }
+    | null;
+  return Array.isArray(parsed?.data) ? parsed.data : [];
+}
+
+/**
+ * Whether the Production environment has a deployed version of the tasks.
+ *
+ * Returns `null` when the platform could not be asked, so the caller can say
+ * "unknown" rather than claiming there is no deployment. A Production run
+ * needs a deployed version: without one it waits for ever.
+ */
+export async function productionDeploymentExists(): Promise<boolean | null> {
+  try {
+    const response = await triggerFetch('/api/v1/deployments/latest', { method: 'GET' });
+    return response.ok ? true : null;
+  } catch (error) {
+    if (error instanceof TriggerApiError && error.status === 404) return false;
+    return null;
+  }
+}

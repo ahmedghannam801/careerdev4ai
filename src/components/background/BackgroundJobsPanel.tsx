@@ -7,11 +7,17 @@
 //
 // A failed job offers a retry. The retry is a separate, explicit action: the
 // panel never restarts anything on its own.
+//
+// The panel also says what the background-job service can actually do. A job
+// that runs on a development worker is not the same thing as a job that runs
+// on Trigger.dev's Production runtime, and the candidate is told which one is
+// in play rather than being left to assume the best.
 import { AlertTriangle, CheckCircle2, Clock, Loader2, RotateCw, XCircle } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import {
   JOB_KIND_LABELS,
   type BackgroundJob,
+  type BackgroundJobAvailability,
   type BackgroundJobStatus,
 } from '../../lib/backgroundJobs';
 import { useBackgroundJobs } from '../../lib/useBackgroundJobs';
@@ -44,6 +50,47 @@ function StatusIcon({ status }: { status: BackgroundJobStatus }) {
   return <Clock className="w-4 h-4 text-[var(--text-muted)]" />;
 }
 
+/**
+ * The note that explains what the service can do.
+ *
+ * Each state gets its own sentence rather than a generic warning, because
+ * the candidate needs to know whether the work will happen at all.
+ */
+function availabilityNote(
+  availability: BackgroundJobAvailability,
+  t: (source: string) => string,
+): { tone: 'info' | 'warning' | 'danger'; text: string } {
+  if (availability.status === 'unavailable') {
+    return {
+      tone: 'danger',
+      text: t(
+        'Background processing is not available right now, so no new background work can start. A job that is already running is unaffected.',
+      ),
+    };
+  }
+  if (availability.status === 'unconfigured') {
+    return {
+      tone: 'danger',
+      text: t('Background processing is not available on this server, so no background work can be started.'),
+    };
+  }
+  if (availability.status === 'degraded') {
+    return {
+      tone: 'warning',
+      text: t(
+        'Background processing is running in a development environment. The work is carried out by a development worker rather than by the Trigger.dev Production runtime.',
+      ),
+    };
+  }
+  if (availability.status === 'unknown') {
+    return {
+      tone: 'warning',
+      text: t('The state of background processing could not be checked just now.'),
+    };
+  }
+  return { tone: 'info', text: t('Background processing is running on the Trigger.dev Production runtime.') };
+}
+
 export interface BackgroundJobsPanelProps {
   /** Called when the candidate asks to start a job of their own. */
   onStart?: () => void;
@@ -65,11 +112,15 @@ export function BackgroundJobsPanel({
   className = '',
 }: BackgroundJobsPanelProps) {
   const { t } = useCareer();
-  const { jobs, loading, error, busy, retry } = useBackgroundJobs();
+  const { jobs, availability, loading, error, busy, retry } = useBackgroundJobs();
 
   const visible = jobs.slice(0, 8);
-  if (loading && visible.length === 0 && !onStart) return null;
-  if (visible.length === 0 && !onStart) return null;
+  const note = availability ? availabilityNote(availability, t) : null;
+  const serviceUnavailable = availability?.status === 'unavailable';
+  const serviceUnconfigured = availability?.status === 'unconfigured';
+
+  if (loading && visible.length === 0 && !onStart && !note) return null;
+  if (visible.length === 0 && !onStart && !note) return null;
 
   const statusLabel = (status: BackgroundJobStatus): string => {
     if (status === 'queued') return t('Queued');
@@ -78,6 +129,8 @@ export function BackgroundJobsPanel({
     if (status === 'failed') return t('Failed');
     return t('Stopped');
   };
+
+  const startDisabled = busy || serviceUnavailable || serviceUnconfigured;
 
   return (
     <section
@@ -90,13 +143,32 @@ export function BackgroundJobsPanel({
           <button
             type="button"
             onClick={onStart}
-            disabled={busy}
+            disabled={startDisabled}
+            title={startDisabled ? note?.text : undefined}
             className="text-xs px-2 py-1 rounded bg-[var(--color-primary-text)] text-[var(--surface-main)] disabled:opacity-60"
           >
             {startLabel}
           </button>
         ) : null}
       </header>
+
+      {note && note.tone !== 'info' ? (
+        <p
+          className={`text-xs mb-2 flex items-start gap-1.5 ${
+            note.tone === 'danger' ? 'text-[var(--color-danger)]' : 'text-[var(--text-muted)]'
+          }`}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>
+            {note.text}
+            {availability?.environment === 'development' ? (
+              <span className="block mt-0.5">
+                {t('Environment')}: {t('Development')}
+              </span>
+            ) : null}
+          </span>
+        </p>
+      ) : null}
 
       {error ? (
         <p className="text-xs text-[var(--color-danger)] flex items-center gap-1.5 mb-2">
@@ -134,6 +206,12 @@ export function BackgroundJobsPanel({
                   <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{job.stage}</p>
                 ) : null}
 
+                {job.waitingForRunner ? (
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                    {t('Waiting for a runner to pick this up.')}
+                  </p>
+                ) : null}
+
                 {job.status === 'failed' && job.errorMessage ? (
                   <p className="text-[11px] text-[var(--color-danger)] mt-0.5">{job.errorMessage}</p>
                 ) : null}
@@ -166,6 +244,7 @@ export function BackgroundJobRow({ job }: { job: BackgroundJob }) {
       <StatusIcon status={job.status} />
       <span className="text-[var(--text-primary)]">{JOB_KIND_LABELS[job.kind]}</span>
       {job.stage ? <span>{job.stage}</span> : null}
+      {job.waitingForRunner ? <span>{t('Waiting for a runner to pick this up.')}</span> : null}
       {job.status === 'failed' && job.errorMessage ? (
         <span className="text-[var(--color-danger)]">{job.errorMessage}</span>
       ) : null}

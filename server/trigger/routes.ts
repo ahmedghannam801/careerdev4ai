@@ -34,6 +34,7 @@ import {
   BACKGROUND_JOB_TASKS,
   computeIdempotencyKey,
   createJob,
+  failStaleQueuedJobs,
   findJobByIdempotencyKey,
   getJobForProfile,
   isBackgroundJobKind,
@@ -42,6 +43,7 @@ import {
   toPublicJob,
   type BackgroundJobKind,
 } from './jobs.ts';
+import { backgroundJobAvailability } from './availability.ts';
 import { cancelRun, TriggerApiError, triggerTask } from './client.ts';
 
 /** How many jobs one candidate may start per minute. */
@@ -321,6 +323,19 @@ export function registerBackgroundJobRoutes(app: Express): void {
         return res.status(403).json({ error: 'This job cannot be started by hand.', code: 'not_startable' });
       }
 
+      // Do not accept work that nothing can carry out. The candidate is told
+      // plainly instead of being left watching a job that will never start.
+      //
+      // The check is skipped unless the platform says, with evidence, that no
+      // runner can pick the work up. "Cannot tell" is never treated as "no".
+      const availability = await backgroundJobAvailability();
+      if (availability.status === 'unavailable') {
+        return res.status(503).json({
+          error: availability.message,
+          code: 'no_runner_available',
+        });
+      }
+
       const sourceId = uuid(body.sourceId);
       if (spec.sourceRequired && !sourceId) {
         return res.status(400).json({ error: 'This job needs the record it is about.', code: 'source_required' });
@@ -415,11 +430,29 @@ export function registerBackgroundJobRoutes(app: Express): void {
     }
   });
 
+  // Whether the background-job service can run work right now.
+  //
+  // Registered before the `/:id` route so that "availability" is read as a
+  // path of its own rather than as a job id.
+  app.get('/api/background-jobs/availability', requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const availability = await backgroundJobAvailability();
+      return res.json({ availability });
+    } catch (error) {
+      console.error('Background job availability error:', error);
+      return res.status(500).json({ error: 'The background job service could not be checked' });
+    }
+  });
+
   // Every job of this candidate.
   app.get('/api/background-jobs', requireAuth, async (req: Request, res: Response) => {
     try {
+      // Give up on the jobs that are never going to start, so none of them sits
+      // queued for ever with no explanation.
+      await failStaleQueuedJobs();
       const jobs = await listJobsForProfile(req.authUser!.id, 25);
-      return res.json({ jobs: jobs.map(toPublicJob) });
+      const availability = await backgroundJobAvailability();
+      return res.json({ jobs: jobs.map(toPublicJob), availability });
     } catch (error) {
       console.error('Background job list error:', error);
       return res.status(500).json({ error: 'The background jobs could not be read' });
@@ -431,6 +464,7 @@ export function registerBackgroundJobRoutes(app: Express): void {
     try {
       const jobId = uuid(req.params.id);
       if (!jobId) return res.status(400).json({ error: 'Invalid job id' });
+      await failStaleQueuedJobs();
       const job = await getJobForProfile(req.authUser!.id, jobId);
       if (!job) return res.status(404).json({ error: 'Not found' });
       return res.json({ job: toPublicJob(job) });
@@ -449,6 +483,16 @@ export function registerBackgroundJobRoutes(app: Express): void {
 
       const job = await getJobForProfile(profileId, jobId);
       if (!job) return res.status(404).json({ error: 'Not found' });
+
+      // The same check as when the job is started: a retry that nothing can
+      // carry out would only leave another job waiting for ever.
+      const availability = await backgroundJobAvailability();
+      if (availability.status === 'unavailable') {
+        return res.status(503).json({
+          error: availability.message,
+          code: 'no_runner_available',
+        });
+      }
 
       // Only a job that has actually stopped can be started again. A job that
       // is still running must not be started a second time.

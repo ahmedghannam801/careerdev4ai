@@ -113,6 +113,46 @@ failure that might not repeat.
 `profile:kind:source`. One candidate's work on one record cannot overlap
 itself, and the platform serialises it.
 
+## Saying what is really true
+
+A background job only runs if something can execute it, and that is not always
+true. A Production run needs a deployed version of the tasks; a Development run
+needs a development worker, which is a process on somebody's machine. A job
+started while neither is true would wait for ever, and a spinner that never
+ends is worse than an honest message.
+
+So the API says plainly what it can do, and the interface shows it:
+
+- `GET /api/background-jobs/availability` returns the state of the service.
+- The environment comes from the secret key itself: a `tr_prod_sk_…` key
+  addresses Production and a `tr_dev_sk_…` key addresses Development.
+- In Production the check asks the platform whether a version is deployed.
+- In Development there is no deployment to ask about, so the evidence is the
+  runs themselves: a run that started recently proves a worker is connected, a
+  run that has been waiting proves one is not.
+- **"Not known" is never reported as "no".** When the platform cannot be asked,
+  the answer is `unknown`, and work is still accepted.
+
+The states are `ready` (the platform's own Production runtime), `degraded`
+(the work runs, but on a development worker), `unavailable` (nothing can pick
+it up), `unconfigured` (this server holds no Trigger.dev key) and `unknown`.
+
+A job in `unavailable` is refused with `503 no_runner_available` rather than
+being accepted and left waiting. The interface shows the state, disables the
+button that starts work, and says why.
+
+Two more things follow from this:
+
+- **A job that never started is given up on.** A row that has been `queued` for
+  half an hour has no runner behind it, so it is failed with
+  `no_runner_available` and a sentence the candidate can read. It does not sit
+  queued for ever with no explanation. If a task does eventually start, it
+  overwrites the row with what it really did.
+- **Nothing can point the server at another worker.** The API URL and the
+  secret key come from the server environment and from nowhere else. A request
+  cannot move production traffic onto a developer's machine, and there is no
+  code path that would let it.
+
 ## Running it
 
 ```bash
@@ -151,10 +191,28 @@ environment (`tr_dev_sk_…`), because Production deployments are not enabled on
 the organisation — `trigger deploy --prod` uploads the build and then refuses
 it with *"Deployments are not available for this organization."*
 
+That refusal is not a problem with the project. It has been checked against
+everything that could cause it: the organisation's Free plan is active (the
+platform's own activation endpoint answers *"Organization is already
+activated"*), the project is initialised, the personal access token is valid
+(the build and the upload both succeed), the CLI is the current published
+version, the remote build provider is operational, and the platform reports no
+incident and no notification for this organisation. Only the creation of the
+deployment is refused, and it is refused for the organisation rather than for
+the project.
+
+`TRIGGER_SUPPORT_REQUEST.md` holds the request to Trigger.dev, with the exact
+error and the project reference.
+
 A Development run needs a worker to pick it up, so `npm run dev:trigger` has to
 be running for a job started by the live site to execute. That is the one
 operational difference from Production: with a Production deployment the
 platform runs the tasks on its own, and nothing has to be kept alive locally.
+
+Until then the interface says so rather than letting the candidate believe
+otherwise: the availability endpoint reports `environment: "development"` and
+`status: "degraded"`, and the panel shows that the work is being carried out by
+a development worker rather than by the Trigger.dev Production runtime.
 
 The live chain was verified end to end with a throwaway identity: a job started
 on the deployed site reached `completed` with a real roadmap (4 phases, 18
@@ -176,5 +234,17 @@ Trigger.dev dashboard.
 
 **Enable Production deployments** on the organisation, if the tasks should run
 without a local worker. After that, `npm run deploy:trigger` publishes to
-Production and the live site needs a `tr_prod_sk_…` key instead.
+Production and the live site needs a `tr_prod_sk_…` key instead. The tasks
+also need their own environment variables in the Trigger.dev environment,
+because a Production run does not read the server's `.env`:
+
+```bash
+npx trigger.dev@latest env set SUPABASE_URL <value> --env prod --secret
+npx trigger.dev@latest env set SUPABASE_SERVICE_ROLE_KEY <value> --env prod --secret
+npx trigger.dev@latest env set GEMINI_API_KEY <value> --env prod --secret
+```
+
+The `--secret` flag matters: it stores the value so it cannot be read back
+through the API.
+
 
