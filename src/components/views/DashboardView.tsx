@@ -25,6 +25,7 @@ import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
 import { CountUp } from '../motion/CountUp';
 import { EmptyState } from '../ui/EmptyState';
+import { RecentActivityPanel } from '../career/RecentActivityPanel';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -579,6 +580,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           </article>
         </div>
       </section>
+
+      {/* Recent activity — the user's own record, not a generated summary. */}
+      <RecentActivityPanel onNavigate={onNavigate} />
 
       {/* Progressive disclosure: the detail is available, not in the way. */}
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">

@@ -3591,8 +3591,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const completeOnboarding = async () => {
     try {
-      await patchProfile({ onboardingCompleted: true });
-      setProfile(prev => ({ ...prev, onboardingCompleted: true }));
+      // The status is the authoritative field; the legacy boolean is kept in
+      // step by the server when the status is written.
+      await patchProfile({ onboardingCompleted: true, onboardingStatus: 'completed' });
+      setProfile(prev => ({
+        ...prev,
+        onboardingCompleted: true,
+        onboardingStatus: 'completed',
+      }));
     } catch (error) {
       console.error('Failed to persist onboarding completion:', error);
       throw error;
@@ -5151,7 +5157,13 @@ Skills: ${activeCV.skillsList.join(', ')}
     const accountOwned: Partial<PreferencesDTO> = {};
     if (updates.theme !== undefined) accountOwned.theme = updates.theme;
     if (updates.language !== undefined) accountOwned.language = updates.language;
-    if (Object.keys(accountOwned).length > 0) {
+    // Only an account can own a preference. A visitor who is browsing the
+    // landing page before signing up still gets the change immediately — the
+    // local state above is updated either way — but there is no account to
+    // persist it to, so no request is made. Sending one would only produce
+    // an authentication error in the console for a change that already
+    // worked.
+    if (Object.keys(accountOwned).length > 0 && currentUser) {
       void patchPreferences(accountOwned).catch((error) => {
         console.error('Failed to persist account settings:', error);
       });

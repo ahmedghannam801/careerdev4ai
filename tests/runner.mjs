@@ -335,6 +335,10 @@ async function main() {
     // planning engine, the legal and contact links reach their real
     // destinations, and the new copy is fully translated. Pure.
     join(TESTS_DIR, 'public-site.test.ts'),
+    // The public website: the interactive product preview runs the real
+    // planning engine, the legal and contact links reach their real
+    // destinations, and the new copy is fully translated. Pure.
+    join(TESTS_DIR, 'public-site.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

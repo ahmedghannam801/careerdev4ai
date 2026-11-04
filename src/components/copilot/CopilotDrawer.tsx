@@ -4,6 +4,7 @@ import { Sparkles, X, Send, Bot, User, ArrowRight, Lightbulb } from 'lucide-reac
 import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 import { AiResponse } from './AiResponse';
+import { EvidencePanel } from './EvidencePanel';
 
 interface CopilotDrawerProps {
   isOpen: boolean;
@@ -76,6 +77,9 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           <ArrowRight className="w-3 h-3 rtl:rotate-180" />
         </button>
       </div>
+
+      {/* The records the assistant is reasoning over. */}
+      <EvidencePanel onNavigate={onNavigate} />
 
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto p-4">

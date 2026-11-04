@@ -45,7 +45,13 @@ export const CountUp: React.FC<CountUpProps> = ({
     return () => controls.stop();
   }, [value, motionValue, duration, reduced]);
 
-  return <motion.span className={className}>{display}</motion.span>;
+  // Tabular numerals stop the digits from changing width as the value
+  // counts, so a readout that is animating does not visibly jitter.
+  return (
+    <motion.span className={className} style={{ fontVariantNumeric: 'tabular-nums' }}>
+      {display}
+    </motion.span>
+  );
 };
 
 export default CountUp;

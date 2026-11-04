@@ -1,49 +1,19 @@
 import React from 'react';
-import { 
-  Activity, 
-  CheckCircle2, 
-  Briefcase, 
-  Target, 
-  Award, 
-  FolderGit2, 
-  FileText, 
-  Filter, 
+import {
+  Activity,
+  Filter,
   ArrowRight,
   Clock
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { ACTIVITY_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
-import { ActivityActionType } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { getActionIcon } from '../career/activityIcons';
 
 export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { activities, t} = useCareer();
   const [filterType, setFilterType] = useRouteParam<string>('type', ACTIVITY_FILTERS, 'all');
-
-  const getActionIcon = (type: ActivityActionType) => {
-    switch (type) {
-      case 'completed_task':
-        return CheckCircle2;
-      case 'applied_job':
-      case 'saved_job':
-        return Briefcase;
-      case 'mock_interview':
-        return Target;
-      case 'acquired_skill':
-      case 'added_evidence':
-        return Award;
-      case 'added_project':
-        return FolderGit2;
-      case 'uploaded_cv':
-      case 'document_saved':
-        return FileText;
-      case 'goal_updated':
-        return Target;
-      default:
-        return Activity;
-    }
-  };
 
   const filteredActivities = filterType === 'all'
     ? activities
