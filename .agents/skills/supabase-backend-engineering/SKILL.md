@@ -74,3 +74,4 @@ Activate this skill when:
 - **Missing RLS**: Creating a table without `ENABLE ROW LEVEL SECURITY`, leaving data publicly readable and writable.
 - **Overly Permissive Policies**: Writing `USING (true)` on insert or update policies for user data.
 - **Breaking Schema Migrations**: Renaming or dropping columns in use by running production workers.
+

@@ -20,6 +20,7 @@ import {
   type InterviewPlanQuestion,
 } from '../../data/interviewBank';
 import { Reveal } from '../motion/Motion';
+import { CareerImage } from '../ui/CareerImage';
 
 interface InterviewFeedback {
   score?: number;
@@ -254,49 +255,69 @@ export const InterviewsView: React.FC = () => {
       {/* Start screen */}
       {!plan && (
         <section className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 lg:col-span-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-primary-text)]">
-              <BrainCircuit className="h-4 w-4 shrink-0" />
-              {t('Your interview plan')}
-            </div>
-            <h2 className="mt-2 text-lg font-bold text-[var(--text-primary)]">
-              {t('15 questions, two stages')}
-            </h2>
-            <p className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">
-              {t(
-                'The first stage is behavioural and personal. It is built from your real experience, projects, volunteering, training and skills. The second stage is technical and follows your primary target role.'
-              )}
-            </p>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
-                  <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                  {t('Behavioural & personal')}
+          <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] lg:col-span-2">
+            <div className="relative h-44 w-full overflow-hidden border-b border-[var(--border-subtle)] sm:h-52">
+              <CareerImage
+                src="/images/features/interview-prep.webp"
+                alt="Interview preparation session"
+                size="md"
+                aspectRatio="21/9"
+                rounded="rounded-none"
+                className="h-full w-full object-cover"
+              >
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface-main)] via-[var(--surface-main)]/35 to-transparent" />
+                <div className="absolute bottom-3 start-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
+                    <BrainCircuit className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
+                    {targetRole.title} {t('Interview Prep')}
+                  </span>
                 </div>
-                <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
-                  {behavioralCount} {t('questions')} · {t('adapted to your CV')}
-                </p>
-              </div>
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
-                  <Target className="h-3.5 w-3.5 shrink-0" />
-                  {t('Technical')}
-                </div>
-                <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
-                  {technicalCount} {t('questions')} · {targetRole.title}
-                </p>
-              </div>
+              </CareerImage>
             </div>
+            <div className="p-6">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-primary-text)]">
+                <BrainCircuit className="h-4 w-4 shrink-0" />
+                {t('Your interview plan')}
+              </div>
+              <h2 className="mt-2 text-lg font-bold text-[var(--text-primary)]">
+                {t('15 questions, two stages')}
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t(
+                  'The first stage is behavioural and personal. It is built from your real experience, projects, volunteering, training and skills. The second stage is technical and follows your primary target role.'
+                )}
+              </p>
 
-            <button
-              type="button"
-              onClick={startInterview}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90"
-            >
-              <Sparkles className="h-4 w-4 shrink-0" />
-              {t('Start Mock Interview')}
-            </button>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                    {t('Behavioural & personal')}
+                  </div>
+                  <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                    {behavioralCount} {t('questions')} · {t('adapted to your CV')}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+                    <Target className="h-3.5 w-3.5 shrink-0" />
+                    {t('Technical')}
+                  </div>
+                  <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                    {technicalCount} {t('questions')} · {targetRole.title}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={startInterview}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90"
+              >
+                <Sparkles className="h-4 w-4 shrink-0" />
+                {t('Start Mock Interview')}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6">

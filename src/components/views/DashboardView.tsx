@@ -26,6 +26,7 @@ import { AnimatedProgress } from '../motion/AnimatedProgress';
 import { CountUp } from '../motion/CountUp';
 import { EmptyState } from '../ui/EmptyState';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
+import { CareerImage } from '../ui/CareerImage';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -285,22 +286,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs"
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 space-y-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-              <Target className="h-3 w-3" />
-              {t('Where you are')}
+          <div className="flex items-start gap-4 min-w-0">
+            <CareerImage
+              category={targetRole.title}
+              size="sm"
+              aspectRatio="square"
+              rounded="rounded-2xl"
+              className="hidden h-16 w-16 shrink-0 border border-[var(--border-subtle)] object-cover shadow-xs sm:block"
+            />
+            <div className="min-w-0 space-y-2">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                <Target className="h-3 w-3" />
+                {t('Where you are')}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="dashboard-where" className="text-lg font-bold text-[var(--text-primary)]">
+                  {targetRole.title}
+                </h2>
+                <span className="rounded-full bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]">
+                  {readinessLabel}
+                </span>
+              </div>
+              <p className="max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
+                {t('Readiness is measured against the real requirements of this role, not against a generic template.')}
+              </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 id="dashboard-where" className="text-lg font-bold text-[var(--text-primary)]">
-                {targetRole.title}
-              </h2>
-              <span className="rounded-full bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]">
-                {readinessLabel}
-              </span>
-            </div>
-            <p className="max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
-              {t('Readiness is measured against the real requirements of this role, not against a generic template.')}
-            </p>
           </div>
 
           <div className="w-full shrink-0 lg:w-72" data-guide="readiness">
@@ -456,14 +466,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
         <div className="grid gap-3 md:grid-cols-3">
           {/* Learning */}
-          <article className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
+          <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
               <BookOpen className="h-3 w-3" />
               {t('Learn')}
             </div>
             {topLearning ? (
               <>
-                <h3 className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
+                <div className="mt-2 overflow-hidden rounded-xl">
+                  <CareerImage
+                    category={topLearning.course.category || topLearning.course.title}
+                    size="sm"
+                    aspectRatio="16/9"
+                    className="h-24 w-full object-cover"
+                  />
+                </div>
+                <h3 className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
                   {topLearning.course.title}
                 </h3>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
@@ -482,7 +500,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                   <span>·</span>
                   <span>{topLearning.course.provider}</span>
                 </div>
-                <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[var(--text-secondary)]">
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
                   {topLearning.aiExplanation ?? topLearning.reason}
                 </p>
                 <div className="mt-auto flex items-center gap-2 pt-3">
@@ -515,17 +533,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           </article>
 
           {/* Project */}
-          <article className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
+          <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
               <FolderGit2 className="h-3 w-3" />
               {t('Build')}
             </div>
             {activeProject ? (
               <>
-                <h3 className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
+                <div className="mt-2 overflow-hidden rounded-xl">
+                  <CareerImage
+                    category={activeProject.skills?.[0] || activeProject.title}
+                    size="sm"
+                    aspectRatio="16/9"
+                    className="h-24 w-full object-cover"
+                  />
+                </div>
+                <h3 className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
                   {activeProject.title}
                 </h3>
-                <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[var(--text-secondary)]">
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
                   {activeProject.goal}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1">

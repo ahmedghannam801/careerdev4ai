@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { MatchedJob } from '../../lib/jobsApi';
+import { CareerImage } from '../ui/CareerImage';
 
 interface LiveJobCardProps {
   item: MatchedJob;
@@ -93,21 +94,33 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
   return (
     <article className="flex h-full flex-col gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs">
       {/* Header */}
-      <header className="space-y-1.5">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-sm font-bold leading-snug text-[var(--text-primary)]">{job.title}</h3>
-          {bookmarked && (
-            <BookmarkCheck
-              className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]"
-              aria-label={t('Saved')}
-            />
-          )}
+      <header className="space-y-2">
+        <div className="flex items-start gap-3">
+          <CareerImage
+            category={job.title}
+            size="sm"
+            aspectRatio="square"
+            rounded="rounded-xl"
+            className="h-11 w-11 shrink-0 border border-[var(--border-subtle)] object-cover shadow-xs"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="line-clamp-2 text-sm font-bold leading-snug text-[var(--text-primary)]">
+                {job.title}
+              </h3>
+              {bookmarked && (
+                <BookmarkCheck
+                  className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]"
+                  aria-label={t('Saved')}
+                />
+              )}
+            </div>
+            <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
+              <Briefcase className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+              <span className="truncate">{job.company}</span>
+            </p>
+          </div>
         </div>
-
-        <p className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
-          <Briefcase className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          <span>{job.company}</span>
-        </p>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
           {job.location && (

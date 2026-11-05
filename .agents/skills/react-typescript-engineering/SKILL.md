@@ -73,3 +73,4 @@ Activate this skill when:
 - **Unsafe Type Casting**: Using `(foo as any).bar` to bypass compiler checks instead of refining the type.
 - **State-Effect Loops**: Setting state inside `useEffect` with that same state variable in the dependency array.
 - **Prop Mutability**: Mutating array or object props directly instead of cloning (`[...items]`).
+

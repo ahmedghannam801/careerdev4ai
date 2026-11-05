@@ -65,3 +65,4 @@ Activate this skill when:
 - **The Phantom Pass**: Assuming code works because build exited with code 0 without rendering the actual pixels.
 - **Uncontrolled Perspective Stacking**: Using 3D CSS transforms with z-index stacking that breaks on smaller laptop viewports (1024px-1280px).
 - **Hardcoded Container Heights**: Forcing an element to `height: 500px` causing overflow clipping when text wraps on different screens.
+

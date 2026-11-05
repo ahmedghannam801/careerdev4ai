@@ -77,3 +77,4 @@ Activate this skill when:
 - **The Big Bang Commit**: Bundling unrelated feature additions, refactoring, and bug fixes into a single unreadable commit.
 - **Accidental Deletions**: Deleting working components or helper utilities because they were not immediately understood.
 - **Breaking Changes Without Fallbacks**: Modifying an API response shape that older client versions or workers rely upon.
+

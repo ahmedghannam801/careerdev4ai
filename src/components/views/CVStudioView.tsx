@@ -18,6 +18,7 @@ import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
+import { CareerImage } from '../ui/CareerImage';
 
 export const CVStudioView: React.FC = () => {
   const {
@@ -141,11 +142,21 @@ export const CVStudioView: React.FC = () => {
     <Reveal className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
-        <div>
-          <div className="text-xs text-[var(--text-secondary)]">{t('CV WORKSPACE & ATS OPTIMIZER')}</div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            {t('CV Studio for')} {targetRole.title}
-          </h1>
+        <div className="flex items-center gap-3.5">
+          <CareerImage
+            src="/images/features/cv-studio.webp"
+            alt="CV Studio"
+            size="sm"
+            aspectRatio="square"
+            rounded="rounded-xl"
+            className="hidden h-14 w-14 shrink-0 border border-[var(--border-subtle)] object-cover shadow-xs sm:block"
+          />
+          <div>
+            <div className="text-xs text-[var(--text-secondary)]">{t('CV WORKSPACE & ATS OPTIMIZER')}</div>
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
+              {t('CV Studio for')} {targetRole.title}
+            </h1>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

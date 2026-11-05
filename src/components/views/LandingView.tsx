@@ -7,6 +7,7 @@ import { SUPPORT_EMAIL, PUBLIC_PATHS, OPERATOR_LINKEDIN_URL } from '../../../sha
 import { Logo } from '../brand/Logo';
 import { CareerJourneyVisual } from '../brand/CareerJourneyVisual';
 import { HeroVisual3D } from '../landing/HeroVisual3D';
+import { CareerImage } from '../ui/CareerImage';
 import { ProductPreview } from '../landing/ProductPreview';
 import { FeatureGrid } from '../landing/FeatureGrid';
 import { TrustSection } from '../landing/TrustSection';
@@ -575,42 +576,56 @@ const navLinks = [
               {
                 id: 'student',
                 title: 'Student',
+                category: 'students',
                 focus: 'Fundamentals & Internships',
                 desc: 'Foundational coursework, first GitHub repositories, internships, and portfolio development.',
               },
               {
                 id: 'fresh_grad',
                 title: 'Fresh Graduate',
+                category: 'education',
                 focus: 'Employability & Proof',
                 desc: 'Bridging academic-to-industry gaps, CV optimization, targeted entry applications, and interview prep.',
               },
               {
                 id: 'working_pro',
                 title: 'Working Professional',
+                category: 'professionals',
                 focus: 'Progression & Promotion',
                 desc: 'Advanced specialization, quantifiable achievements, leadership evidence, and market positioning.',
               },
               {
                 id: 'career_switcher',
                 title: 'Career Switcher',
+                category: 'switchers',
                 focus: 'Transferable Skills',
                 desc: 'Identifying transferable strengths, targeted transition roadmaps, and proof-of-skill portfolio pieces.',
               },
               {
                 id: 'exploring',
                 title: 'Exploring',
+                category: 'entrepreneurship',
                 focus: 'Discovery & Fit',
                 desc: 'Comparing emerging disciplines, understanding market compensations, and discovering your optimal path.',
               },
             ].map((persona) => (
               <StaggerItem key={persona.id}>
-                <div className="flex h-full flex-col justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
-                  <div className="space-y-2">
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-primary-text)]">
-                      {persona.focus}
+                <div className="flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
+                  <div>
+                    <CareerImage
+                      category={persona.category}
+                      aspectRatio="16/10"
+                      size="sm"
+                      rounded="rounded-xl"
+                      className="mb-3.5 h-28 w-full"
+                    />
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-primary-text)]">
+                        {persona.focus}
+                      </div>
+                      <h3 className="text-base font-bold text-[var(--text-primary)]">{persona.title}</h3>
+                      <p className="text-xs leading-relaxed text-[var(--text-secondary)]">{persona.desc}</p>
                     </div>
-                    <h3 className="text-base font-bold text-[var(--text-primary)]">{persona.title}</h3>
-                    <p className="text-xs leading-relaxed text-[var(--text-secondary)]">{persona.desc}</p>
                   </div>
                   <button
                     onClick={onStartOnboarding}
@@ -656,7 +671,14 @@ const navLinks = [
           <Stagger inView gap={0.09} className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {FEATURED_ROLES.map((role) => (
               <StaggerItem key={role.id}>
-                <div className="flex h-full flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
+                <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
+                  <CareerImage
+                    category={role.domainId || role.id}
+                    aspectRatio="video"
+                    size="sm"
+                    rounded="rounded-xl"
+                    className="mb-4 h-36 w-full"
+                  />
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="text-base font-bold text-[var(--text-primary)]">{role.title}</h3>

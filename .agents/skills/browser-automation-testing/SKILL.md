@@ -77,3 +77,4 @@ Activate this skill when:
 - **Hardcoded Sleeps**: Using `page.waitForTimeout(5000)` instead of waiting for network idle or selector visibility.
 - **Leaked Test Users**: Creating real Supabase auth users without cleanup scripts, polluting the database.
 - **Ignoring Console Warnings**: Overlooking React key warnings or CSS parsing errors logged to the console.
+

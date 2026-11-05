@@ -5,7 +5,6 @@ import {
   Github,
   X,
   HeartHandshake,
-  Clock,
   ListChecks,
   Star,
   Edit3,
@@ -21,6 +20,7 @@ import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
 import { ProjectAiPanel } from '../projects/ProjectAiPanel';
 import { uploadPortfolioAttachment } from '../../lib/coreApi';
+import { CareerImage } from '../ui/CareerImage';
 
 /** The user-facing label of each project status. */
 const STATUS_LABELS: Record<string, string> = {
@@ -38,28 +38,6 @@ const CATEGORY_LABELS: Record<ProjectCategory, string> = {
   volunteer: 'Volunteer',
   team: 'Team',
 };
-
-const CATEGORY_COLORS: Record<ProjectCategory, string> = {
-  academic: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-  personal: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  professional: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
-  volunteer: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  team: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
-};
-
-function estimateProjectHours(tasks: string[], difficulty: string): number {
-  const perTask = difficulty === 'Advanced' ? 5 : difficulty === 'Intermediate' ? 3 : 2;
-  return Math.max(perTask, tasks.length * perTask);
-}
-
-function projectInitials(title: string): string {
-  return title
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? '')
-    .join('');
-}
 
 export const ProjectsView: React.FC = () => {
   const { projects, addProject, updateProject, deleteProject, volunteerExperiences, t } = useCareer();
@@ -354,7 +332,6 @@ export const ProjectsView: React.FC = () => {
         <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredProjects.map((project) => {
             const projectCat = (project.category as ProjectCategory) || 'personal';
-            const catClass = CATEGORY_COLORS[projectCat] || CATEGORY_COLORS.personal;
             return (
               <StaggerItem
                 key={project.id}
@@ -387,40 +364,32 @@ export const ProjectsView: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="relative flex h-24 items-center justify-between gap-3 bg-gradient-to-br from-[var(--accent-primary)]/20 via-[var(--surface-secondary)] to-[var(--accent-secondary)]/15 px-5">
-                    <div
-                      aria-hidden
-                      className="absolute -right-6 -top-8 h-24 w-24 rounded-full bg-white/10"
-                    />
-                    <div className="relative">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${catClass}`}
-                        >
+                  <div className="relative h-32 w-full overflow-hidden bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)]">
+                    <CareerImage
+                      category={project.skills?.[0] || project.category || project.title}
+                      size="sm"
+                      aspectRatio="16/9"
+                      rounded="rounded-none"
+                      className="h-full w-full object-cover"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
+                      {project.isFeatured && (
+                        <div className="absolute top-3 start-3 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/90 text-white text-[11px] font-bold shadow-xs">
+                          <Star className="w-3 h-3 fill-current" />
+                          <span>{t('Featured')}</span>
+                        </div>
+                      )}
+                      <div className="absolute bottom-2 start-4 end-4 flex items-center justify-between text-white">
+                        <span className="text-xs font-semibold capitalize bg-black/50 px-2 py-0.5 rounded backdrop-blur-xs">
                           {t(CATEGORY_LABELS[projectCat] ?? projectCat)}
                         </span>
-                        {project.isFeatured && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500">
-                            <Star className="w-3 h-3 fill-current" />
-                            {t('Featured')}
+                        {project.role && (
+                          <span className="text-[11px] font-medium opacity-90 truncate max-w-[140px]">
+                            {project.role}
                           </span>
                         )}
                       </div>
-                      <div className="mt-1 text-2xl font-black tracking-tight text-[var(--color-primary-text)]">
-                        {projectInitials(project.title)}
-                      </div>
-                    </div>
-                    <div className="relative text-end text-[11px] text-[var(--text-secondary)]">
-                      {project.role && (
-                        <div className="text-[11px] font-bold text-[var(--text-primary)] truncate max-w-[140px]">
-                          {project.role}
-                        </div>
-                      )}
-                      <div className="mt-1 inline-flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
-                        <Clock className="h-3 w-3" />~
-                        {estimateProjectHours(project.tasks, project.difficulty)}h {t('estimated')}
-                      </div>
-                    </div>
+                    </CareerImage>
                   </div>
                 )}
 

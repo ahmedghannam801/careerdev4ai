@@ -62,3 +62,4 @@ Activate this skill when:
 - **Lazy-Loading the Hero Image**: Setting `loading="lazy"` on above-the-fold hero images ruins LCP.
 - **Animating Layout Dimensions**: Animating `height` from 0 to auto triggers reflows on every animation frame.
 - **Monolithic Bundles**: Bundling all client views into a single 3MB file without code-splitting.
+

@@ -6,6 +6,7 @@
  */
 
 export const roadmapAr: Record<string, string> = {
+  'Career Roadmap': 'خارطة الطريق المهنية',
   'EXECUTION TIMELINE': 'الجدول الزمني للتنفيذ',
   'Personal Career Roadmap': 'خارطة طريقك المهنية',
   'Roadmap Completion': 'اكتمال خارطة الطريق',

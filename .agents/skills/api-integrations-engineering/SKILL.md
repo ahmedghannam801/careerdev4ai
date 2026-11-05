@@ -61,3 +61,4 @@ Activate this skill when:
 - **Scope Hallucination**: Assuming general OAuth access grants full read/write access to proprietary partner APIs.
 - **Unbounded Retries**: Retrying 4xx errors infinitely, consuming API quotas and causing client hanging.
 - **Unsanitized Third-Party Data**: Rendering raw HTML or unescaped strings returned from external APIs.
+

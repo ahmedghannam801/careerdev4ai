@@ -66,3 +66,4 @@ Activate this skill when:
 - **The Jumbled Card Stack**: Stacking 4+ cards at arbitrary 3D angles that obscure each other.
 - **AI-Style Generic Hero**: Neon gradients, floating glass spheres, or disconnected mockups that do not relate to real product functionality.
 - **The Empty Void**: Section padding exceeding 120px with small content blocks, causing awkward scrolling.
+

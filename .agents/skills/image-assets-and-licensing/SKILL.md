@@ -85,3 +85,4 @@ Activate this skill when:
 - **Hotlinking Dynamic CDNs**: Relying on external URLs that fail or change under rate limits.
 - **Megabyte Bloat**: Embedding 4MB raw uncompressed PNGs/JPEGs directly into the bundle.
 - **Missing Aspect Ratios**: Omitting width/height attributes leading to severe Cumulative Layout Shift (CLS).
+

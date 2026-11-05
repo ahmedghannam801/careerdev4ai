@@ -66,3 +66,4 @@ Activate this skill when:
 - **Client-Side Admin Checks**: Checking `user.role === 'admin'` only in the frontend while leaving the backend API endpoint unprotected.
 - **Leaked Error Traces**: Returning full database error stack traces containing table names and SQL queries to the browser.
 - **Unchecked Redirects**: Accepting open redirect URLs (`returnUrl`) without validating against allowed origin domains.
+

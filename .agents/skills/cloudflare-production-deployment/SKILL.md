@@ -74,3 +74,4 @@ Activate this skill when:
 - **Deploying Uncommitted Work**: Deploying local edits that are not committed or pushed to Git `main`.
 - **Bypassing Failing Tests**: Forcing a deployment when unit tests or TypeScript compilation fails.
 - **Missing Worker Secrets**: Deploying to Pages without configuring required secrets (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`).
+

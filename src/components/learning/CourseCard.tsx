@@ -42,6 +42,7 @@ import {
   resourceCta,
   type LearningResourceType,
 } from '../../../shared/learningResources';
+import { getIndustryVisual } from '../../lib/imageAssets';
 import {
   availabilityBucket,
   availabilityDescription,
@@ -145,14 +146,15 @@ const Thumbnail: React.FC<{ course: LearningCourse; compact?: boolean }> = ({
         />
       ) : (
         <>
-          <div
+          <img
+            src={getIndustryVisual(course.category).srcSm}
+            alt=""
             aria-hidden
-            className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10"
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover opacity-80"
           />
-          <div
-            aria-hidden
-            className="absolute -bottom-10 -left-6 h-24 w-24 rounded-full bg-black/10"
-          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
           {showFavicon ? (
             <img
               src={favicon ?? undefined}
@@ -167,12 +169,11 @@ const Thumbnail: React.FC<{ course: LearningCourse; compact?: boolean }> = ({
             />
           ) : (
             <span
-              className={`relative z-10 font-black tracking-tight ${
-                compact ? 'text-xl' : 'text-3xl'
+              className={`relative z-10 font-bold tracking-tight text-white drop-shadow-md ${
+                compact ? 'text-xs' : 'text-sm'
               }`}
-              style={{ color: brand.textColor }}
             >
-              {brand.short}
+              {course.provider || brand.short}
             </span>
           )}
         </>

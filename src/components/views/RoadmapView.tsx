@@ -29,6 +29,7 @@ import {
 } from '../../../shared/learningResources';
 import { RoadmapTaskStatus } from '../../types/career';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
+import { CareerImage } from '../ui/CareerImage';
 
 interface RoadmapViewProps {
   onNavigate?: (view: string) => void;
@@ -334,6 +335,36 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           )}
         </div>
       </div>
+
+      {/* Visual Roadmap Banner */}
+      {(() => {
+        const targetRoleTitle =
+          roadmapPhases[0]?.title?.replace(
+            / (Foundations|Core Delivery|Advanced Practice|Market Readiness)$/,
+            ''
+          ) || t('Career Roadmap');
+        return (
+          <div className="relative overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">
+            <div className="relative h-32 w-full sm:h-40">
+              <CareerImage
+                category={targetRoleTitle}
+                size="md"
+                aspectRatio="21/9"
+                rounded="rounded-2xl"
+                className="h-full w-full object-cover brightness-[0.8] contrast-[1.05]"
+              >
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface-main)] via-[var(--surface-main)]/40 to-transparent" />
+                <div className="absolute bottom-3 start-4 end-4 flex items-end justify-between">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
+                    <Target className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
+                    {targetRoleTitle}
+                  </span>
+                </div>
+              </CareerImage>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* The plan summary: three facts, not a wall of text. */}
       <div data-guide="roadmap-summary" className="grid grid-cols-1 gap-3 sm:grid-cols-3">

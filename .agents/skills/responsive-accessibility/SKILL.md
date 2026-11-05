@@ -70,3 +70,4 @@ Activate this skill when:
 - **Negative Margin Collision**: Using negative margins on mobile that push cards offscreen or collide with text.
 - **Button as Div**: Using `<div onClick={...}>` without `role="button"`, `tabIndex={0}`, or keyboard listener.
 - **Hidden Overflow Clip**: Setting `overflow-hidden` on parent containers that clips focused focus-rings or dropdowns.
+

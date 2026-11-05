@@ -17,6 +17,7 @@ import {
   History,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { CareerImage } from '../ui/CareerImage';
 
 export interface AssessmentQuestion {
   id: string;
@@ -822,59 +823,77 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
           return (
             <div
               key={cat.id}
-              className="group flex flex-col justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xs transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md"
+              className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xs transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md"
             >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent-surface)] text-[var(--color-primary-text)] transition-transform duration-200 group-hover:scale-105">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                      cat.level === 'Advanced'
-                        ? 'bg-purple-500/15 text-purple-600'
-                        : cat.level === 'Intermediate'
-                        ? 'bg-blue-500/15 text-blue-600'
-                        : 'bg-emerald-500/15 text-emerald-600'
-                    }`}
-                  >
-                    {cat.level}
-                  </span>
-                </div>
-
-                <h3 className="mt-4 text-base font-bold text-[var(--text-primary)]">
-                  {cat.title}
-                </h3>
-                <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-secondary)]">
-                  {cat.description}
-                </p>
-
-                <div className="mt-4 flex items-center gap-4 text-xs text-[var(--text-muted)]">
-                  <span className="flex items-center gap-1 font-mono">
-                    <Clock className="h-3.5 w-3.5" />
-                    {cat.timeMinutes} {t('mins')}
-                  </span>
-                  <span>{cat.questions.length} {t('questions')}</span>
-                </div>
-
-                {attempt && (
-                  <div className="mt-3 flex items-center justify-between rounded-lg bg-[var(--color-surface-secondary)] px-3 py-1.5 text-xs">
-                    <span className="text-[var(--text-secondary)]">{t('Last Score')}:</span>
-                    <span className="font-mono font-bold text-[var(--color-primary-text)]">
-                      {attempt.percentage}% (Lvl {attempt.proficiencyLevel})
+              <div className="relative h-28 w-full overflow-hidden border-b border-[var(--color-border)]">
+                <CareerImage
+                  category={cat.skillName}
+                  size="sm"
+                  aspectRatio="16/9"
+                  rounded="rounded-none"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+                  <div className="absolute top-2.5 end-2.5">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold shadow-xs ${
+                        cat.level === 'Advanced'
+                          ? 'bg-purple-600 text-white'
+                          : cat.level === 'Intermediate'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-emerald-600 text-white'
+                      }`}
+                    >
+                      {cat.level}
                     </span>
                   </div>
-                )}
+                  <div className="absolute bottom-2.5 start-3 flex items-center gap-2 text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-[var(--color-primary-text)] backdrop-blur-xs">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-bold drop-shadow-sm">{cat.skillName}</span>
+                  </div>
+                </CareerImage>
               </div>
 
-              <button
-                type="button"
-                onClick={() => startAssessment(cat)}
-                className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--color-primary)] py-2.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--color-primary-hover)]"
-              >
-                <span>{attempt ? t('Retake Test') : t('Start Assessment')}</span>
-                <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
-              </button>
+              <div className="flex flex-1 flex-col justify-between p-5">
+                <div>
+                  <h3 className="text-base font-bold text-[var(--text-primary)]">
+                    {cat.title}
+                  </h3>
+                  <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-secondary)]">
+                    {cat.description}
+                  </p>
+
+                  <div className="mt-4 flex items-center gap-4 text-xs text-[var(--text-muted)]">
+                    <span className="flex items-center gap-1 font-mono">
+                      <Clock className="h-3.5 w-3.5" />
+                      {cat.timeMinutes} {t('mins')}
+                    </span>
+                    <span>
+                      {cat.questions.length} {t('questions')}
+                    </span>
+                  </div>
+
+                  {attempt && (
+                    <div className="mt-3 flex items-center justify-between rounded-lg bg-[var(--color-surface-secondary)] px-3 py-1.5 text-xs">
+                      <span className="text-[var(--text-secondary)]">{t('Last Score')}:</span>
+                      <span className="font-mono font-bold text-[var(--color-primary-text)]">
+                        {attempt.percentage}% (Lvl {attempt.proficiencyLevel})
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => startAssessment(cat)}
+                  className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--color-primary)] py-2.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--color-primary-hover)]"
+                >
+                  <span>{attempt ? t('Retake Test') : t('Start Assessment')}</span>
+                  <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
+                </button>
+              </div>
             </div>
           );
         })}

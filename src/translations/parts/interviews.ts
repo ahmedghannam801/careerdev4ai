@@ -6,6 +6,7 @@
  */
 
 export const interviewsAr: Record<string, string> = {
+  'Interview Prep': 'التحضير للمقابلة',
   'The interviewer is unreachable right now, so your answer was not evaluated. Your answer is kept below — please try again shortly.':
     'المُقابل غير متاح الآن، لذا لم تُقيَّم إجابتك. إجابتك محفوظة أدناه — يرجى المحاولة مرة أخرى قريبًا.',
   'Adaptive Mock Interview': 'مقابلة تجريبية تكيّفية',
