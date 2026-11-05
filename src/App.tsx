@@ -34,6 +34,7 @@ const CareerSetupView = lazy(() => import('./components/views/CareerSetupView').
 const CareerAnalysisView = lazy(() => import('./components/views/CareerAnalysisView').then((m) => ({ default: m.CareerAnalysisView })));
 const CareerPlanView = lazy(() => import('./components/views/CareerPlanView').then((m) => ({ default: m.CareerPlanView })));
 const SkillsCenterView = lazy(() => import('./components/views/SkillsCenterView').then((m) => ({ default: m.SkillsCenterView })));
+const SkillAssessmentView = lazy(() => import('./components/views/SkillAssessmentView').then((m) => ({ default: m.SkillAssessmentView })));
 const RoadmapView = lazy(() => import('./components/views/RoadmapView').then((m) => ({ default: m.RoadmapView })));
 const LearningCenterView = lazy(() => import('./components/views/LearningCenterView').then((m) => ({ default: m.LearningCenterView })));
 const ProjectsView = lazy(() => import('./components/views/ProjectsView').then((m) => ({ default: m.ProjectsView })));
@@ -309,6 +310,8 @@ function AppRoutes() {
         return <RoadmapView onNavigate={navigateTo} />;
       case 'skills':
         return <SkillsCenterView />;
+      case 'assessment':
+        return <SkillAssessmentView onNavigate={navigateTo} />;
       case 'learning':
         return <LearningCenterView />;
       case 'projects':

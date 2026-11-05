@@ -6,6 +6,7 @@ import { TARGET_ROLES } from '../../data/rolesData';
 import { SUPPORT_EMAIL, PUBLIC_PATHS, OPERATOR_LINKEDIN_URL } from '../../../shared/contact.ts';
 import { Logo } from '../brand/Logo';
 import { CareerJourneyVisual } from '../brand/CareerJourneyVisual';
+import { HeroVisual3D } from '../landing/HeroVisual3D';
 import { ProductPreview } from '../landing/ProductPreview';
 import { FeatureGrid } from '../landing/FeatureGrid';
 import { TrustSection } from '../landing/TrustSection';
@@ -285,10 +286,10 @@ const navLinks = [
               </Reveal>
             </div>
 
-            {/* Journey visual */}
+            {/* Hero visual — 3D card stack (desktop) / 2×2 grid (mobile) */}
             <div className="lg:col-span-6 xl:col-span-6">
               <Reveal delay={0.3} distance="soft">
-                <CareerJourneyVisual />
+                <HeroVisual3D />
               </Reveal>
             </div>
           </div>
@@ -383,6 +384,136 @@ const navLinks = [
               );
             })}
           </Stagger>
+        </div>
+      </section>
+
+      {/* Career Journey Visual */}
+      <section id="journey" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('Career Journey')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('From direction to destination.')}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t('A step-by-step path that connects your ambition to concrete evidence and career momentum.')}
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.1} distance="soft">
+            <div className="mx-auto mt-12 max-w-3xl">
+              <CareerJourneyVisual />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Real Workplace & Learning Context — Licensed Authentic Photography */}
+      <section id="real-experience" className="scroll-mt-24 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]/30 px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('Real Careers in Action')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('Built for students, switchers, and rising leaders.')}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t('Whether preparing for your first internship, transitioning into tech, or managing a high-impact team.')}
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="group overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-1 hover:border-[var(--color-border-strong)] hover:shadow-md">
+              <div className="relative aspect-video w-full overflow-hidden bg-[var(--color-surface-secondary)]">
+                <img
+                  src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&auto=format&fit=crop&q=80"
+                  alt="University students collaborating and studying with laptops in a modern campus environment"
+                  width="800"
+                  height="450"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <span className="absolute bottom-2 end-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/80 backdrop-blur-xs">
+                  Unsplash / Priscilla Du Preez
+                </span>
+              </div>
+              <div className="p-5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                  {t('Students & Fresh Grads')}
+                </span>
+                <h3 className="mt-1.5 text-sm font-bold text-[var(--text-primary)]">
+                  {t('Academic Learning to Industry Readiness')}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {t('Turn semester coursework into targeted portfolios and resume-ready technical evidence.')}
+                </p>
+              </div>
+            </div>
+
+            <div className="group overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-1 hover:border-[var(--color-border-strong)] hover:shadow-md">
+              <div className="relative aspect-video w-full overflow-hidden bg-[var(--color-surface-secondary)]">
+                <img
+                  src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&auto=format&fit=crop&q=80"
+                  alt="Professional engineer presenting technical architecture review in a collaborative team setting"
+                  width="800"
+                  height="450"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <span className="absolute bottom-2 end-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/80 backdrop-blur-xs">
+                  Unsplash / Christina @ wocintechchat
+                </span>
+              </div>
+              <div className="p-5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                  {t('Working Professionals')}
+                </span>
+                <h3 className="mt-1.5 text-sm font-bold text-[var(--text-primary)]">
+                  {t('Measurable Impact & Skill Progression')}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {t('Benchmark existing proficiencies against senior and lead job specifications.')}
+                </p>
+              </div>
+            </div>
+
+            <div className="group overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-1 hover:border-[var(--color-border-strong)] hover:shadow-md sm:col-span-2 lg:col-span-1">
+              <div className="relative aspect-video w-full overflow-hidden bg-[var(--color-surface-secondary)]">
+                <img
+                  src="https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&auto=format&fit=crop&q=80"
+                  alt="Career mentoring and interview preparation discussion between two professionals"
+                  width="800"
+                  height="450"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <span className="absolute bottom-2 end-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/80 backdrop-blur-xs">
+                  Unsplash / Christina @ wocintechchat
+                </span>
+              </div>
+              <div className="p-5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                  {t('Career Switchers')}
+                </span>
+                <h3 className="mt-1.5 text-sm font-bold text-[var(--text-primary)]">
+                  {t('Transferable Skills & Interview Mastery')}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {t('Practice behavioral and technical STAR responses tailored to your transition path.')}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

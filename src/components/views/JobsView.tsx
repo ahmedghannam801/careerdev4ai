@@ -218,6 +218,16 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
 
   const expiredCount = useMemo(() => ordered.filter((entry) => entry.job.expired).length, [ordered]);
 
+  const linkedInSearchUrl = useMemo(() => {
+    const q = filters.query?.trim() || targetRole.title?.trim() || 'Software Engineer';
+    const loc = filters.location?.trim() || (filters.country === 'eg' ? 'Egypt' : '');
+    const params = new URLSearchParams({
+      keywords: q,
+      ...(loc ? { location: loc } : {}),
+    });
+    return `https://www.linkedin.com/jobs/search/?${params.toString()}`;
+  }, [filters.query, filters.location, filters.country, targetRole.title]);
+
   const handleTrackApplication = async (item: MatchedJob) => {
     setTrackingId(item.job.id);
     setTrackNotice(null);
@@ -300,6 +310,37 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             )}
           </p>
         </div>
+      </div>
+
+      {/* LinkedIn Authorized External Search Entry */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0A66C2]/10 text-[#0A66C2]">
+            <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9h2.79v8.37H6.46v-8.37M7.86 6.3a1.63 1.63 0 1 0 0 3.26 1.63 1.63 0 0 0 0-3.26Z" />
+            </svg>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-[var(--text-primary)]">LinkedIn Jobs</span>
+              <span className="rounded bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+                {t('External Search')}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+              {t('Search verified vacancies directly on LinkedIn matching your target role and keywords.')}
+            </p>
+          </div>
+        </div>
+        <a
+          href={linkedInSearchUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:border-[#0A66C2] hover:text-[#0A66C2]"
+        >
+          <span>{t('Search on LinkedIn')}</span>
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
       </div>
 
       {/* Search */}

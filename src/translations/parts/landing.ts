@@ -181,4 +181,26 @@ export const landingAr: Record<string, string> = {
   'Work experience': 'الخبرات العملية',
   'Skill gaps it reasons about': 'فجوات المهارات التي يستند إليها',
   'Account': 'الحساب',
+
+  // ---- Career Journey Visual & Real Photography ----------------------
+  'Career Journey': 'المسار المهني',
+  'From direction to destination.': 'من تحديد الوجهة إلى تحقيق الهدف.',
+  'A step-by-step path that connects your ambition to concrete evidence and career momentum.':
+    'مسار خطوة بخطوة يربط طموحك بالأدلة العملية والتقدم المهني.',
+  'Real Careers in Action': 'مسارات مهنية واقعية',
+  'Built for students, switchers, and rising leaders.': 'مصمم للطلاب ومغيري المسار والقادة الصاعدين.',
+  'Whether preparing for your first internship, transitioning into tech, or managing a high-impact team.':
+    'سواء كنت تستعد لتدريبك الأول، أو تنتقل إلى مجال التقنية، أو تقود فريقًا مؤثرًا.',
+  'Students & Fresh Grads': 'الطلاب والخريجون الجدد',
+  'Academic Learning to Industry Readiness': 'من التحصيل الأكاديمي إلى الجاهزية لسوق العمل',
+  'Turn semester coursework into targeted portfolios and resume-ready technical evidence.':
+    'حوّل دراستك الجامعية إلى معرض أعمال وأدلة تقنية تدعم سيرتك الذاتية.',
+  'Working Professionals': 'المحترفون العاملون',
+  'Measurable Impact & Skill Progression': 'تأثير ملموس وتطور مستمر في المهارات',
+  'Benchmark existing proficiencies against senior and lead job specifications.':
+    'قارن كفاءاتك الحالية بمتطلبات الوظائف المتقدمة والقيادية.',
+  'Career Switchers': 'مغيرو المسار المهني',
+  'Transferable Skills & Interview Mastery': 'مهارات قابلة للنقل وتميز في المقابلات',
+  'Practice behavioral and technical STAR responses tailored to your transition path.':
+    'تدرب على إجابات المقابلات السلوكية والتقنية بأسلوب STAR وفق مسارك الجديد.',
 };

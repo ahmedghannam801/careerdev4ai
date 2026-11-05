@@ -84,4 +84,35 @@ export const skillsAr: Record<string, string> = {
   'project': 'مشروع',
   'course': 'دورة',
   'portfolio': 'معرض أعمال',
+
+  // Skill Assessment Center
+  'Assessments': 'التقييمات',
+  'All Assessments': 'كل التقييمات',
+  'Diagnostic Self-Assessment: Calibrated for practical skill readiness and roadmap tailoring. Not an accredited third-party certification.':
+    'تقييم تشخيصي ذاتي: مخصص لقياس الجاهزية العملية وتخصيص خارطة التعلم، وليس شهادة أكاديمية معتمدة.',
+  'Finish & Score': 'إنهاء واحتساب النتيجة',
+  'Assessment Complete': 'اكتمل التقييم',
+  'Assessed Level': 'المستوى المُقيَّم',
+  'Proficient': 'متمكن',
+  'Foundational': 'تأسيسي',
+  'Skill Profile Updated!': 'تم تحديث ملف المهارات!',
+  'Sync to My Skill Profile': 'تحديث ملف مهاراتي',
+  'Retake Assessment': 'إعادة التقييم',
+  'Browse Matched Courses': 'استعراض الدورات المطابقة',
+  'Detailed Question Breakdown & Explanations': 'تفاصيل الأسئلة والتفسيرات',
+  'Not answered': 'لم تتم الإجابة',
+  'Correct answer': 'الإجابة الصحيحة',
+  'Explanation': 'التوضيح',
+  'Skill Validation': 'التحقق من المهارات',
+  'Skill Assessment Center': 'مركز تقييم المهارات',
+  'Calibrate your actual proficiency through realistic multiple-choice technical benchmarks. Results update your skill profile and refine your personalized roadmap.':
+    'قِس كفاءتك الفعلية من خلال اختبارات تشخيصية عملية. تُحدّث النتائج ملف مهاراتك وتُحسّن خارطة طريقك.',
+  'Self-Assessment Standard': 'معيار التقييم الذاتي',
+  'These assessments serve as objective diagnostic tools for personal growth. They are not accredited academic degrees or licensed corporate certifications.':
+    'تُستخدم هذه التقييمات كأدوات تشخيصية موضوعية للتطور الشخصي، وليست درجات أكاديمية معتمدة أو شهادات مؤسسية مرخصة.',
+  'Last Score': 'آخر نتيجة',
+  'Retake Test': 'إعادة الاختبار',
+  'Start Assessment': 'بدء التقييم',
+  'Recent Assessment Attempts': 'المحاولات السابقة',
+  'Score': 'الدرجة',
 };

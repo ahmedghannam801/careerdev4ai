@@ -26,6 +26,7 @@ export const APP_ROUTES = [
   'plan',
   'roadmap',
   'skills',
+  'assessment',
   'learning',
   'projects',
   'volunteer',

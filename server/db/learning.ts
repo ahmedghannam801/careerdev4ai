@@ -3,7 +3,7 @@
 // Catalogue reads are global. User state writes always use the verified
 // auth user id as profile_id; no client-supplied owner is accepted anywhere in
 // this module.
-import { getSupabaseServer } from './supabase';
+import { getSupabaseServer } from './supabase.ts';
 import { deriveResourceType, officialThumbnail, isLearningResourceType, type LearningResourceType } from '../../shared/learningResources.ts';
 import type {
   Availability,
@@ -201,6 +201,176 @@ export async function listCourses(): Promise<LearningCourse[]> {
 export async function getCourse(courseId: string): Promise<LearningCourse | null> {
   const courses = await listCourses();
   return courses.find((course) => course.id === courseId) ?? null;
+}
+
+export interface SearchCoursesParams {
+  q?: string;
+  level?: string;
+  language?: string;
+  format?: string;
+  availability?: string;
+  provider?: string;
+  category?: string;
+  roleSlug?: string;
+  hasCertificate?: boolean;
+  minDuration?: number;
+  maxDuration?: number;
+  limit?: number;
+  offset?: number;
+  sortBy?: 'relevance' | 'title' | 'provider' | 'duration' | 'rating';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface SearchCoursesResult {
+  courses: LearningCourse[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  facets: {
+    providers: Array<{ name: string; count: number }>;
+    levels: Array<{ name: string; count: number }>;
+    languages: Array<{ name: string; count: number }>;
+    categories: Array<{ name: string; count: number }>;
+    formats: Array<{ name: string; count: number }>;
+  };
+}
+
+export async function searchCourses(params: SearchCoursesParams = {}): Promise<SearchCoursesResult> {
+  const allCourses = await listCourses();
+  const q = (params.q ?? '').trim().toLowerCase();
+  const level = params.level?.trim().toLowerCase();
+  const language = params.language?.trim().toLowerCase();
+  const format = params.format?.trim().toLowerCase();
+  const availability = params.availability?.trim().toLowerCase();
+  const provider = params.provider?.trim().toLowerCase();
+  const category = params.category?.trim().toLowerCase();
+  const roleSlug = params.roleSlug?.trim().toLowerCase();
+  const hasCertificate = params.hasCertificate;
+  const minDuration = params.minDuration;
+  const maxDuration = params.maxDuration;
+
+  type ScoredCourse = { course: LearningCourse; score: number };
+  const matched: ScoredCourse[] = [];
+
+  for (const course of allCourses) {
+    if (level && level !== 'all' && course.level.toLowerCase() !== level) continue;
+    if (language && language !== 'all') {
+      const isArabic = language === 'ar' || language === 'arabic';
+      const isEnglish = language === 'en' || language === 'english';
+      const courseLang = course.language.toLowerCase();
+      if (isArabic && !courseLang.includes('ar') && !courseLang.includes('arabic')) continue;
+      else if (isEnglish && !courseLang.includes('en') && !courseLang.includes('english')) continue;
+      else if (!isArabic && !isEnglish && !courseLang.includes(language)) continue;
+    }
+    if (format && format !== 'all' && course.format.toLowerCase() !== format) continue;
+    if (availability && availability !== 'all' && course.availability.toLowerCase() !== availability) continue;
+    if (provider && provider !== 'all' && course.provider.toLowerCase() !== provider) continue;
+    if (category && category !== 'all' && course.category.toLowerCase() !== category) continue;
+    if (hasCertificate !== undefined && course.hasCertificate !== hasCertificate) continue;
+    if (minDuration !== undefined && (course.durationHours === null || course.durationHours < minDuration)) continue;
+    if (maxDuration !== undefined && (course.durationHours === null || course.durationHours > maxDuration)) continue;
+    if (roleSlug && roleSlug !== 'all') {
+      const hasRole = course.roles?.some((r) => r.roleSlug.toLowerCase() === roleSlug);
+      if (!hasRole) continue;
+    }
+
+    let score = 1;
+    if (q) {
+      const titleLower = course.title.toLowerCase();
+      const descLower = (course.description ?? '').toLowerCase();
+      const provLower = course.provider.toLowerCase();
+      const catLower = course.category.toLowerCase();
+      const skillsLower = course.skills?.map((s) => s.name.toLowerCase()) ?? [];
+
+      const inTitle = titleLower.includes(q);
+      const inSkills = skillsLower.some((s) => s.includes(q));
+      const inProv = provLower.includes(q);
+      const inCat = catLower.includes(q);
+      const inDesc = descLower.includes(q);
+
+      if (!inTitle && !inSkills && !inProv && !inCat && !inDesc) {
+        continue;
+      }
+
+      if (titleLower === q) score += 100;
+      else if (titleLower.startsWith(q)) score += 50;
+      else if (inTitle) score += 30;
+
+      if (inSkills) score += 25;
+      if (inProv) score += 15;
+      if (inCat) score += 10;
+      if (inDesc) score += 5;
+    }
+
+    matched.push({ course, score });
+  }
+
+  const providerCounts = new Map<string, number>();
+  const levelCounts = new Map<string, number>();
+  const languageCounts = new Map<string, number>();
+  const categoryCounts = new Map<string, number>();
+  const formatCounts = new Map<string, number>();
+
+  for (const { course } of matched) {
+    providerCounts.set(course.provider, (providerCounts.get(course.provider) ?? 0) + 1);
+    levelCounts.set(course.level, (levelCounts.get(course.level) ?? 0) + 1);
+    languageCounts.set(course.language, (languageCounts.get(course.language) ?? 0) + 1);
+    categoryCounts.set(course.category, (categoryCounts.get(course.category) ?? 0) + 1);
+    formatCounts.set(course.format, (formatCounts.get(course.format) ?? 0) + 1);
+  }
+
+  const toFacetList = (map: Map<string, number>) =>
+    Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+  const sortBy = params.sortBy ?? (q ? 'relevance' : 'title');
+  const sortOrder = params.sortOrder ?? (sortBy === 'title' || sortBy === 'provider' ? 'asc' : 'desc');
+  const orderMultiplier = sortOrder === 'asc' ? 1 : -1;
+
+  matched.sort((a, b) => {
+    if (sortBy === 'relevance') {
+      return b.score - a.score;
+    }
+    if (sortBy === 'title') {
+      return orderMultiplier * a.course.title.localeCompare(b.course.title);
+    }
+    if (sortBy === 'provider') {
+      return orderMultiplier * a.course.provider.localeCompare(b.course.provider);
+    }
+    if (sortBy === 'duration') {
+      const durA = a.course.durationHours ?? 0;
+      const durB = b.course.durationHours ?? 0;
+      return orderMultiplier * (durA - durB);
+    }
+    if (sortBy === 'rating') {
+      const ratA = a.course.rating ?? 0;
+      const ratB = b.course.rating ?? 0;
+      return orderMultiplier * (ratA - ratB);
+    }
+    return 0;
+  });
+
+  const total = matched.length;
+  const limit = Math.max(1, Math.min(100, Number(params.limit) || 20));
+  const offset = Math.max(0, Number(params.offset) || 0);
+  const pagedCourses = matched.slice(offset, offset + limit).map((m) => m.course);
+
+  return {
+    courses: pagedCourses,
+    total,
+    limit,
+    offset,
+    hasMore: offset + pagedCourses.length < total,
+    facets: {
+      providers: toFacetList(providerCounts),
+      levels: toFacetList(levelCounts),
+      languages: toFacetList(languageCounts),
+      categories: toFacetList(categoryCounts),
+      formats: toFacetList(formatCounts),
+    },
+  };
 }
 
 export async function listLearningItems(profileId: string): Promise<LearningItem[]> {

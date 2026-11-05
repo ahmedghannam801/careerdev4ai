@@ -19,6 +19,53 @@ export async function fetchLearningCatalog(): Promise<LearningCourse[]> {
   return data.courses ?? [];
 }
 
+export interface SearchLearningCatalogParams {
+  q?: string;
+  level?: string;
+  language?: string;
+  format?: string;
+  availability?: string;
+  provider?: string;
+  category?: string;
+  roleSlug?: string;
+  hasCertificate?: boolean;
+  minDuration?: number;
+  maxDuration?: number;
+  limit?: number;
+  offset?: number;
+  sortBy?: 'relevance' | 'title' | 'provider' | 'duration' | 'rating';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface SearchLearningCatalogResult {
+  courses: LearningCourse[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  facets: {
+    providers: Array<{ name: string; count: number }>;
+    levels: Array<{ name: string; count: number }>;
+    languages: Array<{ name: string; count: number }>;
+    categories: Array<{ name: string; count: number }>;
+    formats: Array<{ name: string; count: number }>;
+  };
+}
+
+export async function searchLearningCatalog(
+  params: SearchLearningCatalogParams = {}
+): Promise<SearchLearningCatalogResult> {
+  const query = new URLSearchParams();
+  for (const [key, val] of Object.entries(params)) {
+    if (val !== undefined && val !== null && val !== '') {
+      query.set(key, String(val));
+    }
+  }
+  const queryString = query.toString();
+  const url = `/api/learning/search${queryString ? `?${queryString}` : ''}`;
+  return request<SearchLearningCatalogResult>(url);
+}
+
 export async function fetchLearningItems(): Promise<LearningItem[]> {
   const data = await request<{ items: LearningItem[] }>('/api/learning/items');
   return data.items ?? [];

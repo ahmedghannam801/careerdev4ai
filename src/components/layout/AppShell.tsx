@@ -136,6 +136,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       label: t('Learn'),
       items: [
         { id: 'learning', label: t('navLearn'), icon: BookOpen },
+        { id: 'assessment', label: t('Assessments'), icon: ShieldCheck },
         { id: 'projects', label: t('navProjects'), icon: FolderGit2 },
         { id: 'volunteer', label: t('navOpportunities'), icon: HeartHandshake },
       ],

@@ -95,8 +95,10 @@ function matchesSearch(course: LearningCourse, search: string): boolean {
     course.title.toLowerCase().includes(term) ||
     course.provider.toLowerCase().includes(term) ||
     course.category.toLowerCase().includes(term) ||
+    course.level.toLowerCase().includes(term) ||
     (course.description ?? '').toLowerCase().includes(term) ||
-    course.skills.some((skill) => skill.name.toLowerCase().includes(term))
+    course.skills.some((skill) => skill.name.toLowerCase().includes(term)) ||
+    course.roles.some((role) => role.roleSlug.toLowerCase().includes(term))
   );
 }
 
