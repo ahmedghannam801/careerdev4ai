@@ -9,8 +9,8 @@
 // panel never restarts anything on its own.
 //
 // The panel also says what the background-job service can actually do. A job
-// that runs on a development worker is not the same thing as a job that runs
-// on Trigger.dev's Production runtime, and the candidate is told which one is
+// that runs on a worker that is not picking work up right now is not the same
+// thing as a job that runs normally, and the candidate is told which one is
 // in play rather than being left to assume the best.
 import { AlertTriangle, CheckCircle2, Clock, Loader2, RotateCw, XCircle } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
@@ -26,6 +26,7 @@ import { useBackgroundJobs } from '../../lib/useBackgroundJobs';
 /** The chip that says where a job is. */
 function StatusChip({ status, label }: { status: BackgroundJobStatus; label: string }) {
   const styles: Record<BackgroundJobStatus, string> = {
+    pending: 'bg-[var(--surface-secondary)] text-[var(--text-muted)]',
     queued: 'bg-[var(--surface-secondary)] text-[var(--text-muted)]',
     processing: 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]',
     completed: 'bg-[var(--success-surface)] text-[var(--success-strong)]',
@@ -79,7 +80,7 @@ function availabilityNote(
     return {
       tone: 'warning',
       text: t(
-        'Background processing is running in a development environment. The work is carried out by a development worker rather than by the Trigger.dev Production runtime.',
+        'Background processing has not checked in for a while, so a new job may wait before it starts.',
       ),
     };
   }
@@ -89,7 +90,7 @@ function availabilityNote(
       text: t('The state of background processing could not be checked just now.'),
     };
   }
-  return { tone: 'info', text: t('Background processing is running on the Trigger.dev Production runtime.') };
+  return { tone: 'info', text: t('Background processing is running and picking work up.') };
 }
 
 export interface BackgroundJobsPanelProps {
@@ -124,6 +125,7 @@ export function BackgroundJobsPanel({
   if (visible.length === 0 && !onStart && !note) return null;
 
   const statusLabel = (status: BackgroundJobStatus): string => {
+    if (status === 'pending') return t('Waiting to start');
     if (status === 'queued') return t('Queued');
     if (status === 'processing') return t('In progress');
     if (status === 'completed') return t('Completed');
@@ -304,7 +306,9 @@ export function BackgroundJobRow({ job }: { job: BackgroundJob }) {
       {job.status === 'failed' && job.errorMessage ? (
         <span className="text-[var(--color-danger)]">{job.errorMessage}</span>
       ) : null}
-      {!job.stage && job.status === 'queued' ? <span>{t('Queued')}</span> : null}
+      {!job.stage && (job.status === 'queued' || job.status === 'pending') ? (
+        <span>{job.status === 'pending' ? t('Waiting to start') : t('Queued')}</span>
+      ) : null}
     </div>
   );
 }

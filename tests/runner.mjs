@@ -334,6 +334,7 @@ async function main() {
     join(TESTS_DIR, 'headline-suggestions.test.ts'),
     join(TESTS_DIR, 'professional-links.test.ts'),
     join(TESTS_DIR, 'training-courses.test.ts'),
+    join(TESTS_DIR, 'learning-search.test.ts'),
     // The sequential adaptive interview plan and the catalogue's provider
     // tier / availability vocabulary. Pure.
     join(TESTS_DIR, 'interview-plan.test.ts'),
@@ -350,6 +351,11 @@ async function main() {
     // job that could not start says why, and a finished job survives a
     // refresh.
     join(TESTS_DIR, 'background-jobs.test.ts'),
+    // The background-job queue itself: what a message carries, how a worker
+    // claims a job, what happens when the same message arrives twice, how a
+    // failure is retried and when it is given up on, how a job whose worker
+    // died is handed back, and what a client may not do with a job.
+    join(TESTS_DIR, 'background-queue.test.ts'),
     // Persisted onboarding status distinguishes resumable, skipped and completed.
     join(TESTS_DIR, 'onboarding.test.ts'),
     // The public legal document versions and the server's acceptance predicate.

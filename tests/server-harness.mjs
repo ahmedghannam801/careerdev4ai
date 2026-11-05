@@ -127,17 +127,14 @@ export async function startServer({ port, env, timeoutMs = 120_000 } = {}) {
     AI_PROJECT_DAILY_LIMIT: process.env.AI_PROJECT_DAILY_LIMIT || '500',
   };
 
-  // The server loads `.env` for itself, so the Trigger.dev credential of this
-  // machine would otherwise reach the test server. It must not: the suite
-  // covers the contract that does not depend on the Trigger.dev account being
-  // reachable, and a test must never start a real run on the live project.
-  // Such a run consumes the platform's quota and, when no development worker
-  // is connected, stays queued for ever — which would then make the deployed
-  // site believe that no runner is available.
-  for (const key of Object.keys(serverEnv)) {
-    if (key.startsWith('TRIGGER_')) delete serverEnv[key];
-  }
-
+  // The server loads `.env` for itself. The background-job queue is not among
+  // the machine's settings — it is a binding of the deployed Pages project —
+  // so the test server has no queue at all. That is deliberate: the suite
+  // covers the contract that does not depend on a worker being reachable, and
+  // a test must never start real work. A background job started against the
+  // test server is admitted, recorded, and then failed with the reason that
+  // there is no queue.
+  //
   // The job provider's credential is removed for the same reason: the suite
   // proves the contract of a server without one, and a test must never spend
   // the owner's provider quota.

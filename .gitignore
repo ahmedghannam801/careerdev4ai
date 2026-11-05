@@ -22,10 +22,15 @@ local_db/
 .wrangler/
 .tmp-qa/
 
+# The bundle of the background-job Worker (built by scripts/build-jobs-worker.mjs).
+dist-jobs/
+
+# The secrets file the background-job Worker's secrets are uploaded from.
+# It holds live credentials and must never be committed.
+.wrangler-secrets.json
+
 # Local Android build toolchain (JDK and Android SDK downloaded for the build).
 .tools/
 
 # Local Supabase CLI state (project ref, pooler URL — machine specific)
 supabase/.temp/
-
-.trigger

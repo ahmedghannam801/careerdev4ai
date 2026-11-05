@@ -1,7 +1,7 @@
 // The background-job API.
 //
-// These tests cover the contract that does not depend on the Trigger.dev
-// account being reachable:
+// These tests cover the contract that does not depend on a background worker
+// being reachable:
 //
 //   * a request without a session is refused;
 //   * a job is always associated with the candidate who asked for it, and one
@@ -155,12 +155,12 @@ describe('background jobs', () => {
     });
 
     if (started.status === 202) {
-      // The platform is configured and accepted the job.
+      // The queue is configured and accepted the job.
       return;
     }
 
     assert.equal(started.status, 503);
-    assert.equal(started.body?.code, 'trigger_not_configured');
+    assert.equal(started.body?.code, 'queue_not_configured');
 
     // The failure is recorded, so the job does not stay 'queued' for ever.
     const { data } = await admin

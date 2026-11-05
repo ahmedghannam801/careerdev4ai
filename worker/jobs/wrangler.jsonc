@@ -1,0 +1,81 @@
+{
+  // The background-job worker.
+  //
+  // This Worker is the consumer of the `careerdev4ai-jobs` queue. It is
+  // separate from the Pages project on purpose: a Pages project can *publish*
+  // to a queue, but it cannot consume one, and the work must run somewhere that
+  // has no connection to the public site.
+  //
+  // The three bindings are:
+  //
+  //   JOB_QUEUE  the queue. It is a consumer here and a producer as well: a
+  //              failed attempt is handed back to the queue for a later try,
+  //              and that message is published from this Worker.
+  //   JOB_QUEUE_DLQ  the dead-letter queue. A message that keeps failing is
+  //              parked here rather than being retried for ever.
+  //   (secrets)  the Supabase and model credentials, set with `wrangler secret put`.
+  //
+  // The cron trigger is the maintenance heartbeat. It publishes the jobs that
+  // still need publishing, hands back the jobs a worker was interrupted while
+  // holding, gives an outcome to the jobs that are never going to start, and
+  // writes the heartbeat the API reads to tell the candidate the truth.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "careerdev4ai-jobs",
+  // The path is relative to this file, not to the repository root: the bundle
+  // is written to `dist-jobs/` by `scripts/build-jobs-worker.mjs`.
+  "main": "../../dist-jobs/worker.js",
+  "compatibility_date": "2026-09-01",
+  // The worker answers on its own address as well as through the queue and
+  // the cron. The endpoint it serves is the worker's own health, which is
+  // what an operator reads to see that the consumer is alive.
+  "workers_dev": true,
+
+  // The queue this worker consumes, and publishes retries to.
+  "queues": {
+    "producers": [
+      {
+        "queue": "careerdev4ai-jobs",
+        "binding": "JOB_QUEUE"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "careerdev4ai-jobs",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        // Three tries by the queue itself. The job's own retry budget is
+        // separate and is enforced by the worker, which knows what the job
+        // is and what a second attempt would cost.
+        "max_retries": 3,
+        "retry_delay": 30,
+        "dead_letter_queue": "careerdev4ai-jobs-dlq",
+        // The expensive work — reading a document, writing a CV, answering a
+        // question — is limited to three at a time. The queue's own limit is
+        // generous; this one is about the model's daily allowance and about
+        // one candidate's work not being started twenty times at once.
+        "max_concurrency": 3,
+        // A message becomes visible again after fifteen minutes. That is
+        // longer than any ordinary job, so a slow job is not handed to a
+        // second worker while it is still running. The worker's own lease is
+        // the real protection: it is what actually stops two workers running
+        // the same job.
+        "visibility_timeout_ms": 900000
+      }
+    ]
+  },
+
+  // The scheduled sweep. Every five minutes.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+
+  "vars": {
+    // The name this worker reports itself under, and the environment it runs
+    // in. The API reads the heartbeat to know whether a worker is alive.
+    "CONSUMER_ID": "careerdev4ai-jobs",
+    "JOB_ENVIRONMENT": "production",
+    // The models the work uses. They are not secrets.
+    "GEMINI_MODEL": "gemini-3.1-flash-lite",
+    "OPENROUTER_MODEL": "openrouter/free"
+  }
+}

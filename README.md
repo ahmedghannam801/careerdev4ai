@@ -151,8 +151,39 @@ Use the npm scripts, which encode the same targets:
 | `npm run cf:dev` | Local Pages runtime on `http://localhost:8788` |
 | `npm run cf:deployments` | List deployments for the project |
 | `npm run cf:env` | Apply the environment variables below to Pages, from `.env` |
+| `npm run cf:jobs:deploy` | Deploy the background-job Worker |
+| `npm run cf:jobs:secrets` | Upload the Worker's own copy of the server credentials |
+| `npm run cf:jobs:tail` | Watch the background-job Worker's logs |
 
 Preview URLs are public by default and carry `X-Robots-Tag: noindex`.
+
+### The background-job Worker
+
+The long-running work (reading a CV, writing one for a job, searching for
+vacancies, building a roadmap) does not run in the Pages project. It runs in a
+separate Cloudflare Worker, `careerdev4ai-jobs`, which consumes a Cloudflare
+Queue that the API publishes to.
+
+A Pages project can publish to a queue but cannot consume one, which is why
+the two sides are two deployments. The API writes the job to Supabase first and
+publishes a message second; the worker claims the job in the database — so two
+workers can never run the same job — does the work, and records the outcome.
+
+```bash
+npm run cf:jobs:deploy   # build and deploy the worker
+npm run cf:jobs:tail     # watch it
+```
+
+The worker needs its own copy of the server secrets, because it is a separate
+deployment:
+
+```bash
+npm run cf:jobs:secrets   # reads .env and uploads them with wrangler secret bulk
+```
+
+`BACKGROUND_JOBS.md` describes the whole design: the record, the claim, the
+retry budget, the recovery sweep and what the interface says when the worker is
+not picking work up.
 
 Configure these in the Pages project (Settings → Environment variables) for
 **both** Production and Preview:

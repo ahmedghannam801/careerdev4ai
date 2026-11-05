@@ -1,25 +1,32 @@
 // The HTTP surface of the background-job feature.
 //
-// Four routes, all of them behind the same authentication the rest of the API
+// Five routes, all of them behind the same authentication the rest of the API
 // uses:
 //
-//   POST   /api/background-jobs          start a job
-//   GET    /api/background-jobs          list this candidate's jobs
-//   GET    /api/background-jobs/:id      one job
-//   POST   /api/background-jobs/:id/retry   start the job again
-//   POST   /api/background-jobs/:id/cancel  stop a job that has not finished
+//   POST   /api/background-jobs              start a job
+//   GET    /api/background-jobs              list this candidate's jobs
+//   GET    /api/background-jobs/availability whether the service can run work
+//   GET    /api/background-jobs/:id          one job
+//   POST   /api/background-jobs/:id/retry    start the job again
+//   POST   /api/background-jobs/:id/cancel   stop a job that has not finished
 //
 // The route is deliberately thin. It checks that the caller may run this
 // workflow, that the record the job is about really belongs to the caller,
 // that the daily AI allowance covers the model calls the workflow will make,
-// and then it hands the work to Trigger.dev. Everything else happens in the
-// task.
+// and then it hands the work to the queue. Everything else happens in the
+// worker.
+//
+// The order of the last two steps matters. The row is written first and the
+// message is published second, because a row that says a job exists is a
+// promise; a message that says "come and do this" is only a knock on the door.
+// If the publication fails, the row records why — or stays pending for the
+// scheduled sweep to publish it again. Either way the candidate is told
+// something true.
 //
 // The allowance is spent HERE, when the job is admitted, rather than in the
-// task. The task runs in a different process with its own memory, so an
-// in-process counter would be empty there and every task would look free.
-// Charging at the door keeps the accounting in the one place that is shared
-// by every request.
+// worker. The worker runs with its own memory, so an in-process counter would
+// be empty there and every job would look free. Charging at the door keeps the
+// accounting in the one place that is shared by every request.
 //
 // The owner of a job is always the id verified from the caller's Supabase
 // session. It is never read from the request body, and a job that belongs to
@@ -39,12 +46,21 @@ import {
   getJobForProfile,
   isBackgroundJobKind,
   listJobsForProfile,
+  markJobCancelled,
+  markJobDispatched,
+  markJobDispatchPending,
+  markJobFailed,
   prepareJobRetry,
   toPublicJob,
   type BackgroundJobKind,
 } from './jobs.ts';
 import { backgroundJobAvailability } from './availability.ts';
-import { cancelRun, TriggerApiError, triggerTask } from './client.ts';
+import { getJobPolicy } from './tasks/policies.ts';
+import {
+  QueueNotConfiguredError,
+  QueuePublishError,
+  publishJobMessage,
+} from './queue.ts';
 
 /** How many jobs one candidate may start per minute. */
 const JOB_START_LIMIT = 10;
@@ -148,7 +164,7 @@ function language(value: unknown): 'en' | 'ar' {
 
 // A small in-process limiter for job starts.
 //
-// It exists so one candidate cannot flood the platform with runs. It is keyed
+// It exists so one candidate cannot flood the platform with jobs. It is keyed
 // on the VERIFIED user id, never on anything the browser sends.
 const jobStartBuckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -280,30 +296,39 @@ async function fingerprintFor(
 }
 
 /**
- * Starts a task and records the run against the job.
+ * Hands the job to the queue.
  *
- * Returns the run id. The job row is updated before the response is sent, so
- * the interface can always find the run again.
+ * The row is already written when this is called. The message is published
+ * next, and the row is marked as dispatched only once the message is really on
+ * the queue — so a publication that fails leaves the job marked as still needing
+ * a dispatch, and the worker's scheduled sweep publishes it again.
  */
-async function startTask(
-  job: { id: string; kind: BackgroundJobKind; task_id: string; attempt: number; profile_id: string; source_id: string | null },
-  payload: Record<string, unknown>,
-): Promise<string> {
-  const { runId } = await triggerTask(job.task_id, payload, {
-    // The attempt is part of the key, so a deliberate retry is a new run
-    // while a double submit inside one attempt is the same run.
-    idempotencyKey: `${job.id}:${job.attempt}`,
-    // One candidate's work on one record does not overlap itself.
-    concurrencyKey: `${job.profile_id}:${job.kind}:${job.source_id ?? 'none'}`,
-    tags: [job.kind],
-  });
+async function dispatchJob(job: {
+  id: string;
+  attempt: number;
+}): Promise<void> {
+  const messageId = await publishJobMessage(job.id, job.attempt);
+  await markJobDispatched(job.id, messageId);
+}
 
-  await getSupabaseServer()
-    .from('background_jobs')
-    .update({ run_id: runId })
-    .eq('id', job.id);
+/**
+ * Records a job that could not be handed to the queue.
+ *
+ * A permanent problem — there is no queue at all — fails the job with a
+ * reason. A temporary one leaves the job pending for the scheduled sweep, so
+ * that a blip never loses the candidate's work.
+ */
+async function recordDispatchFailure(jobId: string, error: unknown): Promise<{ status: number; code: string; message: string }> {
+  if (error instanceof QueueNotConfiguredError) {
+    const message = 'Background processing is not set up on this server, so the job could not be started.';
+    await markJobFailed(jobId, 'queue_not_configured', message);
+    return { status: 503, code: 'queue_not_configured', message };
+  }
 
-  return runId;
+  const message =
+    error instanceof Error ? error.message.slice(0, 500) : 'The job could not be started.';
+  await markJobDispatchPending(jobId);
+  return { status: 503, code: 'queue_publish_failed', message };
 }
 
 /** Registers every background-job route on the application. */
@@ -327,7 +352,7 @@ export function registerBackgroundJobRoutes(app: Express): void {
       // plainly instead of being left watching a job that will never start.
       //
       // The check is skipped unless the platform says, with evidence, that no
-      // runner can pick the work up. "Cannot tell" is never treated as "no".
+      // worker can pick the work up. "Cannot tell" is never treated as "no".
       const availability = await backgroundJobAvailability();
       if (availability.status === 'unavailable') {
         return res.status(503).json({
@@ -400,28 +425,16 @@ export function registerBackgroundJobRoutes(app: Express): void {
         stage: 'queued',
         // The sanitised request, so a retry replays exactly this.
         request: taskPayload,
+        // How many times this workflow may be attempted, so the row records
+        // the same budget the worker will enforce.
+        maxAttempts: getJobPolicy(kind)?.maxAttempts,
       });
 
       try {
-        await startTask(job, { ...taskPayload, jobId: job.id });
+        await dispatchJob(job);
       } catch (error) {
-        // The platform refused the job. It never ran, so the row must not stay
-        // 'queued' for ever.
-        await getSupabaseServer()
-          .from('background_jobs')
-          .update({
-            status: 'failed',
-            error_code: error instanceof TriggerApiError ? error.code : 'trigger_failed',
-            error_message:
-              error instanceof Error ? error.message.slice(0, 500) : 'The job could not be started.',
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', job.id);
-
-        if (error instanceof TriggerApiError) {
-          return res.status(error.status).json({ error: error.message, code: error.code });
-        }
-        throw error;
+        const failure = await recordDispatchFailure(job.id, error);
+        return res.status(failure.status).json({ error: failure.message, code: failure.code });
       }
 
       const refreshed = await getJobForProfile(profileId, job.id);
@@ -453,7 +466,7 @@ export function registerBackgroundJobRoutes(app: Express): void {
   app.get('/api/background-jobs', requireAuth, async (req: Request, res: Response) => {
     try {
       // Give up on the jobs that are never going to start, so none of them sits
-      // queued for ever with no explanation.
+      // waiting for ever with no explanation.
       await failStaleQueuedJobs();
       const jobs = await listJobsForProfile(req.authUser!.id, 25);
       const availability = await backgroundJobAvailability();
@@ -501,7 +514,7 @@ export function registerBackgroundJobRoutes(app: Express): void {
 
       // Only a job that has actually stopped can be started again. A job that
       // is still running must not be started a second time.
-      if (job.status === 'queued' || job.status === 'processing') {
+      if (job.status === 'pending' || job.status === 'queued' || job.status === 'processing') {
         return res.status(409).json({
           error: 'This job is still running.',
           code: 'job_running',
@@ -527,37 +540,21 @@ export function registerBackgroundJobRoutes(app: Express): void {
       await prepareJobRetry(job.id);
       const refreshed = (await getJobForProfile(profileId, job.id))!;
 
-      // The original request is replayed, so the retry does exactly what the
-      // first attempt did.
-      const stored = (refreshed.request ?? {}) as Record<string, unknown>;
+      // The request the job was started with is replayed, so the retry does
+      // exactly what the first attempt did. It is already stored on the row.
       try {
-        await startTask(refreshed, { ...stored, jobId: refreshed.id });
+        await dispatchJob(refreshed);
       } catch (error) {
-        // The attempt never started. The row records why, so the candidate
-        // sees a failed job with a reason rather than one that spins for ever.
-        await getSupabaseServer()
-          .from('background_jobs')
-          .update({
-            status: 'failed',
-            error_code: error instanceof TriggerApiError ? error.code : 'trigger_failed',
-            error_message:
-              error instanceof Error ? error.message.slice(0, 500) : 'The job could not be started.',
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', job.id);
-
-        if (error instanceof TriggerApiError) {
-          return res.status(error.status).json({ error: error.message, code: error.code });
-        }
-        throw error;
+        const failure = await recordDispatchFailure(job.id, error);
+        return res.status(failure.status).json({ error: failure.message, code: failure.code });
       }
 
       const updated = await getJobForProfile(profileId, job.id);
       return res.status(202).json({ job: toPublicJob(updated ?? refreshed) });
     } catch (error) {
       console.error('Background job retry error:', error);
-      if (error instanceof TriggerApiError) {
-        return res.status(error.status).json({ error: error.message, code: error.code });
+      if (error instanceof QueuePublishError) {
+        return res.status(503).json({ error: error.message, code: 'queue_publish_failed' });
       }
       return res.status(500).json({ error: 'The background job could not be restarted' });
     }
@@ -578,20 +575,11 @@ export function registerBackgroundJobRoutes(app: Express): void {
         return res.status(200).json({ job: toPublicJob(job) });
       }
 
-      if (job.run_id) {
-        try {
-          await cancelRun(job.run_id);
-        } catch (error) {
-          // A run that already finished cannot be cancelled, and that is not a
-          // failure the candidate needs to hear about.
-          if (!(error instanceof TriggerApiError)) throw error;
-        }
-      }
-
-      await getSupabaseServer()
-        .from('background_jobs')
-        .update({ status: 'cancelled', completed_at: new Date().toISOString() })
-        .eq('id', job.id);
+      // The row is the decision. A worker that is holding the job will find
+      // that it was cancelled at its next step and stop there; a worker that
+      // has not started it will find that it cannot claim it at all. Nothing
+      // has to be told to the worker for the cancellation to take effect.
+      await markJobCancelled(job.id);
 
       const updated = await getJobForProfile(profileId, job.id);
       return res.status(200).json({ job: toPublicJob(updated ?? job) });

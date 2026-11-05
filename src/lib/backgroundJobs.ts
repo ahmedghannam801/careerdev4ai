@@ -9,7 +9,13 @@
 // of its own to lose.
 import { apiRequest } from './apiClient';
 
-export type BackgroundJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+export type BackgroundJobStatus =
+  | 'pending'
+  | 'queued'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 export type BackgroundJobKind =
   | 'process-cv'
@@ -37,21 +43,21 @@ export interface BackgroundJob {
   updatedAt: string;
   startedAt: string | null;
   completedAt: string | null;
-  /** True when the job is queued and no runner has picked it up yet. */
+  /** True when the job is waiting and no worker has picked it up yet. */
   waitingForRunner: boolean;
 }
 
-/** The Trigger.dev environment the background jobs go to. */
-export type TriggerEnvironment = 'production' | 'development' | 'unknown';
+/** The environment the background jobs run in. */
+export type BackgroundJobEnvironment = 'production' | 'development' | 'unknown';
 
 /**
  * What the background-job service can do right now.
  *
- * `ready` means the work runs on Trigger.dev's own Production runtime.
- * `degraded` means it runs, but on a development worker rather than the
- * platform — which the interface has to say out loud rather than let the
- * candidate believe otherwise. `unavailable` means nothing can pick the work
- * up at the moment.
+ * `ready` means a worker has checked in recently and is picking work up.
+ * `degraded` means it has checked in, but not recently enough to say it is
+ * running right now. `unavailable` means nothing is picking the work up at the
+ * moment. `unconfigured` means this server has no queue at all, and
+ * `unknown` means the state could not be read.
  */
 export type BackgroundJobServiceStatus =
   | 'ready'
@@ -62,14 +68,15 @@ export type BackgroundJobServiceStatus =
 
 export interface BackgroundJobAvailability {
   configured: boolean;
-  environment: TriggerEnvironment;
+  environment: BackgroundJobEnvironment;
   environmentLabel: 'Production' | 'Development' | 'Unknown';
   status: BackgroundJobServiceStatus;
   /** `null` means "not known" — never reported as `false` without evidence. */
   runnerAvailable: boolean | null;
-  deploymentExists: boolean | null;
-  /** True when the work can only run on a developer's own machine. */
-  requiresDevelopmentWorker: boolean;
+  /** When the worker last checked in. `null` when it never has. */
+  consumerLastSeenAt: string | null;
+  /** How many jobs are waiting for a worker right now. */
+  waitingJobs: number | null;
   message: string;
   waitingAfterSeconds: number;
   staleAfterSeconds: number;
@@ -161,7 +168,7 @@ export async function cancelBackgroundJob(jobId: string): Promise<BackgroundJob>
 
 /** True when the job is still doing something. */
 export function isJobActive(job: BackgroundJob): boolean {
-  return job.status === 'queued' || job.status === 'processing';
+  return job.status === 'pending' || job.status === 'queued' || job.status === 'processing';
 }
 
 /** A short, readable name for a workflow. */

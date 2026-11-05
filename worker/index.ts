@@ -34,6 +34,7 @@ import { handleAsNodeRequest } from 'cloudflare:node';
 import { app } from '../app.ts';
 import { indexNowKey, indexNowKeyPath } from '../server/seo/indexnow.ts';
 import { VERIFICATION_PATH } from '../server/seo/verification.ts';
+import { CloudflareQueueProducer, setJobQueueProducer } from '../server/jobs/queue.ts';
 
 /** Routing key for the Node HTTP server registered below (not a TCP port). */
 const NODE_PORT = 3000;
@@ -47,8 +48,20 @@ interface AssetBinding {
   fetch(request: Request): Promise<Response>;
 }
 
+interface QueueBinding {
+  send(body: unknown, options?: { delaySeconds?: number }): Promise<void>;
+}
+
 interface Env {
   ASSETS: AssetBinding;
+  /**
+   * The background-job queue.
+   *
+   * A Pages project can publish to a queue; it cannot consume one. The
+   * consuming side is the background-job Worker, which is a separate
+   * deployment. This binding is what the API hands a job to.
+   */
+  JOB_QUEUE?: QueueBinding;
   [key: string]: unknown;
 }
 
@@ -117,6 +130,13 @@ export default {
         }
       }
     }
+
+    // The queue this deployment publishes to. It is registered before the
+    // request is handled, because the API asks for it when a job is started.
+    // A deployment without the binding simply has no queue: the API then
+    // refuses new background work with a reason instead of accepting a job
+    // that nothing would ever carry out.
+    setJobQueueProducer(env.JOB_QUEUE ? new CloudflareQueueProducer(env.JOB_QUEUE) : null);
 
     const url = new URL(request.url);
 

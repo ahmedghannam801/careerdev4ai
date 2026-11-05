@@ -8,6 +8,7 @@
 export const backgroundJobsAr: Record<string, string> = {
   'Background jobs': 'المهام في الخلفية',
   'Queued': 'في الانتظار',
+  'Waiting to start': 'في انتظار البدء',
   'In progress': 'قيد التنفيذ',
   'Completed': 'مكتملة',
   'Failed': 'فشلت',
@@ -17,10 +18,10 @@ export const backgroundJobsAr: Record<string, string> = {
   'Environment': 'البيئة',
   'Development': 'تطوير',
   'Waiting for a runner to pick this up.': 'في انتظار عامل ينفّذ هذه المهمة.',
-  'Background processing is running on the Trigger.dev Production runtime.':
-    'تعمل المعالجة في الخلفية على بيئة تشغيل Trigger.dev الإنتاجية.',
-  'Background processing is running in a development environment. The work is carried out by a development worker rather than by the Trigger.dev Production runtime.':
-    'تعمل المعالجة في الخلفية في بيئة تطوير. выполня العمل عامل تطوير بدلًا من بيئة تشغيل Trigger.dev الإنتاجية.',
+  'Background processing is running and picking work up.':
+    'تعمل المعالجة في الخلفية وينفّذ العامل المهام.',
+  'Background processing has not checked in for a while, so a new job may wait before it starts.':
+    'لم تُبلّغ المعالجة في الخلفية عن نفسها منذ awhile، لذا قد تنتظر مهمة جديدة قليلًا قبل أن تبدأ.',
   'Background processing is not available right now, so no new background work can start. A job that is already running is unaffected.':
     'المعالجة في الخلفية غير متاحة حاليًا، لذا لا يمكن بدء أي عمل جديد في الخلفية. أما المهام التي تعمل بالفعل فغير متأثرة.',
   'Background processing is not available on this server, so no background work can be started.':

@@ -29,7 +29,7 @@ import { parseStructuredCv } from './server/cv/parseStructuredCv.ts';
 // the same code. One implementation means the score shown in CV Studio and the
 // score stored on the version can never drift apart.
 import { runAtsAnalysis, validateAtsPayload } from './server/cv/atsAnalysis.ts';
-import { registerBackgroundJobRoutes } from './server/trigger/routes.ts';
+import { registerBackgroundJobRoutes } from './server/jobs/routes.ts';
 import { boundedList } from './server/ai/boundedList.ts';
 import { generateCoverLetter } from './server/cv/coverLetter.ts';
 import { universalAi, isAnyAiConfigured, getDefaultProvider } from './server/ai/provider.ts';
@@ -121,6 +121,8 @@ import {
 import {
   listCourses,
   getCourse,
+  searchCourses,
+  type SearchCoursesParams,
   listLearningItems,
   upsertLearningItem,
   updateLearningItem,
@@ -524,7 +526,7 @@ app.use((req: Request, res: Response, next: () => void) => {
   next();
 });
 
-// Background jobs (Trigger.dev).
+// Background jobs (Cloudflare Queues).
 //
 // The feature is a coherent unit — the API that starts a task, the durable
 // record of the job and the client that talks to the platform — so it lives in
@@ -5422,6 +5424,54 @@ app.get('/api/learning/catalog', async (_req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to load learning catalogue:', error);
     return res.status(500).json({ error: 'Failed to load learning catalogue' });
+  }
+});
+
+// Full-featured backend learning search with filtering, sorting, pagination and facets.
+app.get('/api/learning/search', async (req: Request, res: Response) => {
+  try {
+    const {
+      q,
+      level,
+      language,
+      format,
+      availability,
+      provider,
+      category,
+      roleSlug,
+      hasCertificate,
+      minDuration,
+      maxDuration,
+      limit,
+      offset,
+      sortBy,
+      sortOrder,
+    } = req.query;
+
+    const params: SearchCoursesParams = {
+      q: typeof q === 'string' ? q : undefined,
+      level: typeof level === 'string' ? level : undefined,
+      language: typeof language === 'string' ? language : undefined,
+      format: typeof format === 'string' ? format : undefined,
+      availability: typeof availability === 'string' ? availability : undefined,
+      provider: typeof provider === 'string' ? provider : undefined,
+      category: typeof category === 'string' ? category : undefined,
+      roleSlug: typeof roleSlug === 'string' ? roleSlug : undefined,
+      hasCertificate: hasCertificate === 'true' ? true : hasCertificate === 'false' ? false : undefined,
+      minDuration: minDuration ? Number(minDuration) : undefined,
+      maxDuration: maxDuration ? Number(maxDuration) : undefined,
+      limit: limit ? Number(limit) : 20,
+      offset: offset ? Number(offset) : 0,
+      sortBy: typeof sortBy === 'string' ? (sortBy as any) : undefined,
+      sortOrder: typeof sortOrder === 'string' ? (sortOrder as any) : undefined,
+    };
+
+    const result = await searchCourses(params);
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to search learning catalogue:', error);
+    return res.status(500).json({ error: 'Failed to search learning catalogue' });
   }
 });
 

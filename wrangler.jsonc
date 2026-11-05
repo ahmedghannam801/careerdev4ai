@@ -18,10 +18,44 @@
   // real `node:http` server implementation used by the Express API in
   // `dist/_worker.js`, so no explicit compatibility flag is needed here;
   // adding one is redundant at this compatibility date.
-  "compatibility_date": "2026-09-01"
+  "compatibility_date": "2026-09-01",
 
   // Preview URLs are a Pages dashboard setting, not a configuration-file key:
   // current Wrangler rejects `preview_urls` when validating a Pages config, so
   // it is deliberately absent here. Preview deployments still use the same
   // Worker build produced by `npm run build`.
+
+  // The background-job queue.
+  //
+  // This is a *producer* binding: the API writes the job to the database and
+  // then hands a message to this queue, and the background-job Worker
+  // (`worker/jobs/wrangler.jsonc`) consumes it. A Pages project can publish to
+  // a queue but cannot consume one, which is why the consuming side is a
+  // separate Worker deployment.
+  //
+  // The name of the binding is what the API looks for: `JOB_QUEUE`.
+  "queues": {
+    "producers": [
+      {
+        "queue": "careerdev4ai-jobs",
+        "binding": "JOB_QUEUE"
+      }
+    ]
+  },
+
+  // The public variables.
+  //
+  // They are public by design — they already ship inside the browser bundle —
+  // and they are declared here because `wrangler pages deploy` applies this
+  // file's `vars` to the deployment: a plain-text variable that is not
+  // declared here is cleared from the project by the next deployment.
+  //
+  // `npm run cf:env` sends the same values from `.env`, and it checks that
+  // the two agree, so the file and the local environment cannot drift apart
+  // unnoticed.
+  "vars": {
+    "VITE_SUPABASE_URL": "https://ciihprsfdojzvjnqgbxl.supabase.co",
+    "VITE_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpaWhwcnNmZG9qenZqbnFnYnhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzNTg4NTAsImV4cCI6MjEwNzkzNDg1MH0.NNdgeEeKqSsUS8iyUwiAS526CAF33wtC83juqhN5RHE",
+    "OPENROUTER_MODEL": "openrouter/free"
+  }
 }

@@ -33,7 +33,13 @@ const PROJECT = 'careerdev4ai';
 const ACCOUNT =
   process.env.CLOUDFLARE_ACCOUNT_ID ?? '2609c1a7921f6c50f1edd82e93bff1a8';
 
-/** The secrets the worker needs at runtime. */
+/**
+ * The secrets the worker needs at runtime.
+ *
+ * The background-job queue is not in this list: it is a *binding*, not a
+ * variable. It is configured in `wrangler.jsonc` and applied by
+ * `wrangler pages deploy`.
+ */
 const SECRET_KEYS = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
@@ -45,7 +51,6 @@ const SECRET_KEYS = [
   'GA4_CLIENT_ID',
   'GA4_CLIENT_SECRET',
   'JSEARCH_RAPIDAPI_KEY',
-  'TRIGGER_SECRET_KEY',
 ];
 
 /**
@@ -102,6 +107,33 @@ function readApiToken() {
   return '';
 }
 
+/**
+ * The public variables, as the deployment configuration declares them.
+ *
+ * `wrangler pages deploy` applies `wrangler.jsonc` to the project, and a
+ * plain-text variable that the file does not declare is cleared from the
+ * project by the deployment. So the values live in the file, and this check
+ * makes sure the file and `.env` still agree — a change in one that has not
+ * reached the other is a bug that would otherwise show up as a broken site.
+ */
+function declaredVars() {
+  const configPath = path.resolve(process.cwd(), 'wrangler.jsonc');
+  if (!fs.existsSync(configPath)) return {};
+  const text = fs.readFileSync(configPath, 'utf8');
+  const start = text.indexOf('"vars"');
+  if (start === -1) return {};
+
+  const declared = {};
+  const block = text.slice(start);
+  const entry = /"([A-Za-z_][A-Za-z0-9_]*)"\s*:\s*"([^"]*)"/g;
+  let match;
+  while ((match = entry.exec(block)) !== null) {
+    declared[match[1]] = match[2];
+    if (Object.keys(declared).length >= PLAIN_KEYS.length) break;
+  }
+  return declared;
+}
+
 const env = readEnvFile();
 const token = readApiToken();
 
@@ -111,6 +143,17 @@ if (missing.length > 0) {
     `these keys are missing or empty in .env, so their values would be wiped:\n${missing
       .map((key) => `  - ${key}`)
       .join('\n')}`,
+  );
+}
+
+// The declared variables and `.env` must agree, or the deployment would carry
+// one value while the local environment carries another.
+const declared = declaredVars();
+const drift = PLAIN_KEYS.filter((key) => declared[key] !== undefined && declared[key] !== env[key]);
+if (drift.length > 0) {
+  fail(
+    `these variables differ between wrangler.jsonc and .env, so the deployed site and the ` +
+      `local environment would disagree:\n${drift.map((key) => `  - ${key}`).join('\n')}`,
   );
 }
 
@@ -139,8 +182,34 @@ function buildEnvVars() {
   return vars;
 }
 
+/**
+ * The variables the project still has that `.env` no longer names.
+ *
+ * The Cloudflare API MERGES the map it is given into the project's existing
+ * one: a variable that is simply left out of the PATCH keeps its old value.
+ * So a variable that has been removed from `.env` — a credential for a service
+ * this project no longer uses — would stay on the project for ever.
+ *
+ * The API cannot delete one either: sending it with a null value is accepted
+ * and ignored. Removing a secret is `wrangler pages secret delete`, so these
+ * are reported with the exact command that removes them rather than being
+ * silently left behind.
+ */
+function staleEnvVars(current) {
+  const keep = new Set([...SECRET_KEYS, ...PLAIN_KEYS]);
+  return Object.keys(current ?? {}).filter((name) => !keep.has(name));
+}
+
 const project = await call('GET');
 const configs = project.deployment_configs ?? {};
+
+// The variables that are no longer wanted are collected from what the project
+// has now, before anything is sent — so a credential that has been dropped is
+// reported rather than left behind unnoticed.
+const stale = {
+  production: staleEnvVars(configs.production?.env_vars),
+  preview: staleEnvVars(configs.preview?.env_vars),
+};
 
 await call('PATCH', {
   deployment_configs: {
@@ -158,6 +227,12 @@ for (const environment of ['production', 'preview']) {
   console.log(
     `[pages-env] ${environment}: ${secrets.length} secrets, ${plain.length} plain-text variables`,
   );
+  if (stale[environment].length > 0) {
+    console.log(
+      `[pages-env] ${environment}: ${stale[environment].join(', ')} are no longer in .env. ` +
+        `Remove them with: npx wrangler pages secret delete <name> --project-name ${PROJECT}`,
+    );
+  }
 }
 console.log(
   '[pages-env] the values were sent. Redeploy for them to take effect: npm run cf:deploy',

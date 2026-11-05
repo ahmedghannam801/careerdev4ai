@@ -34,8 +34,7 @@
     "shared",
     "server.ts",
     "app.ts",
-    "worker",
-    "trigger.config.ts"
+    "worker"
   ],
   "exclude": [
     "dist"
