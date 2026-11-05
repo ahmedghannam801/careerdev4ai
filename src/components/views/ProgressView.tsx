@@ -39,7 +39,7 @@ export const ProgressView: React.FC = () => {
       </div>
 
       {/* 4 Primary Progress Pillars */}
-      <Stagger inView gap={0.06} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Stagger data-tour="progress-metrics" inView gap={0.06} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <Award className="w-4 h-4 text-[var(--color-success-strong)]" />

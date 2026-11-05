@@ -56,7 +56,6 @@ export const SettingsView: React.FC = () => {
   const {
     profile,
     updateProfile,
-    setActiveView,
     settings, 
     updateSettings, 
     aiPreferences, 
@@ -304,7 +303,7 @@ export const SettingsView: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div data-tour="tour-help-revisit" className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-[var(--text-primary)]">{t('Getting started')}</div>
           <p className="mt-1 text-xs text-[var(--text-secondary)]">
@@ -313,9 +312,8 @@ export const SettingsView: React.FC = () => {
         </div>
         <button
           type="button"
-          onClick={async () => {
-            await updateProfile({ onboardingStatus: 'started', onboardingStep: 0, onboardingCompleted: false });
-            setActiveView('onboarding');
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('careerdev4ai:open-tour', { detail: { restart: true } }));
           }}
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
         >

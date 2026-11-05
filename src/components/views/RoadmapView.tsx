@@ -219,7 +219,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
         <div className="absolute start-0 top-5 hidden h-8 w-8 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-main)] text-[var(--text-muted)] sm:flex">
           <FolderGit2 className="h-4 w-4" />
         </div>
-        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5">
+        <div data-tour="roadmap-integrations-panel" className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5">
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
             <FolderGit2 className="h-3 w-3" />
             {t('PROJECTS')}
@@ -604,7 +604,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
       </div>
 
       {/* The stages, in order. */}
-      <div className="relative space-y-4">
+      <div data-tour="roadmap-phases" className="relative space-y-4">
         <div className="absolute start-[15px] top-3 bottom-3 hidden w-px bg-[var(--border-subtle)] sm:block" aria-hidden="true" />
         {stages.map((stage, index) => {
           const isOpen = expanded.includes(stage.id);
@@ -953,6 +953,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                   </label>
                                   <select
                                     id={`status-${task.id}`}
+                                    data-tour={taskIndex === 0 && index === 0 ? "roadmap-task-checkbox" : undefined}
                                     value={task.status}
                                     onChange={(event) =>
                                       updateTaskStatus(

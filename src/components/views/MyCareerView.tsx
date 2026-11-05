@@ -328,7 +328,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   return (
     <Reveal className="space-y-8">
       {/* Top Banner: Where Am I in My Journey? */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
+      <div data-tour="my-career-header" className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold">
@@ -361,7 +361,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         </div>
 
         {/* 8-Step Visual Career Journey Map */}
-        <div className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
+        <div data-tour="career-stage-selector" className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
               {t('Visual Career Journey Map')}
@@ -408,7 +408,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       </div>
 
       {/* "What's Blocking You?" Actionable Blockers Engine */}
-      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+      <div data-tour="career-recommendations-list" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-[var(--color-warning)]" />
@@ -482,7 +482,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         </div>
 
         {/* Primary Goal Card */}
-        <div className="p-5 rounded-xl border-2 border-[var(--accent-primary)]/40 bg-[var(--accent-surface)]/20 space-y-3">
+        <div data-tour="role-picker-container" className="p-5 rounded-xl border-2 border-[var(--accent-primary)]/40 bg-[var(--accent-surface)]/20 space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)] font-mono">
@@ -571,7 +571,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       </div>
 
       {/* Career Asset Scorecard */}
-      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+      <div data-tour="career-requirements-spec" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-[var(--color-success-strong)]" />

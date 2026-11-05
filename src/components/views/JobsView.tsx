@@ -262,7 +262,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   return (
     <Reveal className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 md:flex-row md:items-center">
+      <div data-tour="jobs-header-panel" className="flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 md:flex-row md:items-center">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
             {t('Live Jobs')}
@@ -345,6 +345,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
 
       {/* Search */}
       <form
+        data-tour="jobs-filter-bar"
         onSubmit={submit}
         className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs"
       >

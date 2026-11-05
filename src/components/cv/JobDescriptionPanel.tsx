@@ -1011,7 +1011,7 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
         </div>
       )}
       {analysis && (
-        <section className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 shadow-xs" aria-labelledby="application-cover-letter">
+        <section data-tour="cover-letter-panel" className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 shadow-xs" aria-labelledby="application-cover-letter">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-[var(--color-primary-text)]" />
             <h3 id="application-cover-letter" className="text-sm font-bold text-[var(--text-primary)]">{t('Cover Letter')}</h3>

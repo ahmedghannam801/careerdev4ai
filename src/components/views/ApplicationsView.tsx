@@ -155,7 +155,7 @@ export const ApplicationsView: React.FC = () => {
 
       {/* KANBAN BOARD */}
       {viewMode === 'kanban' ? (
-        <Stagger inView gap={0.06} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 overflow-x-auto pb-4">
+        <Stagger data-tour="applications-kanban" inView gap={0.06} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 overflow-x-auto pb-4">
           {stages.map((st) => {
             const stageApps = applications.filter((a) => a.stage === st);
 

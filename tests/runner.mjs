@@ -358,6 +358,8 @@ async function main() {
     join(TESTS_DIR, 'background-queue.test.ts'),
     // Persisted onboarding status distinguishes resumable, skipped and completed.
     join(TESTS_DIR, 'onboarding.test.ts'),
+    // Multi-stage interactive product tour: 10 chapters, 47 steps, and full Arabic coverage.
+    join(TESTS_DIR, 'product-tour.test.ts'),
     // The public legal document versions and the server's acceptance predicate.
     // Pure; the user-provided legal copy remains an operator TODO.
     join(TESTS_DIR, 'legal.test.ts'),

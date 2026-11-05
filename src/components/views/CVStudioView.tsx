@@ -245,6 +245,7 @@ export const CVStudioView: React.FC = () => {
           {t('Document Editor & Preview')}
         </button>
         <button
+          data-tour="cv-tailor-tab"
           onClick={() => setActiveTab('job')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
             activeTab === 'job'

@@ -170,7 +170,7 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
       )}
 
       {/* Match explanation */}
-      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3">
+      <div data-tour="job-match-badge" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3">
         {match.score === null ? (
           <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
             {t(

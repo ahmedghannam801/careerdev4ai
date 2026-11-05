@@ -13,6 +13,7 @@ import { LandingView } from './components/views/LandingView';
 import { Logo } from './components/brand/Logo';
 import { Skeleton } from './components/ui/Skeleton';
 import { GuidedTour, GUIDES, type GuideDefinition, type GuideKey } from './components/onboarding/GuidedTour';
+import { InteractiveTourModal } from './components/onboarding/InteractiveTourModal';
 import { fetchDismissedGuides } from './lib/personalizationApi';
 import { buildRouteHash, isKnownRoute, parseRouteHash, resolveRouteId } from './lib/routing';
 import { analyticsPathForRoute, trackPageView } from './lib/analytics';
@@ -106,6 +107,7 @@ function AppRoutes() {
   const [publicUsername, setPublicUsername] = useState<string | null>(
     readPublicProfileUsername
   );
+  const [tourOpen, setTourOpen] = useState(false);
 
   const navigateTo = (view: string) => {
     setCurrentView(view);
@@ -206,6 +208,38 @@ function AppRoutes() {
       window.location.hash = buildRouteHash('dashboard');
     }
   }, [currentUser, isHydrated, forceOnboarding, currentView, setActiveView]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkTourState = async () => {
+      try {
+        const dismissed = await fetchDismissedGuides();
+        if (cancelled) return;
+        const local = localStorage.getItem('careerdev4ai_product_tour_state');
+        let localDismissed = false;
+        if (local) {
+          try {
+            localDismissed = Boolean(JSON.parse(local)?.tourDismissed);
+          } catch {}
+        }
+        if (!dismissed.includes('product_tour') && !localDismissed && currentUser && !forceOnboarding && currentView === 'dashboard') {
+          setTourOpen(true);
+        }
+      } catch {}
+    };
+
+    void checkTourState();
+
+    const handleOpenTourEvent = () => {
+      setTourOpen(true);
+    };
+
+    window.addEventListener('careerdev4ai:open-tour', handleOpenTourEvent);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('careerdev4ai:open-tour', handleOpenTourEvent);
+    };
+  }, [currentUser, forceOnboarding, currentView]);
 
   // B.4 finding C-1 (session gate).
   //
@@ -374,6 +408,12 @@ function AppRoutes() {
           over the whole application, and it remembers that it has been
           seen on the server. */}
       <GuidedTourHost currentView={currentView} />
+      <InteractiveTourModal
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
+        currentView={currentView}
+        onNavigate={navigateTo}
+      />
       {/* B.4 finding C-2: the AuthModal existed and was fully functional but
           was never mounted, so there was no way to sign in or sign up. */}
       <AuthModal />

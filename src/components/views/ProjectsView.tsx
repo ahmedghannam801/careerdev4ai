@@ -254,7 +254,7 @@ export const ProjectsView: React.FC = () => {
   return (
     <Reveal className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
+      <div data-guide="projects" className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
           <div className="text-xs text-[var(--text-secondary)]">{t('PORTFOLIO & EVIDENCE ARTIFACTS')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
@@ -263,6 +263,7 @@ export const ProjectsView: React.FC = () => {
         </div>
 
         <button
+          data-tour="add-project-button"
           onClick={openAddModal}
           className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
         >
@@ -451,7 +452,7 @@ export const ProjectsView: React.FC = () => {
                     )}
 
                     {/* Skills Tags */}
-                    <div className="flex flex-wrap gap-1.5 pt-1">
+                    <div data-tour="project-tech-tags" className="flex flex-wrap gap-1.5 pt-1">
                       {project.skills.map((skill, i) => (
                         <span
                           key={i}
@@ -535,7 +536,7 @@ export const ProjectsView: React.FC = () => {
                   </div>
 
                   {/* Links & Actions */}
-                  <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs">
+                  <div data-tour="project-portfolio-sync" className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
                       {project.repositoryUrl && (
                         <a

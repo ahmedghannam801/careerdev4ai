@@ -644,7 +644,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       )}
 
       {/* Top Profile Header Card */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
+      <div data-tour="profile-card" className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
         {/* Subtle accent backdrop */}
         <div className="absolute top-0 end-0 w-96 h-96 bg-[var(--accent-primary)]/5 rounded-full blur-3xl pointer-events-none -me-20 -mt-20" />
 
@@ -1307,7 +1307,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         </div>
 
         {/* Certifications */}
-        <div id="profile-certifications" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+        <div id="profile-certifications" data-tour="profile-credentials" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
               <Award className="w-4 h-4 text-[var(--color-primary-text)]" />

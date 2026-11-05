@@ -315,3 +315,11 @@ export async function dismissGuide(key: string): Promise<void> {
     body: JSON.stringify({}),
   });
 }
+
+/** Resets all guide dismissals for the user. */
+export async function resetAllGuidesApi(): Promise<void> {
+  await apiRequest('/api/guides/reset', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}

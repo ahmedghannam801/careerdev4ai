@@ -255,7 +255,7 @@ export const InterviewsView: React.FC = () => {
       {/* Start screen */}
       {!plan && (
         <section className="grid gap-4 lg:grid-cols-3">
-          <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] lg:col-span-2">
+          <div data-tour="interview-simulator" className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] lg:col-span-2">
             <div className="relative h-44 w-full overflow-hidden border-b border-[var(--border-subtle)] sm:h-52">
               <CareerImage
                 src="/images/features/interview-prep.webp"
@@ -320,7 +320,7 @@ export const InterviewsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6">
+          <div data-tour="ai-mentor-panel" className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6">
             <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
               <History className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
               {t('Recorded Mock Sessions')} ({interviewSessions.length})

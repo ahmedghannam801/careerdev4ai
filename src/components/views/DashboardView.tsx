@@ -70,7 +70,6 @@ const formatMilestoneDate = (value?: string): string => {
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpenCopilot }) => {
   const {
     profile,
-    updateProfile,
     targetRole,
     analysis,
     roadmapPhases,
@@ -240,9 +239,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         </div>
         <button
           type="button"
-          onClick={async () => {
-            await updateProfile({ onboardingStatus: 'started', onboardingStep: 0, onboardingCompleted: false });
-            onNavigate('onboarding');
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('careerdev4ai:open-tour', { detail: { restart: true } }));
           }}
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
         >
@@ -252,7 +250,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
       </section>
 
       {/* Greeting: one sentence, one target. */}
-      <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] pb-4 sm:flex-row sm:items-end sm:justify-between">
+      <div data-tour="dashboard-greeting" className="flex flex-col gap-3 border-b border-[var(--border-subtle)] pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-xs text-[var(--text-secondary)]">
             {t('Welcome back')}, {profile.name}
@@ -282,6 +280,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
       {/* 1. Where am I? */}
       <section
+        data-tour="dashboard-target-role"
         aria-labelledby="dashboard-where"
         className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs"
       >
@@ -340,7 +339,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             </div>
             <div className="text-[10px] text-[var(--text-muted)]">{t('mastered')}</div>
           </div>
-          <div>
+          <div data-tour="dashboard-roadmap-summary">
             <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               {t('Roadmap')}
             </div>

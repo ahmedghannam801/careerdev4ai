@@ -369,7 +369,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         </div>
 
         {skills.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
+          <div data-tour="learning-skills-link" className="mt-2 flex flex-wrap gap-1">
             {skills.map((skill) => (
               <span
                 key={skill}
@@ -382,7 +382,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         )}
 
         {showReason && reason && (
-          <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2.5">
+          <div data-guide="learning-reason" className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2.5">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
               <Sparkles className="h-3 w-3 shrink-0" />
               {t('Why this now')}
@@ -476,6 +476,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             {onSave && !isSaved && !isInProgress && !isCompleted && (
               <button
                 type="button"
+                data-tour="learning-bookmark-btn"
                 onClick={() => onSave(course.id, recommendation?.reason)}
                 className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
               >

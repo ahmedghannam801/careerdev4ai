@@ -499,7 +499,7 @@ export const LearningCenterView: React.FC = () => {
 
   return (
     <Reveal className="space-y-7">
-      <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 md:flex-row md:items-end md:justify-between">
+      <div data-tour="learning-hero" className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
             <Sparkles size={14} /> {t('AI Learning Hub')}
@@ -592,7 +592,7 @@ export const LearningCenterView: React.FC = () => {
         ))}
       </div>
 
-      <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+      <section data-tour="learning-search-filters" className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
             <Filter size={14} /> {t('Learning preferences')}
@@ -798,7 +798,7 @@ export const LearningCenterView: React.FC = () => {
             rails.popularCourses
           )}
 
-          <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+          <section data-tour="learning-search-filters" className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-[var(--color-accent-strong)]" />
               <h2 className="text-sm font-bold text-[var(--text-primary)]">

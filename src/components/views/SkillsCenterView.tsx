@@ -214,7 +214,7 @@ export const SkillsCenterView: React.FC = () => {
                 </div>
 
                 {/* Interactive Level Slider */}
-                <div className="md:w-1/3 space-y-1.5">
+                <div data-tour="skill-rate-widget" className="md:w-1/3 space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-[var(--text-primary)] font-semibold">
                       {t('Current:')} {skill.currentLevel} / 5

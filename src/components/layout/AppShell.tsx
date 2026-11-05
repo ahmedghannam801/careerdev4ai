@@ -228,6 +228,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         {/* Brand Header */}
         <div className="p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
           <button 
+            data-tour="brand-logo"
             onClick={() => handleNavClick('dashboard')}
             className="flex items-center gap-2.5 text-start group"
           >
@@ -244,7 +245,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         </div>
 
         {/* Navigation Links Scroll Container */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+        <div data-tour="sidebar-nav" className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
           {navGroups.map((group, groupIndex) => (
             <div
               key={group.id}
@@ -278,7 +279,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         </div>
 
         {/* Sidebar Footer: Copilot Quick Launch & Profile Widget */}
-        <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-2">
+        <div data-tour="copilot-button" className="p-3 border-t border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-2">
           <button
             onClick={openCopilot}
             className="w-full py-2.5 px-3 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
@@ -344,111 +345,126 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
           {/* Top Actions: Search / Command, Language, Theme, Notifications, Profile */}
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <button
-              onClick={() => setSearchModalOpen(true)}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] sm:hidden"
-              title={t('Search and Command Palette (Ctrl/Cmd + K)')}
-              aria-label={t('Search and Command Palette (Ctrl/Cmd + K)')}
-            >
-              <Search className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setSearchModalOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] text-xs transition-colors"
-              title={t('Search and Command Palette (Ctrl/Cmd + K)')}
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">{t('Search / Actions...')}</span>
-              <span className="hidden lg:inline font-mono text-[10px] bg-[var(--surface-main)] px-1 rounded border border-[var(--border-subtle)]">⌘K</span>
-            </button>
+            <div data-tour="top-controls" className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => setSearchModalOpen(true)}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] sm:hidden"
+                title={t('Search and Command Palette (Ctrl/Cmd + K)')}
+                aria-label={t('Search and Command Palette (Ctrl/Cmd + K)')}
+              >
+                <Search className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setSearchModalOpen(true)}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] text-xs transition-colors"
+                title={t('Search and Command Palette (Ctrl/Cmd + K)')}
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">{t('Search / Actions...')}</span>
+                <span className="hidden lg:inline font-mono text-[10px] bg-[var(--surface-main)] px-1 rounded border border-[var(--border-subtle)]">⌘K</span>
+              </button>
 
-            {/* Language & theme stay in the header from tablet width; phones use the drawer. */}
-            <div className="hidden items-center gap-2 md:flex">
-              <AiLanguageSelector />
-              {languageToggle}
-              {themeToggle}
+              {/* Language & theme stay in the header from tablet width; phones use the drawer. */}
+              <div className="hidden items-center gap-2 md:flex">
+                <AiLanguageSelector />
+                {languageToggle}
+                {themeToggle}
+              </div>
             </div>
 
-            {/* Notifications */}
-            <button
-              onClick={() => setNotificationsOpen(true)}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] relative"
-              title={t('Notifications')}
-              aria-label={t('Notifications')}
-            >
-              <Bell className="w-4 h-4" />
-              {unreadCount > 0 && (
-                <span className="absolute top-2 end-2 w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse" />
-              )}
-            </button>
-
-            {/* Profile Avatar Button */}
-            <button
-              onClick={() => onNavigate('profile')}
-              className="hidden sm:flex items-center gap-2 ps-2 border-s border-[var(--border-subtle)] group"
-              title={t('View My Profile')}
-            >
-              <CareerPilotAvatar
-                avatarId={profile.avatarUrl}
-                className="w-7 h-7 rounded-full border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)] transition-colors"
-              />
-              <span className="hidden lg:inline text-xs font-medium text-[var(--text-primary)]">
-                {displayName.split(' ')[0]}
-              </span>
-            </button>
-
-            {/* Account menu — the sign-out control (B.4 finding C-3). */}
-            <div className="relative">
+            {/* Notifications & Account Controls */}
+            <div data-tour="notifications-account" className="flex items-center gap-1.5 sm:gap-2">
+              {/* Notifications */}
               <button
-                onClick={() => setUserMenuOpen(prev => !prev)}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
-                title={t('Account menu')}
-                aria-label={t('Account menu')}
-                aria-expanded={userMenuOpen}
+                onClick={() => setNotificationsOpen(true)}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] relative"
+                title={t('Notifications')}
+                aria-label={t('Notifications')}
               >
-                <MoreHorizontal className="w-4 h-4" />
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 end-2 w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse" />
+                )}
               </button>
-              {userMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setUserMenuOpen(false)}
-                    aria-hidden="true"
-                  />
-                  <div className="absolute end-0 top-full z-50 mt-2 w-60 max-w-[calc(100vw-1.5rem)] rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
-                    <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
-                      <div className="text-xs font-bold text-[var(--text-primary)] truncate">
-                        {currentUser?.email || displayName}
+
+              {/* Profile Avatar Button */}
+              <button
+                onClick={() => onNavigate('profile')}
+                className="hidden sm:flex items-center gap-2 ps-2 border-s border-[var(--border-subtle)] group"
+                title={t('View My Profile')}
+              >
+                <CareerPilotAvatar
+                  avatarId={profile.avatarUrl}
+                  className="w-7 h-7 rounded-full border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)] transition-colors"
+                />
+                <span className="hidden lg:inline text-xs font-medium text-[var(--text-primary)]">
+                  {displayName.split(' ')[0]}
+                </span>
+              </button>
+
+              {/* Account menu — the sign-out control (B.4 finding C-3). */}
+              <div className="relative">
+                <button
+                  onClick={() => setUserMenuOpen(prev => !prev)}
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+                  title={t('Account menu')}
+                  aria-label={t('Account menu')}
+                  aria-expanded={userMenuOpen}
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+                {userMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setUserMenuOpen(false)}
+                      aria-hidden="true"
+                    />
+                    <div className="absolute end-0 top-full z-50 mt-2 w-60 max-w-[calc(100vw-1.5rem)] rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
+                      <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+                        <div className="text-xs font-bold text-[var(--text-primary)] truncate">
+                          {currentUser?.email || displayName}
+                        </div>
+                        <div className="text-[10px] text-[var(--text-muted)] truncate">
+                          @{profile.username || t('no username set')}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-[var(--text-muted)] truncate">
-                        @{profile.username || t('no username set')}
-                      </div>
+                      <button
+                        onClick={() => { setUserMenuOpen(false); onNavigate('profile'); }}
+                        className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        <span>{t('My Profile')}</span>
+                      </button>
+                      <button
+                        onClick={() => { setUserMenuOpen(false); onNavigate('settings'); }}
+                        className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                        <span>{t('Settings')}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          window.dispatchEvent(new CustomEvent('careerdev4ai:open-tour', { detail: { restart: true } }));
+                        }}
+                        className="w-full px-4 py-2.5 text-start text-xs font-semibold text-[var(--color-primary-text)] hover:bg-[var(--accent-surface)] flex items-center gap-2 border-t border-[var(--border-subtle)]"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
+                        <span>{t('Interactive Product Tour')}</span>
+                      </button>
+                      <button
+                        onClick={() => { setUserMenuOpen(false); logout(); }}
+                        className="w-full px-4 py-2.5 text-start text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 flex items-center gap-2 border-t border-[var(--border-subtle)]"
+                        data-testid="logout-button"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>{t('Sign out')}</span>
+                      </button>
                     </div>
-                    <button
-                      onClick={() => { setUserMenuOpen(false); onNavigate('profile'); }}
-                      className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
-                    >
-                      <User className="w-3.5 h-3.5" />
-                      <span>{t('My Profile')}</span>
-                    </button>
-                    <button
-                      onClick={() => { setUserMenuOpen(false); onNavigate('settings'); }}
-                      className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                      <span>{t('Settings')}</span>
-                    </button>
-                    <button
-                      onClick={() => { setUserMenuOpen(false); logout(); }}
-                      className="w-full px-4 py-2.5 text-start text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 flex items-center gap-2 border-t border-[var(--border-subtle)]"
-                      data-testid="logout-button"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>{t('Sign out')}</span>
-                    </button>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </header>

@@ -804,7 +804,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
       </div>
 
       {/* Honest Diagnostic Notice */}
-      <div className="flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xs">
+      <div data-tour="assessment-results-summary" className="flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xs">
         <ShieldCheck className="h-5 w-5 shrink-0 text-[var(--color-primary-text)]" />
         <div className="text-xs leading-relaxed text-[var(--text-secondary)]">
           <strong className="text-[var(--text-primary)]">{t('Self-Assessment Standard')}:</strong>{' '}
@@ -815,7 +815,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
       </div>
 
       {/* Categories Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div data-tour="assessment-catalog" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {ASSESSMENT_CATEGORIES.map((cat) => {
           const Icon = cat.icon;
           const attempt = pastAttempts.find((a) => a.categoryId === cat.id);

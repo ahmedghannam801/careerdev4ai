@@ -24,6 +24,17 @@ export const GUIDE_KEYS = [
   'volunteer',
   'cv',
   'skills',
+  'product_tour',
+  'tour_welcome',
+  'tour_dashboard',
+  'tour_career-planning',
+  'tour_roadmap',
+  'tour_learning',
+  'tour_skills',
+  'tour_projects',
+  'tour_opportunities',
+  'tour_career-tools',
+  'tour_profile-progress',
 ] as const;
 
 export type GuideKey = (typeof GUIDE_KEYS)[number];
@@ -96,6 +107,18 @@ export async function restoreGuide(
     .delete()
     .eq('profile_id', profileId)
     .eq('guide_key', key);
+  if (error) throw error;
+  return true;
+}
+
+/**
+ * Resets all guide dismissals for the user.
+ */
+export async function resetAllGuides(profileId: string): Promise<boolean> {
+  const { error } = await getSupabaseServer()
+    .from('user_guide_dismissals')
+    .delete()
+    .eq('profile_id', profileId);
   if (error) throw error;
   return true;
 }

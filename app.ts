@@ -221,6 +221,7 @@ import { MIN_JOB_DESCRIPTION_TEXT_LENGTH, type JobDescriptionAnalysis } from './
 import {
   listDismissedGuides,
   dismissGuide,
+  resetAllGuides,
 } from './server/db/guides.ts';
 import { loadAiCareerContext, buildAiContextBlock } from './server/ai/careerContext.ts';
 import {
@@ -3958,6 +3959,16 @@ app.post('/api/guides/:key/dismiss', requireAuth, async (req: Request, res: Resp
   } catch (error) {
     console.error('Failed to dismiss the guide:', error);
     return res.status(500).json({ error: 'Failed to dismiss the guide' });
+  }
+});
+
+app.post('/api/guides/reset', requireAuth, async (req: Request, res: Response) => {
+  try {
+    await resetAllGuides(req.authUser!.id);
+    return res.json({ success: true, message: 'All guided tours reset successfully' });
+  } catch (error) {
+    console.error('Failed to reset guides:', error);
+    return res.status(500).json({ error: 'Failed to reset guides' });
   }
 });
 
