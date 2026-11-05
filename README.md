@@ -157,6 +157,17 @@ Use the npm scripts, which encode the same targets:
 
 Preview URLs are public by default and carry `X-Robots-Tag: noindex`.
 
+> **Pushing to `main` does not deploy the site.** The project's git-connected
+> Pages build fails in Cloudflare's build container — it has failed on every
+> push since 2026-11-04, and it fails within seconds of the build stage
+> starting, before any of this code is reached. The source itself is fine: a
+> clean checkout of `main` installs and builds without complaint. Until that is
+> fixed, **deploy with `npm run cf:deploy`**, and check the result with
+> `npm run cf:deployments`.
+>
+> The background-job Worker is deployed separately either way
+> (`npm run cf:jobs:deploy`); the git integration does not touch it.
+
 ### The background-job Worker
 
 The long-running work (reading a CV, writing one for a job, searching for
