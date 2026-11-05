@@ -218,7 +218,7 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
       {/* Description */}
       {description && (
         <div className="space-y-1">
-          <p className="whitespace-pre-line text-[11px] leading-relaxed text-[var(--text-secondary)]">
+          <p className="whitespace-pre-line text-[11px] leading-relaxed text-[var(--text-primary)]">
             {shownDescription}
           </p>
           {isLong && (

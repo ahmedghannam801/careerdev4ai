@@ -36,6 +36,10 @@ import {
 import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
 import { providerTier } from '../../shared/courseProviders.ts';
 import type { LearningResourceType } from '../../shared/learningResources.ts';
+import {
+  isSemanticCourseDuplicate,
+  isCareerRoleRelevant,
+} from '../../shared/semanticDuplicate.ts';
 
 export type Availability =
   | 'free'
@@ -446,6 +450,8 @@ function formatReason(
 export interface ScoreCourseOptions {
   /** Set to false to include courses the user has already completed. */
   excludeCompleted?: boolean;
+  /** Full list of completed courses to run semantic duplicate checking against. */
+  completedCourses?: LearningCourse[];
 }
 
 /**
@@ -459,10 +465,36 @@ export function scoreCourse(
   options: ScoreCourseOptions = {}
 ): LearningRecommendation | null {
   if (context.dismissedCourseIds.includes(course.id)) return null;
-  if (options.excludeCompleted !== false && context.completedCourseIds.includes(course.id)) {
-    return null;
+  if (options.excludeCompleted !== false) {
+    if (context.completedCourseIds.includes(course.id)) return null;
+    if (
+      options.completedCourses &&
+      options.completedCourses.length > 0 &&
+      isSemanticCourseDuplicate(course, options.completedCourses).isDuplicate
+    ) {
+      return null;
+    }
   }
   if (!isAllowedByBudget(course, context.budget)) return null;
+
+  // Career-role relevance gate: prevents out-of-domain recommendations (e.g. Docker/React for HR roles)
+  if (
+    context.targetRole &&
+    !isCareerRoleRelevant(
+      {
+        title: course.title,
+        category: course.category,
+        skills: course.skills.map((s) => s.name),
+      },
+      {
+        title: context.targetRole.title,
+        domainId: context.targetRole.domainId,
+        skills: context.targetRole.requiredSkills.map((s) => s.name),
+      }
+    )
+  ) {
+    return null;
+  }
 
   const gapMap = buildGapMap(context);
   const gapLookup = createSkillLookup(gapMap.keys());
@@ -695,9 +727,16 @@ export function rankCourses(
   options: RankOptions = {}
 ): LearningRecommendation[] {
   const limit = Math.max(1, Math.min(40, options.limit ?? 12));
+  const completedCourses =
+    options.completedCourses ??
+    courses.filter((c) => context.completedCourseIds.includes(c.id));
+  const effectiveOptions: ScoreCourseOptions = {
+    ...options,
+    completedCourses,
+  };
   const ranked: LearningRecommendation[] = [];
   for (const course of courses) {
-    const scored = scoreCourse(course, context, options);
+    const scored = scoreCourse(course, context, effectiveOptions);
     if (scored) ranked.push(scored);
   }
   const tierOf = (recommendation: LearningRecommendation): number =>

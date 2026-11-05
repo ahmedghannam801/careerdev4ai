@@ -321,7 +321,7 @@ export const ApplicationsView: React.FC = () => {
                   value={editNextAction}
                   onChange={(e) => setEditNextAction(e.target.value)}
                   placeholder={t('e.g. Round 2 Technical Interview with Lead Architect')}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>
 
@@ -333,7 +333,7 @@ export const ApplicationsView: React.FC = () => {
                   type="date"
                   value={editNextActionDate}
                   onChange={(e) => setEditNextActionDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>
 
@@ -346,7 +346,7 @@ export const ApplicationsView: React.FC = () => {
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
                   placeholder={t('Private notes remain completely confidential and are never shared publicly...')}
-                  className="w-full p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] leading-relaxed"
+                  className="w-full p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] leading-relaxed focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>
 
@@ -415,7 +415,7 @@ export const ApplicationsView: React.FC = () => {
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                   placeholder={t('e.g. Stripe, Linear, Vercel')}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>
 
@@ -427,7 +427,7 @@ export const ApplicationsView: React.FC = () => {
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   placeholder={t('e.g. Frontend Engineer')}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>
 
@@ -449,7 +449,7 @@ export const ApplicationsView: React.FC = () => {
                   <select
                     value={workMode}
                     onChange={(e) => setWorkMode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                   >
                     <option value="Remote">{t('Remote')}</option>
                     <option value="Hybrid">{t('Hybrid')}</option>
@@ -464,7 +464,7 @@ export const ApplicationsView: React.FC = () => {
                   type="date"
                   value={appliedDate}
                   onChange={(e) => setAppliedDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>
 
@@ -475,7 +475,7 @@ export const ApplicationsView: React.FC = () => {
                   value={nextAction}
                   onChange={(e) => setNextAction(e.target.value)}
                   placeholder={t('e.g. Technical round scheduled for Oct 22')}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>
 
@@ -486,7 +486,7 @@ export const ApplicationsView: React.FC = () => {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={t('Details, recruiter name, compensation discussed...')}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>
 

@@ -124,6 +124,7 @@ export async function startServer({ port, env, timeoutMs = 120_000 } = {}) {
     CAREERDEV_TEST_TERMS_FIXTURE: 'approved-test-fixture-only',
     PORT: String(port),
     NODE_ENV: 'production',
+    AI_PROJECT_DAILY_LIMIT: process.env.AI_PROJECT_DAILY_LIMIT || '500',
   };
 
   // The server loads `.env` for itself, so the Trigger.dev credential of this
@@ -136,6 +137,12 @@ export async function startServer({ port, env, timeoutMs = 120_000 } = {}) {
   for (const key of Object.keys(serverEnv)) {
     if (key.startsWith('TRIGGER_')) delete serverEnv[key];
   }
+
+  // The job provider's credential is removed for the same reason: the suite
+  // proves the contract of a server without one, and a test must never spend
+  // the owner's provider quota.
+  delete serverEnv.JSEARCH_RAPIDAPI_KEY;
+  delete serverEnv.RAPIDAPI_KEY;
 
   const loader = resolveTsxLoaderUrl();
   const child = spawn(process.execPath, ['--import', loader, 'server.ts'], {

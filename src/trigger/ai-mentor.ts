@@ -60,7 +60,7 @@ export const processAiMentorWorkflowTask = task({
       if (question.length < 5) {
         throw new JobError('question_required', 'Ask the mentor a question first.');
       }
-      if (!process.env.GEMINI_API_KEY) {
+      if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
         throw new JobError('no_model', 'The AI assistant is not available on this server right now.');
       }
 

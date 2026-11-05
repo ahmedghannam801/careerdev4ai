@@ -107,7 +107,7 @@ export const processCvTask = task({
       const outcome = await runAtsAnalysis({
         parsedCv,
         targetRoleTitle,
-        ai: process.env.GEMINI_API_KEY ? ai : null,
+        ai: (process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY) ? ai : null,
         model: getGeminiModel(),
       });
       if (outcome.reason === 'model_error') {

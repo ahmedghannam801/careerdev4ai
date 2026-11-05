@@ -34,6 +34,10 @@ if (process.env.CAREERDEV_TEST_SERVER === 'true') {
   delete process.env.TRIGGER_SECRET_KEY;
   delete process.env.TRIGGER_PROJECT_REF;
   delete process.env.TRIGGER_API_URL;
+  // The same goes for the job provider: the suite proves the contract of a
+  // server that has no credential, and it must not spend the owner's quota.
+  delete process.env.JSEARCH_RAPIDAPI_KEY;
+  delete process.env.RAPIDAPI_KEY;
 }
 
 const { app } = await import('./app.ts');

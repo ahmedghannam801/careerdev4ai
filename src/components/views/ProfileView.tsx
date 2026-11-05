@@ -20,15 +20,22 @@ import {
   Check, 
   FileText,
   X,
-  Smile
+  Smile,
+  FolderGit2,
+  HeartHandshake,
+  Star,
+  Upload,
+  FileCheck
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { 
   UserExperienceEntry, 
   UserEducationEntry, 
   UserCertificationEntry, 
-  UserLanguageEntry 
+  UserLanguageEntry,
+  VolunteerExperience
 } from '../../types/career';
+import { uploadPortfolioAttachment } from '../../lib/coreApi';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { PROFILE_SECTIONS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
@@ -46,7 +53,13 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     suggestAiSummary,
     validateUsername,
     aiPreferences,
-    privacyPreferences, t,} = useCareer();
+    privacyPreferences,
+    volunteerExperiences,
+    addVolunteerExperience,
+    updateVolunteerExperience,
+    deleteVolunteerExperience,
+    t
+  } = useCareer();
 
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
@@ -124,7 +137,27 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     credentialId: '',
     credentialUrl: '',
     description: '',
-    skills: ''
+    skills: '',
+    attachmentUrl: '',
+    doesNotExpire: false,
+  });
+  const [isUploadingCert, setIsUploadingCert] = useState(false);
+  const certFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Form states for Volunteer modal
+  const [volunteerModalOpen, setVolunteerModalOpen] = useState(false);
+  const [editingVolunteer, setEditingVolunteer] = useState<VolunteerExperience | null>(null);
+  const [volunteerForm, setVolunteerForm] = useState({
+    organization: '',
+    role: '',
+    location: '',
+    startDate: '',
+    endDate: '',
+    isCurrent: false,
+    description: '',
+    responsibilities: '',
+    achievements: '',
+    skills: '',
   });
 
   // Form states for Language modal
@@ -138,7 +171,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   // inside the modal that produced it; a failed deletion (which has no
   // modal) is shown as a page-level banner.
   const aModalIsOpen =
-    editBasicOpen || editSummaryOpen || expModalOpen || eduModalOpen || certModalOpen || langModalOpen;
+    editBasicOpen || editSummaryOpen || expModalOpen || eduModalOpen || certModalOpen || langModalOpen || volunteerModalOpen;
 
   // Basic info form
   const [basicForm, setBasicForm] = useState({
@@ -432,6 +465,69 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     }
   };
 
+  // Volunteer handlers
+  const handleSaveVolunteer = async () => {
+    setSaveError(null);
+    setSaving(true);
+    try {
+      const responsibilities = volunteerForm.responsibilities
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const achievements = volunteerForm.achievements
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const skills = volunteerForm.skills
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (editingVolunteer) {
+        await updateVolunteerExperience(editingVolunteer.id, {
+          organization: volunteerForm.organization.trim(),
+          role: volunteerForm.role.trim(),
+          location: volunteerForm.location.trim(),
+          startDate: volunteerForm.startDate.trim(),
+          endDate: volunteerForm.isCurrent ? '' : volunteerForm.endDate.trim(),
+          isCurrent: volunteerForm.isCurrent,
+          description: volunteerForm.description.trim(),
+          responsibilities,
+          achievements,
+          skills,
+        });
+      } else {
+        await addVolunteerExperience({
+          organization: volunteerForm.organization.trim(),
+          role: volunteerForm.role.trim(),
+          location: volunteerForm.location.trim(),
+          startDate: volunteerForm.startDate.trim(),
+          endDate: volunteerForm.isCurrent ? '' : volunteerForm.endDate.trim(),
+          isCurrent: volunteerForm.isCurrent,
+          description: volunteerForm.description.trim(),
+          responsibilities,
+          achievements,
+          skills,
+          projectIds: [],
+        });
+      }
+      setVolunteerModalOpen(false);
+    } catch (e: any) {
+      setSaveError(e?.message || t('Failed to save volunteer experience'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteVolunteer = async (id: string) => {
+    setSaveError(null);
+    try {
+      await deleteVolunteerExperience(id);
+    } catch (e: any) {
+      setSaveError(e?.message || t('Failed to delete volunteer experience'));
+    }
+  };
+
   // Certification handlers
   const handleSaveCert = async () => {
     setSaveError(null);
@@ -449,11 +545,12 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           name: certForm.name,
           provider: certForm.provider,
           issueDate: certForm.issueDate,
-          expiryDate: certForm.expiryDate,
           credentialId: certForm.credentialId,
           credentialUrl: certForm.credentialUrl,
           description: certForm.description,
-          skills: skillNames
+          skills: skillNames,
+          attachmentUrl: certForm.attachmentUrl.trim() || undefined,
+          expiryDate: certForm.doesNotExpire ? undefined : (certForm.expiryDate.trim() || undefined),
         } : c);
         await updateProfile({ certifications: updated });
       } else {
@@ -462,11 +559,12 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           name: certForm.name,
           provider: certForm.provider,
           issueDate: certForm.issueDate,
-          expiryDate: certForm.expiryDate,
           credentialId: certForm.credentialId,
           credentialUrl: certForm.credentialUrl,
           description: certForm.description,
-          skills: skillNames
+          skills: skillNames,
+          attachmentUrl: certForm.attachmentUrl.trim() || undefined,
+          expiryDate: certForm.doesNotExpire ? undefined : (certForm.expiryDate.trim() || undefined),
         };
         await updateProfile({ certifications: [...profile.certifications, newCert] });
       }
@@ -993,6 +1091,221 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
         </div>
 
+        {/* Proof-of-Skill Projects & Portfolio Section */}
+        <div id="profile-projects" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2">
+              <FolderGit2 className="w-4 h-4 text-[var(--color-primary-text)]" />
+              <h2 className="text-base font-bold text-[var(--text-primary)]">
+                {t('Projects & Portfolio')} ({projects.length})
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onNavigate('projects')}
+                className="px-2.5 py-1 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1 transition-colors shadow-xs"
+              >
+                <Plus className="w-3 h-3" />
+                <span>{t('Manage Projects')}</span>
+              </button>
+            </div>
+          </div>
+
+          {projects.length === 0 ? (
+            <p className="text-xs text-[var(--text-secondary)] italic">
+              {t('No projects added yet. Add projects to demonstrate your skills to recruiters.')}
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {projects.map((proj) => (
+                <div
+                  key={proj.id}
+                  className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] space-y-2 hover:border-[var(--color-border-strong)] transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]">
+                          {proj.category || 'personal'}
+                        </span>
+                        {proj.isFeatured && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-500">
+                            <Star className="w-3 h-3 fill-current" />
+                            {t('Featured')}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-xs font-bold text-[var(--text-primary)]">{proj.title}</h3>
+                      {proj.role && (
+                        <div className="text-[11px] font-medium text-[var(--color-primary-text)]">
+                          {proj.role}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[10px] capitalize px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)]">
+                      {proj.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
+                    {proj.description || proj.goal}
+                  </p>
+                  {proj.skills && proj.skills.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {proj.skills.slice(0, 4).map((skill, i) => (
+                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)] border border-[var(--border-subtle)]">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-3">
+                      {proj.repositoryUrl && (
+                        <a href={proj.repositoryUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[var(--text-primary)] hover:underline">
+                          <ExternalLink className="w-3 h-3" />
+                          <span>{t('Repository')}</span>
+                        </a>
+                      )}
+                      {proj.demoUrl && (
+                        <a href={proj.demoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[var(--color-primary-text)] hover:underline font-medium">
+                          <ExternalLink className="w-3 h-3" />
+                          <span>{t('Live Demo')}</span>
+                        </a>
+                      )}
+                    </div>
+                    <button onClick={() => onNavigate('projects')} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-[10px] font-medium">
+                      {t('Manage')} &rarr;
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Volunteering & Community Leadership Section */}
+        <div id="profile-volunteering" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2">
+              <HeartHandshake className="w-4 h-4 text-[var(--color-primary-text)]" />
+              <h2 className="text-base font-bold text-[var(--text-primary)]">
+                {t('Volunteering & Leadership')} ({volunteerExperiences.length})
+              </h2>
+            </div>
+            <button
+              onClick={() => {
+                setEditingVolunteer(null);
+                setVolunteerForm({
+                  organization: '',
+                  role: '',
+                  location: '',
+                  startDate: '',
+                  endDate: '',
+                  isCurrent: false,
+                  description: '',
+                  responsibilities: '',
+                  achievements: '',
+                  skills: '',
+                });
+                setVolunteerModalOpen(true);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-primary)] hover:text-[var(--color-primary-text)] text-xs font-semibold flex items-center gap-1 transition-colors border border-[var(--border-subtle)]"
+            >
+              <Plus className="w-3 h-3" />
+              <span>{t('Add')}</span>
+            </button>
+          </div>
+
+          {volunteerExperiences.length === 0 ? (
+            <p className="text-xs text-[var(--text-secondary)] italic">
+              {t('No volunteering experiences recorded yet. Leadership and community initiatives strengthen your profile.')}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {volunteerExperiences.map((v) => (
+                <div key={v.id} className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold text-[var(--text-primary)]">{v.role}</h3>
+                      <p className="text-xs text-[var(--color-primary-text)] font-semibold">
+                        {v.organization} {v.location ? `• ${v.location}` : ''}
+                      </p>
+                      <p className="text-[10px] font-mono text-[var(--text-muted)] mt-0.5">
+                        {v.startDate} – {v.isCurrent ? t('Present') : v.endDate}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingVolunteer(v);
+                          setVolunteerForm({
+                            organization: v.organization,
+                            role: v.role,
+                            location: v.location || '',
+                            startDate: v.startDate || '',
+                            endDate: v.endDate || '',
+                            isCurrent: v.isCurrent,
+                            description: v.description || '',
+                            responsibilities: (v.responsibilities || []).join('\n'),
+                            achievements: (v.achievements || []).join('\n'),
+                            skills: (v.skills || []).join(', '),
+                          });
+                          setVolunteerModalOpen(true);
+                        }}
+                        aria-label={t('Edit')}
+                        className="p-1 text-[var(--text-muted)] hover:text-[var(--color-primary-text)]"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteVolunteer(v.id)}
+                        aria-label={t('Delete')}
+                        className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)]"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  {v.description && (
+                    <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed break-words">
+                      {v.description}
+                    </p>
+                  )}
+                  {v.responsibilities && v.responsibilities.length > 0 && (
+                    <div className="text-[11px] text-[var(--text-secondary)] space-y-0.5">
+                      <span className="font-semibold text-[var(--text-primary)] text-[10px] uppercase">{t('Key Responsibilities')}:</span>
+                      <ul className="list-disc list-inside space-y-0.5 ps-1 text-[11px]">
+                        {v.responsibilities.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {v.achievements && v.achievements.length > 0 && (
+                    <div className="text-[11px] text-[var(--text-secondary)] space-y-0.5">
+                      <span className="font-semibold text-[var(--text-primary)] text-[10px] uppercase">{t('Key Achievements')}:</span>
+                      <ul className="list-disc list-inside space-y-0.5 ps-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                        {v.achievements.map((a, i) => (
+                          <li key={i}>{a}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {v.skills && v.skills.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {v.skills.map((skill, i) => (
+                        <span key={i} className="px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[10px] font-medium text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Certifications */}
         <div id="profile-certifications" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
@@ -1013,7 +1326,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   credentialId: '',
                   credentialUrl: '',
                   description: '',
-                  skills: ''
+                  skills: '',
+                  attachmentUrl: '',
+                  doesNotExpire: false,
                 });
                 setCertModalOpen(true);
               }}
@@ -1035,9 +1350,26 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     <h3 className="text-xs font-bold text-[var(--text-primary)]">
                       {cert.name}
                     </h3>
-                    <p className="text-xs text-[var(--color-primary-text)] font-medium">
-                      {cert.provider} • Issued {cert.issueDate}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      <span className="text-xs text-[var(--color-primary-text)] font-medium">
+                        {cert.provider} • Issued {cert.issueDate}
+                      </span>
+                      {cert.expiryDate ? (
+                        new Date(cert.expiryDate) < new Date() ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                            {t('Expired')} ({cert.expiryDate})
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            {t('Active')} · {t('Expires')} {cert.expiryDate}
+                          </span>
+                        )
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                          {t('No Expiration')}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -1051,7 +1383,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                           credentialId: cert.credentialId ?? '',
                           credentialUrl: cert.credentialUrl ?? '',
                           description: cert.description ?? '',
-                          skills: (cert.skills ?? []).join(', ')
+                          skills: (cert.skills ?? []).join(', '),
+                          attachmentUrl: cert.attachmentUrl ?? '',
+                          doesNotExpire: !cert.expiryDate,
                         });
                         setCertModalOpen(true);
                       }}
@@ -1089,6 +1423,20 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                         {skill}
                       </span>
                     ))}
+                  </div>
+                )}
+                {cert.attachmentUrl && (
+                  <div className="pt-1">
+                    <a
+                      href={cert.attachmentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[var(--color-primary-text)] hover:underline"
+                    >
+                      <FileCheck className="w-3.5 h-3.5" />
+                      <span>{t('View Certificate Document')}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
                 )}
                 {cert.credentialUrl && (
@@ -1917,17 +2265,29 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     value={certForm.issueDate}
                     onChange={(e) => setCertForm(prev => ({ ...prev, issueDate: e.target.value }))}
                     placeholder="2024-02"
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Expiry Date')}</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-[var(--text-primary)]">{t('Expiry Date')}</label>
+                    <label className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={certForm.doesNotExpire}
+                        onChange={(e) => setCertForm(prev => ({ ...prev, doesNotExpire: e.target.checked, expiryDate: e.target.checked ? '' : prev.expiryDate }))}
+                        className="rounded border-[var(--border-strong)] text-[var(--accent-primary)]"
+                      />
+                      <span>{t('Does not expire')}</span>
+                    </label>
+                  </div>
                   <input
                     type="text"
+                    disabled={certForm.doesNotExpire}
                     value={certForm.expiryDate}
                     onChange={(e) => setCertForm(prev => ({ ...prev, expiryDate: e.target.value }))}
-                    placeholder={t('Leave blank if it never expires')}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
+                    placeholder={certForm.doesNotExpire ? t('Does not expire') : '2026-12'}
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -1964,6 +2324,46 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 />
               </div>
               <div>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Certificate Document / PDF / Image (Optional)')}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={certForm.attachmentUrl}
+                    onChange={(e) => setCertForm(prev => ({ ...prev, attachmentUrl: e.target.value }))}
+                    placeholder="https://... or upload file"
+                    className="flex-1 px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  />
+                  <input
+                    ref={certFileInputRef}
+                    type="file"
+                    accept="application/pdf,image/png,image/jpeg,image/webp"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setIsUploadingCert(true);
+                      try {
+                        const res = await uploadPortfolioAttachment(file);
+                        setCertForm(prev => ({ ...prev, attachmentUrl: res.publicUrl }));
+                      } catch (err: any) {
+                        setSaveError(err?.message || 'Failed to upload certificate');
+                      } finally {
+                        setIsUploadingCert(false);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    disabled={isUploadingCert}
+                    onClick={() => certFileInputRef.current?.click()}
+                    className="px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-surface)] hover:text-[var(--color-primary-text)] flex items-center gap-1 transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isUploadingCert ? t('Uploading…') : t('Upload')}</span>
+                  </button>
+                </div>
+              </div>
+              <div>
                 <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Skills & Tools Gained')}</label>
                 <input
                   type="text"
@@ -1988,6 +2388,147 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50 hover:bg-[var(--accent-secondary)] hover:shadow-sm transition-[background-color,box-shadow]"
               >
                 {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Volunteer Experience */}
+      {volunteerModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-lg p-6 space-y-4 my-8">
+            <h3 className="text-base font-bold text-[var(--text-primary)]">
+              {editingVolunteer ? t('Edit Volunteering & Leadership') : t('Add Volunteering & Leadership')}
+            </h3>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Organization')} *</label>
+                <input
+                  type="text"
+                  required
+                  value={volunteerForm.organization}
+                  onChange={(e) => setVolunteerForm(prev => ({ ...prev, organization: e.target.value }))}
+                  placeholder={t('e.g. Red Crescent, EYE, IEEE, Student Union')}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Role / Position')} *</label>
+                  <input
+                    type="text"
+                    required
+                    value={volunteerForm.role}
+                    onChange={(e) => setVolunteerForm(prev => ({ ...prev, role: e.target.value }))}
+                    placeholder={t('e.g. HR Leader, Volunteer Coordinator')}
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Location')}</label>
+                  <input
+                    type="text"
+                    value={volunteerForm.location}
+                    onChange={(e) => setVolunteerForm(prev => ({ ...prev, location: e.target.value }))}
+                    placeholder={t('e.g. Cairo, Egypt or Remote')}
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Start Date')}</label>
+                  <input
+                    type="date"
+                    value={volunteerForm.startDate}
+                    onChange={(e) => setVolunteerForm(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-[var(--text-primary)]">{t('End Date')}</label>
+                    <label className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={volunteerForm.isCurrent}
+                        onChange={(e) => setVolunteerForm(prev => ({ ...prev, isCurrent: e.target.checked, endDate: e.target.checked ? '' : prev.endDate }))}
+                        className="rounded border-[var(--border-strong)] text-[var(--accent-primary)]"
+                      />
+                      <span>{t('Current')}</span>
+                    </label>
+                  </div>
+                  <input
+                    type="date"
+                    disabled={volunteerForm.isCurrent}
+                    value={volunteerForm.endDate}
+                    onChange={(e) => setVolunteerForm(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] disabled:opacity-50"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Description / Summary')}</label>
+                <textarea
+                  rows={2}
+                  value={volunteerForm.description}
+                  onChange={(e) => setVolunteerForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder={t('Summary of the mission and your contribution...')}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] resize-y"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">
+                  {t('Key Responsibilities (one per line)')}
+                </label>
+                <textarea
+                  rows={3}
+                  value={volunteerForm.responsibilities}
+                  onChange={(e) => setVolunteerForm(prev => ({ ...prev, responsibilities: e.target.value }))}
+                  placeholder={t('Supervised team of 20 volunteers\nOrganized community outreach campaign...')}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] resize-y"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">
+                  {t('Key Achievements (one per line)')}
+                </label>
+                <textarea
+                  rows={2}
+                  value={volunteerForm.achievements}
+                  onChange={(e) => setVolunteerForm(prev => ({ ...prev, achievements: e.target.value }))}
+                  placeholder={t('Recruited and trained 50+ members\nIncreased outreach engagement by 40%...')}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] resize-y"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-[var(--text-primary)] block mb-1">
+                  {t('Skills Demonstrated (comma separated)')}
+                </label>
+                <input
+                  type="text"
+                  value={volunteerForm.skills}
+                  onChange={(e) => setVolunteerForm(prev => ({ ...prev, skills: e.target.value }))}
+                  placeholder={t('Leadership, Public Speaking, Conflict Resolution, Event Planning')}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+            {renderSaveError()}
+            <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
+              <button
+                onClick={() => setVolunteerModalOpen(false)}
+                className="px-3 py-1.5 text-xs text-[var(--text-secondary)]"
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                onClick={handleSaveVolunteer}
+                disabled={saving || !volunteerForm.organization.trim() || !volunteerForm.role.trim()}
+                className="px-3.5 py-1.5 bg-[var(--accent-primary)] text-[var(--color-on-primary)] rounded-lg text-xs font-semibold disabled:opacity-50 hover:bg-[var(--accent-secondary)]"
+              >
+                {saving ? t('Saving…') : t('Save')}
               </button>
             </div>
           </div>

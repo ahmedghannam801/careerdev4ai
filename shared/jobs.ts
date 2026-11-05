@@ -167,7 +167,11 @@ export function normalizeLiveJob(raw: unknown, now: Date = new Date()): LiveJob 
   if (!id || !title || !company) return null;
 
   const expiresAt = asIsoDate(record.job_offer_expiration_datetime) ?? asIsoDate(record.job_expiration_date);
-  const postedAt = asIsoDate(record.job_posted_at_datetime) ?? asIsoDate(record.job_posted_at);
+  const postedAt =
+    asIsoDate(record.job_posted_at_datetime) ??
+    asIsoDate(record.job_posted_at_datetime_utc) ??
+    asIsoDate(record.job_posted_at_timestamp) ??
+    asIsoDate(record.job_posted_at);
 
   const publishedSkills = asStringList(record.job_required_skills);
 
@@ -183,7 +187,7 @@ export function normalizeLiveJob(raw: unknown, now: Date = new Date()): LiveJob 
     expiresAt,
     expired: expiresAt ? new Date(expiresAt).getTime() < now.getTime() : false,
     description: asText(record.job_description) ?? asText(record.description),
-    url: asText(record.job_url) ?? asText(record.job_offer_url),
+    url: asText(record.job_url) ?? asText(record.job_offer_url) ?? asText(record.job_google_link),
     applyUrl: asText(record.job_apply_link) ?? asText(record.job_apply_url),
     publisher: asText(record.job_publisher) ?? asText(record.publisher),
     requiredSkills: publishedSkills,

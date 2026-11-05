@@ -31,7 +31,12 @@ export const isAndroid = Capacitor.getPlatform() === 'android';
  * Empty in the web build, where every call is same-origin. The Android build
  * pins it to the production deployment through `VITE_API_BASE_URL`.
  */
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
+const env =
+  typeof import.meta !== 'undefined' && import.meta && (import.meta as { env?: Record<string, string | undefined> }).env
+    ? (import.meta as { env: Record<string, string | undefined> }).env
+    : (typeof process !== 'undefined' ? process.env : {});
+
+const API_BASE_URL = (env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
 /**
  * Builds the URL of one of the application's own API endpoints.

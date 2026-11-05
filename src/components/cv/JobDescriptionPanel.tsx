@@ -668,7 +668,7 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
           placeholder={t(
             'Paste the full job description here — the title, the requirements, the tools and the responsibilities…'
           )}
-          className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed focus:outline-none focus:border-[var(--accent-primary)]"
+          className="w-full px-3 py-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] leading-relaxed focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
         />
 
         <div className="flex flex-wrap items-center gap-2">
@@ -1053,7 +1053,7 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
               value={coverLetterDraft}
               onChange={(event) => { setCoverLetterDraft(event.target.value); setCoverLetterId(null); }}
               rows={12}
-              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2.5 text-xs leading-relaxed text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2.5 text-xs leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
             />
           )}
           {coverLetterHighlights.length > 0 && (

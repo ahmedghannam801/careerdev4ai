@@ -56,6 +56,14 @@ export function loadTestEnv() {
     }
   }
 
+  const rootDotEnv = join(REPO_ROOT, '.env');
+  if (existsSync(rootDotEnv)) {
+    const rootEnv = parseEnvFile(readFileSync(rootDotEnv, 'utf-8'));
+    for (const [key, value] of Object.entries(rootEnv)) {
+      if (process.env[key] === undefined) process.env[key] = value;
+    }
+  }
+
   const missing = REQUIRED.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     throw new Error(

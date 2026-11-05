@@ -27,4 +27,7 @@ export const backgroundJobsAr: Record<string, string> = {
     'المعالجة في الخلفية غير متاحة على هذا الخادم، لذا لا يمكن بدء أي عمل في الخلفية.',
   'The state of background processing could not be checked just now.':
     'تعذّر التحقق من حالة المعالجة في الخلفية للتو.',
+  'Vacancies found': 'الوظائف التي تم العثور عليها',
+  'No vacancies were found for this search.': 'لم يتم العثور على أي وظائف لهذا البحث.',
+  'Fit': 'التوافق',
 };

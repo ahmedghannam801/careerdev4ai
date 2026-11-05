@@ -127,6 +127,8 @@ export interface RoadmapPhase {
 
 export type ProjectStatus = 'idea' | 'planned' | 'in_progress' | 'completed' | 'published';
 
+export type ProjectCategory = 'academic' | 'personal' | 'professional' | 'volunteer' | 'team';
+
 export interface CareerProject {
   id: string;
   title: string;
@@ -140,6 +142,14 @@ export interface CareerProject {
   repositoryUrl?: string;
   demoUrl?: string;
   documentation?: string;
+  category?: ProjectCategory;
+  role?: string;
+  responsibilities?: string[];
+  startDate?: string;
+  isFeatured?: boolean;
+  includeInPortfolio?: boolean;
+  thumbnailUrl?: string;
+  screenshots?: string[];
   createdAt: string;
   completedAt?: string;
 }
@@ -623,6 +633,7 @@ export interface UserCertificationEntry {
   description?: string;
   /** The skills and tools the certificate produced. */
   skills?: string[];
+  attachmentUrl?: string;
 }
 
 export interface UserLanguageEntry {

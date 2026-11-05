@@ -174,3 +174,66 @@ export const JOB_KIND_LABELS: Record<BackgroundJobKind, string> = {
   'process-ai-mentor-workflow': 'AI mentor',
   'validate-learning-resources': 'Learning catalogue check',
 };
+
+/* -------------------------------------------------------------------------- */
+/* What a finished job search produced                                          */
+/* -------------------------------------------------------------------------- */
+
+/** One vacancy inside a finished job-search result. */
+export interface MatchJobsVacancy {
+  title: string | null;
+  company: string | null;
+  location: string | null;
+  /** The employer's own page for the vacancy, when the source gave one. */
+  url: string | null;
+  /** The fit against the candidate's own record, 0-100. `null` when it could not be made. */
+  fit: number | null;
+}
+
+function readText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function readNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * The vacancies a finished job search produced.
+ *
+ * The result is read back from the server exactly as it was stored, so the
+ * interface shows only what the provider actually said. A record without a
+ * title and without an employer is not shown at all, and a fit the comparison
+ * could not make stays absent rather than being turned into a number.
+ */
+export function readMatchJobsVacancies(job: BackgroundJob): MatchJobsVacancy[] {
+  if (job.kind !== 'match-jobs' || job.status !== 'completed') return [];
+  const result = job.result;
+  if (!result) return [];
+
+  const entries = Array.isArray(result.jobs) ? result.jobs : [];
+  const vacancies: MatchJobsVacancy[] = [];
+
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    const record = entry as Record<string, unknown>;
+    const vacancy = (record.job ?? {}) as Record<string, unknown>;
+    const match = (record.match ?? {}) as Record<string, unknown>;
+
+    const title = readText(vacancy.title);
+    const company = readText(vacancy.company);
+    if (!title && !company) continue;
+
+    vacancies.push({
+      title,
+      company,
+      location: readText(vacancy.location),
+      url: readText(vacancy.url) ?? readText(vacancy.applyUrl),
+      fit: readNumber(match.score),
+    });
+  }
+
+  return vacancies;
+}

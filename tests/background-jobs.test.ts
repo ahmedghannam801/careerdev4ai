@@ -18,6 +18,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { admin, api, apiAnonymous, createTestUser, deleteTestUser, type TestUser } from './helpers.ts';
+import { readMatchJobsVacancies, type BackgroundJob } from '../src/lib/backgroundJobs';
 
 let owner: TestUser;
 let stranger: TestUser;
@@ -393,5 +394,115 @@ describe('the background-job service reports what it can do', () => {
     );
 
     await admin.from('background_jobs').delete().eq('id', inserted!.id);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* What a finished job search shows                                            */
+/* -------------------------------------------------------------------------- */
+
+describe('the vacancies of a finished job search', () => {
+  /** A job as the server sends it back. */
+  function job(overrides: Partial<BackgroundJob> = {}): BackgroundJob {
+    return {
+      id: 'job-1',
+      kind: 'match-jobs',
+      status: 'completed',
+      stage: 'done',
+      sourceType: null,
+      sourceId: null,
+      attempt: 1,
+      result: null,
+      errorCode: null,
+      errorMessage: null,
+      runId: null,
+      createdAt: '2026-11-04T00:00:00.000Z',
+      updatedAt: '2026-11-04T00:00:00.000Z',
+      startedAt: '2026-11-04T00:00:00.000Z',
+      completedAt: '2026-11-04T00:00:05.000Z',
+      waitingForRunner: false,
+      ...overrides,
+    };
+  }
+
+  test('the vacancies of a finished search are shown with the fit', () => {
+    const vacancies = readMatchJobsVacancies(
+      job({
+        result: {
+          jobCount: 2,
+          jobs: [
+            {
+              job: {
+                title: 'Data Analyst',
+                company: 'Nile Digital',
+                location: 'Cairo, Egypt',
+                url: 'https://example.org/jobs/1',
+              },
+              match: { matched: ['SQL'], missing: ['Python'], score: 57 },
+            },
+            {
+              job: {
+                title: 'Analytics Intern',
+                company: 'Delta Labs',
+                location: 'Alexandria',
+                applyUrl: 'https://example.org/apply/2',
+              },
+              match: { matched: [], missing: [], score: null },
+            },
+          ],
+        },
+      }),
+    );
+
+    assert.equal(vacancies.length, 2);
+    assert.equal(vacancies[0].title, 'Data Analyst');
+    assert.equal(vacancies[0].company, 'Nile Digital');
+    assert.equal(vacancies[0].fit, 57);
+    assert.equal(vacancies[0].url, 'https://example.org/jobs/1');
+    assert.equal(vacancies[1].url, 'https://example.org/apply/2');
+    assert.equal(
+      vacancies[1].fit,
+      null,
+      'a fit the comparison could not make must stay absent',
+    );
+  });
+
+  test('a job that is not a search shows nothing', () => {
+    const vacancies = readMatchJobsVacancies(
+      job({
+        kind: 'process-cv',
+        result: { jobs: [{ job: { title: 'Data Analyst', company: 'Nile Digital' } }] },
+      }),
+    );
+
+    assert.deepEqual(vacancies, []);
+  });
+
+  test('a search that has not finished shows nothing yet', () => {
+    const vacancies = readMatchJobsVacancies(
+      job({
+        status: 'processing',
+        result: { jobs: [{ job: { title: 'Data Analyst', company: 'Nile Digital' } }] },
+      }),
+    );
+
+    assert.deepEqual(vacancies, []);
+  });
+
+  test('a vacancy without a title and without an employer is not shown', () => {
+    const vacancies = readMatchJobsVacancies(
+      job({
+        result: {
+          jobs: [
+            { job: { location: 'Cairo' }, match: { score: 40 } },
+            { job: { title: 'Data Analyst' }, match: { score: 40 } },
+          ],
+        },
+      }),
+    );
+
+    assert.equal(vacancies.length, 1);
+    assert.equal(vacancies[0].title, 'Data Analyst');
+    assert.equal(vacancies[0].company, null);
   });
 });

@@ -823,6 +823,14 @@ function toCareerProject(dto: ProjectDTO): CareerProject {
     repositoryUrl: dto.repositoryUrl ?? undefined,
     demoUrl: dto.demoUrl ?? undefined,
     documentation: dto.documentation ?? undefined,
+    category: dto.category ?? 'personal',
+    role: dto.role ?? undefined,
+    responsibilities: dto.responsibilities ?? [],
+    startDate: dto.startDate ?? undefined,
+    isFeatured: dto.isFeatured ?? false,
+    includeInPortfolio: dto.includeInPortfolio !== false,
+    thumbnailUrl: dto.thumbnailUrl ?? undefined,
+    screenshots: dto.screenshots ?? [],
     createdAt: dto.createdAt,
     completedAt: dto.completedAt ?? undefined,
   };
@@ -1027,6 +1035,7 @@ function toCertification(dto: CertificationDTO): UserCertificationEntry {
     credentialUrl: dto.url ?? undefined,
     description: dto.description ?? undefined,
     skills: dto.skills ?? [],
+    attachmentUrl: dto.attachmentUrl ?? undefined,
   };
 }
 
@@ -3493,6 +3502,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           url: entry.credentialUrl,
           description: entry.description,
           skillNames: entry.skills ?? [],
+          attachmentUrl: entry.attachmentUrl,
         };
         if (serverIds.has(entry.id)) {
           await patchCertification(entry.id, fields);
@@ -3983,6 +3993,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         tasks: project.tasks,
         deliverables: project.deliverables,
         skills: project.skills,
+        category: project.category,
+        role: project.role,
+        responsibilities: project.responsibilities,
+        startDate: project.startDate,
+        isFeatured: project.isFeatured,
+        includeInPortfolio: project.includeInPortfolio,
+        thumbnailUrl: project.thumbnailUrl,
+        screenshots: project.screenshots,
       });
       setProjects(prev => [toCareerProject(dto), ...prev]);
       // The funnel records that a project was started. The project's title and
@@ -4017,6 +4035,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         tasks: updates.tasks,
         deliverables: updates.deliverables,
         skills: updates.skills,
+        category: updates.category,
+        role: updates.role,
+        responsibilities: updates.responsibilities,
+        startDate: updates.startDate,
+        isFeatured: updates.isFeatured,
+        includeInPortfolio: updates.includeInPortfolio,
+        thumbnailUrl: updates.thumbnailUrl,
+        screenshots: updates.screenshots,
       });
       setProjects(prev => prev.map(p => (p.id === projectId ? toCareerProject(dto) : p)));
     } catch (error) {

@@ -247,7 +247,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   };
 
   const inputClass =
-    'w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none';
+    'w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] focus:outline-none transition-colors';
 
   return (
     <Reveal className="space-y-8">
@@ -359,7 +359,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-1.5 text-[11px] text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none"
             >
               {JOB_COUNTRIES.map((code) => (
-                <option key={code} value={code}>
+                <option key={code} value={code} className="bg-[var(--surface-main)] text-[var(--text-primary)]">
                   {t(JOB_COUNTRY_LABELS[code] ?? code.toUpperCase())}
                 </option>
               ))}
@@ -374,7 +374,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-1.5 text-[11px] text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none"
             >
               {JOB_DATE_POSTED_OPTIONS.map((option) => (
-                <option key={option} value={option}>
+                <option key={option} value={option} className="bg-[var(--surface-main)] text-[var(--text-primary)]">
                   {t(DATE_POSTED_LABELS[option] ?? option)}
                 </option>
               ))}
@@ -441,8 +441,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             aria-label={t('Sort by')}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-1.5 text-[11px] text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none"
           >
-            <option value="match">{t('Best fit first')}</option>
-            <option value="newest">{t('Newest first')}</option>
+            <option value="match" className="bg-[var(--surface-main)] text-[var(--text-primary)]">{t('Best fit first')}</option>
+            <option value="newest" className="bg-[var(--surface-main)] text-[var(--text-primary)]">{t('Newest first')}</option>
           </select>
           <button
             type="button"

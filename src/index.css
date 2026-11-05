@@ -210,6 +210,65 @@
   }
 
   /* --------------------------------------------------------------------
+   * Form controls theme and contrast guarantees (Light & Dark mode)
+   * ------------------------------------------------------------------
+   * Explicitly binds inputs, textareas, and select elements to the active
+   * theme's semantic tokens so that operating system dark mode overrides,
+   * browser autofill, and un-styled option popups never produce
+   * white-on-white text or low-contrast inputs in Light Mode.
+   */
+  input,
+  textarea,
+  select {
+    color: var(--color-text);
+    background-color: var(--color-surface-secondary);
+    color-scheme: light;
+  }
+
+  .dark input,
+  .dark textarea,
+  .dark select {
+    color: var(--color-text);
+    background-color: var(--color-surface-secondary);
+    color-scheme: dark;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-text-muted) !important;
+    opacity: 1 !important;
+  }
+
+  /* Native select dropdown options */
+  select option {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .dark select option {
+    background-color: var(--color-surface-secondary);
+    color: var(--color-text);
+  }
+
+  /* WebKit / Chromium autofill contrast fix */
+  input:-webkit-autofill,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: var(--color-text) !important;
+    -webkit-box-shadow: 0 0 0 1000px var(--color-surface-secondary) inset !important;
+    box-shadow: 0 0 0 1000px var(--color-surface-secondary) inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  .dark input:-webkit-autofill,
+  .dark textarea:-webkit-autofill,
+  .dark select:-webkit-autofill {
+    -webkit-text-fill-color: var(--color-text) !important;
+    -webkit-box-shadow: 0 0 0 1000px var(--color-surface-secondary) inset !important;
+    box-shadow: 0 0 0 1000px var(--color-surface-secondary) inset !important;
+  }
+
+  /* --------------------------------------------------------------------
    * Press feedback
    * ------------------------------------------------------------------
    * Every button answers a press with a tiny scale-down. It reads as a

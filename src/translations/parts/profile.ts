@@ -6,6 +6,14 @@
  */
 
 export const profileAr: Record<string, string> = {
+  "Uploading…": "جارٍ الرفع…",
+  "Certificate Document / PDF / Image (Optional)": "مستند الشهادة / PDF / صورة (اختياري)",
+  "Does not expire": "لا تنتهي",
+  "View Certificate Document": "عرض مستند الشهادة",
+  "No Expiration": "بدون انتهاء",
+  "Expired": "منتهية",
+  "Key Achievements": "الإنجازات الرئيسية",
+  "Key Responsibilities": "المسؤوليات الرئيسية",
   'Choose CareerDev4AI Avatar': 'اختر صورة CareerDev4AI',
   'Choose Your CareerDev4AI Avatar': 'اختر صورة CareerDev4AI الخاصة بك',
   'Select a curated illustrated avatar that represents your professional profile.':

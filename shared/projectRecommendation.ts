@@ -28,6 +28,7 @@
  */
 
 import { namesMatch, canonicalNameKey } from './jobDescription.ts';
+import { isSemanticProjectDuplicate, isCareerRoleRelevant } from './semanticDuplicate.ts';
 
 // ---------------------------------------------------------------------------
 // The context the recommendations are built from
@@ -408,16 +409,56 @@ export function deriveProjectBriefs(
 
     if (!isRelevant) continue;
 
+    // Check against existing projects to prevent recommending duplicates
+    const dupCheck = isSemanticProjectDuplicate(
+      { title: concept.title },
+      context.existingProjects ?? []
+    );
+
+    let projectTitle = concept.title;
+    let projectDifficulty = difficultyForBrief(context.careerLevel, addressed?.priority ?? null);
+    let reasonSuffix = '';
+
+    if (dupCheck.isDuplicate) {
+      if (dupCheck.isInProgress) {
+        // Skip project already planned, idea, or in progress
+        continue;
+      }
+      if (dupCheck.isCompleted) {
+        // If already completed and user still has an open gap, offer an advanced evolution
+        if (addressed && addressed.gap > 0) {
+          projectTitle = `Scale and automate tests for ${concept.title}`;
+          projectDifficulty = 'Advanced';
+          reasonSuffix = ` You already built "${dupCheck.matchedProject?.title}". This advanced evolution scales and hardens it to close your remaining gap in ${addressed.name}.`;
+        } else {
+          // No remaining gap on this concept — completely skip completed work
+          continue;
+        }
+      }
+    }
+
+    // Role-relevance check: ensure non-technical roles don't get unrelated engineering projects
+    if (
+      !isCareerRoleRelevant(
+        { title: projectTitle },
+        { title: context.targetRoleTitle, skills: context.roleSkills }
+      )
+    ) {
+      continue;
+    }
+
     briefs.push({
       id: `brief-${briefs.length + 1}-${key.replace(/\s+/g, '-').slice(0, 40)}`,
-      title: concept.title,
+      title: projectTitle,
       focusSkill: addressed?.name ?? concept.skill ?? context.roleSkills[0] ?? '',
-      reason: addressed
-        ? `Your ${addressed.name} is ${addressed.gap} level${addressed.gap === 1 ? '' : 's'} short of what ${context.targetRoleTitle ?? 'the role'} expects, and this project exercises exactly that skill.`
-        : 'This is the portfolio work the catalogue names for your target role, and it builds on skills you already have.',
+      reason:
+        (addressed
+          ? `Your ${addressed.name} is ${addressed.gap} level${addressed.gap === 1 ? '' : 's'} short of what ${context.targetRoleTitle ?? 'the role'} expects, and this project exercises exactly that skill.`
+          : 'This is the portfolio work the catalogue names for your target role, and it builds on skills you already have.') +
+        reasonSuffix,
       buildingBlocks,
       gapAddressed: addressed?.name ?? null,
-      difficulty: difficultyForBrief(context.careerLevel, addressed?.priority ?? null),
+      difficulty: projectDifficulty,
     });
 
     if (briefs.length >= limit) break;

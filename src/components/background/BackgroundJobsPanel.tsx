@@ -16,6 +16,7 @@ import { AlertTriangle, CheckCircle2, Clock, Loader2, RotateCw, XCircle } from '
 import { useCareer } from '../../context/CareerContext';
 import {
   JOB_KIND_LABELS,
+  readMatchJobsVacancies,
   type BackgroundJob,
   type BackgroundJobAvailability,
   type BackgroundJobStatus,
@@ -216,6 +217,10 @@ export function BackgroundJobsPanel({
                   <p className="text-[11px] text-[var(--color-danger)] mt-0.5">{job.errorMessage}</p>
                 ) : null}
 
+                {job.kind === 'match-jobs' && job.status === 'completed' ? (
+                  <MatchJobsVacancies job={job} />
+                ) : null}
+
                 {job.status === 'failed' || job.status === 'cancelled' ? (
                   <button
                     type="button"
@@ -233,6 +238,57 @@ export function BackgroundJobsPanel({
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * The vacancies a finished job search produced.
+ *
+ * The result is read back from the server exactly as it was stored, so only
+ * what the provider said is shown. A vacancy without a link is shown as text
+ * rather than as a link that goes nowhere.
+ */
+function MatchJobsVacancies({ job }: { job: BackgroundJob }) {
+  const { t } = useCareer();
+  const vacancies = readMatchJobsVacancies(job);
+
+  if (vacancies.length === 0) {
+    return (
+      <p className="text-[11px] text-[var(--text-muted)] mt-1">
+        {t('No vacancies were found for this search.')}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-1.5">
+      <p className="text-[11px] text-[var(--text-muted)]">
+        {t('Vacancies found')}: {vacancies.length}
+      </p>
+      <ul className="mt-1 flex flex-col gap-0.5">
+        {vacancies.slice(0, 5).map((vacancy, index) => (
+          <li key={`${vacancy.title ?? ''}-${vacancy.company ?? ''}-${index}`} className="text-[11px]">
+            {vacancy.url ? (
+              <a
+                href={vacancy.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--text-primary)] underline"
+              >
+                {vacancy.title ?? vacancy.company}
+              </a>
+            ) : (
+              <span className="text-[var(--text-primary)]">{vacancy.title ?? vacancy.company}</span>
+            )}
+            <span className="text-[var(--text-muted)]">
+              {vacancy.company ? ` · ${vacancy.company}` : ''}
+              {vacancy.location ? ` · ${vacancy.location}` : ''}
+              {vacancy.fit !== null ? ` · ${t('Fit')} ${vacancy.fit}%` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

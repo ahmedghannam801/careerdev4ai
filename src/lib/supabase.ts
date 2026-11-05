@@ -9,8 +9,13 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // The session is persisted by the Supabase client itself and refreshed
 // automatically on expiry.
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as
+const env =
+  typeof import.meta !== 'undefined' && import.meta && (import.meta as { env?: Record<string, string | undefined> }).env
+    ? (import.meta as { env: Record<string, string | undefined> }).env
+    : (typeof process !== 'undefined' ? process.env : {});
+
+const supabaseUrl = (env.VITE_SUPABASE_URL ?? env.SUPABASE_URL) as string | undefined;
+const supabasePublishableKey = (env.VITE_SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY) as
   | string
   | undefined;
 

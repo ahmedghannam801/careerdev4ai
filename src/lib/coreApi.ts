@@ -39,6 +39,14 @@ export interface ProjectDTO {
   tasks: string[];
   deliverables: string[];
   skills: string[];
+  category?: 'academic' | 'personal' | 'professional' | 'volunteer' | 'team';
+  role?: string | null;
+  responsibilities?: string[];
+  startDate?: string | null;
+  isFeatured?: boolean;
+  includeInPortfolio?: boolean;
+  thumbnailUrl?: string | null;
+  screenshots?: string[];
   createdAt: string;
   completedAt: string | null;
 }
@@ -90,6 +98,7 @@ export interface CertificationDTO {
   description: string | null;
   /** The skills and tools the certificate produced. */
   skills: string[];
+  attachmentUrl?: string | null;
 }
 
 export interface LanguageDTO {
@@ -244,6 +253,14 @@ export async function postProject(input: {
   tasks?: string[];
   deliverables?: string[];
   skills?: string[];
+  category?: 'academic' | 'personal' | 'professional' | 'volunteer' | 'team';
+  role?: string;
+  responsibilities?: string[];
+  startDate?: string;
+  isFeatured?: boolean;
+  includeInPortfolio?: boolean;
+  thumbnailUrl?: string;
+  screenshots?: string[];
 }): Promise<ProjectDTO> {
   const data = await request<{ success: boolean; project: ProjectDTO }>('/api/projects', {
     method: 'POST',
@@ -266,6 +283,14 @@ export async function patchProject(
     tasks: string[];
     deliverables: string[];
     skills: string[];
+    category: 'academic' | 'personal' | 'professional' | 'volunteer' | 'team';
+    role: string;
+    responsibilities: string[];
+    startDate: string;
+    isFeatured: boolean;
+    includeInPortfolio: boolean;
+    thumbnailUrl: string;
+    screenshots: string[];
   }>
 ): Promise<ProjectDTO> {
   const data = await request<{ success: boolean; project: ProjectDTO }>(`/api/projects/${id}`, {
@@ -368,6 +393,7 @@ export async function patchEvidence(
     dateAdded: string;
     projectId: string;
     skillNames: string[];
+    attachmentUrl: string;
   }>
 ): Promise<EvidenceDTO> {
   const data = await request<{ success: boolean; evidence: EvidenceDTO }>(`/api/evidence/${id}`, {
@@ -398,6 +424,7 @@ export async function postCertification(input: {
   credentialId?: string;
   description?: string;
   skillNames?: string[];
+  attachmentUrl?: string;
 }): Promise<CertificationDTO> {
   const data = await request<{ success: boolean; certification: CertificationDTO }>(
     '/api/certifications',
@@ -640,4 +667,19 @@ export async function patchInterviewSession(
 
 export async function deleteInterviewSession(id: string): Promise<void> {
   await request<{ success: boolean }>(`/api/interviews/${id}`, { method: 'DELETE' });
+}
+
+export async function uploadPortfolioAttachment(
+  file: File
+): Promise<{ path: string; size: number; fileName: string; publicUrl: string }> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  const data = await request<{
+    success: boolean;
+    file: { path: string; size: number; fileName: string; publicUrl: string };
+  }>('/api/portfolio/upload', {
+    method: 'POST',
+    body: form,
+  });
+  return data.file;
 }

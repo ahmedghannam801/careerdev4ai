@@ -386,6 +386,51 @@ describe('the provider client', () => {
     assert.ok(calls[0].url.includes('country=eg'));
   });
 
+  test('a subscription that serves the older search path is still asked', async () => {
+    stubProvider((url) =>
+      url.includes('/search-v2')
+        ? { status: 404, body: { message: "Endpoint '/search-v2' does not exist" } }
+        : { status: 200, body: { status: 'OK', data: { jobs: [providerJob()] } } }
+    );
+
+    const result = await searchJobs({ query: 'frontend' });
+
+    assert.equal(calls.length, 2, 'the provider should be asked on both paths');
+    assert.ok(calls[0].url.includes('/search-v2'));
+    assert.ok(calls[1].url.includes('/search?'));
+    assert.equal(result.jobs.length, 1);
+    assert.equal(result.jobs[0].title, 'Frontend Engineer');
+  });
+
+  test('the vacancies of the current provider shape are read', async () => {
+    stubProvider(() => ({
+      status: 200,
+      body: {
+        status: 'OK',
+        data: {
+          jobs: [
+            providerJob({
+              job_location: 'Cairo, Egypt',
+              job_posted_at_datetime: undefined,
+              job_posted_at_datetime_utc: '2026-11-01T09:00:00.000Z',
+              job_url: undefined,
+              job_google_link: 'https://example.test/job/1',
+            }),
+          ],
+          cursor: 'next-page',
+        },
+      },
+    }));
+
+    const result = await searchJobs({ query: 'frontend' });
+
+    assert.equal(result.jobs.length, 1);
+    assert.equal(result.jobs[0].location, 'Cairo, Egypt');
+    assert.equal(result.jobs[0].postedAt, '2026-11-01T09:00:00.000Z');
+    assert.equal(result.jobs[0].url, 'https://example.test/job/1');
+    assert.equal(result.cursor, 'next-page');
+  });
+
   test('a repeated search is answered from the cache instead of spending quota', async () => {
     stubProvider(() => ({
       status: 200,

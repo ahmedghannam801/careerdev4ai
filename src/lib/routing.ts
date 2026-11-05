@@ -303,6 +303,8 @@ export const PROFILE_SECTIONS = [
   'experience',
   'education',
   'certifications',
+  'projects',
+  'volunteering',
   'languages',
   'links',
 ] as const;

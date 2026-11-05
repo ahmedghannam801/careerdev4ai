@@ -51,10 +51,30 @@ export function getAiClient(): GoogleGenAI {
 
 /**
  * Canonical lazy facade for AI generation.
+ * Automatically leverages the centralized AI provider abstraction supporting both
+ * Google Gemini and OpenRouter with bounded retries and fallback.
  */
 export const ai = {
   get models() {
-    return getAiClient().models;
+    return {
+      generateContent: async (args: {
+        model?: string;
+        contents: string;
+        config?: Record<string, unknown>;
+      }): Promise<{ text: string; provider?: string; model?: string }> => {
+        const { generateContentUnified } = await import('./provider.ts');
+        const res = await generateContentUnified({
+          contents: args.contents,
+          model: args.model,
+          config: args.config,
+        });
+        return {
+          text: res.text,
+          provider: res.provider,
+          model: res.model,
+        };
+      },
+    };
   },
 };
 

@@ -9,6 +9,7 @@ import { getSupabaseServer } from './supabase';
 
 export type ProjectStatus = 'idea' | 'planned' | 'in_progress' | 'completed' | 'published';
 export type ProjectDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
+export type ProjectCategory = 'academic' | 'personal' | 'professional' | 'volunteer' | 'team';
 
 export interface ProjectDTO {
   id: string;
@@ -24,6 +25,14 @@ export interface ProjectDTO {
   deliverables: string[];
   /** Skill names linked through public.project_skills. */
   skills: string[];
+  category: ProjectCategory;
+  role: string | null;
+  responsibilities: string[];
+  startDate: string | null;
+  isFeatured: boolean;
+  includeInPortfolio: boolean;
+  thumbnailUrl: string | null;
+  screenshots: string[];
   createdAt: string;
   completedAt: string | null;
 }
@@ -40,6 +49,14 @@ export interface CreateProjectInput {
   tasks?: string[];
   deliverables?: string[];
   skills?: string[];
+  category?: ProjectCategory;
+  role?: string;
+  responsibilities?: string[];
+  startDate?: string;
+  isFeatured?: boolean;
+  includeInPortfolio?: boolean;
+  thumbnailUrl?: string;
+  screenshots?: string[];
 }
 
 export type UpdateProjectInput = Partial<CreateProjectInput>;
@@ -58,10 +75,18 @@ interface ProjectRow {
   deliverables: unknown;
   created_at: string;
   completed_at: string | null;
+  category?: string | null;
+  role?: string | null;
+  responsibilities?: unknown;
+  start_date?: string | null;
+  is_featured?: boolean | null;
+  include_in_portfolio?: boolean | null;
+  thumbnail_url?: string | null;
+  screenshots?: unknown;
 }
 
 const SELECT_COLUMNS =
-  'id, title, goal, description, difficulty, status, repository_url, demo_url, documentation, tasks, deliverables, created_at, completed_at';
+  'id, title, goal, description, difficulty, status, repository_url, demo_url, documentation, tasks, deliverables, created_at, completed_at, category, role, responsibilities, start_date, is_featured, include_in_portfolio, thumbnail_url, screenshots';
 
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
@@ -81,6 +106,14 @@ function toDTO(row: ProjectRow, skills: string[]): ProjectDTO {
     tasks: toStringArray(row.tasks),
     deliverables: toStringArray(row.deliverables),
     skills,
+    category: (row.category as ProjectCategory) || 'personal',
+    role: row.role ?? null,
+    responsibilities: toStringArray(row.responsibilities),
+    startDate: row.start_date ?? null,
+    isFeatured: Boolean(row.is_featured),
+    includeInPortfolio: row.include_in_portfolio !== false,
+    thumbnailUrl: row.thumbnail_url ?? null,
+    screenshots: toStringArray(row.screenshots),
     createdAt: row.created_at,
     completedAt: row.completed_at,
   };
@@ -192,6 +225,14 @@ export async function createProject(
       documentation: input.documentation ?? null,
       tasks: input.tasks ?? [],
       deliverables: input.deliverables ?? [],
+      category: input.category ?? 'personal',
+      role: input.role ?? null,
+      responsibilities: input.responsibilities ?? [],
+      start_date: input.startDate ?? null,
+      is_featured: input.isFeatured ?? false,
+      include_in_portfolio: input.includeInPortfolio !== false,
+      thumbnail_url: input.thumbnailUrl ?? null,
+      screenshots: input.screenshots ?? [],
     })
     .select(SELECT_COLUMNS)
     .single();
@@ -244,6 +285,14 @@ export async function updateProject(
   if (updates.documentation !== undefined) patch.documentation = updates.documentation ?? null;
   if (updates.tasks !== undefined) patch.tasks = updates.tasks;
   if (updates.deliverables !== undefined) patch.deliverables = updates.deliverables;
+  if (updates.category !== undefined) patch.category = updates.category;
+  if (updates.role !== undefined) patch.role = updates.role ?? null;
+  if (updates.responsibilities !== undefined) patch.responsibilities = updates.responsibilities;
+  if (updates.startDate !== undefined) patch.start_date = updates.startDate ?? null;
+  if (updates.isFeatured !== undefined) patch.is_featured = updates.isFeatured;
+  if (updates.includeInPortfolio !== undefined) patch.include_in_portfolio = updates.includeInPortfolio;
+  if (updates.thumbnailUrl !== undefined) patch.thumbnail_url = updates.thumbnailUrl ?? null;
+  if (updates.screenshots !== undefined) patch.screenshots = updates.screenshots;
 
   let row: ProjectRow | null = null;
   if (Object.keys(patch).length > 0) {

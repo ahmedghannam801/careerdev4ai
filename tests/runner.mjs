@@ -323,6 +323,9 @@ async function main() {
     // The shared AI answer formatter: what the copilot's markdown becomes
     // before it reaches the reader. Pure.
     join(TESTS_DIR, 'ai-response.test.ts'),
+    join(TESTS_DIR, 'openrouter.test.ts'),
+    join(TESTS_DIR, 'contrast.test.ts'),
+    join(TESTS_DIR, 'recommendation-dedup.test.ts'),
     // The recommendation relevance gate, the learning CTA URL rule and
     // roadmap resource attachment. Pure.
     join(TESTS_DIR, 'recommendation-relevance.test.ts'),

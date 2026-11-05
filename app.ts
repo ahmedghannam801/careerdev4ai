@@ -32,6 +32,7 @@ import { runAtsAnalysis, validateAtsPayload } from './server/cv/atsAnalysis.ts';
 import { registerBackgroundJobRoutes } from './server/trigger/routes.ts';
 import { boundedList } from './server/ai/boundedList.ts';
 import { generateCoverLetter } from './server/cv/coverLetter.ts';
+import { universalAi, isAnyAiConfigured, getDefaultProvider } from './server/ai/provider.ts';
 
 // Express request augmentation.
 //
@@ -261,6 +262,7 @@ import {
   updateCvVersion,
   deleteCvVersion,
 } from './server/db/cvVersions.ts';
+import { uploadPortfolioFile } from './server/db/portfolioStorage.ts';
 import {
   type ProjectDifficulty,
   type ProjectStatus,
@@ -660,7 +662,7 @@ function canonicalizeSkill(rawSkill: string): string {
 // reported clearly instead of surfacing as a confusing failure on the first
 // AI request. The application still starts — the AI routes are the only ones
 // that need the key — but the problem is stated plainly at boot.
-if (!process.env.GEMINI_API_KEY) {
+if (!isAnyAiConfigured()) {
   console.warn(
     '[server] GEMINI_API_KEY is not set. The AI routes (/api/copilot, ' +
       '/api/analyze-career, /api/optimize-cv, /api/mock-interview, ' +
@@ -671,7 +673,7 @@ if (!process.env.GEMINI_API_KEY) {
 let aiClient: GoogleGenAI | null = null;
 let aiClientApiKey: string | null = null;
 
-function getAiClient(): GoogleGenAI {
+export function getAiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -704,11 +706,15 @@ function getAiClient(): GoogleGenAI {
  * indirection a missing key throws inside the calling route's try/catch, which
  * answers an explicit 503 and leaves every non-AI route working.
  */
-const ai = {
-  get models() {
-    return getAiClient().models;
-  },
-};
+const ai = universalAi;
+
+function getActiveAiModel(): string {
+  const provider = getDefaultProvider();
+  if (provider === 'openrouter') {
+    return process.env.OPENROUTER_MODEL?.trim() || 'openrouter/free';
+  }
+  return getGeminiModel();
+}
 
 // The model is configurable so an operator can move to a newer or more
 // available Flash model without editing code. Evaluated dynamically so
@@ -835,8 +841,12 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    modelConfigured: Boolean(process.env.GEMINI_API_KEY),
-    modelName: getGeminiModel(),
+    modelConfigured: isAnyAiConfigured(),
+    modelName: getActiveAiModel(),
+    providers: {
+      gemini: Boolean(process.env.GEMINI_API_KEY),
+      openrouter: Boolean(process.env.OPENROUTER_API_KEY),
+    },
   });
 });
 
@@ -1636,7 +1646,7 @@ app.post('/api/copilot', requireAuth, aiRateLimit, async (req: Request, res: Res
     // No model on this server means no result can be produced. This is
     // checked before the daily budget is touched, so a missing key is never
     // reported as an exhausted quota.
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
 
@@ -1794,7 +1804,7 @@ Return valid JSON schema:
     // No model on this server means no analysis can be produced. This is
     // checked before the daily budget is touched, so a missing key is never
     // reported as an exhausted quota.
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
 
@@ -1853,7 +1863,7 @@ Return JSON schema:
     // No model on this server means no analysis can be produced. This is
     // checked before the daily budget is touched, so a missing key is never
     // reported as an exhausted quota.
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
 
@@ -1945,7 +1955,7 @@ Return JSON schema:
     // No model on this server means no evaluation can be produced. This is
     // checked before the daily budget is touched, so a missing key is never
     // reported as an exhausted quota.
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
 
@@ -2020,7 +2030,7 @@ ${groundingRules()}
     // No model on this server means no summary can be produced. This is
     // checked before the daily budget is touched, so a missing key is never
     // reported as an exhausted quota.
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
 
@@ -2083,7 +2093,7 @@ app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Req
     // No model on this server means no cover letter can be produced. This is
     // checked before the daily budget is touched, so a missing key is never
     // reported as an exhausted quota.
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
 
@@ -2175,7 +2185,7 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, async (req: Request, res
         language: normalizeAiLanguage(body.language),
       };
 
-      const wantsAi = body.ai !== false && Boolean(process.env.GEMINI_API_KEY);
+      const wantsAi = body.ai !== false && isAnyAiConfigured();
       if (!wantsAi) {
         const outcome = await generateCvHeadlineSuggestions(
           req.authUser!.id,
@@ -2216,7 +2226,7 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, async (req: Request, res
     // No model on this server means no text can be produced. This is checked
     // before the daily budget is touched, so a missing key is never reported
     // as an exhausted quota.
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
 
@@ -2353,7 +2363,7 @@ app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, async (req
     //
     // The allowance is only spent when there is a real call to make, so a
     // server with no model configured never burns a candidate's daily budget.
-    const hasModel = Boolean(process.env.GEMINI_API_KEY);
+    const hasModel = isAnyAiConfigured();
     const aiBudget = hasModel ? tryConsumeAiBudget(req.authUser!.id) : false;
     const client: JobDescriptionAiClient | null = hasModel && aiBudget ? ai : null;
 
@@ -2407,7 +2417,7 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, async (re
     // it are never trusted: the records are resolved from the database.
     const document = (body.cv ?? null) as ClientCvDocument | null;
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
 
@@ -2481,7 +2491,7 @@ app.post('/api/projects/recommendations', requireAuth, aiRateLimit, async (req: 
 
     // Reading an optional pasted job description costs one unit, and writing
     // the plans costs another.
-    const hasModel = Boolean(process.env.GEMINI_API_KEY);
+    const hasModel = isAnyAiConfigured();
     const hasJobDescription = readJobDescription(body).ok;
     const aiBudget = hasModel
       ? tryConsumeAiBudget(req.authUser!.id, hasJobDescription ? 2 : 1)
@@ -2535,7 +2545,7 @@ app.post('/api/projects/analyze', requireAuth, aiRateLimit, async (req: Request,
     const body = req.body ?? {};
     const language = normalizeAiLanguage(body.language);
 
-    const hasModel = Boolean(process.env.GEMINI_API_KEY);
+    const hasModel = isAnyAiConfigured();
     const aiBudget = hasModel ? tryConsumeAiBudget(req.authUser!.id) : false;
     const client: JobDescriptionAiClient | null = hasModel && aiBudget ? ai : null;
 
@@ -3752,6 +3762,18 @@ app.post('/api/projects', requireAuth, async (req: Request, res: Response) => {
       skills: Array.isArray(body.skills)
         ? body.skills.filter((v: unknown): v is string => typeof v === 'string').slice(0, 50)
         : [],
+      category: (str(body.category, 50) as any) ?? 'personal',
+      role: str(body.role, 100) ?? undefined,
+      responsibilities: Array.isArray(body.responsibilities)
+        ? body.responsibilities.filter((v: unknown): v is string => typeof v === 'string').slice(0, 100)
+        : [],
+      startDate: str(body.startDate, 40) ?? undefined,
+      isFeatured: typeof body.isFeatured === 'boolean' ? body.isFeatured : false,
+      includeInPortfolio: typeof body.includeInPortfolio === 'boolean' ? body.includeInPortfolio : true,
+      thumbnailUrl: parseHttpUrl(body.thumbnailUrl, 1000).value,
+      screenshots: Array.isArray(body.screenshots)
+        ? body.screenshots.filter((v: unknown): v is string => typeof v === 'string').slice(0, 20)
+        : [],
     });
     return res.status(201).json({ success: true, project });
   } catch (error) {
@@ -3798,6 +3820,18 @@ app.patch('/api/projects/:id', requireAuth, async (req: Request, res: Response) 
       skills: Array.isArray(body.skills)
         ? body.skills.filter((v: unknown): v is string => typeof v === 'string').slice(0, 50)
         : undefined,
+      category: body.category ? (str(body.category, 50) as any) : undefined,
+      role: body.role !== undefined ? (str(body.role, 100) ?? undefined) : undefined,
+      responsibilities: Array.isArray(body.responsibilities)
+        ? body.responsibilities.filter((v: unknown): v is string => typeof v === 'string').slice(0, 100)
+        : undefined,
+      startDate: body.startDate !== undefined ? (str(body.startDate, 40) ?? undefined) : undefined,
+      isFeatured: typeof body.isFeatured === 'boolean' ? body.isFeatured : undefined,
+      includeInPortfolio: typeof body.includeInPortfolio === 'boolean' ? body.includeInPortfolio : undefined,
+      thumbnailUrl: body.thumbnailUrl !== undefined ? parseHttpUrl(body.thumbnailUrl, 1000).value : undefined,
+      screenshots: Array.isArray(body.screenshots)
+        ? body.screenshots.filter((v: unknown): v is string => typeof v === 'string').slice(0, 20)
+        : undefined,
     });
     if (!project) return res.status(404).json({ error: 'Project not found' });
     return res.json({ success: true, project });
@@ -3816,6 +3850,24 @@ app.delete('/api/projects/:id', requireAuth, async (req: Request, res: Response)
   } catch (error) {
     console.error('Failed to delete project:', error);
     return res.status(500).json({ error: 'Failed to delete project' });
+  }
+});
+
+app.post('/api/portfolio/upload', requireAuth, upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+    const uploaded = await uploadPortfolioFile(
+      req.authUser!.id,
+      req.file.originalname,
+      req.file.buffer,
+      req.file.mimetype
+    );
+    return res.status(201).json({ success: true, file: uploaded });
+  } catch (error: any) {
+    console.error('Failed to upload portfolio file:', error);
+    return res.status(400).json({ error: error?.message || 'Failed to upload file' });
   }
 });
 
@@ -4206,6 +4258,10 @@ app.post('/api/certifications', requireAuth, async (req: Request, res: Response)
     if (!certificationUrl.valid) {
       return res.status(400).json({ error: 'url must be an http(s) URL' });
     }
+    const attachmentUrl = parseHttpUrl(body.attachmentUrl, 1000);
+    if (!attachmentUrl.valid) {
+      return res.status(400).json({ error: 'attachmentUrl must be an http(s) URL' });
+    }
     const certification = await createCertification(req.authUser!.id, {
       name,
       issuer: str(body.issuer, 200) ?? undefined,
@@ -4214,6 +4270,7 @@ app.post('/api/certifications', requireAuth, async (req: Request, res: Response)
       url: certificationUrl.value,
       credentialId: str(body.credentialId, 200) ?? undefined,
       description: str(body.description, 2000) ?? undefined,
+      attachmentUrl: attachmentUrl.value,
       skillNames: Array.isArray(body.skillNames)
         ? body.skillNames.filter((v: unknown): v is string => typeof v === 'string').slice(0, 30)
         : undefined,
@@ -4239,6 +4296,13 @@ app.patch('/api/certifications/:id', requireAuth, async (req: Request, res: Resp
     if (!certificationUrl.valid) {
       return res.status(400).json({ error: 'url must be an http(s) URL' });
     }
+    const attachmentUrl =
+      body.attachmentUrl === undefined || body.attachmentUrl === null
+        ? { valid: true, value: undefined }
+        : parseHttpUrl(body.attachmentUrl, 1000);
+    if (!attachmentUrl.valid) {
+      return res.status(400).json({ error: 'attachmentUrl must be an http(s) URL' });
+    }
     const certification = await updateCertification(req.authUser!.id, req.params.id, {
       name: str(body.name, 200) ?? undefined,
       issuer: body.issuer === null ? undefined : (str(body.issuer, 200) ?? undefined),
@@ -4247,6 +4311,11 @@ app.patch('/api/certifications/:id', requireAuth, async (req: Request, res: Resp
       url: certificationUrl.value,
       credentialId:
         body.credentialId === null ? undefined : (str(body.credentialId, 200) ?? undefined),
+      description: body.description !== undefined ? (str(body.description, 2000) ?? undefined) : undefined,
+      attachmentUrl: attachmentUrl.value,
+      skillNames: Array.isArray(body.skillNames)
+        ? body.skillNames.filter((v: unknown): v is string => typeof v === 'string').slice(0, 30)
+        : undefined,
     });
     if (!certification) return res.status(404).json({ error: 'Certification not found' });
     return res.json({ success: true, certification });
@@ -5556,7 +5625,7 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
       const aiBudget = tryConsumeAiBudget(req.authUser!.id);
       result = await enrichRecommendationsWithAi(deterministic, built.context, {
         ai:
-          process.env.GEMINI_API_KEY && aiBudget ? getAiClient() : null,
+          isAnyAiConfigured() && aiBudget ? universalAi : null,
         model: getGeminiModel(),
       });
     }

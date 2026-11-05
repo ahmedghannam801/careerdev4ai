@@ -27,6 +27,17 @@ import {
 const PROVIDER_HOST = 'jsearch.p.rapidapi.com';
 const PROVIDER_BASE = `https://${PROVIDER_HOST}`;
 
+/**
+ * The search paths the provider serves, newest first.
+ *
+ * The provider publishes its search endpoint under two names. A subscription on
+ * the current API answers on `/search-v2`; a subscription on the earlier one
+ * answers on `/search`. The credential belongs to an account rather than to a
+ * path, so the first path the account is entitled to wins and the other is
+ * never asked for.
+ */
+const SEARCH_PATHS = ['/search-v2', '/search'];
+
 /** How long a search result stays usable before it is fetched again. */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -170,8 +181,8 @@ export function clearJobSearchCache(): void {
 /* The upstream call                                                           */
 /* -------------------------------------------------------------------------- */
 
-function buildRequestUrl(query: JobSearchQuery): string {
-  const url = new URL(`${PROVIDER_BASE}/search`);
+function buildRequestUrl(query: JobSearchQuery, path: string): string {
+  const url = new URL(`${PROVIDER_BASE}${path}`);
   url.searchParams.set('query', query.query);
   url.searchParams.set('country', query.country);
   url.searchParams.set('num_pages', String(query.numPages));
@@ -255,6 +266,50 @@ async function fetchProvider(url: string): Promise<Response> {
   }
 }
 
+/** Reads a payload that has already been consumed, without failing on junk. */
+function parseJsonObject(text: string): Record<string, unknown> {
+  if (!text.trim()) return {};
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Asks the provider for vacancies.
+ *
+ * The provider answers 404 for a path the subscription does not serve, so the
+ * paths are tried in turn and the first one that answers wins. Only that
+ * "this path does not exist" answer moves on; every other answer is the real
+ * one and is handed back untouched.
+ */
+async function requestSearch(query: JobSearchQuery): Promise<{
+  response: Response;
+  payload: Record<string, unknown> | null;
+}> {
+  for (let index = 0; index < SEARCH_PATHS.length; index += 1) {
+    const response = await fetchProvider(buildRequestUrl(query, SEARCH_PATHS[index]));
+
+    if (response.status !== 404) {
+      return { response, payload: null };
+    }
+
+    const text = await response.text();
+    if (text.includes('does not exist') && index < SEARCH_PATHS.length - 1) {
+      continue;
+    }
+    return { response, payload: parseJsonObject(text) };
+  }
+
+  throw new JobSearchError(
+    'bad_response',
+    'The job provider does not serve a search endpoint for this credential.',
+    502
+  );
+}
+
 /** Reads the provider's payload, refusing anything that is not an object. */
 async function readJson(response: Response): Promise<Record<string, unknown>> {
   const text = await response.text();
@@ -309,7 +364,7 @@ export async function searchJobs(
     if (cached) return cached;
   }
 
-  const response = await fetchProvider(buildRequestUrl(query));
+  const { response, payload: preloadedPayload } = await requestSearch(query);
   const quota = readQuota(response.headers);
 
   if (response.status === 401 || response.status === 403) {
@@ -345,7 +400,7 @@ export async function searchJobs(
     );
   }
 
-  const payload = await readJson(response);
+  const payload = preloadedPayload ?? (await readJson(response));
 
   // The provider answers with status "ERROR" and a 200 when it rejects the
   // request on its own rules, so the body has to be inspected as well.

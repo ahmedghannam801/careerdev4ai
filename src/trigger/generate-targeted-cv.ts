@@ -71,7 +71,7 @@ export const generateTargetedCvTask = task({
         }
       }
 
-      const hasModel = Boolean(process.env.GEMINI_API_KEY);
+      const hasModel = Boolean(process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY);
       const model = getGeminiModel();
       const language = payload.language === 'ar' ? 'ar' : 'en';
 

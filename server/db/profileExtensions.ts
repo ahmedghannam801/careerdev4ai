@@ -30,6 +30,7 @@ export interface CertificationDTO {
   description: string | null;
   /** The skills and tools the certificate produced, through profile_certification_skills. */
   skills: string[];
+  attachmentUrl: string | null;
 }
 
 export interface CreateCertificationInput {
@@ -42,6 +43,7 @@ export interface CreateCertificationInput {
   description?: string;
   /** The names of the skills or tools the certificate produced. */
   skillNames?: string[];
+  attachmentUrl?: string;
 }
 
 export type UpdateCertificationInput = Partial<CreateCertificationInput>;
@@ -55,10 +57,11 @@ interface CertificationRow {
   url: string | null;
   credential_id: string | null;
   description: string | null;
+  attachment_url: string | null;
 }
 
 const CERT_COLUMNS =
-  'id, name, issuer, issue_date, expiry_date, url, credential_id, description';
+  'id, name, issuer, issue_date, expiry_date, url, credential_id, description, attachment_url';
 
 function toCertification(row: CertificationRow, skills: string[] = []): CertificationDTO {
   return {
@@ -71,6 +74,7 @@ function toCertification(row: CertificationRow, skills: string[] = []): Certific
     credentialId: row.credential_id,
     description: row.description,
     skills,
+    attachmentUrl: row.attachment_url ?? null,
   };
 }
 
@@ -201,6 +205,7 @@ export async function createCertification(
       url: input.url ?? null,
       credential_id: input.credentialId ?? null,
       description: input.description ?? null,
+      attachment_url: input.attachmentUrl ?? null,
     })
     .select(CERT_COLUMNS)
     .single();
@@ -227,6 +232,7 @@ export async function updateCertification(
   if (updates.url !== undefined) patch.url = updates.url ?? null;
   if (updates.credentialId !== undefined) patch.credential_id = updates.credentialId ?? null;
   if (updates.description !== undefined) patch.description = updates.description ?? null;
+  if (updates.attachmentUrl !== undefined) patch.attachment_url = updates.attachmentUrl ?? null;
   // Remove keys whose value is undefined — the Supabase client would otherwise
   // send them as NULL, which violates NOT NULL columns.
   for (const key of Object.keys(patch)) {
