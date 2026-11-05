@@ -219,6 +219,13 @@ export const landingAr: Record<string, string> = {
   'Bilingual English & Arabic': 'بالإنجليزية والعربية',
   'Professional reviewing career roadmap and learning path on laptop in modern workspace':
     'متخصصة تراجع خارطة الطريق المهنية ومسار التعلم على الحاسوب في بيئة عمل عصرية',
+  'CareerDev4AI 3D Architectural Composition': 'تكوين معماري ثلاثي الأبعاد لمنصة CareerDev4AI',
+  'University student studying with a laptop in a modern educational environment':
+    'طالبة جامعية تدرس على جهاز حاسوب محمول في بيئة تعليمية عصرية',
+  'Professional job interview and recruitment discussion in a modern office':
+    'مقابلة توظيف مهنية ونقاش عمل في مكتب عصري',
+  'Diverse professional team collaborating and problem-solving together':
+    'فريق مهني متنوع يتعاون ويحل المشكلات معًا',
 
   // ---- Reference visual showcase -------------------------------------
   'Visual Showcase': 'معرض بصري',

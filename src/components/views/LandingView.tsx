@@ -7,7 +7,6 @@ import { SUPPORT_EMAIL, PUBLIC_PATHS, OPERATOR_LINKEDIN_URL } from '../../../sha
 import { Logo } from '../brand/Logo';
 import { CareerJourneyVisual } from '../brand/CareerJourneyVisual';
 import { HeroVisual3D } from '../landing/HeroVisual3D';
-import { ReferenceShowcaseGrid } from '../landing/ReferenceShowcaseGrid';
 import { CareerImage } from '../ui/CareerImage';
 import { ProductPreview } from '../landing/ProductPreview';
 import { FeatureGrid } from '../landing/FeatureGrid';
@@ -414,11 +413,104 @@ const navLinks = [
         </div>
       </section>
 
-      {/* Reference Visual Showcase — 2x2 Showcase Grid */}
-      <ReferenceShowcaseGrid
-        onStartOnboarding={onStartOnboarding}
-        onExploreRoles={onExploreRoles}
-      />
+      {/* Real Workplace & Learning Context — Authentic Industry Photography */}
+      <section id="real-experience" className="scroll-mt-24 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]/30 px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('Real Careers in Action')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('Built for students, switchers, and rising leaders.')}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t('Whether preparing for your first internship, transitioning into tech, or managing a high-impact team.')}
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Card 1: Learning */}
+            <div className="group overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-1 hover:border-[var(--color-border-strong)] hover:shadow-md">
+              <div className="relative aspect-video w-full overflow-hidden bg-[var(--color-surface-secondary)]">
+                <img
+                  src="/images/showcase/learning.webp"
+                  alt={t('University student studying with a laptop in a modern educational environment')}
+                  width={800}
+                  height={450}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+              <div className="p-5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                  {t('Students & Fresh Grads')}
+                </span>
+                <h3 className="mt-1.5 text-sm font-bold text-[var(--text-primary)]">
+                  {t('Academic Learning to Industry Readiness')}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {t('Turn semester coursework into targeted portfolios and resume-ready technical evidence.')}
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2: Career Opportunities */}
+            <div className="group overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-1 hover:border-[var(--color-border-strong)] hover:shadow-md">
+              <div className="relative aspect-video w-full overflow-hidden bg-[var(--color-surface-secondary)]">
+                <img
+                  src="/images/showcase/career-opportunities.webp"
+                  alt={t('Professional job interview and recruitment discussion in a modern office')}
+                  width={800}
+                  height={450}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+              <div className="p-5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                  {t('Working Professionals')}
+                </span>
+                <h3 className="mt-1.5 text-sm font-bold text-[var(--text-primary)]">
+                  {t('Measurable Impact & Skill Progression')}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {t('Benchmark existing proficiencies against senior and lead job specifications.')}
+                </p>
+              </div>
+            </div>
+
+            {/* Card 3: Professional Growth */}
+            <div className="group overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-1 hover:border-[var(--color-border-strong)] hover:shadow-md sm:col-span-2 lg:col-span-1">
+              <div className="relative aspect-video w-full overflow-hidden bg-[var(--color-surface-secondary)]">
+                <img
+                  src="/images/showcase/professional-growth.webp"
+                  alt={t('Diverse professional team collaborating and problem-solving together')}
+                  width={800}
+                  height={450}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+              <div className="p-5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                  {t('Career Switchers')}
+                </span>
+                <h3 className="mt-1.5 text-sm font-bold text-[var(--text-primary)]">
+                  {t('Transferable Skills & Interview Mastery')}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {t('Practice behavioral and technical STAR responses tailored to your transition path.')}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* AI Intelligence */}
       <section id="ai-guidance" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">

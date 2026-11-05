@@ -4,19 +4,18 @@ import { Route, Sparkles, CheckCircle2, Eye, ShieldCheck } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 
 /**
- * HeroVisual3D — Premium Balanced Hero Visual with Genuine Photography & Floating Product Previews.
+ * HeroVisual3D — Premium Balanced Hero Visual with Genuine Transparent 3D Composition & Floating Product Previews.
  *
  * Visual hierarchy:
- * 1. Dominant focal point: High-resolution authentic photograph of a tech professional
- *    collaborating and reviewing career milestones on a laptop (Unsplash / Christina @ wocintechchat).
+ * 1. Dominant focal point: Genuinely transparent 3D geometric architectural composition
+ *    featuring deep navy structures and copper/terracotta accents with clean antialiased alpha channel.
  * 2. Card 1 (Floating Upper-Left on desktop): Real-time illustrative roadmap pathway.
  *    Explicitly labeled "Illustrative Preview" with authentic phase milestones (NO fake percentages).
  * 3. Card 2 (Floating Lower-Right on desktop): AI Career Intelligence & Market Benchmark pill.
  * 4. Responsive presentation:
- *    - Desktop (>= 1024px): Perspective-balanced floating cards positioned around the image perimeter
- *      without obscuring the subject's face or workstation.
+ *    - Desktop (>= 1024px): Perspective-balanced floating cards positioned around the 3D asset perimeter.
  *    - Tablet & Mobile (< 1024px): Seamlessly reflows into a clean inline 2-column/1-column stack below
- *      the photograph, eliminating collisions, clipping, and horizontal overflow.
+ *      the 3D asset, eliminating collisions, clipping, and horizontal overflow.
  * 5. Full accessibility & reduced-motion support.
  */
 
@@ -32,30 +31,24 @@ export const HeroVisual3D: React.FC = () => {
         className="pointer-events-none absolute -inset-2 rounded-3xl bg-gradient-to-tr from-[var(--color-primary)]/15 via-transparent to-[var(--color-ai)]/15 blur-2xl opacity-75"
       />
 
-      {/* Main Photographic Image Frame */}
-      <div className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl lg:rounded-3xl">
+      {/* Main 3D Architectural Composition with genuine alpha transparency */}
+      <div className="relative flex items-center justify-center p-2 lg:p-4">
         <picture>
           <source
-            srcSet="/images/hero-professional-1200.webp 1200w, /images/hero-professional-800.webp 800w"
-            sizes="(min-width: 1024px) 560px, (min-width: 640px) 600px, 92vw"
+            srcSet="/images/hero-3d-transparent.webp"
             type="image/webp"
           />
           <img
-            src="/images/hero-professional.jpg"
-            alt={t('Professional reviewing career roadmap and learning path on laptop in modern workspace')}
-            width={1200}
-            height={900}
+            src="/images/hero-3d-transparent.png"
+            alt={t('CareerDev4AI 3D Architectural Composition')}
+            width={730}
+            height={590}
             fetchPriority="high"
             loading="eager"
             decoding="async"
-            className="aspect-[4/3] w-full object-cover transition-transform duration-500 hover:scale-[1.01]"
+            className="w-full max-h-[460px] object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.35)] transition-transform duration-500 hover:scale-[1.02]"
           />
         </picture>
-
-        {/* Ethical source attribution pill */}
-        <div className="absolute bottom-3 end-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white/95 backdrop-blur-md shadow-sm">
-          <span>Unsplash / Christina @ wocintechchat</span>
-        </div>
       </div>
 
       {/* ============================================================== */}
