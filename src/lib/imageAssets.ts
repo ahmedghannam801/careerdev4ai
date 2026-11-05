@@ -455,6 +455,62 @@ export const PLATFORM_ASSETS: Record<string, PlatformVisualAsset> = {
     source: 'Unsplash',
     license: 'Unsplash License',
   },
+  'showcase-learning': {
+    id: 'showcase-learning',
+    category: 'Learning',
+    domainId: 'education',
+    titleEn: 'Learning',
+    titleAr: 'التعلم',
+    altEn: 'University student studying with a laptop in a modern educational environment',
+    altAr: 'صور تعليمية فوتوغرافية حقيقية.',
+    src: '/images/showcase/learning.webp',
+    srcSm: '/images/showcase/learning-sm.webp',
+    photographer: 'Licensed Showcase',
+    source: 'CareerDev4AI Showcase',
+    license: 'Commercial',
+  },
+  'showcase-hero-3d': {
+    id: 'showcase-hero-3d',
+    category: 'Hero 3D',
+    domainId: 'technology',
+    titleEn: 'Hero 3D',
+    titleAr: 'العنصر الرئيسي ثلاثي الأبعاد',
+    altEn: 'Premium 3D abstract geometric architectural composition with copper and dark navy structures',
+    altAr: 'العنصر الرئيسي قبل التسجيل.',
+    src: '/images/showcase/hero-3d.webp',
+    srcSm: '/images/showcase/hero-3d-sm.webp',
+    photographer: 'CareerDev4AI 3D Lab',
+    source: 'CareerDev4AI Brand Assets',
+    license: 'Proprietary / Open Access',
+  },
+  'showcase-career-opportunities': {
+    id: 'showcase-career-opportunities',
+    category: 'Career Opportunities',
+    domainId: 'business',
+    titleEn: 'Career Opportunities',
+    titleAr: 'فرص مهنية ومقابلات',
+    altEn: 'Realistic professional job interview and recruitment meeting',
+    altAr: 'مقابلات وفرص عمل.',
+    src: '/images/showcase/career-opportunities.webp',
+    srcSm: '/images/showcase/career-opportunities-sm.webp',
+    photographer: 'Licensed Showcase',
+    source: 'CareerDev4AI Showcase',
+    license: 'Commercial',
+  },
+  'showcase-professional-growth': {
+    id: 'showcase-professional-growth',
+    category: 'Professional Growth',
+    domainId: 'operations',
+    titleEn: 'Professional Growth',
+    titleAr: 'النمو المهني وبيئة العمل',
+    altEn: 'Diverse professional team collaborating in a modern workplace',
+    altAr: 'تعاون وبيئة عمل حقيقية.',
+    src: '/images/showcase/professional-growth.webp',
+    srcSm: '/images/showcase/professional-growth-sm.webp',
+    photographer: 'Licensed Showcase',
+    source: 'CareerDev4AI Showcase',
+    license: 'Commercial',
+  },
 };
 
 /**
@@ -558,3 +614,4 @@ export function getIndustryVisual(identifier: string | null | undefined): Platfo
   // Safe default: Software Engineering
   return PLATFORM_ASSETS['software-engineering'];
 }
+

@@ -151,7 +151,7 @@ export const InterviewsView: React.FC = () => {
           const body = await res.json().catch(() => null);
           throw new Error(
             body?.error ??
-              t('The interviewer is unavailable right now. No feedback was generated — please try again shortly.')
+            t('The interviewer is unavailable right now. No feedback was generated — please try again shortly.')
           );
         }
         const result = (await res.json()) as InterviewFeedback;
@@ -173,11 +173,11 @@ export const InterviewsView: React.FC = () => {
               improvements: result.improvements ?? [],
               starEvaluation: result.starEvaluation
                 ? {
-                    situation: result.starEvaluation.situation ?? '',
-                    task: result.starEvaluation.task ?? '',
-                    action: result.starEvaluation.action ?? '',
-                    result: result.starEvaluation.result ?? '',
-                  }
+                  situation: result.starEvaluation.situation ?? '',
+                  task: result.starEvaluation.task ?? '',
+                  action: result.starEvaluation.action ?? '',
+                  result: result.starEvaluation.result ?? '',
+                }
                 : undefined,
               suggestedAnswer: result.suggestedAnswer ?? '',
             },

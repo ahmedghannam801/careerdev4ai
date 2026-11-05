@@ -219,4 +219,15 @@ export const landingAr: Record<string, string> = {
   'Bilingual English & Arabic': 'بالإنجليزية والعربية',
   'Professional reviewing career roadmap and learning path on laptop in modern workspace':
     'متخصصة تراجع خارطة الطريق المهنية ومسار التعلم على الحاسوب في بيئة عمل عصرية',
+
+  // ---- Reference visual showcase -------------------------------------
+  'Visual Showcase': 'معرض بصري',
+  'Authentic Workplace & Learning Imagery': 'مشاهد تعليمية وبيئات عمل حقيقية',
+  'Authentic educational photography.': 'صور تعليمية فوتوغرافية حقيقية.',
+  'Primary element before registration.': 'العنصر الرئيسي قبل التسجيل.',
+  'Interviews and career opportunities.': 'مقابلات وفرص عمل.',
+  'Collaboration and real work environments.': 'تعاون وبيئة عمل حقيقية.',
+  'Hero 3D': 'Hero 3D',
+  'Career Opportunities': 'Career Opportunities',
+  'Professional Growth': 'Professional Growth',
 };
