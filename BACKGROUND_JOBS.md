@@ -25,7 +25,8 @@ what happened.
 | Part | Where it lives |
 | --- | --- |
 | The work | `server/jobs/tasks/*.ts` — one function per workflow |
-| The registry and the retry policies | `server/jobs/tasks/index.ts` |
+| The registry | `server/jobs/tasks/index.ts` |
+| The retry policies | `server/jobs/tasks/policies.ts` |
 | The shared task helpers | `server/jobs/runtime.ts` |
 | The durable record | `public.background_jobs` |
 | The API | `server/jobs/routes.ts` |
@@ -99,9 +100,13 @@ done and the result simply carries no score. A missing score is honest; a
 made-up one is not.
 
 **Retries are small, deliberate and bounded.** Each workflow declares its own
-budget in `server/jobs/tasks/index.ts`, and the ones that cost model calls get
+budget in `server/jobs/tasks/policies.ts`, and the ones that cost model calls get
 at most one retry. The wait between attempts doubles each time and stops at the
 policy's ceiling.
+
+The policies live apart from the tasks on purpose: the API needs to know how
+many attempts a job is allowed, and it must not pull the whole task library —
+and the model SDK with it — into its own bundle to learn a number.
 
 **One candidate's work on one record does not overlap itself.** The claim
 checks for another job of the same candidate, the same workflow and the same
