@@ -152,12 +152,12 @@ const navLinks = [
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--surface-main)]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <div className="flex min-w-0 items-center gap-2.5">
+          <a href="#" className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90" aria-label={t('CareerDev4AI')}>
             <Logo variant="icon" className="h-8 w-8 shrink-0" alt="" />
             <span className="hidden shrink-0 whitespace-nowrap text-base font-semibold tracking-tight text-[var(--text-primary)] sm:inline">
               {t('CareerDev4AI')}
             </span>
-          </div>
+          </a>
 
           {/* The full navigation needs room. Below the large breakpoint the
               seven links do not fit beside the logo and the call to action,
@@ -226,8 +226,8 @@ const navLinks = [
       <section className="relative overflow-hidden border-b border-[var(--color-border)]">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 cp-brand-wash" />
 
-        <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-16 sm:pt-20 lg:pb-28 lg:pt-24">
-          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-14">
+        <div className="relative mx-auto max-w-6xl px-6 pb-14 pt-12 sm:pb-18 sm:pt-16 lg:pb-20 lg:pt-20 xl:max-w-7xl">
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12 xl:gap-14">
             {/* Copy column */}
             <div className="lg:col-span-6 xl:col-span-6">
               <Reveal>
@@ -238,13 +238,13 @@ const navLinks = [
               </Reveal>
 
               <Reveal delay={0.06}>
-                <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.08] tracking-tight text-[var(--text-primary)] sm:text-5xl lg:text-6xl">
+                <h1 className="mt-5 text-balance text-3xl font-bold leading-[1.12] tracking-tight text-[var(--text-primary)] sm:text-4xl md:text-5xl lg:text-[3.25rem]">
                   {HERO_HEADLINE}
                 </h1>
               </Reveal>
 
               <Reveal delay={0.12}>
-                <p className="mt-6 max-w-xl text-pretty text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
+                <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
                   {HERO_SUPPORTING}
                 </p>
               </Reveal>
@@ -252,10 +252,10 @@ const navLinks = [
               <Reveal delay={0.18}>
                 <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4">
                   <button
-                    onClick={onStartOnboarding}
+                    onClick={profile.onboardingCompleted ? onOpenDashboard : onStartOnboarding}
                     className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-6 py-3.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-sm transition-[background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-[var(--color-primary-hover)] hover:shadow-lg active:translate-y-0 active:scale-[0.98]"
                   >
-                    <span>{t('Start Your Career Journey')}</span>
+                    <span>{profile.onboardingCompleted ? t('Open Career Dashboard') : t('Start Your Career Journey')}</span>
                     <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
                   </button>
 
@@ -280,7 +280,7 @@ const navLinks = [
                   </div>
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="h-4 w-4 text-[var(--color-success-strong)]" />
-                    <span>{t('Bilingual English &amp; Arabic')}</span>
+                    <span>{t('Bilingual English & Arabic')}</span>
                   </div>
                 </div>
               </Reveal>

@@ -203,4 +203,20 @@ export const landingAr: Record<string, string> = {
   'Transferable Skills & Interview Mastery': 'مهارات قابلة للنقل وتميز في المقابلات',
   'Practice behavioral and technical STAR responses tailored to your transition path.':
     'تدرب على إجابات المقابلات السلوكية والتقنية بأسلوب STAR وفق مسارك الجديد.',
+
+  // ---- Hero visual & trust badges -------------------------------------
+  'Illustrative Preview': 'معاينة توضيحية',
+  'Full-Stack Engineer': 'مهندس برمجيات شامل',
+  'Next: System Architecture & APIs': 'التالي: بنية النظم وواجهات البرمجة',
+  'Core Fundamentals': 'الأساسيات الجوهرية',
+  'Verified': 'موثّق',
+  'Architecture & APIs': 'البنية والواجهات البرمجية',
+  'In Progress': 'قيد التقدم',
+  'Market Skill Benchmark': 'معيار مهارات السوق',
+  'Grounded in verified requirements': 'مبني على متطلبات معتمدة',
+  '100% Free & Open Access': 'مجاني 100% ومتاح للجميع',
+  'Open Career Dashboard': 'فتح لوحة التحكم المهنية',
+  'Bilingual English & Arabic': 'بالإنجليزية والعربية',
+  'Professional reviewing career roadmap and learning path on laptop in modern workspace':
+    'متخصصة تراجع خارطة الطريق المهنية ومسار التعلم على الحاسوب في بيئة عمل عصرية',
 };

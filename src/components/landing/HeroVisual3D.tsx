@@ -1,567 +1,196 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
+import { Route, Sparkles, CheckCircle2, Eye, ShieldCheck } from 'lucide-react';
+import { useCareer } from '../../context/CareerContext';
 
 /**
- * HeroVisual3D — Premium CSS 3D card-stack visual for the landing hero.
+ * HeroVisual3D — Premium Balanced Hero Visual with Genuine Photography & Floating Product Previews.
  *
- * Four feature cards arranged in a staggered 3D stack using CSS perspective
- * transforms. Each card shows a live product capability with micro-animations:
- * progress bars, circular progress, pulsing live indicator, and typing dots.
- *
- * Design constraints:
- * - CSS-only 3D (no Three.js / WebGL)
- * - will-change: transform only on animating elements
- * - prefers-reduced-motion respected — all CSS keyframes stop, motion/react
- *   entrance collapses to instant
- * - No external images or icon library beyond what's already in the bundle
- * - Mobile: collapses to a simple 2×2 grid (no 3D)
- * - Total added CSS: < 2 KB
+ * Visual hierarchy:
+ * 1. Dominant focal point: High-resolution authentic photograph of a tech professional
+ *    collaborating and reviewing career milestones on a laptop (Unsplash / Christina @ wocintechchat).
+ * 2. Card 1 (Floating Upper-Left on desktop): Real-time illustrative roadmap pathway.
+ *    Explicitly labeled "Illustrative Preview" with authentic phase milestones (NO fake percentages).
+ * 3. Card 2 (Floating Lower-Right on desktop): AI Career Intelligence & Market Benchmark pill.
+ * 4. Responsive presentation:
+ *    - Desktop (>= 1024px): Perspective-balanced floating cards positioned around the image perimeter
+ *      without obscuring the subject's face or workstation.
+ *    - Tablet & Mobile (< 1024px): Seamlessly reflows into a clean inline 2-column/1-column stack below
+ *      the photograph, eliminating collisions, clipping, and horizontal overflow.
+ * 5. Full accessibility & reduced-motion support.
  */
-
-/* ------------------------------------------------------------------ */
-/* Card data                                                            */
-/* ------------------------------------------------------------------ */
-
-interface FeatureCard {
-  id: string;
-  label: string;
-  sub: string;
-  accentVar: string; // CSS variable string for the accent stripe colour
-  content: 'roadmap' | 'skill' | 'jobs' | 'ai';
-}
-
-const CARDS: FeatureCard[] = [
-  {
-    id: 'roadmap',
-    label: 'Career Roadmap',
-    sub: 'Personalized phases',
-    accentVar: 'var(--color-primary)',
-    content: 'roadmap',
-  },
-  {
-    id: 'skill',
-    label: 'Skill Match',
-    sub: 'Gap analysis',
-    accentVar: 'var(--color-ai)',
-    content: 'skill',
-  },
-  {
-    id: 'jobs',
-    label: 'Live Jobs',
-    sub: 'Curated matches',
-    accentVar: 'var(--color-success-strong)',
-    content: 'jobs',
-  },
-  {
-    id: 'ai',
-    label: 'AI Mentor',
-    sub: 'Grounded guidance',
-    accentVar: 'var(--color-ai)',
-    content: 'ai',
-  },
-];
-
-/* ------------------------------------------------------------------ */
-/* Sub-components for each card's inner content                         */
-/* ------------------------------------------------------------------ */
-
-/** Card 1 — Career Roadmap: animated progress bar */
-const RoadmapContent: React.FC<{ reduced: boolean }> = ({ reduced }) => {
-  const phases = [
-    { label: 'Foundation', pct: 85 },
-    { label: 'Specialise', pct: 52 },
-    { label: 'Portfolio', pct: 28 },
-  ];
-  return (
-    <div className="mt-3 space-y-2.5">
-      {phases.map((p) => (
-        <div key={p.label}>
-          <div className="mb-1 flex items-center justify-between">
-            <span
-              style={{ fontSize: '10px', color: 'var(--color-text-secondary)', fontWeight: 500 }}
-            >
-              {p.label}
-            </span>
-            <span
-              style={{
-                fontSize: '10px',
-                color: 'var(--color-primary-text)',
-                fontWeight: 700,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {p.pct}%
-            </span>
-          </div>
-          <div
-            style={{
-              height: '5px',
-              borderRadius: '999px',
-              background: 'var(--color-border)',
-              overflow: 'hidden',
-            }}
-          >
-            <motion.div
-              initial={{ width: reduced ? `${p.pct}%` : '0%' }}
-              animate={{ width: `${p.pct}%` }}
-              transition={
-                reduced ? { duration: 0.01 } : { duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.5 }
-              }
-              style={{
-                height: '100%',
-                borderRadius: '999px',
-                background: 'var(--color-primary)',
-                willChange: 'width',
-              }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-/** Card 2 — Skill Match: CSS-only circular progress ring */
-const SkillContent: React.FC<{ reduced: boolean }> = ({ reduced }) => {
-  const pct = 73;
-  const r = 20;
-  const circ = 2 * Math.PI * r;
-  const dash = circ * (pct / 100);
-
-  return (
-    <div className="mt-3 flex items-center gap-4">
-      {/* Circular ring */}
-      <svg
-        width="56"
-        height="56"
-        viewBox="0 0 56 56"
-        aria-label={`${pct}% skill match`}
-        style={{ flexShrink: 0 }}
-      >
-        {/* track */}
-        <circle
-          cx="28"
-          cy="28"
-          r={r}
-          fill="none"
-          stroke="var(--color-border)"
-          strokeWidth="5"
-        />
-        {/* progress */}
-        <motion.circle
-          cx="28"
-          cy="28"
-          r={r}
-          fill="none"
-          stroke="var(--color-ai)"
-          strokeWidth="5"
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          initial={{ strokeDashoffset: reduced ? circ - dash : circ }}
-          animate={{ strokeDashoffset: circ - dash }}
-          transform="rotate(-90 28 28)"
-          transition={
-            reduced ? { duration: 0.01 } : { duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.6 }
-          }
-          style={{ willChange: 'stroke-dashoffset' }}
-        />
-        <text
-          x="28"
-          y="33"
-          textAnchor="middle"
-          style={{
-            fontSize: '12px',
-            fontWeight: 700,
-            fill: 'var(--color-ai-text)',
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          {pct}%
-        </text>
-      </svg>
-      {/* Legend */}
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text)' }}>
-          Match Score
-        </div>
-        <div
-          style={{
-            fontSize: '10px',
-            color: 'var(--color-text-secondary)',
-            marginTop: '2px',
-            lineHeight: 1.4,
-          }}
-        >
-          7 of 9 required
-          <br />
-          skills covered
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/** Card 3 — Live Jobs: pulsing green indicator + job pills */
-const JobsContent: React.FC = () => {
-  const jobs = ['Senior UX Designer', 'Product Manager', 'Data Analyst'];
-  return (
-    <div className="mt-3">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          marginBottom: '8px',
-        }}
-      >
-        {/* Pulsing dot */}
-        <span className="hero3d-pulse-dot" aria-hidden="true" />
-        <span style={{ fontSize: '10px', color: 'var(--color-success-strong)', fontWeight: 600 }}>
-          247 live openings
-        </span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        {jobs.map((j) => (
-          <div
-            key={j}
-            style={{
-              fontSize: '10px',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              background: 'var(--color-success-surface)',
-              color: 'var(--color-text)',
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {j}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-/** Card 4 — AI Mentor: typing dots animation */
-const AiContent: React.FC<{ reduced: boolean }> = ({ reduced }) => {
-  return (
-    <div className="mt-3">
-      {/* Simulated chat bubble */}
-      <div
-        style={{
-          background: 'var(--color-ai-surface)',
-          border: '1px solid var(--color-ai-border)',
-          borderRadius: '8px',
-          padding: '8px 10px',
-          fontSize: '10px',
-          lineHeight: 1.5,
-          color: 'var(--color-text-secondary)',
-        }}
-      >
-        Based on your roadmap, I'd suggest focusing on system design fundamentals next.
-      </div>
-      {/* Typing indicator */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '5px',
-          marginTop: '8px',
-        }}
-      >
-        <span
-          style={{
-            fontSize: '9px',
-            color: 'var(--color-ai-text)',
-            fontWeight: 600,
-          }}
-        >
-          AI Mentor
-        </span>
-        {!reduced && (
-          <span
-            style={{ display: 'flex', gap: '3px', alignItems: 'center' }}
-            aria-label="Typing"
-          >
-            <span className="hero3d-dot hero3d-dot-1" />
-            <span className="hero3d-dot hero3d-dot-2" />
-            <span className="hero3d-dot hero3d-dot-3" />
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/* 3D stack layout config                                               */
-/* ------------------------------------------------------------------ */
-
-/**
- * Each card's 3D transform in the stack. Cards are layered front-to-back
- * with modest X/Y rotations — professional, NOT flashy.
- */
-const STACK_TRANSFORMS = [
-  // Card 0 (front) — Career Roadmap
-  { rotateX: 6, rotateY: -10, translateZ: 60, translateX: 0, translateY: 0 },
-  // Card 1 — Skill Match
-  { rotateX: 5, rotateY: -8, translateZ: 30, translateX: 50, translateY: 20 },
-  // Card 2 — Live Jobs
-  { rotateX: 4, rotateY: -6, translateZ: 10, translateX: 30, translateY: 50 },
-  // Card 3 (back) — AI Mentor
-  { rotateX: 3, rotateY: -4, translateZ: -20, translateX: 60, translateY: 80 },
-];
-
-/* ------------------------------------------------------------------ */
-/* Main component                                                       */
-/* ------------------------------------------------------------------ */
 
 export const HeroVisual3D: React.FC = () => {
+  const { t } = useCareer();
   const reduced = useReducedMotion() ?? false;
 
   return (
-    <>
-      {/* Inject keyframes as a style tag — keeps CSS under 2 KB, no new files */}
-      <style>{`
-        /* Floating keyframe for each card */
-        @keyframes hero3d-float-0 {
-          0%, 100% { transform: translateY(0px); }
-          50%        { transform: translateY(-6px); }
-        }
-        @keyframes hero3d-float-1 {
-          0%, 100% { transform: translateY(0px); }
-          50%        { transform: translateY(-5px); }
-        }
-        @keyframes hero3d-float-2 {
-          0%, 100% { transform: translateY(0px); }
-          50%        { transform: translateY(-4px); }
-        }
-        @keyframes hero3d-float-3 {
-          0%, 100% { transform: translateY(0px); }
-          50%        { transform: translateY(-3px); }
-        }
-
-        /* Pulsing live-jobs dot */
-        @keyframes hero3d-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50%       { opacity: 0.6; transform: scale(1.4); }
-        }
-
-        /* AI typing dots */
-        @keyframes hero3d-blink {
-          0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
-          40%            { opacity: 1;   transform: translateY(-3px); }
-        }
-
-        .hero3d-pulse-dot {
-          display: inline-block;
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          background: var(--color-success-strong);
-          animation: hero3d-pulse 1.6s ease-in-out infinite;
-          will-change: transform;
-          flex-shrink: 0;
-        }
-
-        .hero3d-dot {
-          display: inline-block;
-          width: 5px;
-          height: 5px;
-          border-radius: 50%;
-          background: var(--color-ai);
-          animation: hero3d-blink 1.4s ease-in-out infinite;
-          will-change: transform;
-        }
-        .hero3d-dot-1 { animation-delay: 0s; }
-        .hero3d-dot-2 { animation-delay: 0.2s; }
-        .hero3d-dot-3 { animation-delay: 0.4s; }
-
-        /* Respect reduced motion — kill all hero3d animations */
-        @media (prefers-reduced-motion: reduce) {
-          .hero3d-pulse-dot,
-          .hero3d-dot {
-            animation: none !important;
-            opacity: 1 !important;
-            transform: none !important;
-          }
-        }
-      `}</style>
-
-      {/*
-        Desktop: perspective scene with absolute-positioned cards
-        Mobile: simple 2×2 grid (no 3D)
-      */}
-
-      {/* Mobile layout — simple grid, no 3D */}
+    <div className="relative mx-auto w-full max-w-lg lg:max-w-none">
+      {/* Decorative ambient backlight wash */}
       <div
-        className="grid grid-cols-2 gap-3 lg:hidden"
-        aria-label="Platform features"
-      >
-        {CARDS.map((card) => (
-          <div
-            key={card.id}
-            style={{
-              borderRadius: '14px',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-surface)',
-              padding: '14px',
-              boxShadow: 'var(--shadow-card)',
-            }}
-          >
-            {/* Accent stripe */}
-            <div
-              aria-hidden="true"
-              style={{
-                width: '28px',
-                height: '3px',
-                borderRadius: '99px',
-                background: card.accentVar,
-                marginBottom: '8px',
-              }}
-            />
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text)' }}>
-              {card.label}
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-              {card.sub}
-            </div>
-            {card.content === 'roadmap' && <RoadmapContent reduced={reduced} />}
-            {card.content === 'skill' && <SkillContent reduced={reduced} />}
-            {card.content === 'jobs' && <JobsContent />}
-            {card.content === 'ai' && <AiContent reduced={reduced} />}
-          </div>
-        ))}
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-2 rounded-3xl bg-gradient-to-tr from-[var(--color-primary)]/15 via-transparent to-[var(--color-ai)]/15 blur-2xl opacity-75"
+      />
+
+      {/* Main Photographic Image Frame */}
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl lg:rounded-3xl">
+        <picture>
+          <source
+            srcSet="/images/hero-professional-1200.webp 1200w, /images/hero-professional-800.webp 800w"
+            sizes="(min-width: 1024px) 560px, (min-width: 640px) 600px, 92vw"
+            type="image/webp"
+          />
+          <img
+            src="/images/hero-professional.jpg"
+            alt={t('Professional reviewing career roadmap and learning path on laptop in modern workspace')}
+            width={1200}
+            height={900}
+            fetchPriority="high"
+            loading="eager"
+            decoding="async"
+            className="aspect-[4/3] w-full object-cover transition-transform duration-500 hover:scale-[1.01]"
+          />
+        </picture>
+
+        {/* Ethical source attribution pill */}
+        <div className="absolute bottom-3 end-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white/95 backdrop-blur-md shadow-sm">
+          <span>Unsplash / Christina @ wocintechchat</span>
+        </div>
       </div>
 
-      {/* Desktop layout — CSS 3D perspective stack */}
-      <div
-        className="relative hidden lg:block"
+      {/* ============================================================== */}
+      {/* DESKTOP FLOATING CARDS (>= lg)                                 */}
+      {/* Anchored with precision to avoid obscuring the photograph      */}
+      {/* ============================================================== */}
+
+      {/* Card 1: Illustrative Pathway Preview (Floating Top-Left) */}
+      <motion.div
+        initial={{ opacity: 0, y: reduced ? 0 : 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={reduced ? { duration: 0.01 } : { duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+        className="absolute -top-6 -left-6 z-20 hidden w-64 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]/95 p-4 shadow-xl backdrop-blur-md lg:block xl:-left-8 xl:w-72"
         style={{
-          /*
-           * Explicit height prevents layout shift (CLS). The stack spans
-           * ~400px vertically before the perspective offset.
-           */
-          height: '420px',
-          width: '100%',
+          boxShadow: '0 12px 32px -8px color-mix(in srgb, var(--color-text) 16%, transparent), 0 0 0 1px color-mix(in srgb, var(--color-primary) 15%, transparent)',
         }}
-        aria-label="Platform features"
       >
-        {CARDS.map((card, i) => {
-          const t = STACK_TRANSFORMS[i];
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border)]/60 pb-2.5">
+          <div className="flex items-center gap-1.5">
+            <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-primary)] text-white">
+              <Route className="h-3 w-3" />
+            </div>
+            <span className="text-xs font-bold tracking-tight text-[var(--text-primary)]">
+              {t('Full-Stack Engineer')}
+            </span>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-surface)] px-2 py-0.5 text-[9px] font-semibold text-[var(--color-primary-text)] uppercase tracking-wider">
+            <Eye className="h-2.5 w-2.5" />
+            {t('Illustrative Preview')}
+          </span>
+        </div>
 
-          return (
-            <motion.div
-              key={card.id}
-              initial={{
-                opacity: 0,
-                y: reduced ? 0 : 24,
-              }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={
-                reduced
-                  ? { duration: 0.01 }
-                  : { duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.3 + i * 0.1 }
-              }
-              style={{
-                position: 'absolute',
-                top: `${t.translateY}px`,
-                left: `${t.translateX}px`,
-                width: '240px',
-                /*
-                 * Explicit width+height prevents layout shift and allows
-                 * will-change to work without reflow.
-                 */
-                zIndex: CARDS.length - i,
-                /*
-                 * The perspective is on the individual card, not the container,
-                 * so each card's depth is self-contained and stacking context
-                 * is preserved for z-index ordering.
-                 */
-                transform: `perspective(900px) rotateX(${t.rotateX}deg) rotateY(${t.rotateY}deg) translateZ(${t.translateZ}px)`,
-                willChange: 'transform',
-                /*
-                 * Float animation wraps the perspective transform so the
-                 * rotation is not disturbed by the float offset.
-                 */
-                animation: reduced
-                  ? 'none'
-                  : `hero3d-float-${i} ${3.6 + i * 0.4}s ease-in-out infinite`,
-                animationDelay: `${i * 0.5}s`,
-              }}
-            >
-              {/* Card shell */}
-              <div
-                style={{
-                  borderRadius: '16px',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-surface)',
-                  padding: '16px',
-                  boxShadow: `
-                    0 1px 2px color-mix(in srgb, var(--color-text) 6%, transparent),
-                    0 ${8 + i * 4}px ${24 + i * 8}px -8px color-mix(in srgb, var(--color-text) ${20 - i * 3}%, transparent)
-                  `,
-                  /*
-                   * Subtle glow behind the front card using the brand primary.
-                   * The glow fades for deeper cards to reinforce the depth cue.
-                   */
-                  ...(i === 0
-                    ? {
-                        boxShadow: `
-                          0 1px 2px color-mix(in srgb, var(--color-text) 6%, transparent),
-                          0 12px 32px -8px color-mix(in srgb, var(--color-text) 18%, transparent),
-                          0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent)
-                        `,
-                      }
-                    : {}),
-                }}
-              >
-                {/* Accent stripe */}
-                <div
-                  aria-hidden="true"
-                  style={{
-                    width: '32px',
-                    height: '3px',
-                    borderRadius: '99px',
-                    background: card.accentVar,
-                    marginBottom: '10px',
-                  }}
-                />
+        <div className="mt-2.5 space-y-2">
+          <div>
+            <div className="text-[10px] font-medium text-[var(--text-secondary)]">
+              {t('Next: System Architecture & APIs')}
+            </div>
+          </div>
 
-                {/* Header */}
-                <div
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: 'var(--color-text)',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  {card.label}
-                </div>
-                <div
-                  style={{
-                    fontSize: '10px',
-                    color: 'var(--color-text-secondary)',
-                    marginTop: '2px',
-                  }}
-                >
-                  {card.sub}
-                </div>
+          <div className="flex items-center justify-between rounded-lg bg-[var(--color-surface-secondary)]/70 px-2.5 py-1.5 text-[10px]">
+            <span className="font-medium text-[var(--text-primary)]">{t('Core Fundamentals')}</span>
+            <span className="inline-flex items-center gap-1 font-semibold text-[var(--color-success-strong)]">
+              <CheckCircle2 className="h-3 w-3" />
+              {t('Verified')}
+            </span>
+          </div>
 
-                {/* Per-card content */}
-                {card.content === 'roadmap' && <RoadmapContent reduced={reduced} />}
-                {card.content === 'skill' && <SkillContent reduced={reduced} />}
-                {card.content === 'jobs' && <JobsContent />}
-                {card.content === 'ai' && <AiContent reduced={reduced} />}
-              </div>
-            </motion.div>
-          );
-        })}
+          <div className="flex items-center justify-between rounded-lg bg-[var(--color-surface-secondary)]/70 px-2.5 py-1.5 text-[10px]">
+            <span className="font-medium text-[var(--text-primary)]">{t('Architecture & APIs')}</span>
+            <span className="font-semibold text-[var(--color-primary-text)]">
+              {t('In Progress')}
+            </span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Card 2: AI Career Intelligence (Floating Bottom-Right) */}
+      <motion.div
+        initial={{ opacity: 0, y: reduced ? 0 : 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={reduced ? { duration: 0.01 } : { duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
+        className="absolute -bottom-6 -right-4 z-20 hidden w-60 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3.5 shadow-xl backdrop-blur-md lg:block xl:-right-6 xl:w-64"
+        style={{
+          boxShadow: '0 12px 32px -8px color-mix(in srgb, var(--color-text) 16%, transparent), 0 0 0 1px color-mix(in srgb, var(--color-ai) 20%, transparent)',
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-ai)] text-white">
+            <Sparkles className="h-3 w-3" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[var(--text-primary)]">
+              {t('Career Intelligence')}
+            </div>
+            <div className="text-[10px] text-[var(--text-secondary)]">
+              {t('Market Skill Benchmark')}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-2 text-[10px] leading-relaxed text-[var(--text-secondary)]">
+          {t('Grounded in verified requirements')}
+        </div>
+
+        <div className="mt-2.5 flex items-center gap-1.5 border-t border-[var(--color-border)]/60 pt-2 text-[10px] font-semibold text-[var(--color-success-strong)]">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+          <span>{t('100% Free & Open Access')}</span>
+        </div>
+      </motion.div>
+
+      {/* ============================================================== */}
+      {/* MOBILE / TABLET INLINE PREVIEW (< lg)                           */}
+      {/* Clean grid directly beneath photograph without any collisions  */}
+      {/* ============================================================== */}
+      <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:hidden">
+        {/* Mobile Item 1 */}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <Route className="h-3.5 w-3.5 text-[var(--color-primary)]" />
+              <span className="text-xs font-bold text-[var(--text-primary)]">{t('Full-Stack Engineer')}</span>
+            </div>
+            <span className="text-[9px] font-semibold text-[var(--color-primary-text)] uppercase">
+              {t('Illustrative Preview')}
+            </span>
+          </div>
+          <div className="mt-1.5 text-[11px] text-[var(--text-secondary)]">
+            {t('Next: System Architecture & APIs')}
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[10px]">
+            <span className="text-[var(--text-primary)]">{t('Core Fundamentals')}</span>
+            <span className="font-semibold text-[var(--color-success-strong)]">{t('Verified')}</span>
+          </div>
+        </div>
+
+        {/* Mobile Item 2 */}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-[var(--color-ai)]" />
+              <span className="text-xs font-bold text-[var(--text-primary)]">{t('Career Intelligence')}</span>
+            </div>
+            <span className="text-[10px] font-semibold text-[var(--color-success-strong)]">
+              {t('100% Free & Open Access')}
+            </span>
+          </div>
+          <div className="mt-1.5 text-[11px] text-[var(--text-secondary)]">
+            {t('Grounded in verified requirements')}
+          </div>
+          <div className="mt-2 text-[10px] text-[var(--text-secondary)]">
+            {t('Market Skill Benchmark')}
+          </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 

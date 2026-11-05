@@ -74,7 +74,7 @@ export const projectsAr: Record<string, string> = {
   'e.g. Remote or Berlin': 'مثال: عن بُعد أو برلين',
   'What employers usually ask for': 'ما تطلبه جهات التوظيف عادةً',
   'Track a role you found': 'تابع وظيفة وجدتها',
-  'Bilingual English &amp; Arabic': 'بالإنجليزية والعربية',
+  'Bilingual English & Arabic': 'بالإنجليزية والعربية',
   'Live demo': 'عرض حي',
   'Verify credential': 'تحقّق من الشهادة',
   'Your Projects': 'مشاريعك',
