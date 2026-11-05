@@ -39,6 +39,7 @@ const SECRET_KEYS = [
   'SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'GEMINI_API_KEY',
+  'OPENROUTER_API_KEY',
   'INDEXNOW_KEY',
   'GA4_PROPERTY_ID',
   'GA4_CLIENT_ID',
@@ -50,7 +51,7 @@ const SECRET_KEYS = [
  * inside the browser bundle — and they are plain text so the build can read
  * them.
  */
-const PLAIN_KEYS = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY'];
+const PLAIN_KEYS = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'OPENROUTER_MODEL'];
 
 function fail(message) {
   console.error(`[pages-env] ${message}`);
