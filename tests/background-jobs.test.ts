@@ -18,7 +18,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { admin, api, apiAnonymous, createTestUser, deleteTestUser, type TestUser } from './helpers.ts';
-import { readMatchJobsVacancies, type BackgroundJob } from '../src/lib/backgroundJobs';
+import { readMatchJobsVacancies, type BackgroundJob } from '../src/lib/backgroundJobs.ts';
 
 let owner: TestUser;
 let stranger: TestUser;
