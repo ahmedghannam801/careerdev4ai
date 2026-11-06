@@ -364,4 +364,47 @@ export const tourAr: Record<string, string> = {
     'لم تقم بتقييم أي مهارات بعد. قيّم كفاءتك لحساب فجواتك بدقة.',
   'Add your first portfolio project to make your CV stand out to recruiters.':
     'أضف مشروعك الأول لمعرض الأعمال لتجعل سيرتك الذاتية مميزة أمام مسؤولي التوظيف.',
+
+  // ---- Per-area coach marks (the short, in-context tours) -----------------
+  'How ready you are':
+    'مدى جاهزيتك',
+  'This is your readiness for the role you picked. It rises as you rate the skills the role actually asks for.':
+    'هذه نسبة جاهزيتك للدور الذي اخترته، وترتفع كلما قيّمت المهارات التي يطلبها هذا الدور فعلياً.',
+  'The single step worth doing today, taken from the top of your gap list.':
+    'الخطوة الوحيدة التي تستحق أن تبدأ بها اليوم، مأخوذة من أعلى قائمة فجواتك.',
+  'Your skill gaps':
+    'فجواتك المهارية',
+  'Every skill the role needs, sorted by how urgent it is. Critical means it is holding you back.':
+    'كل مهارة يحتاجها الدور، مرتبة حسب درجة إلحاحها. حرجة تعني أنها تعيق تقدّمك.',
+  'Your roadmap is built for your role':
+    'خارطة طريقك مبنية على دورك',
+  'The phases come from the role catalogue, and the steps come from the skills you are actually missing.':
+    'المراحل تأتي من دليل الأدوار، والخطوات تأتي من المهارات التي تفتقدها فعلاً.',
+  'One step at a time':
+    'خطوة واحدة في كل مرة',
+  'Every step says which skill it closes, how long it should take, what has to come first, and which course and project to use.':
+    'كل خطوة توضّح أي مهارة تُغلق، وكم تستغرق، وما الذي يجب أن يأتي أولاً، وأي دورة ومشروع تستخدم.',
+  'Why this course':
+    'لماذا هذه الدورة',
+  'Each recommendation explains the gap it closes and the score that put it in your list.':
+    'كل توصية توضّح الفجوة التي تُغلقها والدرجة التي أضافتها إلى قائمتك.',
+  'Projects that prove the skill':
+    'مشاريع تُثبت المهارة',
+  'A project is worth more than a certificate. These are the ones that match the skills you still need.':
+    'المشروع يساوي شهادة أكثر. وهذه هي المشاريع المطابقة للمهارات التي ما زالت تحتاجها.',
+  'Volunteering that counts':
+    'عمل تطوعي يُحتسب',
+  'These are real organisations you can apply to, ordered by how closely they match the skills you still need.':
+    'هذه جهات حقيقية يمكنك التقديم إليها، مرتبة حسب مدى تطابقها مع المهارات التي ما زالت تحتاجها.',
+  'Your CV, built from your data':
+    'سيرتك الذاتية، مبنية من بياناتك',
+  'CareerDev4AI assembles this from the experience, skills, projects, volunteering and courses you have entered. It never invents anything.':
+    'يجمع CareerDev4AI هذه السيرة من خبراتك ومهاراتك ومشاريعك وعملك التطوعي ودوراتك التي أدخلتها. ولا يخترع أي شيء.',
+  'Rate what you can do':
+    'قيّم ما تستطيع فعله',
+  'Your ratings are what make the roadmap, the learning and the volunteer list specific to you.':
+    'تقييماتك هي ما يجعل خارطة الطريق والدورات وقائمة العمل التطوعي مخصصة لك أنت.',
+  'End the tour now. You can start it again from Settings.':
+    'أنهِ الجولة الآن. يمكنك تشغيلها مرة أخرى من الإعدادات.',
+  'Skip Tour': 'تخطي الجولة',
 };

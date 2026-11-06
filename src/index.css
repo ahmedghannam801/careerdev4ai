@@ -11,6 +11,48 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ----------------------------------------------------------------------
+ * Tailwind theme bridge
+ * ----------------------------------------------------------------------
+ * The components in this application are written against semantic colour
+ * names — `bg-surface`, `text-foreground`, `text-muted`, `border-border`,
+ * `bg-primary`, `bg-surface-raised`. Tailwind only generates a utility for
+ * a colour name that exists in the theme, and this project deliberately
+ * keeps a single class-based dark-mode strategy (`.dark` on <html>) with
+ * the palette declared as plain CSS variables in `@layer base`.
+ *
+ * Without this block those classes produced NO CSS AT ALL: a `bg-surface`
+ * panel rendered with no background, `border-border` drew no border, and
+ * `text-foreground` / `text-muted` fell back to the inherited colour. That
+ * is what made floating surfaces (the credits dropdown, the upgrade modal,
+ * the language picker) look transparent and washed out.
+ *
+ * `inline` is required here: the theme variable references the semantic
+ * variable of the same name, and `inline` makes Tailwind put that
+ * reference straight into the utility instead of resolving it once at
+ * build time. The utility therefore stays dynamic and follows the
+ * `.dark` override at runtime.
+ *
+ * The declarations themselves live in `@layer base` (below), which is
+ * ordered AFTER Tailwind's own `@layer theme`, so the palette in
+ * `@layer base` always wins over anything the theme layer emits.
+ */
+@theme inline {
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-secondary: var(--color-surface-secondary);
+  --color-surface-elevated: var(--color-surface-elevated);
+  --color-surface-raised: var(--color-surface-elevated-alt);
+  --color-foreground: var(--color-text);
+  --color-muted: var(--color-text-muted);
+  --color-border: var(--color-border);
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-surface: var(--color-accent-surface);
+  --color-card: var(--color-surface);
+  --color-ai: var(--color-ai);
+}
+
 @layer base {
   :root {
     color-scheme: light;
@@ -33,6 +75,25 @@
     --color-accent: #D9A49A;
     --color-accent-strong: #95594E;
     --color-accent-surface: #FBEFEC;
+
+    /* ------------------------------------------------------------------
+     * Surfaces and aliases referenced by the components.
+     *
+     * These names are used directly through `var(--name)` in the views
+     * (the admin panels, the background-jobs status chips, the guided
+     * tour, the hero badge). They were referenced but never declared, so
+     * every one of them resolved to an invalid value: the chip and the
+     * panel lost their background and the text lost its colour.
+     * ---------------------------------------------------------------- */
+    --color-primary-surface: #F8EBE7;
+    --color-error: #B3261E;
+    --color-text-primary: #282B29;
+    --success-strong: #4F6B49;
+    --success-surface: #DDE6D5;
+    --danger-surface: #FBEAE8;
+    --text-warning: #8A5A0F;
+    --surface-raised: #FAF7F1;
+    --bg-subtle: #F2EEE7;
 
     --color-success: #DDE6D5;
     --color-success-strong: #4F6B49;
@@ -127,6 +188,17 @@
     --color-accent: #D9A49A;
     --color-accent-strong: #E3B4AA;
     --color-accent-surface: #2C1F1C;
+
+    /* The dark counterparts of the surfaces and aliases above. */
+    --color-primary-surface: #2C1F1C;
+    --color-error: #F08C82;
+    --color-text-primary: #F5F0E8;
+    --success-strong: #A8C5A0;
+    --success-surface: #2C3829;
+    --danger-surface: #3A2320;
+    --text-warning: #F0B872;
+    --surface-raised: #303531;
+    --bg-subtle: #222623;
 
     --color-success: #A8C5A0;
     --color-success-strong: #A8C5A0;

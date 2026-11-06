@@ -610,7 +610,7 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="space-y-4 text-xs">
-            <AiLanguageSelector variant="card" />
+            <AiLanguageSelector />
 
             <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] flex items-center justify-between">
               <div>

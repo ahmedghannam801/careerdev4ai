@@ -57,6 +57,10 @@ import { trackEvent } from '../lib/analytics';
 import { apiUrl } from '../lib/native';
 import { planPersonalImport } from '../../shared/cvImport';
 import { mergeCanonicalCvDocument } from '../../shared/cvProjection';
+import {
+  DEFAULT_RESUME_LANGUAGE,
+  normalizeResumeLanguage,
+} from '../../shared/resumeLanguage';
 import type { CvSourceData } from '../../shared/cvDocument';
 import {
   isAtsAnalysisForRole,
@@ -180,6 +184,10 @@ import {
   type PreferencesDTO,
 } from '../lib/preferencesApi';
 import { fetchBookmarks, createBookmark, deleteBookmark } from '../lib/bookmarksApi';
+import {
+  reorderProfileCollection,
+  type OrderedCollection,
+} from '../lib/profileOrderApi';
 import {
   fetchLearningCatalog,
   fetchLearningItems,
@@ -341,6 +349,13 @@ interface CareerContextType {
   // Profile & Persona
   profile: UserProfile;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  /**
+   * Stores the order of one of the collections that appear on a CV.
+   *
+   * The order is part of the document, so it is written to the server next to
+   * the entries themselves rather than kept in the browser.
+   */
+  reorderCvCollection: (collection: OrderedCollection, ids: string[]) => Promise<void>;
   setCareerState: (state: CareerState) => Promise<void>;
   setCareerGoal: (goal: CareerGoal, customText?: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -1335,6 +1350,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               ...prev,
               theme: (record.theme as UserSettings['theme']) ?? prev.theme,
               language: (record.language as UserSettings['language']) ?? prev.language,
+              // The resume language is the account's, not the browser's. It
+              // is the language the CV is written in, and it is deliberately
+              // not the interface language.
+              resumeLanguage: normalizeResumeLanguage(record.resumeLanguage),
             }));
           })
           .catch(() => {
@@ -2117,7 +2136,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           skills: skills.map(s => s.name),
           projects: projects.map(p => ({ title: p.title, description: p.description, skills: p.skills })),
           tone,
-          language: aiPreferences.preferredLanguage
+          // The cover letter is a document the candidate sends alongside
+          // the CV, so it is written in the language the CV is written in
+          // rather than in the language the assistant happens to answer in.
+          language: settings.resumeLanguage
         }),
         signal
       });
@@ -2497,11 +2519,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [skills, targetRole, cvVersions, bookmarkedJobIds, applications]);
   const [settings, setSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem('careerpilot_settings');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    return {
+    // The defaults are spread UNDER the saved value so a setting added in a
+    // later version of the product is present even in a browser that stored
+    // an older shape. The resume language is normalised for the same reason:
+    // a value written by an earlier build, or by hand, must never leave the
+    // studio with a language it cannot render.
+    const defaults: UserSettings = {
       language: 'en',
+      resumeLanguage: DEFAULT_RESUME_LANGUAGE,
       theme: 'light',
       emailAlerts: true,
       roadmapReminders: true,
@@ -2509,6 +2534,17 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       weeklyProgressSummary: true,
       allowAiContextLearning: true,
     };
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as Partial<UserSettings>;
+        return {
+          ...defaults,
+          ...parsed,
+          resumeLanguage: normalizeResumeLanguage(parsed.resumeLanguage),
+        };
+      } catch {}
+    }
+    return defaults;
   });
 
   // Apply theme & RTL direction
@@ -3400,6 +3436,47 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } = updates;
     setProfile(prev => ({ ...prev, ...localOnly }));
   };
+
+  /**
+   * Stores the order of one of the collections that appear on a CV.
+   *
+   * The order is part of the document, so it lives on the server next to the
+   * entries themselves. The local list is put into the order the server
+   * actually stored, so a row that was created in another session — and that
+   * the client did not know about — keeps its place instead of appearing in
+   * a different position than the one the server will show next time.
+   */
+  const reorderCvCollection = useCallback(
+    async (collection: OrderedCollection, ids: string[]): Promise<void> => {
+      const stored = await reorderProfileCollection(collection, ids);
+      const byId = new Map(stored.map((id, index) => [id, index]));
+      const sortByStoredOrder = <T extends { id: string }>(items: T[]): T[] =>
+        [...items].sort(
+          (left, right) =>
+            (byId.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+            (byId.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+        );
+
+      if (collection === 'experiences') {
+        setProfile((prev) => ({ ...prev, experiences: sortByStoredOrder(prev.experiences) }));
+        return;
+      }
+      if (collection === 'educations') {
+        setProfile((prev) => ({ ...prev, education: sortByStoredOrder(prev.education) }));
+        return;
+      }
+      if (collection === 'certifications') {
+        setProfile((prev) => ({ ...prev, certifications: sortByStoredOrder(prev.certifications) }));
+        return;
+      }
+      if (collection === 'languages') {
+        setProfile((prev) => ({ ...prev, languages: sortByStoredOrder(prev.languages) }));
+        return;
+      }
+      setProjects((prev) => sortByStoredOrder(prev));
+    },
+    []
+  );
 
   /**
    * Reconciles the local experience list with the server.
@@ -5243,13 +5320,18 @@ Skills: ${activeCV.skillsList.join(', ')}
 
   const updateSettings = (updates: Partial<UserSettings>) => {
     setSettings(prev => ({ ...prev, ...updates }));
-    // The theme and the interface language belong to the ACCOUNT, so they
-    // follow the user to another device. The remaining settings (the
-    // reminder toggles, the AI personalisation controls) are per-device UI
-    // preferences and deliberately stay in local state.
+    // The theme, the interface language and the resume language belong to the
+    // ACCOUNT, so they follow the user to another device. The remaining
+    // settings (the reminder toggles, the AI personalisation controls) are
+    // per-device UI preferences and deliberately stay in local state.
     const accountOwned: Partial<PreferencesDTO> = {};
     if (updates.theme !== undefined) accountOwned.theme = updates.theme;
     if (updates.language !== undefined) accountOwned.language = updates.language;
+    // The resume language is written separately from the interface language
+    // so that changing one can never move the other.
+    if (updates.resumeLanguage !== undefined) {
+      accountOwned.resumeLanguage = normalizeResumeLanguage(updates.resumeLanguage);
+    }
     // Only an account can own a preference. A visitor who is browsing the
     // landing page before signing up still gets the change immediately — the
     // local state above is updated either way — but there is no account to
@@ -5396,6 +5478,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         dismissPasswordRecovery,
         profile,
         updateProfile,
+        reorderCvCollection,
         setCareerState,
         setCareerGoal,
         completeOnboarding,

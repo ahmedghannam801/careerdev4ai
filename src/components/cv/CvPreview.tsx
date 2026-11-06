@@ -19,12 +19,27 @@
 
 import React from 'react';
 import type { CVProfile } from '../../types/career';
+import {
+  resumeDirection,
+  resumeSectionHeading,
+  type ResumeLanguage,
+} from '../../../shared/resumeLanguage';
 
 interface CvPreviewProps {
   cv: CVProfile;
+  /**
+   * The language the CV is written in.
+   *
+   * It decides the section headings printed on the paper and the direction
+   * the paper is laid out in. It is deliberately not the interface language:
+   * a candidate can work in an Arabic interface and print an English CV.
+   */
+  language?: ResumeLanguage;
 }
 
-export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
+export const CvPreview: React.FC<CvPreviewProps> = ({ cv, language = 'en' }) => {
+  const heading = (section: string) => resumeSectionHeading(language, section);
+  const direction = resumeDirection(language);
   const links = (cv.links ?? []).filter((link) => link.enabled && link.url.trim());
   const volunteering = cv.volunteering ?? [];
   const courses = cv.courses ?? [];
@@ -37,6 +52,8 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
   return (
     <div
       data-cv-print
+      dir={direction}
+      lang={language}
       className="p-8 sm:p-12 rounded-2xl bg-white border border-[var(--border-subtle)] shadow-md text-slate-900 font-sans space-y-6"
     >
       {/* Paper header */}
@@ -78,7 +95,7 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
       {cv.summary.trim() && (
         <section className="space-y-1.5">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-            Professional Summary
+            {heading('summary')}
           </h3>
           <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{cv.summary}</p>
         </section>
@@ -88,7 +105,7 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
       {cv.experiences.length > 0 && (
         <section className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-            Work Experience
+            {heading('experience')}
           </h3>
           <div className="space-y-3">
             {cv.experiences.map((exp) => (
@@ -119,7 +136,7 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
       {volunteering.length > 0 && (
         <section className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-            Volunteering
+            {heading('volunteering')}
           </h3>
           {volunteering.map((entry) => (
             <div key={entry.id} className="space-y-1 text-xs">
@@ -148,7 +165,7 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
       {cv.projects.length > 0 && (
         <section className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-            Projects
+            {heading('projects')}
           </h3>
           {cv.projects.map((project) => (
             <div key={project.id} className="space-y-1 text-xs">
@@ -179,7 +196,7 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
       {cv.education.length > 0 && (
         <section className="space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-            Education
+            {heading('education')}
           </h3>
           {cv.education.map((edu) => {
             // A field of study recorded as a full stop is a typo in the
@@ -213,7 +230,7 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
       {cv.skillsList.length > 0 && (
         <section className="space-y-1.5">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-            Core Skills & Technologies
+            {heading('skills')}
           </h3>
           <div className="text-xs text-slate-700">{cv.skillsList.join(' · ')}</div>
         </section>
@@ -223,7 +240,7 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
       {certificationDetails.length > 0 && (
         <section className="space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-            Certifications
+            {heading('certifications')}
           </h3>
           <ul className="space-y-1">
             {certificationDetails.map((entry, index) => (
@@ -243,7 +260,7 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv }) => {
       {courses.length > 0 && (
         <section className="space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
-            Completed Courses
+            {heading('courses')}
           </h3>
           <ul className="space-y-1">
             {courses.map((course) => (

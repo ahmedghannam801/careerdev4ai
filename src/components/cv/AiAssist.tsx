@@ -23,13 +23,15 @@
  * already good.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Check, Loader2, Sparkles, X } from 'lucide-react';
 import { assistCvField } from '../../lib/cvAssistApi';
 import { useCareer } from '../../context/CareerContext';
 import {
   CV_ASSIST_LENGTHS,
   CV_ASSIST_TONES,
+  cvAssistActionsFor,
+  type CvAssistAction,
   type CvAssistField,
   type CvAssistLength,
   type CvAssistSourceKind,
@@ -88,6 +90,23 @@ const LENGTH_LABELS: Record<CvAssistLength, string> = {
   long: 'Long',
 };
 
+/**
+ * The label for each action.
+ *
+ * Kept here beside the field labels so the control and the contract can
+ * never drift apart.
+ */
+const ACTION_LABELS: Record<CvAssistAction, string> = {
+  write: 'Write it for me',
+  improve: 'Improve what I wrote',
+  shorten: 'Make it shorter',
+  expand: 'Add more detail',
+  bullets: 'Turn it into bullet points',
+  achievements: 'Suggest achievements',
+  responsibilities: 'Suggest responsibilities',
+  keywords: 'Suggest relevant skills',
+};
+
 export const AiAssist: React.FC<AiAssistProps> = ({
   field,
   sourceKind,
@@ -99,7 +118,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
   label,
   disabledReason,
 }) => {
-  const { t, aiPreferences, privacyPreferences } = useCareer();
+  const { t, aiPreferences, privacyPreferences, settings } = useCareer();
   const enabled = aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -110,6 +129,10 @@ export const AiAssist: React.FC<AiAssistProps> = ({
   const [groundingNote, setGroundingNote] = useState<string | null>(null);
   const [tone, setTone] = useState<CvAssistTone>('professional');
   const [length, setLength] = useState<CvAssistLength>('medium');
+  // The actions that make sense for this field. A certificate has no
+  // achievements to suggest, so the control never offers one.
+  const actions = useMemo(() => cvAssistActionsFor(field), [field]);
+  const [action, setAction] = useState<CvAssistAction>('write');
   const attemptRef = useRef(0);
   // The request that is currently in flight, so closing the panel really
   // stops it instead of only hiding the answer.
@@ -127,6 +150,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
       try {
         const response = await assistCvField({
           field,
+          action,
           sourceKind,
           sourceId,
           context,
@@ -134,7 +158,11 @@ export const AiAssist: React.FC<AiAssistProps> = ({
           targetRoleTitle,
           tone,
           length,
-          language: aiPreferences.preferredLanguage,
+          // The CV is written in the resume language, so the text the
+          // assistant produces for it is written in that language too. The
+          // AI response language is a separate setting and does not apply
+          // here.
+          language: settings.resumeLanguage,
           attempt,
         }, { signal: controller.signal });
         // A late answer from a request the candidate already replaced or
@@ -165,6 +193,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
     },
     [
       field,
+      action,
       sourceKind,
       sourceId,
       context,
@@ -172,7 +201,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
       targetRoleTitle,
       tone,
       length,
-      aiPreferences.preferredLanguage,
+      settings.resumeLanguage,
       t,
     ]
   );
@@ -237,6 +266,37 @@ export const AiAssist: React.FC<AiAssistProps> = ({
 
       {isOpen && (
         <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-3">
+          {/* What the candidate is asking for. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
+              {t('AI Suggestions')}
+            </span>
+            {actions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => {
+                  setAction(option);
+                  // The answer changes with the action, so the old one is
+                  // discarded rather than left on screen next to the new
+                  // question.
+                  setDraft('');
+                  setDraftBullets([]);
+                  setGroundingNote(null);
+                  attemptRef.current = 0;
+                  void run(0);
+                }}
+                className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors ${
+                  option === action
+                    ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+                    : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {t(ACTION_LABELS[option])}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
               <span>{t('Tone')}</span>

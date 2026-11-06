@@ -126,6 +126,11 @@ import { PRIVACY_VERSION, TERMS_VERSION } from './shared/legal.ts';
 import { hasServerTermsApproval } from './server/legal.ts';
 import { resolveTargetRoleWrite } from './server/targetRole.ts';
 import { getPreferences, upsertPreferences } from './server/db/preferences.ts';
+import { isOrderedCollection, reorderCollection } from './server/db/ordering.ts';
+import {
+  isResumeLanguage,
+  normalizeResumeLanguage,
+} from './shared/resumeLanguage.ts';
 import {
   getFeedbackState,
   recordFeedbackEvent,
@@ -221,6 +226,7 @@ import {
   type CvAssistRequest,
 } from './server/cv/aiAssist.ts';
 import {
+  isCvAssistAction,
   isCvAssistField,
   isCvAssistLength,
   isCvAssistSourceKind,
@@ -945,6 +951,35 @@ app.post('/api/state', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error writing state:', error);
     return res.status(500).json({ error: 'Failed to persist state' });
+  }
+});
+
+// ---- The order of the CV entries ----
+//
+// The order of the experience, the education, the certifications, the
+// languages and the projects is part of the document, so it is stored rather
+// than re-derived from a date on every read.
+//
+// The collection is chosen from a fixed list on the server, the owner is
+// always the verified user id, and the whole collection is renumbered so the
+// stored order is always complete.
+app.post('/api/profile/reorder', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    if (!isOrderedCollection(body.collection)) {
+      return res.status(400).json({ error: 'Invalid collection' });
+    }
+    if (!Array.isArray(body.ids)) {
+      return res.status(400).json({ error: 'Invalid ids' });
+    }
+    const ids = body.ids
+      .filter((id: unknown): id is string => typeof id === 'string')
+      .slice(0, 500);
+    const order = await reorderCollection(req.authUser!.id, body.collection, ids);
+    return res.json({ success: true, collection: body.collection, order });
+  } catch (error) {
+    console.error('Failed to reorder the collection:', error);
+    return res.status(500).json({ error: 'Failed to reorder the collection' });
   }
 });
 
@@ -2448,6 +2483,7 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, requireEntitlement('cv.b
 
     const request: CvAssistRequest = {
       field,
+      action: isCvAssistAction(body.action) ? body.action : undefined,
       sourceKind,
       sourceId,
       context: str(body.context, 1200) ?? undefined,
@@ -5407,9 +5443,14 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
 
 // ---- Preferences (the settings that belong to the ACCOUNT) ----
 //
-// public.user_preferences holds the three settings that belong to the account
-// rather than to the browser: the theme, the interface language and the
-// notification switch. They follow the user to another device.
+// public.user_preferences holds the four settings that belong to the account
+// rather than to the browser: the theme, the interface language, the resume
+// language and the notification switch. They follow the user to another
+// device.
+//
+// The interface language and the resume language are separate on purpose. The
+// interface language decides what the product says; the resume language
+// decides what the CV says, and it must never move the interface.
 //
 // The remaining settings in the interface (the reminder toggles, the AI
 // personalisation controls) are per-device UI preferences and deliberately
@@ -5423,6 +5464,7 @@ app.get('/api/preferences', requireAuth, async (req: Request, res: Response) => 
         ? {
             theme: preferences.theme,
             language: preferences.language,
+            resumeLanguage: normalizeResumeLanguage(preferences.resume_language),
             notificationsEnabled: preferences.notifications_enabled,
           }
         : null,
@@ -5436,7 +5478,12 @@ app.get('/api/preferences', requireAuth, async (req: Request, res: Response) => 
 app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
-    const updates: { theme?: string; language?: string; notifications_enabled?: boolean } = {};
+    const updates: {
+      theme?: string;
+      language?: string;
+      resume_language?: string;
+      notifications_enabled?: boolean;
+    } = {};
 
     if (body.theme !== undefined) {
       const theme = str(body.theme, 20);
@@ -5451,6 +5498,14 @@ app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) =
         return res.status(400).json({ error: 'Invalid language' });
       }
       updates.language = language;
+    }
+    // The resume language is validated against the shared vocabulary rather
+    // than against a list written out here, so the two cannot drift apart.
+    if (body.resumeLanguage !== undefined) {
+      if (!isResumeLanguage(body.resumeLanguage)) {
+        return res.status(400).json({ error: 'Invalid resume language' });
+      }
+      updates.resume_language = body.resumeLanguage;
     }
     if (body.notificationsEnabled !== undefined) {
       if (typeof body.notificationsEnabled !== 'boolean') {
@@ -5468,6 +5523,7 @@ app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) =
       preferences: {
         theme: saved.theme,
         language: saved.language,
+        resumeLanguage: normalizeResumeLanguage(saved.resume_language),
         notificationsEnabled: saved.notifications_enabled,
       },
     });

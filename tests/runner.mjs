@@ -302,6 +302,17 @@ async function main() {
     // platform's records. Pure, like the two above: no database needed.
     join(TESTS_DIR, 'cv-studio.test.ts'),
     join(TESTS_DIR, 'cv-preview.test.ts'),
+    // The studio's own data: the resume language and its separation from the
+    // interface language, the AI actions offered on each section, the order
+    // of the entries on the document, and the placement of the tour's
+    // instruction card. Pure.
+    join(TESTS_DIR, 'resume-language.test.ts'),
+    join(TESTS_DIR, 'cv-assist-actions.test.ts'),
+    join(TESTS_DIR, 'cv-studio-data.test.ts'),
+    // The same, against the live database: the resume language is stored on
+    // the account and refused when it is a language the studio cannot
+    // render, and the order of the entries survives a reload.
+    join(TESTS_DIR, 'cv-studio-persistence.test.ts'),
     // The document the CV studio shows is a projection of the platform's
     // records, so a change to a record reaches the CV on its own. Pure.
     join(TESTS_DIR, 'cv-projection.test.ts'),

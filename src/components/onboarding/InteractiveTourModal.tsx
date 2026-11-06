@@ -24,6 +24,7 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { TOUR_CHAPTERS, TOTAL_TOUR_STEPS } from './tourData';
 import { dismissGuide, resetAllGuidesApi } from '../../lib/personalizationApi';
+import { placeTooltip } from './useSpotlight';
 
 const STORAGE_KEY = 'careerdev4ai_product_tour_state';
 
@@ -110,6 +111,23 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
   const [chapterDrawerOpen, setChapterDrawerOpen] = useState(false);
   const [position, setPosition] = useState<SpotlightPosition | null>(null);
   const [targetMissing, setTargetMissing] = useState(false);
+
+  // The viewport size, kept live. The card is placed against it, and a
+  // window that is resized while the tour is open has to move the card
+  // rather than leave it hanging off the screen.
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window === 'undefined' ? 1280 : window.innerWidth,
+    height: typeof window === 'undefined' ? 800 : window.innerHeight,
+  }));
+  const viewportWidth = viewport.width;
+  const viewportHeight = viewport.height;
+
+  useEffect(() => {
+    const onResize = () =>
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Sync state changes to storage
   useEffect(() => {
@@ -252,10 +270,6 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
     }
   }, [stepIndex, currentChapterIndex]);
 
-  const handleSkipStep = useCallback(() => {
-    handleNextStep();
-  }, [handleNextStep]);
-
   const handleSkipChapter = useCallback(() => {
     if (currentChapterIndex < TOUR_CHAPTERS.length - 1) {
       const nextChap = TOUR_CHAPTERS[currentChapterIndex + 1];
@@ -320,34 +334,31 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Popover positioning logic
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  // Popover positioning logic.
+  //
+  // The card is never allowed to sit on top of the element the step is
+  // describing: `placeTooltip` tries every side and rejects any placement
+  // that would overlap the target. On a phone the card becomes a sheet at
+  // the bottom of the screen, which is the only place it can go without
+  // covering the subject.
+  const isMobile = viewportWidth < 768;
   const cardWidth = 380;
-  const cardHeight = 260;
+  const cardHeight = 300;
   const margin = 16;
 
-  let cardTop = 100;
-  let cardLeft = margin;
+  const placement = placeTooltip({
+    rect: position && !targetMissing ? position : null,
+    cardWidth,
+    cardHeight,
+    margin,
+    gap: 12,
+    viewportWidth,
+    viewportHeight,
+    isRtl,
+  });
 
-  if (position && !isMobile) {
-    const spaceBelow = window.innerHeight - position.top - position.height;
-    const placeBelow = spaceBelow > cardHeight + margin;
-    cardTop = placeBelow
-      ? position.top + position.height + margin
-      : Math.max(margin, position.top - cardHeight - margin);
-
-    const rawLeft = isRtl
-      ? position.left + position.width - cardWidth
-      : position.left;
-    cardLeft = Math.min(
-      Math.max(margin, rawLeft),
-      Math.max(margin, window.innerWidth - cardWidth - margin)
-    );
-  } else if (!isMobile) {
-    // Centered fallback if element not yet on screen
-    cardTop = Math.max(margin, (window.innerHeight - cardHeight) / 2);
-    cardLeft = Math.max(margin, (window.innerWidth - cardWidth) / 2);
-  }
+  const cardTop = placement.top;
+  const cardLeft = placement.left;
 
   const IconComponent = CHAPTER_ICONS[currentChapter.icon] || Sparkles;
   const isLastStepOfChapter = stepIndex === steps.length - 1;
@@ -374,9 +385,23 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
       aria-modal="true"
       aria-label={t('Interactive Product Tour')}
     >
-      {/* Dark overlay backdrop */}
+      {/*
+        The backdrop.
+
+        When the step has a target, the dimming is drawn by the spotlight
+        below as a RING, so the element the instruction is talking about stays
+        fully visible. Painting a full-screen scrim here as well would put a
+        dark veil over that element — the one thing the candidate is being
+        asked to look at — and the spotlight ring underneath it could not
+        undo it.
+
+        So the backdrop is transparent while a spotlight is showing, and it
+        only dims the page when the step has nothing to point at.
+      */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
+        className={`absolute inset-0 transition-opacity duration-300 ${
+          position && !targetMissing ? 'bg-transparent' : 'bg-black/60'
+        }`}
         onClick={handleExit}
         aria-hidden="true"
       />
@@ -390,7 +415,9 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
             left: position.left - 6,
             width: position.width + 12,
             height: position.height + 12,
-            boxShadow: '0 0 0 9999px rgba(8, 11, 18, 0.75), 0 0 24px var(--color-primary)',
+            // The ring is the dimming. The element's own box is left
+            // uncovered, so it is the brightest thing on the screen.
+            boxShadow: '0 0 0 9999px rgba(8, 11, 18, 0.68), 0 0 24px var(--color-primary)',
           }}
           aria-hidden="true"
         />
@@ -504,10 +531,11 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
 
             <button
               type="button"
-              onClick={handleSkipStep}
+              onClick={handleExit}
               className="text-[11px] text-[var(--text-muted)] underline-offset-2 hover:underline hover:text-[var(--text-primary)] px-1"
+              title={t('End the tour now. You can start it again from Settings.')}
             >
-              {t('Skip Step')}
+              {t('Skip Tour')}
             </button>
           </div>
 

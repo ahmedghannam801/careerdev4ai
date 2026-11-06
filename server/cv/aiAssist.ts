@@ -22,11 +22,14 @@
  */
 
 import {
+  CV_ASSIST_ACTIONS,
   CV_ASSIST_FIELDS,
   cvAssistBulletBudget,
   cvAssistVariationHint,
   cvAssistWordBudget,
   CV_ASSIST_TONE_INSTRUCTIONS,
+  resolveCvAssistAction,
+  type CvAssistAction,
   type CvAssistField,
   type CvAssistLength,
   type CvAssistSourceKind,
@@ -83,6 +86,14 @@ const MAX_EXISTING_CHARS = 4000;
 export interface CvAssistRequest {
   /** Which CV field is being written. */
   field: CvAssistField;
+  /**
+   * What the candidate asked for: a fresh write, an improvement of what they
+   * already wrote, bullet points, the achievements of a role, and so on.
+   *
+   * An action that does not apply to the field falls back to a plain write,
+   * so a request can never ask for something the field cannot produce.
+   */
+  action?: CvAssistAction;
   /** The record the field belongs to, when it belongs to one. */
   sourceKind?: CvAssistSourceKind;
   /** The id of that record. */
@@ -251,10 +262,17 @@ export function buildCvAssistPrompt(input: {
   const words = cvAssistWordBudget(request.field, length);
   const bullets = cvAssistBulletBudget(length);
   const variation = cvAssistVariationHint(request.attempt ?? 0);
+  const action = resolveCvAssistAction(request.field, request.action);
 
   const parts: string[] = [];
 
   parts.push('You are writing ONE section of a CV for the candidate below.');
+  parts.push('');
+
+  // What was asked for comes before what the field is. "Write the bullet
+  // points for one role" and "suggest the achievements of this role" are
+  // the same field and very different jobs.
+  parts.push(CV_ASSIST_ACTIONS[action].instruction);
   parts.push('');
   parts.push(spec.instruction);
 

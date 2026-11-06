@@ -10,6 +10,7 @@ export type { SkillCategory, TargetRole, RoleSkill } from '../../shared/careerTy
 
 import type { SkillCategory, TargetRole } from '../../shared/careerTypes.ts';
 import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
+import type { ResumeLanguage } from '../../shared/resumeLanguage.ts';
 
 export type CareerState = 
   | 'student' 
@@ -529,6 +530,14 @@ export interface UserNotification {
 
 export interface UserSettings {
   language: 'en' | 'ar';
+  /**
+   * The language the CV is written in.
+   *
+   * This is deliberately NOT the same as `language`, which is the interface
+   * language. A candidate can work in an Arabic interface and write their CV
+   * in English; changing one must never change the other.
+   */
+  resumeLanguage: ResumeLanguage;
   theme: 'light' | 'dark';
   emailAlerts: boolean;
   roadmapReminders: boolean;

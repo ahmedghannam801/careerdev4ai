@@ -7,6 +7,9 @@ export interface PreferencesRow {
   user_id: string;
   theme: string | null;
   language: string | null;
+  // The language the CV is written in. Independent of `language`, which is
+  // the interface language. See shared/resumeLanguage.ts.
+  resume_language: string | null;
   notifications_enabled: boolean | null;
   // Feedback invitation state. It lives here rather than in its own table so
   // the existing owner-only row-level security covers it without a new
@@ -22,7 +25,10 @@ export interface PreferencesRow {
 }
 
 export type PreferencesUpdate = Partial<
-  Pick<PreferencesRow, 'theme' | 'language' | 'notifications_enabled'>
+  Pick<
+    PreferencesRow,
+    'theme' | 'language' | 'resume_language' | 'notifications_enabled'
+  >
 >;
 
 /** The subset of `user_preferences` the feedback policy owns. */

@@ -499,6 +499,7 @@ function GuidedTourHost({ currentView }: { currentView: string }) {
         done: t('Done'),
         close: t('Close'),
         step: t('Step'),
+        skip: t('Skip tour'),
       }}
     />
   );

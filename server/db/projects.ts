@@ -183,6 +183,10 @@ export async function listProjects(profileId: string): Promise<ProjectDTO[]> {
     .from('projects')
     .select(SELECT_COLUMNS)
     .eq('profile_id', profileId)
+    // The candidate's order comes first. The creation time is only the
+    // tiebreak, so rows that have never been reordered keep the order they
+    // always had.
+    .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false });
   if (error) throw error;
   const rows = (data ?? []) as ProjectRow[];

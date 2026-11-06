@@ -8,6 +8,7 @@
 
 import { apiRequest } from './apiClient';
 import type {
+  CvAssistAction,
   CvAssistField,
   CvAssistLength,
   CvAssistSourceKind,
@@ -29,6 +30,12 @@ export interface CvAssistPayload {
 
 export interface CvAssistRequestBody {
   field: CvAssistField;
+  /**
+   * What was asked for: a fresh write, an improvement, bullet points, the
+   * achievements of a role, and so on. The server falls back to a plain write
+   * when the action does not apply to the field.
+   */
+  action?: CvAssistAction;
   sourceKind?: CvAssistSourceKind;
   sourceId?: string;
   context?: string;

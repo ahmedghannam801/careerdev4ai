@@ -20,6 +20,8 @@ import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
+import { CvDataManager } from '../cv/studio/CvDataManager';
+import { ResumeLanguagePicker } from '../cv/studio/ResumeLanguagePicker';
 import { CareerImage } from '../ui/CareerImage';
 
 export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
@@ -42,6 +44,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
     volunteerExperiences,
     learningItems,
     learningCatalog,
+    settings,
     t } = useCareer();
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
@@ -169,7 +172,6 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
             <Upload className="w-3.5 h-3.5" />
             <span>{t('Import / Paste')}</span>
           </button>
-
           <button
             onClick={handleRunAtsAudit}
             disabled={isOptimizingCV || !aiWritingEnabled}
@@ -198,6 +200,12 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           )}
         </div>
       </div>
+
+      {/* The language of the document.
+          It is a studio setting, not a header one: the language the CV is
+          written in is a property of the CV, and the interface language is a
+          separate setting that this must never move. */}
+      <ResumeLanguagePicker />
 
       {/* The background jobs of this candidate. The list is read back from the
           server, so a CV that finished while the tab was closed is still
@@ -247,6 +255,17 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           {t('Document Editor & Preview')}
         </button>
         <button
+          data-tour="cv-data-tab"
+          onClick={() => setActiveTab('data')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            activeTab === 'data'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          {t('My Data')}
+        </button>
+        <button
           data-tour="cv-tailor-tab"
           onClick={() => setActiveTab('job')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -292,6 +311,9 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         </button>
       </div>
 
+      {/* TAB 0: THE RECORDS THE CV IS BUILT FROM */}
+      {activeTab === 'data' && <CvDataManager />}
+
       {/* TAB 0: THE CV ASSEMBLED FROM THE USER'S OWN RECORDS */}
       {activeTab === 'built' && <BuiltCvPanel />}
 
@@ -336,7 +358,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
           {/* Right Clean Paper Preview (7 cols) */}
           <div className="lg:col-span-7">
-            <CvPreview cv={activeCV} />
+            <CvPreview cv={activeCV} language={settings.resumeLanguage} />
           </div>
         </div>
       )}

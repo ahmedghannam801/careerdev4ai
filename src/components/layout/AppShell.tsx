@@ -34,7 +34,6 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { useFeedback } from '../../context/FeedbackContext';
 import { FEEDBACK_FORM_URL } from '../../../shared/feedback';
-import { AiLanguageSelector } from '../ui/AiLanguageSelector';
 import { Logo } from '../brand/Logo';
 import { backdropVariants, drawerLeftVariants, drawerVariants } from '../../lib/motion';
 import { useRouteParam } from '../../lib/useRouteParams';
@@ -375,9 +374,12 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 <span className="hidden lg:inline font-mono text-[10px] bg-[var(--surface-main)] px-1 rounded border border-[var(--border-subtle)]">⌘K</span>
               </button>
 
-              {/* Language & theme stay in the header from tablet width; phones use the drawer. */}
+              {/* The interface language and the theme stay in the header from
+                  tablet width; phones use the drawer. The AI response language
+                  is a settings-level preference and is NOT a header control —
+                  it was previously rendered here and read as if it chose the
+                  language of the CV. */}
               <div className="hidden items-center gap-2 md:flex">
-                <AiLanguageSelector />
                 {languageToggle}
                 {themeToggle}
               </div>
@@ -610,7 +612,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                   {themeToggle}
                 </div>
               </div>
-              <AiLanguageSelector />
               <button
                 onClick={() => { openCopilot(); setMobileMenuOpen(false); }}
                 className="w-full min-h-11 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2"

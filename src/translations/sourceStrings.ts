@@ -39,6 +39,7 @@ import { settingsAr } from './parts/settings.ts';
 import { skillsAr } from './parts/skills.ts';
 import { volunteerAr } from './parts/volunteer.ts';
 import { tourAr } from './parts/tour.ts';
+import { cvStudioDataAr } from './parts/cvStudioData.ts';
 import { subscriptionsAr } from './parts/subscriptions.ts';
 
 /** The Arabic catalogue, keyed by the English source string. */
@@ -66,6 +67,7 @@ export const AR_STRINGS: Record<string, string> = {
   ...profileAr,
   ...settingsAr,
   ...tourAr,
+  ...cvStudioDataAr,
   ...subscriptionsAr,
 };
 

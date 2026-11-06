@@ -170,8 +170,22 @@ export function resolveRouteId(hash: string, fallback: string): string {
  * leaving the page in a state the view does not understand.
  */
 
-/** The tabs of the CV studio. */
-export const CV_STUDIO_TABS = ['editor', 'job', 'ats', 'versions', 'built'] as const;
+/**
+ * The tabs of the CV studio.
+ *
+ * `data` is the tab where the candidate manages the records the CV is built
+ * from — the experience, the education, the projects, the certificates, the
+ * skills and the languages — so that they never have to leave the studio to
+ * change them.
+ */
+export const CV_STUDIO_TABS = [
+  'editor',
+  'data',
+  'job',
+  'ats',
+  'versions',
+  'built',
+] as const;
 export type CvStudioTab = (typeof CV_STUDIO_TABS)[number];
 
 /** The tabs of the learning hub. */

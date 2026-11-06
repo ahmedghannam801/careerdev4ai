@@ -101,6 +101,10 @@ export async function listEducations(userId: string): Promise<EducationDTO[]> {
     .from('educations')
     .select(EDUCATION_COLUMNS)
     .eq('user_id', userId)
+    // The candidate's order comes first. The start date is only the
+    // tiebreak, so rows that have never been reordered keep the order they
+    // always had.
+    .order('sort_order', { ascending: true })
     .order('start_date', { ascending: false });
   if (error) throw error;
   return ((data ?? []) as EducationRow[]).map(toEducation);

@@ -179,6 +179,10 @@ export async function listCertifications(profileId: string): Promise<Certificati
     .from('profile_certifications')
     .select(CERT_COLUMNS)
     .eq('profile_id', profileId)
+    // The candidate's order comes first. The issue date is only the
+    // tiebreak, so rows that have never been reordered keep the order they
+    // always had.
+    .order('sort_order', { ascending: true })
     .order('issue_date', { ascending: false });
   if (error) throw error;
   const rows = (data ?? []) as CertificationRow[];
@@ -372,6 +376,9 @@ export async function listLanguages(profileId: string): Promise<LanguageDTO[]> {
     .from('profile_languages')
     .select(LANG_COLUMNS)
     .eq('profile_id', profileId)
+    // The candidate's order comes first. The name is only the tiebreak, so
+    // rows that have never been reordered keep the order they always had.
+    .order('sort_order', { ascending: true })
     .order('name', { ascending: true });
   if (error) throw error;
   return ((data ?? []) as LanguageRow[]).map(toLanguage);

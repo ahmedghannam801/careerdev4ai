@@ -32,6 +32,157 @@ export type CvAssistField =
 /** How a field's content is shaped. */
 export type CvAssistFormat = 'text' | 'bullets';
 
+/**
+ * What the candidate asked the assistant to DO with a field.
+ *
+ * The field says WHICH part of the CV is being written. The action says
+ * WHAT is being asked for, and the two are independent: the same experience
+ * entry can be asked for as a fresh write, as an improvement of what the
+ * candidate already wrote, as a set of bullet points, as the
+ * responsibilities of the role, or as the achievements it produced.
+ *
+ * Every action is bounded by the same rule: the model rewrites what is in
+ * the record, it never creates what is not.
+ */
+export type CvAssistAction =
+  | 'write'
+  | 'improve'
+  | 'shorten'
+  | 'expand'
+  | 'bullets'
+  | 'achievements'
+  | 'responsibilities'
+  | 'keywords';
+
+export interface CvAssistActionSpec {
+  /** The instruction added to the prompt for this action. */
+  instruction: string;
+  /** The fields this action makes sense for. */
+  appliesTo: CvAssistField[];
+}
+
+/**
+ * The actions on offer.
+ *
+ * `write` is the default and applies everywhere. The others are offered
+ * only where they mean something, so the studio never offers to suggest
+ * achievements for a certificate.
+ */
+export const CV_ASSIST_ACTIONS: Record<CvAssistAction, CvAssistActionSpec> = {
+  write: {
+    instruction:
+      'Write this section from the record. Use the candidate\'s own words where the record has them.',
+    appliesTo: [
+      'summary',
+      'headline',
+      'experience',
+      'education',
+      'project',
+      'certification',
+      'course',
+      'volunteering',
+      'skills',
+    ],
+  },
+  improve: {
+    instruction:
+      'Improve the text the candidate already wrote. Keep what is already right, and do not remove any fact they stated.',
+    appliesTo: [
+      'summary',
+      'headline',
+      'experience',
+      'education',
+      'project',
+      'certification',
+      'course',
+      'volunteering',
+      'skills',
+    ],
+  },
+  shorten: {
+    instruction:
+      'Make this shorter. Cut the wording, never the substance: every fact that was there must still be there.',
+    appliesTo: [
+      'summary',
+      'headline',
+      'experience',
+      'education',
+      'project',
+      'certification',
+      'course',
+      'volunteering',
+      'skills',
+    ],
+  },
+  expand: {
+    instruction:
+      'Add the detail the record supports. Every added fact must already be in the record; do not elaborate beyond it.',
+    appliesTo: ['summary', 'experience', 'education', 'project', 'volunteering'],
+  },
+  bullets: {
+    instruction:
+      'Turn this into bullet points, one per line. Each bullet is one thing the candidate did.',
+    appliesTo: ['experience', 'project', 'volunteering'],
+  },
+  achievements: {
+    instruction:
+      'Suggest the achievements this piece of work produced. Only name an achievement the record supports, and do not invent a number, a percentage or a name.',
+    appliesTo: ['experience', 'volunteering'],
+  },
+  responsibilities: {
+    instruction:
+      'Suggest the responsibilities of this role, based on what the record says the candidate did in it.',
+    appliesTo: ['experience'],
+  },
+  keywords: {
+    instruction:
+      'Suggest the skills and keywords this section should carry, choosing only from the skills the candidate has actually rated.',
+    appliesTo: ['summary', 'skills', 'experience', 'project'],
+  },
+};
+
+/** The actions on offer, in the order they are shown. */
+export const CV_ASSIST_ACTION_ORDER: readonly CvAssistAction[] = [
+  'write',
+  'improve',
+  'shorten',
+  'expand',
+  'bullets',
+  'achievements',
+  'responsibilities',
+  'keywords',
+];
+
+/** True when the value is an action this application offers. */
+export function isCvAssistAction(value: unknown): value is CvAssistAction {
+  return (
+    typeof value === 'string' &&
+    Object.prototype.hasOwnProperty.call(CV_ASSIST_ACTIONS, value)
+  );
+}
+
+/**
+ * The action to run for a field.
+ *
+ * An action that does not apply to the field falls back to `write`, so a
+ * request can never ask for something the field cannot produce.
+ */
+export function resolveCvAssistAction(
+  field: CvAssistField,
+  action: unknown
+): CvAssistAction {
+  if (!isCvAssistAction(action)) return 'write';
+  const spec = CV_ASSIST_ACTIONS[action];
+  return spec.appliesTo.includes(field) ? action : 'write';
+}
+
+/** The actions that make sense for a field. */
+export function cvAssistActionsFor(field: CvAssistField): CvAssistAction[] {
+  return CV_ASSIST_ACTION_ORDER.filter((action) =>
+    CV_ASSIST_ACTIONS[action].appliesTo.includes(field)
+  );
+}
+
 /** The register the candidate asked for. */
 export type CvAssistTone = 'professional' | 'impactful' | 'concise' | 'technical';
 
