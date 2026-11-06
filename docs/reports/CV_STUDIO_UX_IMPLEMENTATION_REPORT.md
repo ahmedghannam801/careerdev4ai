@@ -7,7 +7,7 @@ per section, the separation between the CV studio and the profile screen, and
 the UX of the studio as a whole.
 
 **Branch.** `main` · **Status.** Implemented, verified against the live
-database, deployed.
+database, deployed to `https://careerdev4ai.pages.dev` and verified there.
 
 ---
 
@@ -269,25 +269,82 @@ is unchanged; the action picker sits above it.
 
 | Check | Result |
 |---|---|
-| `npx tsc --noEmit` | clean |
-| `npm test` | see §4 |
-| `npx vite build` | clean, and the generated CSS contains the utilities it did not contain before |
+| `npx tsc --noEmit` | clean, 0 errors |
+| `npm test` | **1027 tests — 1021 pass, 0 fail, 6 skipped** |
+| The new suites on their own | 43 tests — 33 pure + 10 against the live database — all pass |
+| `npx vite build` | clean; the generated CSS now contains the utilities it did not contain before |
 | Migrations applied to the live database | `resume_language` and the five `sort_order` columns confirmed present |
-| Data manager / preview / picker | exercised against the live database |
+| `scripts/visual-qa-capture.mjs` | **24 scenarios** (6 viewports × light/dark × LTR/RTL) — 0 overflow, 0 console errors |
+| Arabic coverage | 1835/1835 source strings routed through `t()` — **100%** |
+
+### The visual evidence
+
+The visual capture is what turned the transparency report from a belief into
+a measurement. The floating cards on the landing page — the role card and
+the "Career Intelligence" card, both of which are written with `bg-surface`
+— now render as **opaque surfaces with a visible border and a real shadow**,
+in light mode and in dark mode, in both directions:
+
+```
+.bg-surface{background-color:var(--color-surface)}
+.bg-surface-raised{background-color:var(--color-surface-elevated-alt)}
+.bg-primary\/10{background-color:color-mix(in oklab, var(--color-primary) 10%, transparent)}
+```
+
+Before this change those three rules did not exist in the bundle at all.
+
+The cascade was checked in the built CSS as well, because the bridge maps a
+theme variable onto a semantic variable of the same name:
+
+```
+@layer theme{ …  --color-surface:var(--color-surface) }   ← index 5509
+@layer base{ …  --color-surface:#fff   }                  ← index 9782
+                .dark{ --color-surface:#282b29 }           ← index 12390
+```
+
+`@layer base` is ordered after `@layer theme`, so the palette wins over
+whatever the theme layer emits, and the utility stays dynamic, so it follows
+the `.dark` override at runtime.
+
+### The production deployment
+
+| Check | Result |
+|---|---|
+| `npm run cf:deploy` | Deployment complete — `https://careerdev4ai.pages.dev` |
+| `GET /api/health` | `200 {"status":"ok", …}` |
+| The stylesheet the live page loads | `index-BWJLdXi-.css`, and it contains `bg-surface`, `text-foreground`, `bg-primary`, `text-muted`, `border-border` and `bg-surface-raised` |
+| The bundle the live page loads | contains "Resume Language", "My Data", "Skip Tour", "Write it for me" and "Suggest achievements" |
+| `POST /api/profile/reorder`, unauthenticated | `401 {"error":"Unauthorized"}` |
+| `GET /api/preferences`, unauthenticated | `401` |
+| Visual QA against production | 24/24 scenarios, **0 horizontal overflow** |
+
+The only console entry the production capture reports is a `401` on
+`GET /api/guides`, in every scenario. That route has required
+authentication all along — an anonymous visitor on the landing page has no
+identity, so the server refuses to record their guide dismissals. It is not
+a regression, and it is not a defect: the local capture showed no error at
+all only because the static preview server answers `/api/*` with the SPA
+fallback instead of refusing the request.
 
 ### The new tests
 
 `tests/resume-language.test.ts`, `tests/cv-assist-actions.test.ts` and
-`tests/cv-studio-data.test.ts` — all pure, all registered in the runner.
+`tests/cv-studio-data.test.ts` are pure; `tests/cv-studio-persistence.test.ts`
+runs against the live database. All four are registered in the runner.
 
 They protect the properties that are easy to break:
 
-* the resume language is normalised, and the three languages stay separate;
+* the resume language is normalised, and the three languages stay separate —
+  the database suite proves that writing the CV in Arabic does not move the
+  interface language, and that moving the interface language does not move
+  the document;
 * the English headings are byte-identical to the ones the document has always
   printed;
 * an action that does not apply to a field falls back to a plain write, and
   the grounding rules are in the prompt for **every** action;
-* a collection whose order is not stored cannot be named;
+* a candidate can put the entry they want first, and the order survives a
+  reload; a candidate cannot reorder somebody else's entries; a collection
+  that does not store its order cannot be named at all;
 * the tour card never overlaps the element it describes.
 
 ---
@@ -319,3 +376,15 @@ They protect the properties that are easy to break:
 `server/db/experiences.ts` · `server/db/educations.ts` ·
 `server/db/profileExtensions.ts` · `server/db/projects.ts` ·
 `app.ts` · `tests/runner.mjs`
+
+---
+
+## 5. A note on the commit history
+
+Two commits were pushed together:
+
+* `3c906b9` — `fix(cv): flip the analyzer stage arrow in the Arabic layout`.
+  A one-line RTL fix in `CvAnalyzerView.tsx`, made outside this work while
+  it was in progress. It is included in the push because it was already in
+  `main` locally.
+* `a13fd5d` — this work.
