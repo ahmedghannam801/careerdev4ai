@@ -376,8 +376,11 @@ describe('the analytics', () => {
     assert.equal(path.includes('ahmed'), false);
   });
 
-  it('names only the events the funnel is built from', () => {
+  it('names only the events the product reports', () => {
     assert.deepEqual([...ANALYTICS_EVENTS].sort(), [
+      'feedback_form_opened',
+      'feedback_invitation_dismissed',
+      'feedback_invitation_impression',
       'learning_complete',
       'learning_start',
       'login',

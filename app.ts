@@ -114,6 +114,15 @@ import { hasServerTermsApproval } from './server/legal.ts';
 import { resolveTargetRoleWrite } from './server/targetRole.ts';
 import { getPreferences, upsertPreferences } from './server/db/preferences.ts';
 import {
+  getFeedbackState,
+  recordFeedbackEvent,
+  registerFeedbackSession,
+} from './server/db/feedback.ts';
+import {
+  isFeedbackEventType,
+  isFeedbackSource,
+} from './shared/feedback.ts';
+import {
   listBookmarks,
   createBookmark,
   deleteBookmark,
@@ -5263,6 +5272,66 @@ app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) =
     return res.status(500).json({ error: 'Failed to save preferences' });
   }
 });
+
+// ---- Feedback invitations ----
+//
+// The feedback form is Google's, and its address is a constant in
+// `shared/feedback.ts`. The server never receives the answers: it stores only
+// the decision state that implements the frequency policy — when an invitation
+// was shown, dismissed or opened, and how many active sessions the account has
+// had. See the migration `20261106000002_feedback_invitation_state.sql`.
+//
+// Only the three events named in the shared vocabulary are accepted, and only
+// the four known surfaces count as a source. Any other value is rejected
+// rather than stored, so the analytics dimension stays clean.
+const feedbackEventRateLimit = rateLimit(30, 60_000, 'feedback');
+
+app.get('/api/feedback', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const state = await getFeedbackState(req.authUser!.id);
+    return res.json({ success: true, state });
+  } catch (error) {
+    console.error('Failed to load feedback state:', error);
+    return res.status(500).json({ error: 'Failed to load feedback state' });
+  }
+});
+
+app.post('/api/feedback/session', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { state, counted } = await registerFeedbackSession(req.authUser!.id);
+    return res.json({ success: true, state, counted });
+  } catch (error) {
+    console.error('Failed to register feedback session:', error);
+    return res.status(500).json({ error: 'Failed to register feedback session' });
+  }
+});
+
+app.post(
+  '/api/feedback/event',
+  requireAuth,
+  feedbackEventRateLimit,
+  async (req: Request, res: Response) => {
+    try {
+      const body = req.body ?? {};
+      if (!isFeedbackEventType(body.type)) {
+        return res.status(400).json({ error: 'Invalid feedback event' });
+      }
+      if (!isFeedbackSource(body.source)) {
+        return res.status(400).json({ error: 'Invalid feedback source' });
+      }
+
+      const state = await recordFeedbackEvent(
+        req.authUser!.id,
+        body.type,
+        body.source
+      );
+      return res.json({ success: true, state });
+    } catch (error) {
+      console.error('Failed to record feedback event:', error);
+      return res.status(500).json({ error: 'Failed to record feedback event' });
+    }
+  }
+);
 
 // ---- Live job vacancies ----
 //

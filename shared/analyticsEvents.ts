@@ -19,6 +19,12 @@ export const ANALYTICS_EVENTS = [
   'project_start',
   'opportunity_view',
   'opportunity_click',
+  // Feedback invitations. These three are the only feedback events: an
+  // invitation was seen, it was dismissed, or the form was opened. Submitting
+  // the form happens on Google's own domain and is not reported here.
+  'feedback_invitation_impression',
+  'feedback_invitation_dismissed',
+  'feedback_form_opened',
 ] as const;
 
 /** The name of an event the application reports. */
@@ -45,6 +51,8 @@ export interface AnalyticsParams {
   outcome?: 'completed' | 'started' | 'abandoned';
   /** How the session arrived. */
   source?: string;
+  /** The surface that showed or opened the feedback form, e.g. "settings". */
+  feedback_invitation_source?: string;
   /** The number of items in a batch, when the event describes a batch. */
   count?: number;
 }

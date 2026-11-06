@@ -26,6 +26,7 @@ import { AnimatedProgress } from '../motion/AnimatedProgress';
 import { CountUp } from '../motion/CountUp';
 import { EmptyState } from '../ui/EmptyState';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
+import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
 import { CareerImage } from '../ui/CareerImage';
 
 interface DashboardViewProps {
@@ -605,6 +606,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           </article>
         </div>
       </section>
+
+      {/* A permanent, quiet route to the feedback form. It is not an
+          interruption: it sits below the work, and dismissing it never
+          removes the account-menu and Settings routes. */}
+      <DashboardFeedbackCard />
 
       {/* Recent activity — the user's own record, not a generated summary. */}
       <RecentActivityPanel onNavigate={onNavigate} />

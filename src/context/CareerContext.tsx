@@ -617,7 +617,12 @@ export function normalizeSkillName(name: string): string {
 // Maps a Supabase Auth user to the application's account shape.
 // The id is always auth.users.id — the same value as public.profiles.id.
 function toUserAccount(
-  user: { id: string; email?: string; user_metadata?: Record<string, any> },
+  user: {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, any>;
+    created_at?: string;
+  },
   token?: string
 ): UserAccount {
   const meta = user.user_metadata || {};
@@ -637,7 +642,11 @@ function toUserAccount(
       (email ? email.split('@')[0] : 'User'),
     avatarUrl: meta.avatar_url || undefined,
     token,
-    createdAt: meta.created_at || new Date().toISOString(),
+    // `created_at` is the authoritative account age. The metadata copy is a
+    // fallback for providers that do not expose the column, and the current
+    // time is the last resort — an unknown age must not look old enough for
+    // an invitation.
+    createdAt: user.created_at || meta.created_at || new Date().toISOString(),
   };
 }
 

@@ -5,6 +5,8 @@
 
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { CareerProvider, useCareer } from './context/CareerContext';
+import { FeedbackProvider } from './context/FeedbackContext';
+import { FeedbackInvitationHost } from './components/feedback/FeedbackInvitationHost';
 import { AppShell } from './components/layout/AppShell';
 import { AuthModal } from './components/auth/AuthModal';
 import { ConsentGate } from './components/auth/ConsentGate';
@@ -408,6 +410,10 @@ function AppRoutes() {
           over the whole application, and it remembers that it has been
           seen on the server. */}
       <GuidedTourHost currentView={currentView} />
+      {/* The contextual feedback invitation. It decides for itself whether
+          this view and this account are eligible, and it never opens over a
+          dialog. */}
+      <FeedbackInvitationHost currentView={currentView} />
       <InteractiveTourModal
         isOpen={tourOpen}
         onClose={() => setTourOpen(false)}
@@ -506,7 +512,9 @@ function AppContent() {
 export default function App() {
   return (
     <CareerProvider>
-      <AppContent />
+      <FeedbackProvider>
+        <AppContent />
+      </FeedbackProvider>
     </CareerProvider>
   );
 }

@@ -18,9 +18,12 @@ import {
   Phone,
   Linkedin,
   Github,
-  ExternalLink
+  ExternalLink,
+  MessageSquare
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { useFeedback } from '../../context/FeedbackContext';
+import { FEEDBACK_FORM_URL } from '../../../shared/feedback.ts';
 import { AiLanguageSelector } from '../ui/AiLanguageSelector';
 import { SETTINGS_TABS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
@@ -66,6 +69,9 @@ export const SettingsView: React.FC = () => {
     updatePrivacyPreferences, 
     validateUsername, 
     exportDataJson, t,} = useCareer();
+  // The permanent feedback route. It lives in About & Developer so it is
+  // reachable even after the dashboard card has been dismissed.
+  const { markOpened } = useFeedback();
 
   const [activeTab, setActiveTab] = useRouteParam<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface' | 'about'>('tab', SETTINGS_TABS, 'account');
 
@@ -883,6 +889,29 @@ export const SettingsView: React.FC = () => {
                       <div className="font-semibold text-[var(--text-primary)]">{t('Phone')}</div>
                       <div className="text-[11px] text-[var(--text-secondary)] truncate font-mono">
                         +201027053876
+                      </div>
+                    </div>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors shrink-0" />
+                </a>
+
+                <a
+                  href={FEEDBACK_FORM_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => markOpened('settings')}
+                  className="sm:col-span-2 p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] hover:border-[var(--color-primary-text)]/30 transition-all flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-[var(--surface-main)] text-[var(--color-primary-text)] border border-[var(--border-subtle)]">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[var(--text-primary)]">
+                        {t('Feedback & support')}
+                      </div>
+                      <div className="text-[11px] text-[var(--text-secondary)]">
+                        {t('Opens the Google Form in a new tab. A Google account is required.')}
                       </div>
                     </div>
                   </div>

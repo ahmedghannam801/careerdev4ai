@@ -290,6 +290,14 @@ async function main() {
     join(TESTS_DIR, 'personalization-api.test.ts'),
     join(TESTS_DIR, 'grounding.test.ts'),
     join(TESTS_DIR, 'localization.test.ts'),
+    // The feedback invitation policy: never during onboarding or a focused
+    // task, never for a new account, one invitation per period, and a card
+    // dismissal that does not silence the contextual invitation. Pure.
+    join(TESTS_DIR, 'feedback.test.ts'),
+    // The same policy against the running API: the session counter, the three
+    // events, the rejected values, and one account's history staying private
+    // from another.
+    join(TESTS_DIR, 'feedback-api.test.ts'),
     // The CV studio's writing assistant and the document it builds from the
     // platform's records. Pure, like the two above: no database needed.
     join(TESTS_DIR, 'cv-studio.test.ts'),
