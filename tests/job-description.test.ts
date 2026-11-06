@@ -623,6 +623,41 @@ describe('reading a job description without a model', () => {
     assert.ok(analysis.educationRequirements!.length > 0);
   });
 
+  it('keeps the number a requirement states', () => {
+    const analysis = extractDeterministicJobDescription(
+      [
+        'Frontend Engineer',
+        '- 3+ years of experience with React',
+        'Requirements:',
+        '- 5+ years of experience shipping web applications',
+      ].join('\n')
+    );
+
+    assert.deepEqual(analysis.experienceRequirements, [
+      '3+ years of experience with React',
+      '5+ years of experience shipping web applications',
+    ]);
+  });
+
+  it('does not read a section heading as a requirement', () => {
+    const analysis = extractDeterministicJobDescription(
+      ['Frontend Engineer', 'Requirements:', '- React and TypeScript'].join('\n')
+    );
+
+    // The heading introduces the lines that follow it. Counting it as a
+    // requirement would charge the candidate for the employer's formatting.
+    const everything = [
+      ...analysis.requiredSkills,
+      ...analysis.preferredSkills!,
+      ...analysis.technicalSkills,
+      ...analysis.keywords,
+      ...analysis.responsibilities,
+      ...analysis.experienceRequirements,
+    ];
+    assert.ok(!everything.includes('Requirements:'));
+    assert.ok(everything.includes('React and TypeScript'));
+  });
+
   it('reads the stated company, place, seniority and arrangement', () => {
     const analysis = extractDeterministicJobDescription(
       [

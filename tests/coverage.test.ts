@@ -534,8 +534,8 @@ describe('the AI routes fail honestly when model is absent or quota exhausted', 
       }
 
       assert.ok(
-        res.status === 429 || res.status === 503,
-        `${route.path} must answer 429 (quota) or 503 (unavailable), not ${res.status}`
+        res.status === 429 || res.status === 503 || res.status === 402,
+        `${route.path} must answer 429 (quota), 503 (unavailable) or 402 (insufficient credits), not ${res.status}`
       );
       assert.equal(
         typeof res.body?.error,

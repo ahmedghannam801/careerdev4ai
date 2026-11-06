@@ -34,6 +34,7 @@ describe('the route vocabulary', () => {
     for (const route of [
       'profile',
       'cv-studio',
+      'cv-analyzer',
       'roadmap',
       'learning',
       'projects',

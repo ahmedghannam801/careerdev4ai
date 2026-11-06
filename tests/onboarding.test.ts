@@ -46,7 +46,30 @@ describe('persisted onboarding state', () => {
       join(REPO_ROOT, 'src', 'components', 'views', 'SettingsView.tsx'),
       'utf-8'
     );
+    const tour = readFileSync(
+      join(REPO_ROOT, 'src', 'components', 'onboarding', 'InteractiveTourModal.tsx'),
+      'utf-8'
+    );
+
+    // The reopen path is the tour event, and the tour listens for it and
+    // starts again from the first step.
     assert.match(settings, /Show me around again/);
-    assert.match(settings, /onboardingStatus: 'started'/);
+    assert.match(
+      settings,
+      /new CustomEvent\('careerdev4ai:open-tour', \{ detail: \{ restart: true \} \}\)/,
+      'the Settings button must ask for the tour to start from the beginning'
+    );
+    assert.match(tour, /addEventListener\('careerdev4ai:open-tour'/);
+    assert.match(tour, /if \(detail\?\.restart\) \{/);
+
+    // The profile status is deliberately NOT set to 'started' here. That
+    // status is what `shouldForceOnboarding` reads, so setting it would drag
+    // the candidate into the onboarding wizard on their next sign-in — the
+    // B.4 finding this reopen path was rebuilt to avoid.
+    assert.doesNotMatch(
+      settings,
+      /onboardingStatus:\s*'started'/,
+      'repeating the tour must not change the onboarding status'
+    );
   });
 });

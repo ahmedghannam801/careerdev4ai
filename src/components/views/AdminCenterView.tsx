@@ -33,11 +33,17 @@ import {
   Trash2,
   TrendingUp,
   Users,
+  CreditCard,
+  Smartphone,
+  DollarSign,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useAdminAccess } from '../../lib/useAdminAccess';
 import { AnnouncementsPanel } from '../admin/AnnouncementsPanel';
 import { TrafficAnalyticsPanel } from '../admin/TrafficAnalyticsPanel';
+import { AdminSubscriptionsPanel } from '../admin/AdminSubscriptionsPanel';
+import { AdminPaymentsPanel } from '../admin/AdminPaymentsPanel';
+import { AdminRevenuePanel } from '../admin/AdminRevenuePanel';
 import {
   createAdmin,
   deleteAdmin,
@@ -64,7 +70,17 @@ import {
 } from '../../../shared/admin';
 import { OPPORTUNITY_LABELS, type OpportunityKind } from '../../../shared/opportunities';
 
-type AdminTab = 'overview' | 'traffic' | 'announcements' | 'admins' | 'opportunities' | 'learning' | 'audit';
+type AdminTab =
+  | 'overview'
+  | 'traffic'
+  | 'announcements'
+  | 'admins'
+  | 'opportunities'
+  | 'learning'
+  | 'audit'
+  | 'subscriptions'
+  | 'payments'
+  | 'revenue';
 
 const ROLE_OPTIONS: AdminRole[] = [
   'super_admin',
@@ -970,6 +986,15 @@ export const AdminCenterView: React.FC = () => {
     if (permissions.has('audit.read')) {
       entries.push({ id: 'audit', label: t('Audit log'), icon: Shield });
     }
+    if (permissions.has('subscriptions.read')) {
+      entries.push({ id: 'subscriptions', label: t('Subscriptions'), icon: CreditCard });
+    }
+    if (permissions.has('payments.read')) {
+      entries.push({ id: 'payments', label: t('Payments'), icon: Smartphone });
+    }
+    if (permissions.has('revenue.read')) {
+      entries.push({ id: 'revenue', label: t('Revenue & Finance'), icon: DollarSign });
+    }
     return entries;
   }, [permissions, t]);
 
@@ -1120,6 +1145,9 @@ export const AdminCenterView: React.FC = () => {
         <LearningPanel canWrite={permissions.has('learning.write')} canModerate={canModerate} />
       )}
       {tab === 'audit' && <AuditPanel />}
+      {tab === 'subscriptions' && <AdminSubscriptionsPanel />}
+      {tab === 'payments' && <AdminPaymentsPanel />}
+      {tab === 'revenue' && <AdminRevenuePanel />}
 
       {tabs.length === 1 && (
         <div className={`${CARD} p-6 text-center text-xs text-[var(--text-secondary)]`}>

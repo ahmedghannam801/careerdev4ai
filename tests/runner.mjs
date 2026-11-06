@@ -312,6 +312,17 @@ async function main() {
     // compared with the candidate's record, and what is written onto their
     // document. Pure.
     join(TESTS_DIR, 'job-description.test.ts'),
+    // The deterministic CV analysis: the score is measured from the document
+    // rather than described by a model, a dimension the document cannot support
+    // is left out of the average instead of being scored as zero, and the
+    // market dimension reports only the job description it was given. Pure.
+    join(TESTS_DIR, 'cv-analysis.test.ts'),
+    // The measured analysis route: the score the candidate sees is counted from
+    // their own CV, it needs no model, and it is private to them.
+    join(TESTS_DIR, 'cv-analysis-route.test.ts'),
+    // The CV Analyzer page: a real route, a real view, and a stage list that
+    // comes from the server rather than from a timer.
+    join(TESTS_DIR, 'cv-analyzer.test.ts'),
     // The project advisor: what it recommends and what it finds wrong with
     // the projects the candidate already has. Pure.
     join(TESTS_DIR, 'project-recommendation.test.ts'),
@@ -384,10 +395,11 @@ async function main() {
     // planning engine, the legal and contact links reach their real
     // destinations, and the new copy is fully translated. Pure.
     join(TESTS_DIR, 'public-site.test.ts'),
-    // The public website: the interactive product preview runs the real
-    // planning engine, the legal and contact links reach their real
-    // destinations, and the new copy is fully translated. Pure.
-    join(TESTS_DIR, 'public-site.test.ts'),
+    // The subscription architecture: plan catalog, pricing in piasters, feature matrix. Pure.
+    join(TESTS_DIR, 'subscriptions-system.test.ts'),
+    // Subscription security and concurrency: RLS boundaries, payment confirmation idempotency,
+    // AI endpoint gating, and credit expiration isolation.
+    join(TESTS_DIR, 'subscriptions-security-and-concurrency.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

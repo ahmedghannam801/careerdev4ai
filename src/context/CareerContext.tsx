@@ -196,6 +196,14 @@ import type {
   LearningStatus,
   CourseFormat,
 } from '../types/learning';
+import {
+  fetchCurrentSubscription,
+  type CurrentSubscriptionResponse,
+} from '../lib/subscriptionApi';
+import {
+  fetchCreditBalance,
+} from '../lib/creditsApi';
+import type { CreditBalanceDTO } from '../../shared/credits';
 
 export interface UserProfile {
   name: string;
@@ -535,6 +543,12 @@ interface CareerContextType {
   t: (key: string) => string;
   exportDataJson: () => void;
   resetAllData: () => void;
+
+  // Subscription & AI Credits
+  subscription: CurrentSubscriptionResponse | null;
+  creditBalance: CreditBalanceDTO | null;
+  refreshSubscription: () => Promise<void>;
+  refreshCredits: () => Promise<void>;
 }
 
 const CareerContext = createContext<CareerContextType | undefined>(undefined);
@@ -1128,6 +1142,28 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [consentState, setConsentState] = useState<ConsentState | null>(null);
   const [consentError, setConsentError] = useState<string | null>(null);
 
+  // Subscriptions & AI Credits
+  const [subscription, setSubscription] = useState<CurrentSubscriptionResponse | null>(null);
+  const [creditBalance, setCreditBalance] = useState<CreditBalanceDTO | null>(null);
+
+  const refreshSubscription = useCallback(async () => {
+    try {
+      const data = await fetchCurrentSubscription();
+      setSubscription(data);
+    } catch (err) {
+      console.warn('Could not refresh subscription:', err);
+    }
+  }, []);
+
+  const refreshCredits = useCallback(async () => {
+    try {
+      const data = await fetchCreditBalance();
+      setCreditBalance(data);
+    } catch (err) {
+      console.warn('Could not refresh credit balance:', err);
+    }
+  }, []);
+
   // The identity the in-memory career state belongs to. When the Supabase
   // session changes to a different user (or disappears) without going through
   // the explicit logout button, the old user's data must be cleared before the
@@ -1533,6 +1569,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // Hydration is complete: only now may the localStorage cache be
         // written, and only then does the app trust the server's view.
         setIsHydrated(true);
+        void refreshSubscription();
+        void refreshCredits();
       } catch (error) {
         if (!cancelled) {
           console.error('Failed to hydrate career data:', error);
@@ -3050,6 +3088,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // inherit the previous one's answer.
     setConsentState(null);
     setConsentError(null);
+    setSubscription(null);
+    setCreditBalance(null);
     setIsHydrated(false);
     setPasswordRecovery(false);
   }
@@ -4323,6 +4363,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return {
         success: true,
         cv: data.cv,
+        // The CV and the version the upload produced. A caller that measures
+        // the CV afterwards measures the stored version, not a copy of it.
+        cvId: data.cvId,
+        cvVersionId: data.cvVersionId,
         extraction: data.extraction,
         extractionQuality: data.extractionQuality,
         atsAnalysis: data.atsAnalysis ?? null,
@@ -4385,6 +4429,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return {
         success: true,
         cv: data.cv,
+        // The CV and the version the upload produced. A caller that measures
+        // the CV afterwards measures the stored version, not a copy of it.
+        cvId: data.cvId,
+        cvVersionId: data.cvVersionId,
         extraction: data.extraction,
         extractionQuality: data.extractionQuality,
         atsAnalysis: data.atsAnalysis ?? null,
@@ -5471,6 +5519,10 @@ Skills: ${activeCV.skillsList.join(', ')}
         t,
         exportDataJson,
         resetAllData,
+        subscription,
+        creditBalance,
+        refreshSubscription,
+        refreshCredits,
       }}
     >
       {children}

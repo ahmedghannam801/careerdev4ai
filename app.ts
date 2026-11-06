@@ -29,7 +29,20 @@ import { parseStructuredCv } from './server/cv/parseStructuredCv.ts';
 // the same code. One implementation means the score shown in CV Studio and the
 // score stored on the version can never drift apart.
 import { runAtsAnalysis, validateAtsPayload } from './server/cv/atsAnalysis.ts';
+// The measured analysis of a CV. It runs no model, so the score it produces is
+// measured from the document rather than described by a provider.
+import {
+  measureAndRecord,
+  measureCvWithStages,
+  recordMeasurement,
+  resolveAnalysisRequest,
+  toStoredAnalysis,
+} from './server/cv/cvAnalysis.ts';
+import { listCvMeasurements } from './server/db/cvMeasurements.ts';
 import { registerBackgroundJobRoutes } from './server/jobs/routes.ts';
+import { registerSubscriptionRoutes } from './server/subscriptions/routes.ts';
+import { requireEntitlement } from './server/subscriptions/entitlements.ts';
+import { requireCredits } from './server/credits/middleware.ts';
 import { boundedList } from './server/ai/boundedList.ts';
 import { generateCoverLetter } from './server/cv/coverLetter.ts';
 import { universalAi, isAnyAiConfigured, getDefaultProvider } from './server/ai/provider.ts';
@@ -53,7 +66,7 @@ declare global {
     }
   }
 }
-import { requireAuth } from './server/auth/require-auth.ts';
+import { requireAuth, requireSession } from './server/auth/require-auth.ts';
 import { findProfileByUsername } from './server/db/profiles.ts';
 import { changePassword, changeEmail, deleteAccount } from './server/db/account.ts';
 import { saveState, loadState, unmappedStateFields } from './server/db/state.ts';
@@ -1630,7 +1643,13 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
 const accountRateLimit = rateLimit(10, 60_000, 'account');
 
 // AI Copilot with Contextual Page Understanding & Action Proposals
-app.post('/api/copilot', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/copilot', requireAuth, (req: Request, res: Response, next) => {
+  const userPrompt = str(req.body?.userPrompt, 2000);
+  if (!userPrompt) {
+    return res.status(400).json({ error: 'userPrompt is required' });
+  }
+  next();
+}, aiRateLimit, requireEntitlement('ai_mentor.session'), requireCredits('career_consultation_chat'), async (req: Request, res: Response) => {
   try {
     // The prompt is validated before anything else: it must be a string, and
     // it must be short enough that one request cannot cost an unbounded
@@ -1771,7 +1790,7 @@ Answering rules:
 });
 
 // AI Career Analysis Endpoint
-app.post('/api/analyze-career', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/analyze-career', requireAuth, aiRateLimit, requireEntitlement('ats.analysis'), requireCredits('cv_ats_analysis'), async (req: Request, res: Response) => {
   try {
     const { targetRole, careerState } = req.body;
     // The role title falls back to the user's own target role, never to a
@@ -1855,7 +1874,7 @@ Return valid JSON schema:
 });
 
 // AI CV ATS & Content Optimization Endpoint
-app.post('/api/optimize-cv', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/optimize-cv', requireAuth, aiRateLimit, requireEntitlement('cv.tailoring'), requireCredits('cv_tailoring'), async (req: Request, res: Response) => {
   try {
     const { cvText, targetRoleTitle, targetRoleSkills } = req.body;
     const language = normalizeAiLanguage(req.body?.language);
@@ -1937,7 +1956,7 @@ Return JSON schema:
 });
 
 // AI Mock Interview Evaluation Endpoint
-app.post('/api/mock-interview', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/mock-interview', requireAuth, aiRateLimit, requireEntitlement('interview.mock_simulation'), requireCredits('interview_mock_session'), async (req: Request, res: Response) => {
   try {
     const { roleTitle, interviewType, question, userAnswer } = req.body;
     // Every field that reaches the model is length-capped: a single request
@@ -2005,7 +2024,7 @@ Return JSON schema:
   }
 });
 // AI Professional Summary Suggestion
-app.post('/api/suggest-summary', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/suggest-summary', requireAuth, aiRateLimit, requireEntitlement('cv.builder'), requireCredits('ai_assist_inline'), async (req: Request, res: Response) => {
   try {
     const { name, targetRoleTitle, careerState, yearsExperience, skills, keyAchievements } = req.body;
     // No hard-coded role: the summary is written for whatever role the user
@@ -2097,7 +2116,7 @@ ${groundingRules()}
 });
 
 // AI Cover Letter Generation Endpoint
-app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, requireEntitlement('cover_letter.generate'), requireCredits('cover_letter_generation'), async (req: Request, res: Response) => {
   try {
     const { company, jobTitle, jobDescription, candidateName, experiences, skills, projects, tone } = req.body;
     const language = normalizeAiLanguage(req.body?.language);
@@ -2168,13 +2187,198 @@ app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Req
   }
 });
 
+// The measured analysis of the candidate's CV.
+//
+// This route measures the document; it does not describe it. Nothing here
+// calls a model, so the analysis is the same every time, it costs no quota,
+// and it is available whether or not a provider is configured. The AI routes
+// beside it keep their own contract: they return the model's answer or an
+// explicit failure, and they never answer with something of their own.
+//
+// The session is required; the legal acceptance is not. The measurement is
+// counted on the platform from the candidate's own document, so nothing is sent
+// to a third party and nothing of theirs is used on their behalf.
+app.post('/api/cv/analysis', requireSession, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const request = await resolveAnalysisRequest(req.authUser!.id, body);
+
+    if (!request.document) {
+      if (request.problem === 'unknown_version') {
+        return res.status(404).json({
+          error: 'That CV version was not found.',
+          code: 'unknown_version',
+        });
+      }
+      return res.status(400).json({
+        error: 'A CV is required before it can be measured.',
+        code: 'document_required',
+      });
+    }
+
+    const measured = await measureAndRecord(req.authUser!.id, {
+      cv: request.document,
+      cvId: request.cvId,
+      cvVersionId: request.cvVersionId,
+      targetRoleTitle: request.targetRoleTitle,
+      targetRoleSkills: request.targetRoleSkills,
+      jobDescription: request.jobDescription ?? undefined,
+    });
+
+    if (!measured) {
+      return res.status(422).json({
+        error: 'This CV could not be read, so there is nothing to measure yet.',
+        code: 'document_unreadable',
+      });
+    }
+
+    return res.json({
+      success: true,
+      analysis: measured.report,
+      // The stored shape, so a caller that already knows how to read a score
+      // can read this one without learning anything new.
+      atsAnalysis: toStoredAnalysis(measured.report),
+      // The record of this run, when it was about a stored CV. A re-analysis
+      // is a new record; it never replaces the earlier one.
+      measurementId: measured.measurementId,
+    });
+  } catch (error) {
+    console.error('[cv/analysis] failed', error);
+    return res.status(500).json({
+      error: 'The CV could not be measured right now.',
+      code: 'analysis_failed',
+    });
+  }
+});
+
+// The same measurement, with the stages as they happen.
+//
+// The stages are not decoration: each one is reported after the work it names
+// has actually been done, so the list the candidate watches is the list the
+// measurement really went through. The stream carries the same result the
+// plain route returns — the two read the same document and run the same
+// measurement.
+app.post('/api/cv/analysis/stream', requireSession, async (req: Request, res: Response) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+
+  const send = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const request = await resolveAnalysisRequest(req.authUser!.id, body);
+
+    if (!request.document) {
+      res.status(request.problem === 'unknown_version' ? 404 : 400);
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          error:
+            request.problem === 'unknown_version'
+              ? 'That CV version was not found.'
+              : 'A CV is required before it can be measured.',
+          code: request.problem ?? 'document_required',
+        })
+      );
+      return;
+    }
+
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    // Ask any proxy in front of the application not to buffer the stream.
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    const report = await measureCvWithStages(
+      {
+        cv: request.document,
+        targetRoleTitle: request.targetRoleTitle,
+        targetRoleSkills: request.targetRoleSkills,
+        jobDescription: request.jobDescription ?? undefined,
+      },
+      (stage) => {
+        send('stage', stage);
+      }
+    );
+
+    if (!report) {
+      send('error', {
+        code: 'document_unreadable',
+        error: 'This CV could not be read, so there is nothing to measure yet.',
+      });
+      res.end();
+      return;
+    }
+
+    const measurementId = await recordMeasurement(req.authUser!.id, {
+      cvId: request.cvId,
+      cvVersionId: request.cvVersionId,
+      targetRoleTitle: request.targetRoleTitle,
+      jobDescription: request.jobDescription,
+      report,
+    });
+
+    send('complete', {
+      analysis: report,
+      atsAnalysis: toStoredAnalysis(report),
+      measurementId,
+    });
+    res.end();
+  } catch (error) {
+    console.error('[cv/analysis/stream] failed', error);
+    if (res.headersSent) {
+      // The stream is already open, so the failure is reported inside it
+      // rather than as a status code.
+      send('error', {
+        code: 'analysis_failed',
+        error: 'The CV could not be measured right now.',
+      });
+      res.end();
+      return;
+    }
+    res.status(500).json({
+      error: 'The CV could not be measured right now.',
+      code: 'analysis_failed',
+    });
+  }
+});
+
+// The history of the measured analyses: the newest first, and never replacing
+// an earlier run.
+app.get('/api/cv/analyses', requireSession, async (req: Request, res: Response) => {
+  try {
+    const cvId = typeof req.query.cvId === 'string' ? req.query.cvId : undefined;
+    const measurements = await listCvMeasurements(req.authUser!.id, {
+      cvId: cvId && isUuid(cvId) ? cvId : undefined,
+    });
+    return res.json({ success: true, measurements });
+  } catch (error) {
+    console.error('[cv/analyses] failed', error);
+    return res.status(500).json({
+      error: 'The analysis history could not be read right now.',
+      code: 'history_failed',
+    });
+  }
+});
+
 // AI-assisted writing for one CV field.
 //
 // The model writes from the candidate's own record: the record is read from
 // the database for the verified user id, and the answer is checked back
 // against it before it is returned. The client cannot talk the model into a
 // career the candidate does not have.
-app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, requireEntitlement('cv.builder'), (req: Request, res: Response, next) => {
+  const body = req.body ?? {};
+  if (!isCvAssistField(body.field)) {
+    return res.status(400).json({ error: 'A valid CV field is required' });
+  }
+  if (body.ai === false) {
+    return next();
+  }
+  return requireCredits('ai_assist_inline')(req as any, res, next);
+}, async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
     const field = body.field;
@@ -2357,7 +2561,7 @@ async function readOptionalJobDescription(
 }
 
 // Reads a job description and reports what it asks for.
-app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, requireEntitlement('job_description.analysis'), requireCredits('job_description_analysis'), async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
     const read = readJobDescription(body);
@@ -2412,7 +2616,7 @@ app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, async (req
 // write the CV — so it costs two units of the daily allowance. The candidate's
 // document is only touched by the client, after the content has been checked,
 // so a failure here leaves their CV exactly as it was.
-app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireEntitlement('cv.tailoring'), requireCredits('cv_tailoring'), async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
     const read = readJobDescription(body);
@@ -2490,7 +2694,7 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, async (re
 // candidate's own record and the role catalogue's curated portfolio work. The
 // model only rewrites the plans, and a plan it fails to produce keeps the
 // deterministic one.
-app.post('/api/projects/recommendations', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/projects/recommendations', requireAuth, aiRateLimit, requireCredits('project_analysis'), async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
     const language = normalizeAiLanguage(body.language);
@@ -2552,7 +2756,7 @@ app.post('/api/projects/recommendations', requireAuth, aiRateLimit, async (req: 
 //
 // The problems are read out of the records. The model only improves the
 // wording of the suggestions, and it never decides that a problem exists.
-app.post('/api/projects/analyze', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/projects/analyze', requireAuth, aiRateLimit, requireCredits('project_analysis'), async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
     const language = normalizeAiLanguage(body.language);
@@ -5683,7 +5887,7 @@ app.delete('/api/learning/items/:courseId', requireAuth, async (req: Request, re
  * the authenticated user's persisted profile, skills, roadmap and learning
  * state, and the AI only sees the already-ranked candidates.
  */
-app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredits('learning_recommendation'), async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
 
@@ -6587,6 +6791,11 @@ app.patch(
     }
   }
 );
+
+/* -------------------------------------------------------------------------- */
+/* Subscriptions, Payments & Credits Routes                                   */
+/* -------------------------------------------------------------------------- */
+registerSubscriptionRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* Public SEO pages                                                           */

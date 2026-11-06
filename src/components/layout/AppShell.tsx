@@ -28,7 +28,8 @@ import {
   HeartHandshake,
   ShieldCheck,
   ExternalLink,
-  MessageSquare
+  MessageSquare,
+  Gauge
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useFeedback } from '../../context/FeedbackContext';
@@ -39,6 +40,7 @@ import { backdropVariants, drawerLeftVariants, drawerVariants } from '../../lib/
 import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
 import { useAdminAccess } from '../../lib/useAdminAccess';
+import { CreditBalanceBadge } from '../subscription/CreditBalanceBadge';
 
 const GlobalSearchModal = lazy(() =>
   import('./GlobalSearchModal').then((module) => ({ default: module.GlobalSearchModal }))
@@ -154,6 +156,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       label: t('Career Tools'),
       items: [
         { id: 'cv-studio', label: t('navCV'), icon: FileText },
+        { id: 'cv-analyzer', label: t('CV Analyzer'), icon: Gauge },
         { id: 'jobs', label: t('navJobs'), icon: Briefcase },
         { id: 'applications', label: t('navApplications'), icon: Calendar },
         { id: 'interviews', label: t('navInterviews'), icon: Target },
@@ -382,6 +385,8 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
             {/* Notifications & Account Controls */}
             <div data-tour="notifications-account" className="flex items-center gap-1.5 sm:gap-2">
+              <CreditBalanceBadge onOpenPricing={() => onNavigate('pricing')} />
+
               {/* Notifications */}
               <button
                 onClick={() => setNotificationsOpen(true)}
@@ -450,6 +455,13 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                       >
                         <Settings className="w-3.5 h-3.5" />
                         <span>{t('Settings')}</span>
+                      </button>
+                      <button
+                        onClick={() => { setUserMenuOpen(false); onNavigate('pricing'); }}
+                        className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary)]" />
+                        <span>{t('Subscriptions & Pricing')}</span>
                       </button>
                       <a
                         href={FEEDBACK_FORM_URL}

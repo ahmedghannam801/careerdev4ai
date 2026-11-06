@@ -630,3 +630,4 @@ export const TOUR_CHAPTERS: TourChapter[] = [
 
 export const ALL_TOUR_STEPS = TOUR_CHAPTERS.flatMap((c) => c.steps);
 export const TOTAL_TOUR_STEPS = ALL_TOUR_STEPS.length;
+

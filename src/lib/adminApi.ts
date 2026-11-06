@@ -389,3 +389,146 @@ export async function patchAdminCourse(
   );
   return data.course;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Subscriptions, Payments & Revenue Admin Endpoints                          */
+/* -------------------------------------------------------------------------- */
+
+export interface AdminSubscriptionRow {
+  id: string;
+  profile_id: string;
+  plan_id: string;
+  billing_cycle: string;
+  status: string;
+  current_period_starts_at: string;
+  current_period_ends_at: string;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
+  subscription_plans?: {
+    code: string;
+    name_en: string;
+    name_ar: string;
+    price_monthly_piasters: number;
+    price_annual_piasters: number;
+  };
+  profiles?: {
+    full_name: string | null;
+    username: string | null;
+  };
+}
+
+export interface AdminPaymentRow {
+  id: string;
+  profile_id: string;
+  plan_id: string;
+  billing_cycle: string;
+  original_amount_piasters: number;
+  discount_amount_piasters: number;
+  amount_piasters: number;
+  currency: string;
+  payment_method: string;
+  status: string;
+  transaction_reference: string | null;
+  sender_phone_or_handle: string | null;
+  receipt_storage_path: string | null;
+  receipt_filename: string | null;
+  risk_score: number;
+  risk_flags: string[];
+  temporary_access_granted_at: string | null;
+  temporary_access_expires_at: string | null;
+  review_notes: string | null;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  paid_at: string | null;
+  expires_at: string;
+  created_at: string;
+  subscription_plans?: {
+    code: string;
+    name_en: string;
+    name_ar: string;
+  };
+  profiles?: {
+    full_name: string | null;
+    username: string | null;
+  };
+}
+
+export interface AdminRevenueMetrics {
+  totalCollectedPiasters: number;
+  totalCollectedEgp: number;
+  transactionCount: number;
+  breakdownByMethodPiasters: Record<string, number>;
+  breakdownByPlanPiasters: Record<string, number>;
+  breakdownByCyclePiasters: Record<string, number>;
+}
+
+export async function fetchAdminSubscriptions(): Promise<AdminSubscriptionRow[]> {
+  const data = await request<{ subscriptions: AdminSubscriptionRow[] }>('/api/admin/subscriptions');
+  return data.subscriptions ?? [];
+}
+
+export async function fetchAdminPayments(status?: string): Promise<AdminPaymentRow[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  const data = await request<{ payments: AdminPaymentRow[] }>(`/api/admin/payments${query}`);
+  return data.payments ?? [];
+}
+
+export async function confirmAdminPayment(
+  paymentId: string,
+  notes?: string
+): Promise<{ success: boolean; subscriptionId?: string }> {
+  return request<{ success: boolean; subscriptionId?: string }>(
+    `/api/admin/payments/${encodeURIComponent(paymentId)}/confirm`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }
+  );
+}
+
+export async function rejectAdminPayment(
+  paymentId: string,
+  reason: string,
+  notes?: string
+): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(
+    `/api/admin/payments/${encodeURIComponent(paymentId)}/reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason, notes }),
+    }
+  );
+}
+
+export async function restoreAdminPayment(
+  paymentId: string,
+  notes?: string
+): Promise<{ success: boolean; subscriptionId?: string }> {
+  return request<{ success: boolean; subscriptionId?: string }>(
+    `/api/admin/payments/${encodeURIComponent(paymentId)}/restore`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }
+  );
+}
+
+export async function fetchAdminRevenue(): Promise<AdminRevenueMetrics> {
+  const data = await request<{ metrics: AdminRevenueMetrics }>('/api/admin/revenue');
+  return data.metrics;
+}
+
+export async function grantAdminCredits(
+  profileId: string,
+  amount: number,
+  reason: string
+): Promise<{ success: boolean; grantedCredits: number }> {
+  return request<{ success: boolean; grantedCredits: number }>('/api/admin/credits/grant', {
+    method: 'POST',
+    body: JSON.stringify({ profileId, amount, reason }),
+  });
+}

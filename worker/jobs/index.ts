@@ -37,6 +37,7 @@ import {
 } from '../../server/jobs/jobs.ts';
 import { getSupabaseServer } from '../../server/db/supabase.ts';
 import { writeConsumerHeartbeat } from '../../server/jobs/heartbeat.ts';
+import { runSubscriptionMaintenanceSweeps } from '../../server/jobs/maintenance.ts';
 
 interface QueueBinding {
   send(body: unknown, options?: { delaySeconds?: number }): Promise<void>;
@@ -265,6 +266,12 @@ export default {
     } catch (error) {
       sweep.failed = 0;
       console.error('The background job stale sweep failed:', error);
+    }
+
+    try {
+      await runSubscriptionMaintenanceSweeps();
+    } catch (error) {
+      console.error('The subscription maintenance sweep failed:', error);
     }
 
     await writeHeartbeat(env, sweep);

@@ -19,6 +19,51 @@ export interface AuthedRequest extends Request {
 const CONSENT_EXEMPT_PATHS = new Set(['/api/consent', '/api/account/delete']);
 
 /**
+ * Express middleware that requires a valid Supabase Auth session, without the
+ * legal acceptance.
+ *
+ * The measured CV analysis is the one feature that is exempt from the legal
+ * gate, and it is exempt for a reason: the measurement is counted on the
+ * platform from the candidate's own document. No model is called, nothing is
+ * sent to a third party, and the answer reads only the caller's own record.
+ * The terms and the privacy policy govern what the platform does with a
+ * candidate's data *on their behalf* — a local measurement does none of that,
+ * so a candidate who has not accepted them yet can still see how their own CV
+ * measures.
+ *
+ * The session is still required: an anonymous caller never gets in. Only the
+ * legal acceptance is skipped, and only for the two routes that use this.
+ */
+export async function requireSession(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  // Authenticated payloads are private and change as the user works.
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const result = await verifySupabaseToken(req.headers.authorization);
+    if (result.status !== 'valid') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    req.authUser = { id: result.userId, email: result.email };
+
+    // The service as a whole stays closed while the approved legal text is
+    // missing, exactly as it is for every other route.
+    if (!hasServerTermsApproval()) {
+      return res.status(503).json({
+        error: 'Approved Terms content is not available. The service is not open for production use.',
+        code: 'LEGAL_CONTENT_UNAVAILABLE',
+      });
+    }
+
+    return next();
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+
+/**
  * Express middleware that requires a valid Supabase Auth access token and a
  * current acceptance of the Terms & Conditions and Privacy Policy.
  *

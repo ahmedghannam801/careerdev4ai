@@ -54,6 +54,12 @@ export interface CreateTestUserOptions {
   consent?: boolean;
   termsVersion?: string;
   privacyVersion?: string;
+  /**
+   * Whether to provision an active subscription and test AI credits.
+   * Defaults to true so integration tests can exercise AI features.
+   */
+  subscription?: boolean;
+  planCode?: string;
 }
 
 /**
@@ -146,6 +152,36 @@ export async function createTestUser(
         privacyVersion: options.privacyVersion,
       })
     );
+  }
+
+  if (options.subscription !== false) {
+    const targetPlan = options.planCode ?? 'pro';
+    const { data: plan } = await admin
+      .from('subscription_plans')
+      .select('id')
+      .eq('code', targetPlan)
+      .maybeSingle();
+
+    if (plan?.id) {
+      await admin.from('subscriptions').insert({
+        profile_id: data.user.id,
+        plan_id: plan.id,
+        billing_cycle: 'monthly',
+        status: 'active',
+        current_period_starts_at: new Date().toISOString(),
+        current_period_ends_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      });
+
+      await admin.from('ai_credit_ledger').insert({
+        profile_id: data.user.id,
+        amount: 100,
+        running_balance: 100,
+        source: 'trial_grant',
+        action: 'admin_adjustment',
+        idempotency_key: `test_init_${data.user.id}`,
+        description: 'Test harness initial credit grant',
+      });
+    }
   }
 
   // A dedicated client per user: signing one user out must not affect

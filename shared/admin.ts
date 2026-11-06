@@ -43,6 +43,15 @@ export const ADMIN_PERMISSIONS = [
   'moderation.read',
   'moderation.write',
   'audit.read',
+  'subscriptions.read',
+  'subscriptions.manage',
+  'payments.read',
+  'payments.confirm',
+  'credits.read',
+  'credits.grant',
+  'revenue.read',
+  'coupons.manage',
+  'plans.manage',
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -64,6 +73,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     'learning.write',
     'analytics.read',
     'moderation.read',
+    'subscriptions.read',
+    'revenue.read',
   ],
   opportunity_admin: [
     'opportunities.read',
@@ -78,6 +89,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     'learning.read',
     'moderation.read',
     'moderation.write',
+    'payments.read',
   ],
 };
 

@@ -246,6 +246,9 @@ export type CvExtractionQuality = 'high' | 'medium' | 'low' | 'failed';
 export interface CvUploadResult {
   success: boolean;
   cv?: CVProfile;
+  /** The CV the upload created, and the version it was stored as. */
+  cvId?: string;
+  cvVersionId?: string;
   extraction?: CvExtractionMetadata;
   extractionQuality?: CvExtractionQuality;
   atsAnalysis?: ATSAnalysis | null;

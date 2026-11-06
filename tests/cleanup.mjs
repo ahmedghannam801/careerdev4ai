@@ -106,6 +106,10 @@ const PROFILE_SCOPED_TABLES = [
   // wrote it, so a failed run cannot leave a test announcement behind.
   { table: 'announcements', column: 'created_by' },
   { table: 'admin_users', column: 'profile_id' },
+  // SaaS subscription & payment test records
+  { table: 'subscriptions', column: 'profile_id' },
+  { table: 'ai_credit_ledger', column: 'profile_id' },
+  { table: 'payment_requests', column: 'profile_id' },
 ];
 
 export function createAdminClient(env) {

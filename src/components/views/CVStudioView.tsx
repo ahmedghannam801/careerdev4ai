@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Sparkles, 
-  CheckCircle2, 
-  AlertCircle, 
-  Upload, 
-  Printer
+import {
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Upload,
+  Printer,
+  Gauge
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { BuiltCvPanel } from '../cv/BuiltCvPanel';
@@ -13,6 +14,7 @@ import { CvPreview } from '../cv/CvPreview';
 import { CvSectionEditor } from '../cv/CvSectionEditor';
 import { Reveal } from '../motion/Motion';
 import { CVImportModal } from '../cv/CVImportModal';
+import { CvMeasuredAnalysis } from '../cv/CvMeasuredAnalysis';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
 import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
@@ -20,7 +22,7 @@ import { useAIProcessing } from '../../lib/useAIProcessing';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
 import { CareerImage } from '../ui/CareerImage';
 
-export const CVStudioView: React.FC = () => {
+export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
   const {
     activeCV,
     updateCV,
@@ -340,6 +342,29 @@ export const CVStudioView: React.FC = () => {
       )}
 
       {/* TAB 2: ATS ANALYSIS */}
+      {/* The measured analysis comes first. It is counted from the document, so
+          it does not wait for a model and it does not change because a
+          provider was busy. */}
+      {activeTab === 'ats' && (
+        <>
+          <CvMeasuredAnalysis
+            cv={activeCV}
+            targetRoleTitle={targetRole.title}
+            targetRoleSkills={targetRole.requiredSkills.map(s => s.name)}
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => onNavigate?.('cv-analyzer')}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
+            >
+              <Gauge className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
+              {t('Open the CV Analyzer')}
+            </button>
+          </div>
+        </>
+      )}
+
       {activeTab === 'ats' && latestAnalysis && (
         <div className="space-y-6">
           {analysisRole.isStale && (

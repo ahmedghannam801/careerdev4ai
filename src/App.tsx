@@ -44,6 +44,7 @@ const ProjectsView = lazy(() => import('./components/views/ProjectsView').then((
 const VolunteerView = lazy(() => import('./components/views/VolunteerView').then((m) => ({ default: m.VolunteerView })));
 const EvidenceView = lazy(() => import('./components/views/EvidenceView').then((m) => ({ default: m.EvidenceView })));
 const CVStudioView = lazy(() => import('./components/views/CVStudioView').then((m) => ({ default: m.CVStudioView })));
+const CvAnalyzerView = lazy(() => import('./components/views/CvAnalyzerView').then((m) => ({ default: m.CvAnalyzerView })));
 const JobsView = lazy(() => import('./components/views/JobsView').then((m) => ({ default: m.JobsView })));
 const ApplicationsView = lazy(() => import('./components/views/ApplicationsView').then((m) => ({ default: m.ApplicationsView })));
 const InterviewsView = lazy(() => import('./components/views/InterviewsView').then((m) => ({ default: m.InterviewsView })));
@@ -54,6 +55,7 @@ const ProfileView = lazy(() => import('./components/views/ProfileView').then((m)
 const DocumentsView = lazy(() => import('./components/views/DocumentsView').then((m) => ({ default: m.DocumentsView })));
 const ActivityView = lazy(() => import('./components/views/ActivityView').then((m) => ({ default: m.ActivityView })));
 const AdminCenterView = lazy(() => import('./components/views/AdminCenterView').then((m) => ({ default: m.AdminCenterView })));
+const PricingView = lazy(() => import('./components/views/PricingView').then((m) => ({ default: m.PricingView })));
 
 /**
  * Extracts the username from `#/profile/<username>`. A plain `#/profile` is
@@ -357,7 +359,9 @@ function AppRoutes() {
       case 'evidence':
         return <EvidenceView />;
       case 'cv-studio':
-        return <CVStudioView />;
+        return <CVStudioView onNavigate={navigateTo} />;
+      case 'cv-analyzer':
+        return <CvAnalyzerView onNavigate={navigateTo} />;
       case 'documents':
         return <DocumentsView onNavigate={navigateTo} />;
       case 'jobs':
@@ -376,6 +380,8 @@ function AppRoutes() {
         return <SettingsView />;
       case 'admin':
         return <AdminCenterView />;
+      case 'pricing':
+        return <PricingView />;
       default:
         return <DashboardView onNavigate={navigateTo} onOpenCopilot={() => setCopilotOpen(true)} />;
     }

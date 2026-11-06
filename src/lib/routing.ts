@@ -32,6 +32,7 @@ export const APP_ROUTES = [
   'volunteer',
   'evidence',
   'cv-studio',
+  'cv-analyzer',
   'documents',
   'jobs',
   'applications',
@@ -41,6 +42,7 @@ export const APP_ROUTES = [
   'progress',
   'settings',
   'admin',
+  'pricing',
 ] as const;
 
 /** A view the signed-in application can show. */

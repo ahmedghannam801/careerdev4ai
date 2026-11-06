@@ -1208,6 +1208,26 @@ const METADATA_LABEL_PATTERN =
   /^(company|employer|organisation|organization|location|work location|office|city|seniority|experience level|job level|level|work arrangement|work mode|arrangement|mode|remote)\s*[:\-–—]/i;
 
 /**
+ * The marker an employer writes in front of a requirement.
+ *
+ * Only a bullet marker or a numbered list marker is removed. A leading number
+ * that belongs to the requirement itself — "3+ years of experience",
+ * "2024 - Present" — is part of the sentence, and removing it would turn the
+ * requirement into "+ years of experience" and hide the number the
+ * requirement is about.
+ */
+const BULLET_PREFIX_PATTERN = /^(?:[•\-*·–—)]\s*|\d+[.)](?:\s+|$))/;
+
+/**
+ * A heading the employer wrote on its own, such as "Requirements:".
+ *
+ * The heading introduces the lines that follow it. It is not itself a
+ * requirement, and counting it as one would charge the candidate for the
+ * employer's formatting.
+ */
+const PURE_SECTION_HEADING_PATTERN = /^[a-z][a-z\s/&.-]{0,40}:\s*$/i;
+
+/**
  * Reads a job description without a model.
  *
  * When the model is unavailable, the candidate still gets an analysis and an
@@ -1232,7 +1252,7 @@ export function extractDeterministicJobDescription(jdText: string): JobDescripti
 
   const entries = raw.map((line) => ({
     isBullet: /^[-•*·–—]/.test(line),
-    text: line.replace(/^[•\-*·–—\d.)\s]+/, '').trim(),
+    text: line.replace(BULLET_PREFIX_PATTERN, '').trim(),
   }));
 
   const lines = entries.map((entry) => entry.text).filter((text) => text.length > 2);
@@ -1273,6 +1293,9 @@ export function extractDeterministicJobDescription(jdText: string): JobDescripti
     // A labelled detail is metadata, not a requirement, and repeating it as a
     // keyword would count it twice in the score.
     if (METADATA_LABEL_PATTERN.test(line)) continue;
+    // A heading with nothing after it introduces the lines that follow it; it
+    // is not a requirement of its own.
+    if (PURE_SECTION_HEADING_PATTERN.test(line)) continue;
     const lower = line.toLowerCase();
 
     if (/(preferred|nice to have|desirable|a plus|bonus|advantage)/.test(lower)) {
