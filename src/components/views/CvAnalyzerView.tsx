@@ -388,7 +388,9 @@ export const CvAnalyzerView: React.FC<{ onNavigate?: (view: string) => void }> =
               )}
               {step.label}
             </span>
-            {index < steps.length - 1 && <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
+            {index < steps.length - 1 && (
+              <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)] rtl:rotate-180" />
+            )}
           </li>
         ))}
       </ol>
