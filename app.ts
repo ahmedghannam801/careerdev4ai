@@ -54,6 +54,7 @@ import {
 import { listCvMeasurements } from './server/db/cvMeasurements.ts';
 import { registerBackgroundJobRoutes } from './server/jobs/routes.ts';
 import { registerSubscriptionRoutes } from './server/subscriptions/routes.ts';
+import { registerStripeRoutes } from './server/stripe/routes.ts';
 import { requireEntitlement } from './server/subscriptions/entitlements.ts';
 import { requireCredits } from './server/credits/middleware.ts';
 import { boundedList } from './server/ai/boundedList.ts';
@@ -512,6 +513,10 @@ app.use((req: Request, res: Response, next: () => void) => {
 
   collectRequestBody(req)
     .then((buffer) => {
+      // Keep the exact bytes. Stripe signs the raw payload, and re-serialising
+      // the parsed JSON changes whitespace and key order, which invalidates
+      // the signature. The buffer is small: the same 15 MB ceiling applies.
+      (req as Request & { rawBody?: Buffer }).rawBody = buffer;
       const text = buffer.toString('utf8');
       if (contentType === 'application/json') {
         if (text.length === 0) {
@@ -7104,6 +7109,10 @@ app.patch(
 /* -------------------------------------------------------------------------- */
 registerSubscriptionRoutes(app);
 
+/* -------------------------------------------------------------------------- */
+/* Stripe card payments, subscriptions, and webhooks                          */
+/* -------------------------------------------------------------------------- */
+registerStripeRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* Public SEO pages                                                           */
