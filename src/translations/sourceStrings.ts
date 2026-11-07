@@ -25,6 +25,7 @@ import { applicationWorkflowAr } from './parts/applicationWorkflow.ts';
 import { commonAr } from './parts/common.ts';
 import { careerAr } from './parts/career.ts';
 import { cvAr } from './parts/cv.ts';
+import { cvExtractionAr } from './parts/cvExtraction.ts';
 import { dashboardAr } from './parts/dashboard.ts';
 import { discoveryAr } from './parts/discovery.ts';
 import { feedbackAr } from './parts/feedback.ts';
@@ -64,6 +65,7 @@ export const AR_STRINGS: Record<string, string> = {
   ...projectsAr,
   ...volunteerAr,
   ...cvAr,
+  ...cvExtractionAr,
   ...profileAr,
   ...settingsAr,
   ...tourAr,

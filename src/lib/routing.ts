@@ -180,6 +180,7 @@ export function resolveRouteId(hash: string, fallback: string): string {
  */
 export const CV_STUDIO_TABS = [
   'editor',
+  'review',
   'data',
   'job',
   'ats',

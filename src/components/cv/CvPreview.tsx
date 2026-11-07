@@ -44,6 +44,11 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv, language = 'en' }) => 
   const volunteering = cv.volunteering ?? [];
   const courses = cv.courses ?? [];
   const certificationDetails = cv.certificationDetails ?? [];
+  const internships = cv.internships ?? [];
+  const awards = cv.awards ?? [];
+  const publications = cv.publications ?? [];
+  const research = cv.research ?? [];
+  const leadership = cv.leadership ?? [];
 
   const contactParts = [cv.email, cv.phone, cv.location].filter(
     (value) => value && value.trim()
@@ -269,6 +274,118 @@ export const CvPreview: React.FC<CvPreviewProps> = ({ cv, language = 'en' }) => 
                 {course.provider ? ` — ${course.provider}` : ''}
                 {course.description && (
                   <p className="text-[11px] leading-relaxed text-slate-600">{course.description}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* The sections a CV carries beyond work, study and skills. They are
+          the sections the platform has no record type for, so they live on
+          the document — and a document that is not shown is a document the
+          candidate cannot check. */}
+      {internships.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
+            {heading('internships')}
+          </h3>
+          <ul className="space-y-1.5">
+            {internships.map((entry) => (
+              <li key={entry.id} className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">
+                  {entry.role}
+                  {entry.organization ? ` — ${entry.organization}` : ''}
+                </span>
+                {entry.period ? ` · ${entry.period}` : ''}
+                {entry.description && (
+                  <p className="text-[11px] leading-relaxed text-slate-600">{entry.description}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {awards.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
+            {heading('awards')}
+          </h3>
+          <ul className="space-y-1">
+            {awards.map((entry) => (
+              <li key={entry.id} className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">{entry.title}</span>
+                {entry.issuer ? ` — ${entry.issuer}` : ''}
+                {entry.date ? ` (${entry.date})` : ''}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {publications.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
+            {heading('publications')}
+          </h3>
+          <ul className="space-y-1">
+            {publications.map((entry) => (
+              <li key={entry.id} className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">{entry.title}</span>
+                {entry.publisher ? ` — ${entry.publisher}` : ''}
+                {entry.date ? ` (${entry.date})` : ''}
+                {entry.url && (
+                  <a
+                    href={entry.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="block text-[11px] text-[var(--color-primary-text)] underline break-all"
+                  >
+                    {entry.url}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {research.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
+            {heading('research')}
+          </h3>
+          <ul className="space-y-1.5">
+            {research.map((entry) => (
+              <li key={entry.id} className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">{entry.title}</span>
+                {entry.institution ? ` — ${entry.institution}` : ''}
+                {entry.period ? ` · ${entry.period}` : ''}
+                {entry.description && (
+                  <p className="text-[11px] leading-relaxed text-slate-600">{entry.description}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {leadership.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-1">
+            {heading('leadership')}
+          </h3>
+          <ul className="space-y-1.5">
+            {leadership.map((entry) => (
+              <li key={entry.id} className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">
+                  {entry.role}
+                  {entry.organization ? ` — ${entry.organization}` : ''}
+                </span>
+                {entry.period ? ` · ${entry.period}` : ''}
+                {entry.description && (
+                  <p className="text-[11px] leading-relaxed text-slate-600">{entry.description}</p>
                 )}
               </li>
             ))}

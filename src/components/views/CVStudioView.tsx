@@ -15,7 +15,10 @@ import { CvSectionEditor } from '../cv/CvSectionEditor';
 import { Reveal } from '../motion/Motion';
 import { CVImportModal } from '../cv/CVImportModal';
 import { CvMeasuredAnalysis } from '../cv/CvMeasuredAnalysis';
+import { CvAnalysisPanel } from '../cv/CvAnalysisPanel';
+import { CvReviewWorkspace } from '../cv/CvReviewWorkspace';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
+import type { CvAnalysisReport } from '../../../shared/cvAnalysis';
 import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
@@ -54,6 +57,10 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionName, setVersionName] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  // The measurement of this document. The editor shows the advice it holds
+  // next to the section each piece of advice is about, so the two cannot
+  // drift apart: they come from the same report.
+  const [measuredReport, setMeasuredReport] = useState<CvAnalysisReport | null>(null);
   const { run: runAIProcessing, isRunning: isAtsAuditRunning, modal: aiProcessingModal } = useAIProcessing();
 
   /**
@@ -255,6 +262,16 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           {t('Document Editor & Preview')}
         </button>
         <button
+          onClick={() => setActiveTab('review')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            activeTab === 'review'
+              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          {t('Import & Review')}
+        </button>
+        <button
           data-tour="cv-data-tab"
           onClick={() => setActiveTab('data')}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -314,6 +331,16 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       {/* TAB 0: THE RECORDS THE CV IS BUILT FROM */}
       {activeTab === 'data' && <CvDataManager />}
 
+      {/* The import that is also a review. The document is read first and
+          nothing is written until the candidate has looked at it. */}
+      {activeTab === 'review' && (
+        <CvReviewWorkspace
+          onApplied={() => {
+            setActiveTab('editor');
+          }}
+        />
+      )}
+
       {/* TAB 0: THE CV ASSEMBLED FROM THE USER'S OWN RECORDS */}
       {activeTab === 'built' && <BuiltCvPanel />}
 
@@ -333,6 +360,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               targetRoleTitle={targetRole.title}
               source={editorSource}
               ratedSkills={ratedSkills}
+              advice={measuredReport}
             />
 
             <button
@@ -373,6 +401,16 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
             cv={activeCV}
             targetRoleTitle={targetRole.title}
             targetRoleSkills={targetRole.requiredSkills.map(s => s.name)}
+            onMeasured={setMeasuredReport}
+          />
+          {/* The analyzer's own run, now part of the studio.
+              The CV Analyzer page used to be a separate place with a
+              separate upload; this is the same measurement, with the same
+              stages and the same history, reachable without leaving the
+              document the candidate is working on. */}
+          <CvAnalysisPanel
+            cv={activeCV}
+            jobDescription={jobDescriptionState.jobDescription}
           />
           <div className="flex justify-end">
             <button

@@ -54,6 +54,65 @@ export interface ParsedCvProject {
   bullets: string[];
 }
 
+/** One internship placement, as it was read out of the document. */
+export interface ParsedCvInternship {
+  id: string;
+  organization: string;
+  role: string;
+  period: string;
+  location: string;
+  bullets: string[];
+  startDate?: string;
+  endDate?: string;
+  isCurrent?: boolean;
+}
+
+/** One language the document listed. */
+export interface ParsedCvLanguage {
+  id: string;
+  name: string;
+  level: string;
+}
+
+/** One award or honour, as it was read out of the document. */
+export interface ParsedCvAward {
+  id: string;
+  title: string;
+  issuer: string;
+  date: string;
+  description: string;
+}
+
+/** One publication, as it was read out of the document. */
+export interface ParsedCvPublication {
+  id: string;
+  title: string;
+  publisher: string;
+  date: string;
+  url: string;
+  description: string;
+}
+
+/** One piece of research work, as it was read out of the document. */
+export interface ParsedCvResearch {
+  id: string;
+  title: string;
+  institution: string;
+  period: string;
+  description: string;
+  bullets: string[];
+}
+
+/** One leadership or committee role, as it was read out of the document. */
+export interface ParsedCvLeadership {
+  id: string;
+  organization: string;
+  role: string;
+  period: string;
+  description: string;
+  bullets: string[];
+}
+
 export interface ParsedCv {
   documentType: 'cv';
   fullName: string;
@@ -66,6 +125,7 @@ export interface ParsedCv {
   github: string;
   website: string;
   experiences: ParsedCvExperience[];
+  internships: ParsedCvInternship[];
   education: ParsedCvEducation[];
   projects: ParsedCvProject[];
   skillsList: string[];
@@ -81,6 +141,13 @@ export interface ParsedCv {
     /** The identifier the issuing body printed on the certificate. */
     credentialId: string;
   }>;
+  courses: Array<{ id: string; title: string; provider: string; date: string; description: string }>;
+  languages: ParsedCvLanguage[];
+  volunteering: ParsedCvInternship[];
+  awards: ParsedCvAward[];
+  publications: ParsedCvPublication[];
+  research: ParsedCvResearch[];
+  leadership: ParsedCvLeadership[];
 }
 
 export interface CvConfidence {
@@ -92,6 +159,14 @@ export interface CvConfidence {
   skills: number;
   projects: number;
   certifications: number;
+  internships: number;
+  courses: number;
+  languages: number;
+  volunteering: number;
+  awards: number;
+  publications: number;
+  research: number;
+  leadership: number;
 }
 
 export interface CvEvidence {
@@ -112,16 +187,23 @@ export interface CvExtractionMetadata {
   warnings: string[];
 }
 
-type SectionKey =
+export type SectionKey =
   | 'header'
   | 'contact'
   | 'summary'
   | 'experience'
+  | 'internships'
   | 'education'
   | 'skills'
   | 'projects'
   | 'certifications'
+  | 'courses'
   | 'languages'
+  | 'volunteering'
+  | 'awards'
+  | 'publications'
+  | 'research'
+  | 'leadership'
   | 'other';
 
 interface SectionHeading {
@@ -147,45 +229,80 @@ interface DateRange {
 const SECTION_PATTERNS: Array<{ key: SectionKey; pattern: RegExp }> = [
   {
     key: 'contact',
-    pattern: /^(?:contact(?:\s+details|\s+information)?|personal\s+details|contact\s+info)$/i,
+    pattern:
+      /^(?:contact(?:\s+details|\s+information)?|personal\s+details|contact\s+info|معلومات?\s+التواصل|بيانات?\s+التواصل|التواصل|معلومات?\s+شخصية)$/iu,
   },
   {
     key: 'summary',
     pattern:
-      /^(?:professional\s+summary|career\s+summary|executive\s+summary|summary|profile|about(?:\s+me)?|career\s+objective|objective|professional\s+profile)$/i,
+      /^(?:professional\s+summary|career\s+summary|executive\s+summary|summary|profile|about(?:\s+me)?|career\s+objective|objective|professional\s+profile|الملخص(?:\s+المهني)?|نبذة(?:\s+تعريفية)?(?:\s+عني)?|نبذة\s+عن\s+ moi|الهدف\s+المهني|ملخص)$/iu,
   },
   {
     key: 'experience',
     pattern:
-      /^(?:work\s+experience|professional\s+experience|employment\s+(?:history|experience)|work\s+history|career\s+history|experience|employment)$/i,
+      /^(?:work\s+experience|professional\s+experience|employment\s+(?:history|experience)|work\s+history|career\s+history|experience|employment|الخبرة\s+العملية|الخبرات|الخبرة|سجل\s+العمل|العمل|الخلفية\s+الوظيفية)$/iu,
+  },
+  {
+    key: 'internships',
+    pattern:
+      /^(?:internships?|internship\s+(?:experience|programme|program)|placements?|التدريبات?|فترات?\s+التدريب|تدريبات)$/iu,
   },
   {
     key: 'education',
     pattern:
-      /^(?:education(?:\s+and\s+training)?|academic\s+(?:background|history|qualifications)|educational\s+background|qualifications|education)$/i,
+      /^(?:education(?:\s+and\s+training)?|academic\s+(?:background|history|qualifications)|educational\s+background|qualifications|المؤهلات(?:\s+العلمية)?|التعليم|الدرجات\s+العلمية|الشهادات\s+الجامعية|الخلفية\s+التعليمية)$/iu,
   },
   {
     key: 'skills',
     pattern:
-      /^(?:technical\s+skills|core\s+skills|key\s+skills|professional\s+skills|skills(?:\s+and\s+tools)?|core\s+competencies|competencies|areas\s+of\s+expertise|technologies|tools(?:\s+and\s+technologies)?|tech\s+stack)$/i,
+      /^(?:technical\s+skills|core\s+skills|key\s+skills|professional\s+skills|skills(?:\s+and\s+tools)?|core\s+competencies|competencies|areas\s+of\s+expertise|technologies|tools(?:\s+and\s+technologies)?|tech\s+stack|المهارات(?:\s+الفنية|\s+الأساسية)?|الكفاءات|المهارات\s+والأدوات|التقنيات)$/iu,
   },
   {
     key: 'projects',
-    pattern: /^(?:key\s+projects|selected\s+projects|personal\s+projects|technical\s+projects|projects|portfolio)$/i,
+    pattern: /^(?:key\s+projects|selected\s+projects|personal\s+projects|technical\s+projects|projects|portfolio|المشاريع|مشاريع|أعمال)$/iu,
   },
   {
     key: 'certifications',
     pattern:
-      /^(?:certifications?|certificates?|licenses?(?:\s+and\s+certifications?)?|credentials|professional\s+development|courses|training)$/i,
+      /^(?:certifications?|certificates?|licenses?(?:\s+and\s+certifications?)?|credentials|professional\s+development|الشهادات(?:\s+المهنية)?|الاعتمادات|التراخيص|التطوير\s+المهني)$/iu,
+  },
+  {
+    key: 'courses',
+    pattern:
+      /^(?:courses?|training(?:\s+(?:and\s+certifications|courses))?|completed\s+courses?|الدورات?(?:\s+التدريبية|\s+المكتملة)?|التدريب|الدورات\s+المكتملة)$/iu,
   },
   {
     key: 'languages',
-    pattern: /^(?:languages(?:\s+spoken|\s+proficiency)?|spoken\s+languages)$/i,
+    pattern:
+      /^(?:languages(?:\s+spoken|\s+proficiency)?|spoken\s+languages|اللغات(?:\s+المتحدثة)?|المهارات\s+اللغوية)$/iu,
+  },
+  {
+    key: 'volunteering',
+    pattern:
+      /^(?:volunteer(?:ing)?(?:\s+experience)?|community\s+service|العمل\s+التطوعي|التطوع|الأنشطة\s+التطوعية)$/iu,
+  },
+  {
+    key: 'awards',
+    pattern: /^(?:awards?|honou?rs?|الجوائز?(?:\s+والتكريم)?|التكريم)$/iu,
+  },
+  {
+    key: 'publications',
+    pattern:
+      /^(?:publications?|published\s+works?|papers?|المنشورات|مقالات|الأبحاث\s+المنشورة|النشر)$/iu,
+  },
+  {
+    key: 'research',
+    pattern: /^(?:research(?:\s+(?:work|experience|projects))?|الأبحاث|البحث\s+العلمي|البحوث)$/iu,
+  },
+  {
+    key: 'leadership',
+    pattern:
+      /^(?:leadership|leadership\s+and\s+volunteering|committee\s+roles?|القيادة|الأدوار\s+القيادية|الأنشطة\s+القيادية)$/iu,
   },
   {
     key: 'other',
     pattern:
-      /^(?:interests|hobbies|references|awards|achievements|publications|volunteer(?:\s+experience)?|additional\s+information)$/i,
+      /^(?:interests|hobbies|references|achievements|additional\s+information|الهوايات|المراجع|معلومات\s+إضافية)$/iu,
   },
 ];
 
@@ -204,8 +321,10 @@ function matchSectionHeading(text: string): SectionHeading | null {
     if (entry.pattern.test(clean)) return { key: entry.key, remainder: '' };
   }
 
-  // "SKILLS: SQL, Python" is a heading and content on one line.
-  const inline = text.match(/^([A-Za-z][A-Za-z &/]+?)\s*:\s*(.+)$/);
+  // "SKILLS: SQL, Python" is a heading and content on one line. The same
+  // shape appears in an Arabic CV ("المهارات: SQL, Python"), so the heading
+  // part is any run of letters rather than only Latin ones.
+  const inline = text.match(/^([\p{L}][\p{L} &/]+?)\s*:\s*(.+)$/u);
   if (inline) {
     const heading = cleanHeadingCandidate(inline[1]);
     if (heading.length <= 40) {
@@ -231,20 +350,51 @@ function stripBullet(text: string): string {
 /* Dates                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const MONTHS: Array<[RegExp, number, string]> = [
-  [/^jan(?:uary)?\.?$/i, 1, 'Jan'],
-  [/^feb(?:ruary)?\.?$/i, 2, 'Feb'],
-  [/^mar(?:ch)?\.?$/i, 3, 'Mar'],
-  [/^apr(?:il)?\.?$/i, 4, 'Apr'],
-  [/^may\.?$/i, 5, 'May'],
-  [/^jun(?:e)?\.?$/i, 6, 'Jun'],
-  [/^jul(?:y)?\.?$/i, 7, 'Jul'],
-  [/^aug(?:ust)?\.?$/i, 8, 'Aug'],
-  [/^sep(?:t(?:ember)?)?\.?$/i, 9, 'Sep'],
-  [/^oct(?:ober)?\.?$/i, 10, 'Oct'],
-  [/^nov(?:ember)?\.?$/i, 11, 'Nov'],
-  [/^dec(?:ember)?\.?$/i, 12, 'Dec'],
+/**
+ * The months a CV may name them by.
+ *
+ * Each entry is the pattern that recognises the month, the number, the
+ * English short name and the Arabic one. The document's own wording is
+ * kept: an Arabic CV keeps its Arabic months, because the period a
+ * candidate wrote is part of what they wrote.
+ */
+const MONTHS: Array<[RegExp, number, string, string]> = [
+  [/^jan(?:uary)?\.?$/i, 1, 'Jan', 'يناير'],
+  [/^feb(?:ruary)?\.?$/i, 2, 'Feb', 'فبراير'],
+  [/^mar(?:ch)?\.?$/i, 3, 'Mar', 'مارس'],
+  [/^apr(?:il)?\.?$/i, 4, 'Apr', 'أبريل'],
+  [/^may\.?$/i, 5, 'May', 'مايو'],
+  [/^jun(?:e)?\.?$/i, 6, 'Jun', 'يونيو'],
+  [/^jul(?:y)?\.?$/i, 7, 'Jul', 'يوليو'],
+  [/^aug(?:ust)?\.?$/i, 8, 'Aug', 'أغسطس'],
+  [/^sep(?:t(?:ember)?)?\.?$/i, 9, 'Sep', 'سبتمبر'],
+  [/^oct(?:ober)?\.?$/i, 10, 'Oct', 'أكتوبر'],
+  [/^nov(?:ember)?\.?$/i, 11, 'Nov', 'نوفمبر'],
+  [/^dec(?:ember)?\.?$/i, 12, 'Dec', 'ديسمبر'],
+  // The Arabic names of the months.
+  [/^يناير$/, 1, 'Jan', 'يناير'],
+  [/^فبراير$/, 2, 'Feb', 'فبراير'],
+  [/^مارس$/, 3, 'Mar', 'مارس'],
+  [/^أبريل$|^ابريل$/, 4, 'Apr', 'أبريل'],
+  [/^مايو$/, 5, 'May', 'مايو'],
+  [/^يونيو$/, 6, 'Jun', 'يونيو'],
+  [/^يوليو$/, 7, 'Jul', 'يوليو'],
+  [/^أغسطس$|^اغسطس$/, 8, 'Aug', 'أغسطس'],
+  [/^سبتمبر$/, 9, 'Sep', 'سبتمبر'],
+  [/^أكتوبر$|^اكتوبر$/, 10, 'Oct', 'أكتوبر'],
+  [/^نوفمبر$/, 11, 'Nov', 'نوفمبر'],
+  [/^ديسمبر$/, 12, 'Dec', 'ديسمبر'],
 ];
+
+/** True when the text is written in Arabic. */
+function isArabicText(value: string): boolean {
+  return /[\u0600-\u06FF]/.test(value);
+}
+
+/** The short name of a month, in the language the document is written in. */
+function monthDisplay(entry: [RegExp, number, string, string], arabic: boolean): string {
+  return arabic ? entry[3] : entry[2];
+}
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -259,14 +409,27 @@ interface NormalizedDateToken {
 }
 
 function normalizeDateToken(raw: string): NormalizedDateToken | null {
+  // The strip is Unicode-aware on purpose: a date written in Arabic is
+  // written in Arabic letters, and a strip that only knows ASCII would
+  // remove every one of them.
   const token = raw
     .replace(/\s+/g, ' ')
-    .replace(/^[^\w\d]+|[^\w\d]+$/g, '')
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
     .trim();
   if (!token) return null;
 
-  if (/^(present|current|now|today)$/i.test(token)) {
-    return { iso: '', display: 'Present', year: 0, month: 0, isCurrent: true };
+  if (
+  /^(present|current|now|today)$/i.test(token) ||
+  /^(حتى الآن|حتى الان|الآن|الان|حالياً|حاليا|مستمرة|حالي)$/.test(token)
+) {
+    const arabic = isArabicText(token);
+    return {
+      iso: '',
+      display: arabic ? 'حتى الآن' : 'Present',
+      year: 0,
+      month: 0,
+      isCurrent: true,
+    };
   }
 
   // YYYY-MM-DD
@@ -287,15 +450,16 @@ function normalizeDateToken(raw: string): NormalizedDateToken | null {
   }
 
   // Month YYYY / Mon YYYY / Mon 'YY
-  const monthYear = token.match(/^([A-Za-z]+)\.?\s*['’]?(\d{2,4})$/);
+  const monthYear = token.match(/^([\p{L}]+)\.?\s*['’]?(\d{2,4})$/u);
   if (monthYear) {
     const monthEntry = MONTHS.find(([regex]) => regex.test(monthYear[1]));
     if (monthEntry) {
       let year = Number(monthYear[2]);
       if (year < 100) year += year >= 70 ? 1900 : 2000;
+      const arabic = isArabicText(monthYear[1]);
       return {
         iso: `${year}-${pad2(monthEntry[1])}-01`,
-        display: `${monthEntry[2]} ${year}`,
+        display: `${monthDisplay(monthEntry, arabic)} ${year}`,
         year,
         month: monthEntry[1],
         isCurrent: false,
@@ -354,10 +518,20 @@ function normalizeDateToken(raw: string): NormalizedDateToken | null {
   return null;
 }
 
+/**
+ * The months a date may name, in the languages a CV is written in.
+ *
+ * The Arabic names are listed one by one rather than as a general rule: a
+ * general rule would match every word in the document, and a date range is
+ * found by matching a month, not by guessing.
+ */
+const ARABIC_MONTH_SOURCE =
+  '(?:يناير|فبراير|مارس|أبريل|ابريل|مايو|يونيو|يوليو|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر)';
+
 const DATE_TOKEN_SOURCE =
-  '(?:[A-Za-z]{3,9}\\.?\\s*[\'’]?\\d{2,4}|\\d{1,2}[./-]\\d{4}|\\d{4}[./-]\\d{1,2}|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{4})';
+  `(?:${ARABIC_MONTH_SOURCE}\\s*\\d{2,4}|[A-Za-z]{3,9}\\.?\\s*['’]?\\d{2,4}|\\d{1,2}[./-]\\d{4}|\\d{4}[./-]\\d{1,2}|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{4})`;
 const DATE_RANGE_REGEX = new RegExp(
-  `(${DATE_TOKEN_SOURCE})\\s*(?:–|—|-|to|until|through|\\u2013|\\u2014)\\s*(${DATE_TOKEN_SOURCE}|present|current|now)`,
+  `(${DATE_TOKEN_SOURCE})\\s*(?:–|—|-|to|until|through|\\u2013|\\u2014)\\s*(${DATE_TOKEN_SOURCE}|present|current|now|حتى\\s+الآن|حتى\\s+الان|الآن|الان|حالياً|حاليا)`,
   'i'
 );
 
@@ -430,7 +604,10 @@ function isLocationText(value: string): boolean {
     return false;
   }
   // City, Country / City, State / City, Country (Remote)
-  if (!/^[\p{L}][\p{L}.'’ -]{1,40},\s*[\p{L}][\p{L}.'’() -]{1,40}$/u.test(text)) {
+  //
+  // The Arabic comma is its own character, and an Arabic CV uses it, so the
+  // pattern has to know about it.
+  if (!/^[\p{L}][\p{L}.'’ -]{1,40}[,،]\s*[\p{L}][\p{L}.'’() -]{1,40}$/u.test(text)) {
     return false;
   }
   return true;
@@ -456,11 +633,28 @@ function findLocation(blocks: DocumentBlock[]): { location: string; evidence?: D
   return { location: '' };
 }
 
+/**
+ * The words that mean "this line is a section heading", not a name.
+ *
+ * The Arabic half matters: without it the Arabic heading "الملخص المهني"
+ * is a two-word line of letters, and the reader takes it for a name.
+ */
 const NAME_EXCLUSIONS =
   /\b(resume|curriculum\s+vitae|cv|profile|summary|contact|experience|education|skills|projects|certifications|languages|objective|portfolio|linkedin|github)\b/i;
+const ARABIC_NAME_EXCLUSIONS =
+  /^(?:السيرة\s+الذاتية|السيرة|الملخص|الملخص\s+المهني|النبذة|نبذة|التواصل|معلومات\s+التواصل|البيانات\s+الشخصية|الخبرة|الخبرة\s+العملية|العمل|التعليم|المؤهلات|المؤهلات\s+العلمية|المهارات|المشاريع|الشهادات|الشهادات\s+المهنية|اللغات|الهدف\s+المهني|الدورات|التدريب|التدريبات|العمل\s+التطوعي|الجوائز|الأبحاث|المنشورات|القيادة|باسم|للتواصل|للتقديم)$/;
 
+/**
+ * The words that name a job.
+ *
+ * A line that names a job is a title, never a person's name, so the two
+ * lexicons have to cover the same languages — otherwise an Arabic CV puts
+ * its title where its name belongs.
+ */
 const ROLE_WORDS =
   /\b(engineer|engineering|developer|analyst|manager|director|consultant|specialist|coordinator|designer|architect|scientist|administrator|officer|accountant|auditor|teacher|professor|nurse|doctor|physician|technician|representative|executive|associate|lead|intern|trainee|researcher|strategist|planner|buyer|recruiter|marketer|writer|editor|producer|therapist|lawyer|attorney|paralegal|chef|driver|agent|supervisor|head|chief|owner|founder|president|vice\s+president)\b/i;
+const ARABIC_ROLE_WORDS =
+  /(?:\b(?:مهندس|محلل|مدير|اختصاصي|أخصائي|منسق|مصمم|باحث|محاسب|مدرس|طبيب|فني|مندوب|مسؤول|رئيس|مؤسس|متدرب|خريج|طالب|مساعد|شريك|مستشار|مخطط|مشتغل|عامل)\b|محلل\s+بيانات|مهندس\s+برمجيات|مهندس\s+خلفيه)/;
 
 function titleCaseName(value: string): string {
   return value
@@ -480,14 +674,20 @@ function findName(headerBlocks: DocumentBlock[]): { name: string; evidence?: Doc
     const text = block.text.trim();
     if (!text || text.length > 60) continue;
     if (EMAIL_REGEX.test(text) || URL_REGEX.test(text) || /\d/.test(text)) continue;
-    if (NAME_EXCLUSIONS.test(text) || ROLE_WORDS.test(text)) continue;
+    if (NAME_EXCLUSIONS.test(text) || ARABIC_NAME_EXCLUSIONS.test(text)) continue;
+    if (ROLE_WORDS.test(text) || ARABIC_ROLE_WORDS.test(text)) continue;
     if (/[:|@]/.test(text)) continue;
     const words = text.split(/\s+/).filter(Boolean);
     if (words.length < 2 || words.length > 4) continue;
     if (!words.every((word) => /^[\p{L}][\p{L}.'’ -]*$/u.test(word))) continue;
     const capitalized = words.every(
       (word) =>
-        /^[A-Z\p{Lu}]/u.test(word) || /^[A-Z]{2,}$/.test(word) || word.includes('-')
+        /^[A-Z\p{Lu}]/u.test(word) ||
+        /^[A-Z]{2,}$/.test(word) ||
+        word.includes('-') ||
+        // A script with no case — Arabic, for one — has nothing to
+        // capitalise, so there is nothing for the rule to check.
+        !/\p{Lu}|\p{Ll}/u.test(word)
     );
     if (!capitalized) continue;
     const score =
@@ -517,10 +717,10 @@ function findTitle(
     const text = block.text.trim();
     if (!text || text.length < 2 || text.length > 80) continue;
     if (EMAIL_REGEX.test(text) || URL_REGEX.test(text) || /\d/.test(text)) continue;
-    if (matchSectionHeading(text) || NAME_EXCLUSIONS.test(text)) continue;
+    if (matchSectionHeading(text) || NAME_EXCLUSIONS.test(text) || ARABIC_NAME_EXCLUSIONS.test(text)) continue;
     const words = text.split(/\s+/).filter(Boolean);
     if (words.length > 8) continue;
-    if (!ROLE_WORDS.test(text)) continue;
+    if (!ROLE_WORDS.test(text) && !ARABIC_ROLE_WORDS.test(text)) continue;
     return { title: text.replace(/\s*[|•·].*$/, '').trim(), evidence: block };
   }
   return { title: '' };
@@ -531,12 +731,23 @@ function findTitle(
 /* -------------------------------------------------------------------------- */
 
 function looksLikeRole(value: string): boolean {
-  return ROLE_WORDS.test(value);
+  return ROLE_WORDS.test(value) || ARABIC_ROLE_WORDS.test(value);
 }
 
+/**
+ * The words that name an organisation.
+ *
+ * The Arabic half matters for the same reason the role words do: a line
+ * that names an organisation is a company, not a job title.
+ */
+const ARABIC_COMPANY_WORDS =
+  /(?:\b(?:شركه|مجموعة|مجموعات|جامعة|جامعه|معهد|مؤسسة|موؤسسة|بنك|مستشفى|مستشفي|عياده|وكالة|استوديو|حلول|انظمة|خدمات|استشارات|شركاء|جمعيه|فريق|مكتب)\b|مجموعة\s+)/;
+
 function looksLikeCompany(value: string): boolean {
-  return /\b(inc|llc|ltd|limited|corp|corporation|company|co\.|group|holdings|bank|university|college|institute|hospital|clinic|agency|studio|labs?|technologies|solutions|systems|services|consulting|partners|associates|foundation|ngo)\b/i.test(
-    value
+  return (
+    /\b(inc|llc|ltd|limited|corp|corporation|company|co\.|group|holdings|bank|university|college|institute|hospital|clinic|agency|studio|labs?|technologies|solutions|systems|services|consulting|partners|associates|foundation|ngo)\b/i.test(
+      value
+    ) || ARABIC_COMPANY_WORDS.test(value)
   );
 }
 
@@ -582,7 +793,149 @@ function isExperienceHeaderLine(value: string): boolean {
   return false;
 }
 
-function parseExperience(blocks: DocumentBlock[]): ParsedCvExperience[] {
+/**
+ * The column labels a CV table uses, and what each one means.
+ *
+ * A CV table says what each column holds by labelling it, so the labels
+ * are the only thing that tells the reader which value is the role and
+ * which is the company.
+ */
+const TABLE_COLUMN_LABELS: Record<string, string> = {
+  period: 'period',
+  dates: 'period',
+  date: 'period',
+  'date range': 'period',
+  role: 'role',
+  position: 'role',
+  'job title': 'role',
+  title: 'role',
+  company: 'company',
+  employer: 'company',
+  organisation: 'company',
+  organization: 'company',
+  location: 'location',
+  place: 'location',
+  'المدة': 'period',
+  'الفترة': 'period',
+  'الوظيفة': 'role',
+  'المسمى': 'role',
+  'الشركة': 'company',
+  'جهة العمل': 'company',
+  'الموقع': 'location',
+};
+
+/**
+ * Reads a section that is written as a table.
+ *
+ * A CV table puts the label in the first cell of each column and the rows
+ * under it, so the reader meets the cells one after the other: a label,
+ * the values of that column, the next label, and so on. The values have
+ * to be put back into rows before they can be read as roles.
+ *
+ * It returns null when the section is not a table, and the ordinary reader
+ * takes it from there.
+ */
+function parseTableRoles(blocks: DocumentBlock[]): ParsedCvExperience[] | null {
+  const labels: Array<{ index: number; kind: string }> = [];
+  for (let index = 0; index < blocks.length; index += 1) {
+    const text = blocks[index].text.trim().toLowerCase().replace(/[:：\s]+$/, '');
+    const kind = TABLE_COLUMN_LABELS[text];
+    if (kind) labels.push({ index, kind });
+  }
+  if (labels.length < 2) return null;
+
+  // The columns have to be the same width for the section to be a table.
+  const stride = labels[1].index - labels[0].index;
+  if (stride < 2) return null;
+  for (let index = 1; index < labels.length; index += 1) {
+    if (labels[index].index - labels[index - 1].index !== stride) return null;
+  }
+
+  const columns = new Map<string, string[]>();
+  for (let index = 0; index < labels.length; index += 1) {
+    const start = labels[index].index + 1;
+    const end = index + 1 < labels.length ? labels[index + 1].index : blocks.length;
+    columns.set(labels[index].kind, blocks.slice(start, end).map((block) => block.text.trim()));
+  }
+
+  const periods = columns.get('period') ?? [];
+  const roles = columns.get('role') ?? [];
+  const companies = columns.get('company') ?? [];
+  const locations = columns.get('location') ?? [];
+  const rowCount = Math.max(periods.length, roles.length, companies.length);
+  if (rowCount === 0) return null;
+
+  const experiences: ParsedCvExperience[] = [];
+  for (let row = 0; row < rowCount; row += 1) {
+    const raw = periods[row] ?? '';
+    const range = parseDateRange(raw);
+    const role = roles[row] ?? '';
+    const company = companies[row] ?? '';
+    if (!role && !company) continue;
+    experiences.push({
+      id: '',
+      role,
+      company,
+      period: range?.period ?? raw,
+      location: locations[row] ?? '',
+      bullets: [],
+      startDate: range?.startDate,
+      endDate: range?.endDate,
+      isCurrent: range?.isCurrent,
+    });
+  }
+
+  return experiences.length ? experiences : null;
+}
+
+/**
+ * A placement written as a season rather than as a range.
+ *
+ * "Summer 2019" is how an internship is dated, and it is a period the
+ * candidate wrote, so it is kept as it stands rather than turned into a
+ * range the document never said.
+ */
+const SEASON_PERIODS: Record<string, [number, number]> = {
+  spring: [3, 6],
+  summer: [6, 9],
+  autumn: [9, 12],
+  fall: [9, 12],
+  winter: [12, 12],
+};
+
+function parseSeasonPeriod(text: string): { period: string; startDate: string; endDate: string } | null {
+  const match = text.match(/^(spring|summer|autumn|fall|winter)\s+((?:19|20)\d{2})$/i);
+  if (!match) return null;
+  const year = Number(match[2]);
+  const months = SEASON_PERIODS[match[1].toLowerCase()];
+  if (!months) return null;
+  return {
+    period: `${match[1]} ${year}`,
+    startDate: `${year}-${pad2(months[0])}-01`,
+    endDate: `${year}-${pad2(months[1])}-28`,
+  };
+}
+
+/**
+ * Reads a section of roles: work experience, internships, volunteering or
+ * leadership.
+ *
+ * The four sections are written the same way in every CV — a role, an
+ * organisation, sometimes a place and a date range — so they are read by the
+ * same reader. What differs is only what the section is called, and that is
+ * decided before the reader is called.
+ *
+ * A section written as a table is read by the table reader instead: the
+ * labels say which column is which, and reading the cells in the order
+ * they appear would put the header row in the work history.
+ */
+export function parseExperience(blocks: DocumentBlock[]): ParsedCvExperience[] {
+  const table = parseTableRoles(blocks);
+  if (table) {
+    return table
+      .slice(0, 20)
+      .map((entry, index) => ({ ...entry, id: `exp-${index + 1}` }));
+  }
   const experiences: ParsedCvExperience[] = [];
   let current: ParsedCvExperience | null = null;
   let pendingRange: DateRange | null = null;
@@ -614,6 +967,34 @@ function parseExperience(blocks: DocumentBlock[]): ParsedCvExperience[] {
 
     const range = parseDateRange(raw);
     const bullet = isBulletLine(raw);
+
+    // A placement written as a season — "Summer 2019 | Cairo, Egypt" — is a
+    // period the candidate wrote. It is kept as it stands rather than being
+    // read as a role.
+    const season = range ? null : parseSeasonPeriod(raw.split(/\s*[|·]\s*/)[0].trim());
+    if (season) {
+      const remainder = raw.slice(raw.indexOf(season.period) + season.period.length).replace(/^[\s|,;:–—-]+/, '').trim();
+      if (current && !current.period) {
+        current.period = season.period;
+        current.startDate = season.startDate;
+        current.endDate = season.endDate;
+        if (!current.location && isLocationText(remainder)) current.location = remainder;
+        continue;
+      }
+      if (!current) {
+        pendingRange = {
+          startDate: season.startDate,
+          endDate: season.endDate,
+          isCurrent: false,
+          period: season.period,
+          startIndex: 0,
+          endIndex: 0,
+          startDisplay: season.period,
+          endDisplay: season.period,
+        };
+        continue;
+      }
+    }
 
     if (bullet) {
       const text = stripBullet(raw);
@@ -744,8 +1125,20 @@ function parseExperience(blocks: DocumentBlock[]): ParsedCvExperience[] {
 const DEGREE_REGEX =
   /\b(ph\.?\s?d\.?|d\.?phil|m\.?b\.?a|b\.?s\.?c\.?|m\.?s\.?c\.?|b\.?a\.?|m\.?a\.?|b\.?eng\.?|m\.?eng\.?|bachelor(?:'s)?(?:\s+of\s+[A-Za-z ]+)?|master(?:'s)?(?:\s+of\s+[A-Za-z ]+)?|associate(?:'s)?(?:\s+of\s+[A-Za-z ]+)?|diploma|high\s+school\s+diploma|secondary\s+school)\b/i;
 
+/**
+ * The Arabic names of the degrees.
+ *
+ * An Arabic CV writes "بكالوريوس" where an English one writes "BSc", and
+ * without this the whole education section reads as one long line.
+ */
+const ARABIC_DEGREE_REGEX =
+  /(?:بكالوريوس|ماجستير|دكتوراه|دبلوم|ليسانس|بكالوريوس\s+هندسه|ماجستير\s+اداره|ثانوية|دبلوم\s+عالي)/u;
+
 const INSTITUTION_REGEX =
   /\b(university|college|institute|institution|school|academy|polytechnic|faculty)\b/i;
+
+/** The Arabic names of the institutions. */
+const ARABIC_INSTITUTION_REGEX = /(?:جامعه|جامعة|معهد|كليه|كلية|مدرسه|مدرسة|اكاديمي|أكاديمي)/u;
 
 interface EducationParts {
   institution: string;
@@ -758,14 +1151,16 @@ function splitDegreeField(degreeText: string): { degree: string; field: string }
   if (!text) return { degree: '', field: '' };
 
   const inMatch = text.match(/^(.+?)\s+in\s+(.+)$/i);
-  if (inMatch && DEGREE_REGEX.test(inMatch[1])) {
+  if (inMatch && (DEGREE_REGEX.test(inMatch[1]) || ARABIC_DEGREE_REGEX.test(inMatch[1]))) {
     return { degree: inMatch[1].trim(), field: inMatch[2].trim() };
   }
 
+  const arabicDegree = text.match(ARABIC_DEGREE_REGEX);
   const match = text.match(DEGREE_REGEX);
-  if (!match) return { degree: '', field: text };
-  const degree = match[0].trim();
-  const remainder = text.slice((match.index ?? 0) + match[0].length).trim();
+  if (!match && !arabicDegree) return { degree: '', field: text };
+  const found = match?.[0] ?? arabicDegree?.[0] ?? '';
+  const degree = found.trim();
+  const remainder = text.slice((match?.index ?? arabicDegree?.index ?? 0) + found.length).trim();
   return { degree, field: remainder.replace(/^[,\-–—:]+/, '').trim() };
 }
 
@@ -781,10 +1176,11 @@ function parseEducationLine(value: string): EducationParts {
     const right = text.slice(index + separator.length).trim();
     if (!left || !right) continue;
 
-    const leftIsInstitution = INSTITUTION_REGEX.test(left);
-    const rightIsInstitution = INSTITUTION_REGEX.test(right);
-    const leftIsDegree = DEGREE_REGEX.test(left);
-    const rightIsDegree = DEGREE_REGEX.test(right);
+    const leftIsInstitution = INSTITUTION_REGEX.test(left) || ARABIC_INSTITUTION_REGEX.test(left);
+    const rightIsInstitution =
+      INSTITUTION_REGEX.test(right) || ARABIC_INSTITUTION_REGEX.test(right);
+    const leftIsDegree = DEGREE_REGEX.test(left) || ARABIC_DEGREE_REGEX.test(left);
+    const rightIsDegree = DEGREE_REGEX.test(right) || ARABIC_DEGREE_REGEX.test(right);
 
     if (leftIsInstitution && !rightIsInstitution) {
       const degreeParts = splitDegreeField(right);
@@ -804,15 +1200,19 @@ function parseEducationLine(value: string): EducationParts {
     }
   }
 
-  if (INSTITUTION_REGEX.test(text) && !DEGREE_REGEX.test(text)) {
+  if (
+    (INSTITUTION_REGEX.test(text) || ARABIC_INSTITUTION_REGEX.test(text)) &&
+    !DEGREE_REGEX.test(text) &&
+    !ARABIC_DEGREE_REGEX.test(text)
+  ) {
     return { institution: text, degree: '', field: '' };
   }
-  if (DEGREE_REGEX.test(text)) {
+  if (DEGREE_REGEX.test(text) || ARABIC_DEGREE_REGEX.test(text)) {
     // The degree and institution are in the same fragment, e.g.
     // "BSc Statistics Cairo University". Keep only the degree facts; the
     // institution is not guessed.
     const degreeParts = splitDegreeField(
-      text.replace(INSTITUTION_REGEX, '').trim()
+      text.replace(INSTITUTION_REGEX, '').replace(ARABIC_INSTITUTION_REGEX, '').trim()
     );
     return { institution: '', ...degreeParts };
   }
@@ -841,7 +1241,10 @@ function parseEducation(blocks: DocumentBlock[]): ParsedCvEducation[] {
 
     const range = parseDateRange(raw);
     if (range) {
-      const gpaMatch = raw.match(/\bGPA\s*:?\s*([0-9.]+(?:\s*\/\s*[0-9.]+)?)/i);
+      // The grade, written either as "GPA 3.7/4.0" or as "معدل 3.7 من 4".
+      const gpaMatch =
+        raw.match(/\bGPA\s*:?\s*([0-9.]+(?:\s*\/\s*[0-9.]+)?)/i) ??
+        raw.match(/معدل\s*:?\s*([0-9.]+)(?:\s*من\s*([0-9.]+))?/u);
       if (current && !current.period) {
         current.period = range.period;
         current.startDate = range.startDate;
@@ -1072,6 +1475,16 @@ const CERTIFICATION_WORDS =
   /\b(certificat(?:e|ion|ed)|certifications|diploma|certificate|courses?|trainings?|programmes?|programs?|bootcamp|academy|workshops?|pathways?|curriculum|masterclass|nanodegree|licen[cs]e|diplomas?)\b/i;
 
 /**
+ * The Arabic names of a qualification.
+ *
+ * The gate above has to cover the same languages as the rest of the reader:
+ * an Arabic CV says "شهادة" where an English one says "certificate", and
+ * without this the certificate section of an Arabic CV reads as nothing.
+ */
+const ARABIC_CERTIFICATION_WORDS =
+  /(?:شهادة|شهادات|دوره|دورات|بروتوكول|اعتماد|اعتمادات|رخصه|رخصة|تدريب|معتمد)/u;
+
+/**
  * Organisations that appear as the body that issued a certificate.
  *
  * These are the names a CV actually uses. A line that mentions one of them
@@ -1102,9 +1515,9 @@ const NEVER_A_CERTIFICATE: RegExp[] = [
 const SENTENCE_OPENERS =
   /^(led|managed|delivered|achieved|eliminated|built|developed|conducted|organized|organised|served|increased|reduced|designed|implemented|coordinated|established|founded|supervised|facilitated|automated|earned|completed|created|launched|supported|improved|handled|drove|grew|maintained|presented|produced|provided|reviewed|streamlined|trained|worked|reduced|generated|reduced)\b/i;
 
-/** A month and a year, or a bare year. */
+/** A month and a year, or a bare year — with or without brackets around it. */
 const DATE_SEGMENT =
-  /^(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?:19|20)\d{2}|(?:19|20)\d{2})$/i;
+  /^(?:\(?\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?:19|20)\d{2}\s*\)?|\(?\s*(?:19|20)\d{2}\s*\)?)$/i;
 
 /** The identifier an issuing body prints on the certificate. */
 const CREDENTIAL_ID = /\b(?:student\s*id|cert(?:ificate)?\s*id|credential\s*id|id)\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9-]{3,})\b/i;
@@ -1265,8 +1678,11 @@ function parseCertifications(blocks: DocumentBlock[]): {
     // The evidence has to say this is a qualification. A line that mentions
     // no certificate word, no date, no issuing body and carries no
     // structure is something else on the CV.
-    const hasKeyword = CERTIFICATION_WORDS.test(text);
-    const hasIssuer = Boolean(issuer);
+    const hasKeyword = CERTIFICATION_WORDS.test(text) || ARABIC_CERTIFICATION_WORDS.test(text);
+    // A certificate named after the body that issued it — "Microsoft Excel
+    // Specialist" — carries the issuer inside the name. That is still
+    // evidence that the line is about a qualification.
+    const hasIssuer = Boolean(issuer) || KNOWN_ISSUERS.test(name);
     const hasDate = Boolean(issueDate);
     const hasSeparator = parts.length > 1;
     // A list of the tools a certificate covered is evidence of a
@@ -1299,6 +1715,159 @@ function parseCertifications(blocks: DocumentBlock[]): {
 }
 
 /* -------------------------------------------------------------------------- */
+/* The sections a CV carries beyond work, study and skills                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A line that names one thing: a course, an award, a publication.
+ *
+ * These sections are read loosely on purpose. A course may be one line
+ * ("Advanced Excel — Coursera, 2022") or three (title, provider, date), and
+ * both are the same fact written differently. The reader therefore keeps the
+ * first line as the title, takes the next lines as its detail, and pulls a
+ * date out of whichever line carries one.
+ */
+interface NamedEntry {
+  title: string;
+  subtitle: string;
+  date: string;
+  description: string;
+  bullets: string[];
+  url: string;
+}
+
+function emptyNamedEntry(): NamedEntry {
+  return { title: '', subtitle: '', date: '', description: '', bullets: [], url: '' };
+}
+
+/**
+ * Reads a section of named entries.
+ *
+ * A bullet belongs to the entry above it, which is how these sections are
+ * written everywhere: a title line, then the things that make it up.
+ */
+function parseNamedEntries(blocks: DocumentBlock[]): NamedEntry[] {
+  const entries: NamedEntry[] = [];
+  let current: NamedEntry | null = null;
+
+  const finish = () => {
+    if (!current) return;
+    if (current.title.trim()) {
+      const key = `${current.title.toLowerCase()}|${current.subtitle.toLowerCase()}`;
+      const existing = entries.find(
+        (entry) => `${entry.title.toLowerCase()}|${entry.subtitle.toLowerCase()}` === key
+      );
+      if (existing) {
+        existing.bullets = Array.from(new Set([...existing.bullets, ...current.bullets]));
+        if (!existing.description) existing.description = current.description;
+      } else {
+        entries.push(current);
+      }
+    }
+    current = null;
+  };
+
+  for (const block of blocks) {
+    const raw = block.text.trim();
+    if (!raw) continue;
+    if (matchSectionHeading(raw)) continue;
+
+    if (isBulletLine(raw)) {
+      const text = stripBullet(raw);
+      if (!text) continue;
+      if (!current) continue;
+      current.bullets.push(text);
+      continue;
+    }
+
+    // A line that carries a date range is the tail of an entry whose title
+    // was on an earlier line.
+    const range = parseDateRange(raw);
+    if (range && current && current.title && !current.date) {
+      current.date = range.period;
+      const remainder = removeDateRange(raw, range).replace(/^[\s|,;:–—-]+/, '').trim();
+      if (remainder && !current.subtitle) current.subtitle = remainder;
+      continue;
+    }
+
+    // A new title line starts a new entry, unless the current entry has
+    // nothing but a title yet — then this is the second half of it.
+    if (current && current.title && !current.subtitle && !current.description && !current.bullets.length) {
+      current.subtitle = raw;
+      continue;
+    }
+
+    finish();
+    current = emptyNamedEntry();
+    current.title = raw;
+    const inlineDate = parseDateRange(raw);
+    if (inlineDate) {
+      current.date = inlineDate.period;
+      current.title = removeDateRange(raw, inlineDate).replace(/^[\s|,;:–—-]+/, '').trim();
+    }
+    const url = raw.match(URL_REGEX)?.[0];
+    if (url) current.url = url;
+  }
+  finish();
+
+  return entries;
+}
+
+/**
+ * Reads the languages a CV lists.
+ *
+ * The level is whatever the document wrote beside the language — "Fluent",
+ * "B2", "Native" — and it is not translated into a scale of our own.
+ */
+function parseLanguages(blocks: DocumentBlock[]): Array<{ name: string; level: string }> {
+  const languages: Array<{ name: string; level: string }> = [];
+  const seen = new Set<string>();
+
+  for (const block of blocks) {
+    const raw = block.text.trim();
+    if (!raw || matchSectionHeading(raw)) continue;
+
+    // A comma separates the languages here as well: the level of a language is
+    // written inside brackets, so a comma never appears inside one.
+    for (const part of raw.split(/[;|,·]/).map((entry) => entry.trim()).filter(Boolean)) {
+      // "English (Fluent)", "Arabic - Native", "French: B2", "German (C1)"
+      const match = part.match(/^([^(\-–—:,]+)\s*[(\-–—:,]\s*([^)\-–—:]+)\)?\s*$/);
+      const name = (match ? match[1] : part).trim();
+      const level = match ? match[2].trim() : '';
+      if (!name || name.length > 60) continue;
+      if (/^\d+$/.test(name)) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      languages.push({ name, level });
+    }
+  }
+
+  return languages.slice(0, 12);
+}
+
+/**
+ * Reads the awards, publications, research and leadership sections.
+ *
+ * These four sections have the same shape in the document — a title and
+ * something about it — so they share one reader and differ only in which
+ * part of the entry they keep.
+ */
+function parseTitleAndBody(
+  blocks: DocumentBlock[],
+  options: { keepSubtitle: boolean; keepDate: boolean; keepUrl: boolean }
+): NamedEntry[] {
+  return parseNamedEntries(blocks)
+    .map((entry) => ({
+      ...entry,
+      subtitle: options.keepSubtitle ? entry.subtitle : '',
+      date: options.keepDate ? entry.date : '',
+      url: options.keepUrl ? entry.url : '',
+    }))
+    .filter((entry) => entry.title.trim().length > 0);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Confidence / evidence                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -1318,37 +1887,88 @@ function evidence(field: string, text: string, page?: number): CvEvidence {
 /* Public parser                                                              */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The sections of the document, as they were found.
+ *
+ * The parser knows where every section began and ended, and that is what
+ * lets the review say where a value came from: a company name read out of
+ * the experience section is a different claim from the same name read out
+ * of a bullet, and only the section tells them apart.
+ */
+export interface ParsedCvSection {
+  key: SectionKey;
+  /** The heading as it was written in the document. */
+  heading: string;
+  /** The blocks that belong to the section. */
+  blocks: DocumentBlock[];
+  /** Where the section begins in the document's block list. */
+  startIndex: number;
+  /** Where it ends. */
+  endIndex: number;
+}
+
 export function parseStructuredCv(extraction: DocumentExtraction): {
   cv: ParsedCv;
   metadata: CvExtractionMetadata;
+  sections: ParsedCvSection[];
 } {
   const sections: Record<SectionKey, DocumentBlock[]> = {
     header: [],
     contact: [],
     summary: [],
     experience: [],
+    internships: [],
     education: [],
     skills: [],
     projects: [],
     certifications: [],
+    courses: [],
     languages: [],
+    volunteering: [],
+    awards: [],
+    publications: [],
+    research: [],
+    leadership: [],
     other: [],
   };
 
   let currentSection: SectionKey = 'header';
+  const sectionMeta = new Map<SectionKey, { heading: string; startIndex: number }>();
+  let blockIndex = 0;
   for (const block of extraction.blocks) {
     const text = block.text.trim();
-    if (!text) continue;
+    if (!text) {
+      blockIndex += 1;
+      continue;
+    }
     const heading = matchSectionHeading(text);
     if (heading) {
       currentSection = heading.key;
+      if (!sectionMeta.has(currentSection)) {
+        sectionMeta.set(currentSection, { heading: text, startIndex: blockIndex });
+      }
       if (heading.remainder) {
         sections[currentSection].push({ ...block, text: heading.remainder });
       }
+      blockIndex += 1;
       continue;
     }
     sections[currentSection].push(block);
+    blockIndex += 1;
   }
+
+  const sectionList: ParsedCvSection[] = (
+    Object.keys(sections) as SectionKey[]
+  ).map((key) => {
+    const meta = sectionMeta.get(key);
+    return {
+      key,
+      heading: meta?.heading ?? '',
+      blocks: sections[key],
+      startIndex: meta?.startIndex ?? 0,
+      endIndex: meta?.startIndex ?? 0,
+    };
+  });
 
   const headerAndContact = [...sections.header, ...sections.contact];
   const contactText = [...sections.header, ...sections.contact]
@@ -1443,6 +2063,127 @@ export function parseStructuredCv(extraction: DocumentExtraction): {
     evidenceList.push(evidence('certification', certification));
   }
 
+  // The sections beyond work, study and skills. Each is read by the reader
+  // that fits its shape, and each is reported only when the document really
+  // had it — an absent section is an empty list, never an invented one.
+  const internshipRoles = parseExperience(sections.internships);
+  const internships: ParsedCvInternship[] = internshipRoles.map((entry) => ({
+    id: entry.id,
+    organization: entry.company,
+    role: entry.role,
+    period: entry.period,
+    location: entry.location,
+    bullets: entry.bullets,
+    startDate: entry.startDate,
+    endDate: entry.endDate,
+    isCurrent: entry.isCurrent,
+  }));
+
+  const volunteeringRoles = parseExperience(sections.volunteering);
+  const volunteering: ParsedCvInternship[] = volunteeringRoles.map((entry) => ({
+    id: entry.id,
+    organization: entry.company,
+    role: entry.role,
+    period: entry.period,
+    location: entry.location,
+    bullets: entry.bullets,
+    startDate: entry.startDate,
+    endDate: entry.endDate,
+    isCurrent: entry.isCurrent,
+  }));
+
+  const leadershipRoles = parseExperience(sections.leadership);
+  const leadership: ParsedCvLeadership[] = leadershipRoles.map((entry) => ({
+    id: entry.id,
+    organization: entry.company,
+    role: entry.role,
+    period: entry.period,
+    description: entry.bullets.join('\n'),
+    bullets: entry.bullets,
+  }));
+
+  const courseEntries = parseTitleAndBody(sections.courses, {
+    keepSubtitle: true,
+    keepDate: true,
+    keepUrl: false,
+  });
+  const courses = courseEntries.map((entry) => ({
+    id: entry.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    title: entry.title,
+    provider: entry.subtitle,
+    date: entry.date,
+    description: entry.bullets.join('\n'),
+  }));
+
+  const languageEntries = parseLanguages(sections.languages);
+  const languages: ParsedCvLanguage[] = languageEntries.map((entry, index) => ({
+    id: `${index}-${entry.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    name: entry.name,
+    level: entry.level,
+  }));
+
+  const awardEntries = parseTitleAndBody(sections.awards, {
+    keepSubtitle: true,
+    keepDate: true,
+    keepUrl: false,
+  });
+  const awards: ParsedCvAward[] = awardEntries.map((entry) => ({
+    id: entry.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    title: entry.title,
+    issuer: entry.subtitle,
+    date: entry.date,
+    description: entry.bullets.join('\n'),
+  }));
+
+  const publicationEntries = parseTitleAndBody(sections.publications, {
+    keepSubtitle: true,
+    keepDate: true,
+    keepUrl: true,
+  });
+  const publications: ParsedCvPublication[] = publicationEntries.map((entry) => ({
+    id: entry.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    title: entry.title,
+    publisher: entry.subtitle,
+    date: entry.date,
+    url: entry.url,
+    description: entry.bullets.join('\n'),
+  }));
+
+  const researchEntries = parseTitleAndBody(sections.research, {
+    keepSubtitle: true,
+    keepDate: true,
+    keepUrl: false,
+  });
+  const research: ParsedCvResearch[] = researchEntries.map((entry) => ({
+    id: entry.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    title: entry.title,
+    institution: entry.subtitle,
+    period: entry.date,
+    description: entry.bullets.join('\n'),
+    bullets: entry.bullets,
+  }));
+
+  for (const entry of internships) {
+    evidenceList.push(
+      evidence('internship', `${entry.role}${entry.organization ? ` — ${entry.organization}` : ''}`)
+    );
+  }
+  for (const entry of volunteering) {
+    evidenceList.push(
+      evidence('volunteering', `${entry.role}${entry.organization ? ` — ${entry.organization}` : ''}`)
+    );
+  }
+  for (const entry of leadership) {
+    evidenceList.push(
+      evidence('leadership', `${entry.role}${entry.organization ? ` — ${entry.organization}` : ''}`)
+    );
+  }
+  for (const entry of courses) evidenceList.push(evidence('course', entry.title));
+  for (const entry of languages) evidenceList.push(evidence('language', entry.name));
+  for (const entry of awards) evidenceList.push(evidence('award', entry.title));
+  for (const entry of publications) evidenceList.push(evidence('publication', entry.title));
+  for (const entry of research) evidenceList.push(evidence('research', entry.title));
+
   if (!nameMatch.name) warnings.push('No candidate name was found in the document header.');
   if (!email) warnings.push('No email address was found in the document.');
   if (!phone) warnings.push('No phone number was found in the document.');
@@ -1483,6 +2224,20 @@ export function parseStructuredCv(extraction: DocumentExtraction): {
     ? clamp(70 + certifications.names.length * 5)
     : 0;
 
+  // The sections beyond the core four are scored on their own and are
+  // reported separately. They never move the overall score: a CV that has no
+  // awards is not a worse CV, it is a CV with no awards.
+  const sectionScore = (count: number): number =>
+    count ? clamp(70 + Math.min(30, count * 5)) : 0;
+  const internshipsScore = sectionScore(internships.length);
+  const coursesScore = sectionScore(courses.length);
+  const languagesScore = sectionScore(languages.length);
+  const volunteeringScore = sectionScore(volunteering.length);
+  const awardsScore = sectionScore(awards.length);
+  const publicationsScore = sectionScore(publications.length);
+  const researchScore = sectionScore(research.length);
+  const leadershipScore = sectionScore(leadership.length);
+
   const overall = clamp(
     personal * 0.25 +
       experienceScore * 0.3 +
@@ -1505,15 +2260,24 @@ export function parseStructuredCv(extraction: DocumentExtraction): {
     github,
     website,
     experiences,
+    internships,
     education,
     projects,
     skillsList,
     certifications: certifications.names,
     certificationDetails: certifications.details,
+    courses,
+    languages,
+    volunteering,
+    awards,
+    publications,
+    research,
+    leadership,
   };
 
   return {
     cv,
+    sections: sectionList,
     metadata: {
       method: 'deterministic',
       format: extraction.format,
@@ -1530,6 +2294,14 @@ export function parseStructuredCv(extraction: DocumentExtraction): {
         skills: skillsScore,
         projects: projectsScore,
         certifications: certificationsScore,
+        internships: internshipsScore,
+        courses: coursesScore,
+        languages: languagesScore,
+        volunteering: volunteeringScore,
+        awards: awardsScore,
+        publications: publicationsScore,
+        research: researchScore,
+        leadership: leadershipScore,
       },
       evidence: evidenceList.slice(0, 80),
       warnings,

@@ -512,6 +512,20 @@ interface CareerContextType {
     cv: CVProfile,
     selectedSections: Record<string, boolean>
   ) => Promise<CvImportResult>;
+  /**
+   * Puts a reviewed CV into the studio.
+   *
+   * The document the candidate reviewed and accepted becomes the document the
+   * studio works on, and it is shown as a version so it can be compared with
+   * the ones that came before it.
+   */
+  applyReviewedCv: (options: {
+    cv: CVProfile;
+    versionName?: string;
+    targetRoleTitle?: string;
+    cvId?: string;
+    cvVersionId?: string;
+  }) => void;
   regeneratePersonalizedRoadmap: () => Promise<boolean>;
   careerContext: CareerContextSummary;
   isUploadingCv: boolean;
@@ -4890,6 +4904,39 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return { success: failed === 0, imported, skipped, failed, sections, errors };
   };
 
+  /**
+   * Puts a reviewed CV into the studio.
+   *
+   * The document is set as the studio's document and shown as a version. The
+   * version is what makes it durable: the studio's document is a projection
+   * of the platform's records, and the sections a CV carries that the
+   * platform has no record type for — an internship, an award, a
+   * publication — live in the version and nowhere else.
+   */
+  const applyReviewedCv = (options: {
+    cv: CVProfile;
+    versionName?: string;
+    targetRoleTitle?: string;
+    cvId?: string;
+    cvVersionId?: string;
+  }) => {
+    const { cv, versionName, targetRoleTitle, cvId, cvVersionId } = options;
+    setActiveCV(cv);
+    if (cvId) setActiveCvId(cvId);
+    const newVersion: CVVersion = {
+      id: cvVersionId ?? `cv-v-${Date.now()}`,
+      cvId,
+      name: versionName ?? 'Reviewed CV',
+      targetRoleTitle: targetRoleTitle ?? targetRole.title,
+      createdAt: new Date().toISOString().split('T')[0],
+      profile: cv,
+    };
+    setCvVersions((previous) => [
+      newVersion,
+      ...previous.filter((entry) => entry.id !== newVersion.id),
+    ]);
+  };
+
   const runAiCvOptimization = async (options?: {
     signal?: AbortSignal;
     setPhase?: (stage: string, cancellable?: boolean) => void;
@@ -5569,6 +5616,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         uploadCvFile,
         pasteCvText,
         importExtractedCvData,
+        applyReviewedCv,
         isUploadingCv,
         jobs,
         bookmarkedJobIds,

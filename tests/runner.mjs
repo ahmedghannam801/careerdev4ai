@@ -276,6 +276,13 @@ async function main() {
     join(TESTS_DIR, 'b5.test.ts'),
     join(TESTS_DIR, 'career-catalog.test.ts'),
     join(TESTS_DIR, 'cv-pipeline.test.ts'),
+    // The extraction review: the confidence, the evidence and the issues a
+    // candidate is shown before they accept a CV, and the idempotent write
+    // that applies it. Pure.
+    join(TESTS_DIR, 'cv-extraction-review.test.ts'),
+    // The accuracy of the extraction engine against documents whose contents
+    // are known, with the metrics printed so they can be watched. Pure.
+    join(TESTS_DIR, 'cv-extraction-quality.test.ts'),
     join(TESTS_DIR, 'target-role.test.ts'),
     join(TESTS_DIR, 'volunteer.test.ts'),
     // Live job vacancies: what the provider record becomes, what the fit

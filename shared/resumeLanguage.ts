@@ -132,6 +132,10 @@ export const RESUME_SECTION_HEADINGS: Record<ResumeLanguage, Record<string, stri
     languages: 'Languages',
     links: 'Links',
     awards: 'Awards',
+    internships: 'Internships',
+    publications: 'Publications',
+    research: 'Research',
+    leadership: 'Leadership',
   },
   ar: {
     summary: 'الملخص المهني',
@@ -145,6 +149,10 @@ export const RESUME_SECTION_HEADINGS: Record<ResumeLanguage, Record<string, stri
     languages: 'اللغات',
     links: 'الروابط',
     awards: 'الجوائز',
+    internships: 'التدريبات',
+    publications: 'المنشورات',
+    research: 'الأبحاث',
+    leadership: 'القيادة',
   },
 };
 

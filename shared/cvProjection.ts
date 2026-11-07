@@ -390,6 +390,15 @@ export function mergeCanonicalCvDocument(
     links,
     volunteering,
     courses,
+    // The sections the platform has no record type for. They belong to the
+    // document, so the document is where they are read from — dropping them
+    // here would erase an imported internship or award on the next reload.
+    internships: previous.internships ?? [],
+    languages: previous.languages ?? [],
+    awards: previous.awards ?? [],
+    publications: previous.publications ?? [],
+    research: previous.research ?? [],
+    leadership: previous.leadership ?? [],
     hiddenSkills: previous.hiddenSkills,
   };
 }

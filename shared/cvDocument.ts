@@ -382,5 +382,14 @@ export function buildCvDocument(source: CvSourceData, existing?: Partial<CVProfi
         description: previous?.description ?? entry.description ?? '',
       };
     }),
+
+    // The sections the platform has no record type for are the document's
+    // own. An existing document keeps them; a new one has none yet.
+    internships: existing?.internships ?? [],
+    languages: existing?.languages ?? [],
+    awards: existing?.awards ?? [],
+    publications: existing?.publications ?? [],
+    research: existing?.research ?? [],
+    leadership: existing?.leadership ?? [],
   };
 }

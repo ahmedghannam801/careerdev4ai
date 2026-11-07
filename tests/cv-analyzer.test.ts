@@ -1,14 +1,23 @@
 // The CV Analyzer.
 //
-// The analyzer is a separate page with three stages: the CV is chosen, the CV
-// is measured, and the measurement is read. These tests hold the page to the
-// rules the platform already follows:
+// The analyzer used to be a page that did the measuring on its own, while
+// the studio had a second implementation of the same measurement. It is now
+// one panel — `CvAnalysisPanel` — rendered by the studio's analysis tab and
+// by the analyzer page.
+//
+// These tests hold that to the rules the platform already follows:
 //
 //   * it is reachable — a real route, a real view, a real navigation entry;
 //   * it never shows a score it cannot explain;
 //   * it does not fake progress: the stage list comes from the server's real
 //     stage events, and the interface has no timer that moves it;
-//   * the ATS score of the model stays a separate, labelled system.
+//   * the ATS score of the model stays a separate, labelled system;
+//   * the page and the studio share one implementation, so they cannot
+//     drift apart.
+//
+// The behavioural guarantees are asserted against the file that now holds
+// the behaviour, which is the point of the merge: a guarantee that lives in
+// the implementation is checked in the implementation.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,6 +30,14 @@ const REPO_ROOT = join(import.meta.dirname, '..');
 
 const analyzer = readFileSync(
   join(REPO_ROOT, 'src', 'components', 'views', 'CvAnalyzerView.tsx'),
+  'utf-8'
+);
+const panel = readFileSync(
+  join(REPO_ROOT, 'src', 'components', 'cv', 'CvAnalysisPanel.tsx'),
+  'utf-8'
+);
+const studio = readFileSync(
+  join(REPO_ROOT, 'src', 'components', 'views', 'CVStudioView.tsx'),
   'utf-8'
 );
 const app = readFileSync(join(REPO_ROOT, 'src', 'App.tsx'), 'utf-8');
@@ -45,29 +62,47 @@ describe('the CV Analyzer is a page of the application', () => {
   });
 });
 
+describe('the analyzer is merged into CV Studio', () => {
+  test('the page and the studio render the same panel', () => {
+    // One implementation. If the studio grew its own copy of the
+    // measurement, the two would drift apart and the candidate would get
+    // two different answers to the same question.
+    assert.match(analyzer, /CvAnalysisPanel/);
+    assert.match(studio, /CvAnalysisPanel/);
+  });
+
+  test('the studio measures the document it is working on', () => {
+    assert.match(studio, /cv=\{activeCV\}/);
+  });
+
+  test('the analyzer page points back into the studio', () => {
+    assert.match(analyzer, /cv-studio/);
+  });
+});
+
 describe('the analyzer never shows a score it cannot explain', () => {
   test('it shows the measured score and the evidence behind it', () => {
-    assert.match(analyzer, /report\.overallScore/);
-    assert.match(analyzer, /CvMeasurementReport/);
+    assert.match(panel, /report\.overallScore/);
+    assert.match(panel, /CvMeasurementReport/);
   });
 
   test('the ATS score of the model is shown as a separate system', () => {
     // The measured score and the model's score are different numbers from
     // different systems. They are never shown as one score.
-    assert.match(analyzer, /AI ATS score/);
-    assert.match(analyzer, /atsScore/);
+    assert.match(panel, /AI ATS score/);
+    assert.match(panel, /atsScore/);
   });
 });
 
 describe('the analyzer does not fake progress', () => {
   test('the stage list comes from the server, not from a timer', () => {
-    assert.match(analyzer, /CV_ANALYSIS_STAGES/);
-    assert.match(analyzer, /streamMeasuredAnalysis/);
+    assert.match(panel, /CV_ANALYSIS_STAGES/);
+    assert.match(panel, /streamMeasuredAnalysis/);
 
     // There is no timer in the analyzer. A stage only moves because the
     // server reported it.
-    assert.doesNotMatch(analyzer, /setInterval/);
-    assert.doesNotMatch(analyzer, /setTimeout/);
+    assert.doesNotMatch(panel, /setInterval/);
+    assert.doesNotMatch(panel, /setTimeout/);
   });
 
   test('the client reads the real stage events', () => {
@@ -81,32 +116,32 @@ describe('the analyzer handles the awkward cases', () => {
   test('a dropped connection falls back to the same measurement', () => {
     // The stages are a way of watching the measurement, not part of it. When
     // the stream breaks, the plain request returns the same answer.
-    assert.match(analyzer, /requestMeasuredAnalysis/);
+    assert.match(panel, /requestMeasuredAnalysis/);
   });
 
   test('the candidate can stop the measurement', () => {
-    assert.match(analyzer, /AbortController/);
-    assert.match(analyzer, /abortRef/);
-    assert.match(analyzer, /Cancel/);
+    assert.match(panel, /AbortController/);
+    assert.match(panel, /abortRef/);
+    assert.match(panel, /Cancel/);
   });
 
   test('a re-analysis keeps the earlier one', () => {
     // The history is read back from the server, where every run is a new row.
-    assert.match(analyzer, /fetchMeasurementHistory/);
-    assert.match(analyzer, /Earlier measurements/);
+    assert.match(panel, /fetchMeasurementHistory/);
+    assert.match(panel, /Earlier measurements/);
   });
 
   test('a saved CV can be analysed without uploading again', () => {
-    assert.match(analyzer, /cvVersions/);
-    assert.match(analyzer, /cvVersionId/);
+    assert.match(panel, /cvVersions/);
+    assert.match(panel, /cvVersionId/);
   });
 
   test('a re-analysis measures the same CV again instead of uploading it twice', () => {
     // The button lives in the results header. The window around it is the
     // button itself, so an upload cannot hide in it.
-    const at = analyzer.indexOf("t('Re-analyze')");
+    const at = panel.indexOf("t('Re-analyze')");
     assert.ok(at > 0, 'the results header must offer a re-analysis');
-    const button = analyzer.slice(Math.max(0, at - 700), at + 80);
+    const button = panel.slice(Math.max(0, at - 700), at + 80);
 
     assert.match(button, /measure\(subject\)/, 'the re-analysis measures what was measured');
     assert.doesNotMatch(

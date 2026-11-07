@@ -54,6 +54,8 @@ import {
   type ProfileLinkDraft,
 } from '../../../shared/profileLinks';
 import type { CVLink, CVProfile, TargetRole } from '../../types/career';
+import type { CvAnalysisReport } from '../../../shared/cvAnalysis';
+import { CvSectionAdvice } from './CvSectionAdvice';
 
 interface CvSectionEditorProps {
   /** The document being edited. */
@@ -77,6 +79,14 @@ interface CvSectionEditorProps {
    * assistant cannot put a skill on the CV that the candidate does not have.
    */
   ratedSkills: string[];
+  /**
+   * The measurement of this document, when there is one.
+   *
+   * It is used to put the advice next to the section it is about, so the
+   * candidate reads "this is weak" and "this is where you fix it" as one
+   * thing rather than two.
+   */
+  advice?: CvAnalysisReport | null;
 }
 
 const LINK_INPUT_CLASS =
@@ -91,6 +101,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
   targetRoleTitle,
   source,
   ratedSkills,
+  advice,
 }) => {
   const { t } = useCareer();
   const links = cv.links ?? [];
@@ -191,6 +202,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
       {/* ---- Executive Summary ---- */}
       <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
         <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Executive Summary')}</h3>
+        <CvSectionAdvice section="summary" report={advice ?? null} />
         <textarea
           rows={4}
           value={cv.summary}
@@ -214,6 +226,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
           <Briefcase className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
           {t('Work Experience')}
         </h3>
+        <CvSectionAdvice section="experience" report={advice ?? null} />
         {cv.experiences.length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No work experience yet.')}</p>
         ) : (
@@ -321,6 +334,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
           <Wrench className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
           {t('Core Skills & Technologies')}
         </h3>
+        <CvSectionAdvice section="skills" report={advice ?? null} />
         {cv.skillsList.length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No skills yet.')}</p>
         ) : (
@@ -371,6 +385,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
           <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
           {t('Projects')}
         </h3>
+        <CvSectionAdvice section="projects" report={advice ?? null} />
         {cv.projects.length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No projects yet.')}</p>
         ) : (

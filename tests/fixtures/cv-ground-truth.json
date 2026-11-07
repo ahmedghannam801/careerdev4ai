@@ -1,0 +1,258 @@
+{
+  "$comment": "The ground truth of the extraction quality suite. Every expectation here was written from the fixture document itself, by reading the document, not by reading the parser's output. A value marked 'prefix' is compared as a prefix because the reader may stop a long line where the document's paragraph ends.",
+  "fixtures": [
+    {
+      "file": "modern-two-column.pdf",
+      "why": "A two-column PDF: the sidebar is drawn before the main column, so the visual reading order and the content-stream order differ.",
+      "sections": [
+        "personal",
+        "summary",
+        "experience",
+        "education",
+        "skills",
+        "projects",
+        "certifications",
+        "languages",
+        "links"
+      ],
+      "fields": {
+        "fullName": "Sara Hassan",
+        "email": "sara.hassan@example.com",
+        "phone": "+20 100 555 0142",
+        "location": "Cairo, Egypt",
+        "title": "Data Analyst",
+        "summary": {
+          "prefix": "Data analyst with four years of experience turning operational data into decisions."
+        }
+      },
+      "lists": {
+        "experience": 2,
+        "education": 1,
+        "projects": 1,
+        "skills": 6,
+        "certifications": 1,
+        "languages": 2
+      }
+    },
+    {
+      "file": "modern-two-column.docx",
+      "why": "The same CV as a real OOXML package, with the sidebar in a table.",
+      "sections": [
+        "personal",
+        "summary",
+        "experience",
+        "education",
+        "skills",
+        "projects",
+        "certifications",
+        "links"
+      ],
+      "fields": {
+        "fullName": "Sara Hassan",
+        "email": "sara.hassan@example.com",
+        "phone": "+20 100 555 0142",
+        "location": "Cairo, Egypt",
+        "title": "Data Analyst",
+        "summary": {
+          "prefix": "Data analyst with four years of experience turning operational data into decisions."
+        }
+      },
+      "lists": {
+        "experience": 2,
+        "education": 1,
+        "projects": 1,
+        "skills": 6,
+        "certifications": 1
+      }
+    },
+    {
+      "file": "arabic-cv.docx",
+      "why": "An Arabic CV with Arabic headings, Arabic months and Arabic contact details.",
+      "sections": [
+        "personal",
+        "summary",
+        "experience",
+        "education",
+        "skills",
+        "certifications",
+        "languages"
+      ],
+      "fields": {
+        "fullName": "سارة حسن",
+        "email": "sara.hassan@example.com",
+        "phone": "+20 100 555 0142",
+        "location": "القاهرة، مصر",
+        "title": "محلل بيانات",
+        "summary": {
+          "prefix": "محلل بيانات بخبرة أربع سنوات"
+        }
+      },
+      "lists": {
+        "experience": 2,
+        "education": 1,
+        "skills": 6,
+        "certifications": 1,
+        "languages": 2
+      }
+    },
+    {
+      "file": "mixed-language-cv.docx",
+      "why": "A CV whose headings switch between Arabic and English halfway through.",
+      "sections": [
+        "personal",
+        "summary",
+        "experience",
+        "education",
+        "skills"
+      ],
+      "fields": {
+        "fullName": "Omar Khaled",
+        "email": "omar.khaled@example.com",
+        "phone": "+20 111 222 3344",
+        "location": "Cairo, Egypt",
+        "title": "Software Engineer",
+        "summary": {
+          "prefix": "Backend engineer with six years"
+        }
+      },
+      "lists": {
+        "experience": 1,
+        "education": 1,
+        "skills": 4
+      }
+    },
+    {
+      "file": "multi-page.pdf",
+      "why": "A CV that runs over two pages, so the reader has to keep its thread at the page boundary.",
+      "sections": [
+        "personal",
+        "summary",
+        "experience",
+        "education",
+        "projects",
+        "certifications"
+      ],
+      "fields": {
+        "fullName": "Sara Hassan",
+        "email": "sara.hassan@example.com",
+        "phone": "+20 100 555 0142",
+        "location": "Cairo, Egypt",
+        "title": "Data Analyst"
+      },
+      "lists": {
+        "experience": 1,
+        "education": 1,
+        "projects": 1,
+        "certifications": 1
+      }
+    },
+    {
+      "file": "table-layout-cv.docx",
+      "why": "A CV whose whole body is a table, so the column labels are the only thing that says which value is which.",
+      "sections": ["personal", "experience", "skills"],
+      "fields": {
+        "fullName": "Sara Hassan",
+        "email": "sara.hassan@example.com",
+        "location": "Cairo, Egypt"
+      },
+      "lists": {
+        "experience": 2,
+        "skills": 5
+      }
+    },
+    {
+      "file": "legacy-word.doc",
+      "why": "A legacy Word document: a compound file with a piece table, holding a piece of 8-bit text and a piece of 16-bit text.",
+      "sections": [
+        "personal",
+        "summary",
+        "experience",
+        "education",
+        "skills",
+        "certifications"
+      ],
+      "fields": {
+        "fullName": "Sara Hassan",
+        "email": "sara.hassan@example.com",
+        "phone": "+20 100 555 0142",
+        "location": "Cairo, Egypt",
+        "title": "Data Analyst",
+        "summary": {
+          "prefix": "Data analyst with four years of experience turning operational data into decisions."
+        }
+      },
+      "lists": {
+        "experience": 2,
+        "education": 1,
+        "skills": 5,
+        "certifications": 1
+      }
+    },
+    {
+      "file": "edge-cases-cv.docx",
+      "why": "The awkward cases: two roles at the same company, two roles that overlap in time, a role with no dates, and the sections a CV carries beyond work and study.",
+      "sections": [
+        "personal",
+        "summary",
+        "experience",
+        "internships",
+        "education",
+        "skills",
+        "projects",
+        "certifications",
+        "courses",
+        "languages",
+        "awards",
+        "publications"
+      ],
+      "fields": {
+        "fullName": "Nour Ali",
+        "email": "nour.ali@example.com",
+        "phone": "+20 122 333 4455",
+        "location": "Alexandria, Egypt",
+        "summary": {
+          "prefix": "Business analyst with three years"
+        }
+      },
+      "lists": {
+        "experience": 3,
+        "internships": 1,
+        "education": 1,
+        "projects": 2,
+        "skills": 5,
+        "certifications": 2,
+        "courses": 1,
+        "languages": 3,
+        "awards": 1,
+        "publications": 1
+      }
+    },
+    {
+      "file": "ambiguous-location.docx",
+      "why": "The only place a city is named is inside a bullet, so the reader has to leave the location empty rather than take a city out of a sentence.",
+      "sections": ["personal", "experience", "education", "skills", "links"],
+      "fields": {
+        "fullName": "Omar Khaled",
+        "email": "omar.khaled@example.com",
+        "phone": "+20 111 222 3344",
+        "title": "Software Engineer"
+      },
+      "absentFields": ["location", "summary"],
+      "lists": {
+        "experience": 1,
+        "education": 1,
+        "skills": 4
+      }
+    },
+    {
+      "file": "no-contact.docx",
+      "why": "A CV with no header at all: the reader must report the header as missing rather than invent one.",
+      "sections": ["summary", "experience", "education"],
+      "absentFields": ["fullName", "email", "phone", "location", "title"],
+      "lists": {
+        "experience": 1,
+        "education": 1
+      }
+    }
+  ]
+}

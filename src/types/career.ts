@@ -231,7 +231,7 @@ export interface CvExtractionEvidence {
  */
 export interface CvExtractionMetadata {
   method: 'deterministic';
-  format: 'pdf' | 'docx' | 'txt' | 'json';
+  format: 'pdf' | 'docx' | 'doc' | 'txt' | 'json';
   pageCount: number;
   layout: 'single-column' | 'two-column' | 'multi-column';
   characterCount: number;
@@ -316,6 +316,10 @@ export interface CVVolunteering {
   /** The candidate's own description, or the one the assistant wrote. */
   description: string;
   bullets: string[];
+  /** The machine-readable dates, when the source of the CV gave them. */
+  startDate?: string;
+  endDate?: string;
+  isCurrent?: boolean;
 }
 
 /** One completed course, as it appears on a CV. */
@@ -325,6 +329,86 @@ export interface CVCourse {
   provider: string;
   /** The candidate's own line about the course, or the one the assistant wrote. */
   description: string;
+}
+
+/**
+ * One internship, as it appears on a CV.
+ *
+ * An internship is kept apart from a full-time role because the two are read
+ * differently by an employer: an internship is a placement with a limited
+ * term, and folding it into the employment history loses that. The platform
+ * has no separate internship record, so these live on the document itself.
+ */
+export interface CVInternship {
+  id: string;
+  organization: string;
+  role: string;
+  period: string;
+  location?: string;
+  /** The candidate's own line about the placement. */
+  description?: string;
+  bullets: string[];
+  startDate?: string;
+  endDate?: string;
+  isCurrent?: boolean;
+}
+
+/**
+ * One language the candidate speaks.
+ *
+ * The level is whatever the document stated — "Fluent", "B2", "Native" — and
+ * is not translated into a scale the candidate did not ask for.
+ */
+export interface CVLanguage {
+  id: string;
+  name: string;
+  /** The level the document stated, when it stated one. */
+  level?: string;
+}
+
+/** One award or honour, as it appears on a CV. */
+export interface CVAward {
+  id: string;
+  title: string;
+  /** The body that gave the award. */
+  issuer?: string;
+  /** When it was given. */
+  date?: string;
+  description?: string;
+}
+
+/** One publication, as it appears on a CV. */
+export interface CVPublication {
+  id: string;
+  title: string;
+  /** The journal, conference or publisher. */
+  publisher?: string;
+  /** When it was published. */
+  date?: string;
+  /** Where it can be read. */
+  url?: string;
+  description?: string;
+}
+
+/** One piece of research work, as it appears on a CV. */
+export interface CVResearch {
+  id: string;
+  title: string;
+  /** The university, laboratory or institute the work belongs to. */
+  institution?: string;
+  period?: string;
+  description?: string;
+  bullets?: string[];
+}
+
+/** One leadership or committee role, as it appears on a CV. */
+export interface CVLeadership {
+  id: string;
+  organization: string;
+  role: string;
+  period?: string;
+  description?: string;
+  bullets?: string[];
 }
 
 export interface CVProfile {
@@ -407,6 +491,23 @@ export interface CVProfile {
   volunteering?: CVVolunteering[];
   /** The completed courses shown on this CV. */
   courses?: CVCourse[];
+  /**
+   * The internship placements shown on this CV.
+   *
+   * Kept apart from the employment history: an internship is a placement
+   * with a limited term and an employer reads it differently.
+   */
+  internships?: CVInternship[];
+  /** The languages shown on this CV. */
+  languages?: CVLanguage[];
+  /** The awards and honours shown on this CV. */
+  awards?: CVAward[];
+  /** The publications shown on this CV. */
+  publications?: CVPublication[];
+  /** The research work shown on this CV. */
+  research?: CVResearch[];
+  /** The leadership and committee roles shown on this CV. */
+  leadership?: CVLeadership[];
   /**
    * The skills the candidate took off this CV.
    *

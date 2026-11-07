@@ -24,6 +24,7 @@ import {
   AlignmentType,
   BorderStyle,
 } from 'docx';
+import { writeLegacyDoc } from './legacyDocWriter.mjs';
 
 let outDir = path.resolve('.tmp-qa/fixtures');
 
@@ -236,6 +237,290 @@ async function noContactDocx() {
 }
 
 /**
+ * An Arabic CV.
+ *
+ * The headings are the ones an Arabic CV really uses, not translations of
+ * the English ones. A parser that only knows English headings reads this
+ * document as one long undifferentiated block, which is the failure this
+ * fixture exists to catch.
+ */
+async function arabicDocx() {
+  const children = [
+    new Paragraph({ text: 'سارة حسن', heading: HeadingLevel.TITLE }),
+    new Paragraph({ children: [new TextRun({ text: 'محلل بيانات', bold: true })] }),
+    new Paragraph('sara.hassan@example.com | +20 100 555 0142 | القاهرة، مصر'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'الملخص المهني', bold: true })] }),
+    new Paragraph(
+      'محلل بيانات بخبرة أربع سنوات في تحويل البيانات التشغيلية إلى قرارات، وبناء تقارير تستخدمها فرق المنتج والتسويق.'
+    ),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'الخبرة العملية', bold: true })] }),
+    new Paragraph({
+      children: [new TextRun({ text: 'محلل بيانات أول — مجموعة النيل للتجزئة', bold: true })],
+    }),
+    new Paragraph('يناير 2022 – حتى الآن | القاهرة، مصر'),
+    new Paragraph({ text: 'بنيت نموذجاً للفاقد قلّل المعدل الشهري بنسبة 12%.', bullet: { level: 0 } }),
+    new Paragraph({ text: 'أتمتت التقارير الأسبوعية للإدارة في Power BI.', bullet: { level: 0 } }),
+    new Paragraph({ children: [new TextRun({ text: 'محلل بيانات — دلتا للخدمات اللوجستية', bold: true })] }),
+    new Paragraph('يونيو 2020 – ديسمبر 2021 | الإسكندرية، مصر'),
+    new Paragraph({ text: 'أعدت بناء لوحة المؤشرات في Tableau لأكثر من 40 مشغّلاً.', bullet: { level: 0 } }),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'المؤهلات العلمية', bold: true })] }),
+    new Paragraph({ children: [new TextRun({ text: 'بكالوريوس الإحصاء — جامعة القاهرة', bold: true })] }),
+    new Paragraph('2016 – 2020 | معدل 3.7 من 4'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'المهارات', bold: true })] }),
+    new Paragraph('SQL · Python · Tableau · Power BI · Excel · اختبار A/B'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'اللغات', bold: true })] }),
+    new Paragraph('العربية (اللغة الأم) · الإنجليزية (طلقة)'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'الشهادات', bold: true })] }),
+    new Paragraph('شهادة تحليلات البيانات من Google (2023)'),
+  ];
+  const doc = new Document({ sections: [{ properties: {}, children }] });
+  const buffer = await Packer.toBuffer(doc);
+  fs.writeFileSync(path.join(outDir, 'arabic-cv.docx'), buffer);
+  return { fileName: 'arabic-cv.docx', bytes: buffer.length };
+}
+
+/**
+ * A CV written in both languages.
+ *
+ * Egyptian employers write in both, and the headings switch halfway
+ * through. The reader has to find the Arabic sections and the English ones
+ * in the same document.
+ */
+async function mixedLanguageDocx() {
+  const children = [
+    new Paragraph({ text: 'Omar Khaled', heading: HeadingLevel.TITLE }),
+    new Paragraph({ children: [new TextRun({ text: 'Software Engineer', bold: true })] }),
+    new Paragraph('omar.khaled@example.com | +20 111 222 3344 | Cairo, Egypt'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'PROFESSIONAL SUMMARY', bold: true })] }),
+    new Paragraph(
+      'Backend engineer with six years building payment and logistics systems for the Egyptian market.'
+    ),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'الخبرة العملية', bold: true })] }),
+    new Paragraph({
+      children: [new TextRun({ text: 'مهندس خلفية — مجموعة النيل للتجزئة', bold: true })],
+    }),
+    new Paragraph('2021 – Present | Cairo, Egypt'),
+    new Paragraph({
+      text: 'Built Node.js services and PostgreSQL schemas for the Cairo fulfilment centre.',
+      bullet: { level: 0 },
+    }),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'SKILLS', bold: true })] }),
+    new Paragraph('TypeScript · Node.js · PostgreSQL · Docker'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'المؤهلات العلمية', bold: true })] }),
+    new Paragraph({ children: [new TextRun({ text: 'بكالوريوس علوم الحاسب — جامعة القاهرة', bold: true })] }),
+    new Paragraph('2017 – 2021 | GPA 3.6/4.0'),
+  ];
+  const doc = new Document({ sections: [{ properties: {}, children }] });
+  const buffer = await Packer.toBuffer(doc);
+  fs.writeFileSync(path.join(outDir, 'mixed-language-cv.docx'), buffer);
+  return { fileName: 'mixed-language-cv.docx', bytes: buffer.length };
+}
+
+/**
+ * A CV that is more than one page.
+ *
+ * A single-page CV never exercises the boundary between pages, and a reader
+ * that loses the thread at the boundary loses a whole section.
+ */
+async function multiPagePdf() {
+  return pdfToFile('multi-page.pdf', (doc, font) => {
+    const width = 500;
+    doc.font(font).fontSize(20).fillColor('#111827').text('SARA HASSAN', 48, 44, { width });
+    doc.fontSize(10).fillColor('#4b5563').text('Data Analyst', 48, 72, { width });
+    doc.fontSize(9).fillColor('#111827').text('sara.hassan@example.com | +20 100 555 0142 | Cairo, Egypt', 48, 88, { width });
+    doc.fontSize(9).fillColor('#111827').text('PROFILE', 48, 110, { width });
+    doc.fontSize(8.5).fillColor('#374151').text(
+      'Data analyst with four years of experience turning operational data into decisions.',
+      48,
+      124,
+      { width, lineGap: 2 }
+    );
+    doc.fontSize(9).fillColor('#111827').text('EXPERIENCE', 48, 170, { width });
+    doc.fontSize(8.5).fillColor('#111827').text('Senior Data Analyst — Nile Retail Group', 48, 186, { width });
+    doc.fillColor('#4b5563').text('Jan 2022 – Present | Cairo, Egypt', 48, 198, { width });
+    doc.fillColor('#374151').text('• Built a churn model that reduced monthly churn by 12%.', 48, 212, { width });
+
+    doc.addPage();
+    doc.font(font).fontSize(9).fillColor('#111827').text('EDUCATION', 48, 44, { width });
+    doc.fontSize(8.5).fillColor('#111827').text('BSc Statistics — Cairo University', 48, 60, { width });
+    doc.fillColor('#4b5563').text('2016 – 2020 | GPA 3.7/4.0', 48, 72, { width });
+    doc.fontSize(9).fillColor('#111827').text('PROJECTS', 48, 104, { width });
+    doc.fontSize(8.5).fillColor('#111827').text('Customer Churn Dashboard — Python, SQL, Power BI', 48, 120, { width });
+    doc.fillColor('#374151').text('Published a dashboard and case study on churn drivers.', 48, 132, { width });
+    doc.fontSize(9).fillColor('#111827').text('CERTIFICATIONS', 48, 164, { width });
+    doc.fontSize(8.5).fillColor('#374151').text('Google Data Analytics Professional Certificate (2023)', 48, 180, { width });
+  });
+}
+
+/**
+ * A CV whose whole body is a table.
+ *
+ * Tables are how a lot of CVs are actually written, and a reader that only
+ * looks at paragraphs reads a table as one long line.
+ */
+async function tableLayoutDocx() {
+  const heading = (text) => new Paragraph({ children: [new TextRun({ text, bold: true })] });
+  const rows = [
+    new TableRow({
+      children: [
+        new TableCell({
+          width: { size: 30, type: WidthType.PERCENTAGE },
+          children: [
+            heading('Period'),
+            new Paragraph('Jan 2022 – Present'),
+            new Paragraph('Jun 2020 – Dec 2021'),
+          ],
+        }),
+        new TableCell({
+          width: { size: 34, type: WidthType.PERCENTAGE },
+          children: [
+            heading('Role'),
+            new Paragraph('Senior Data Analyst'),
+            new Paragraph('Data Analyst'),
+          ],
+        }),
+        new TableCell({
+          width: { size: 36, type: WidthType.PERCENTAGE },
+          children: [
+            heading('Company'),
+            new Paragraph('Nile Retail Group'),
+            new Paragraph('Delta Logistics'),
+          ],
+        }),
+      ],
+    }),
+  ];
+
+  const children = [
+    new Paragraph({ text: 'SARA HASSAN', heading: HeadingLevel.TITLE }),
+    new Paragraph('Data Analyst | sara.hassan@example.com | Cairo, Egypt'),
+    new Paragraph(''),
+    heading('EXPERIENCE'),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows,
+    }),
+    new Paragraph(''),
+    heading('SKILLS'),
+    new Paragraph('SQL, Python, Tableau, Power BI, Excel'),
+  ];
+  const doc = new Document({ sections: [{ properties: {}, children }] });
+  const buffer = await Packer.toBuffer(doc);
+  fs.writeFileSync(path.join(outDir, 'table-layout-cv.docx'), buffer);
+  return { fileName: 'table-layout-cv.docx', bytes: buffer.length };
+}
+
+/**
+ * The awkward cases, in one document.
+ *
+ * Two roles at the same company, two roles that overlap in time, a role
+ * with no dates at all, and the sections a CV is expected to carry beyond
+ * work and study: internships, courses, languages, awards and publications.
+ */
+async function edgeCaseDocx() {
+  const children = [
+    new Paragraph({ text: 'NOUR ALI', heading: HeadingLevel.TITLE }),
+    new Paragraph('Business Analyst | nour.ali@example.com | +20 122 333 4455 | Alexandria, Egypt'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'PROFESSIONAL SUMMARY', bold: true })] }),
+    new Paragraph('Business analyst with three years in retail operations and pricing analysis.'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'EXPERIENCE', bold: true })] }),
+    new Paragraph({ children: [new TextRun({ text: 'Business Analyst — Delta Logistics', bold: true })] }),
+    new Paragraph('Jan 2021 – Present | Alexandria, Egypt'),
+    new Paragraph({ text: 'Rebuilt the pricing model for 120 stores.', bullet: { level: 0 } }),
+    new Paragraph({ children: [new TextRun({ text: 'Business Analyst — Delta Logistics', bold: true })] }),
+    new Paragraph('Jun 2020 – Dec 2020 | Alexandria, Egypt'),
+    new Paragraph({ text: 'Supported the pricing team through the peak season.', bullet: { level: 0 } }),
+    new Paragraph({ children: [new TextRun({ text: 'Operations Coordinator', bold: true })] }),
+    new Paragraph('Cairo, Egypt'),
+    new Paragraph({ text: 'Maintained the vendor register.', bullet: { level: 0 } }),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'INTERNSHIPS', bold: true })] }),
+    new Paragraph({ children: [new TextRun({ text: 'Marketing Intern — Nile Retail Group', bold: true })] }),
+    new Paragraph('Summer 2019 | Cairo, Egypt'),
+    new Paragraph({ text: 'Ran the summer campaign report.', bullet: { level: 0 } }),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'EDUCATION', bold: true })] }),
+    new Paragraph({ children: [new TextRun({ text: 'BA Business Administration — Alexandria University', bold: true })] }),
+    new Paragraph('2016 – 2020 | GPA 3.4/4.0'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'PROJECTS', bold: true })] }),
+    new Paragraph({ children: [new TextRun({ text: 'Retail Pricing Study — Python, SQL', bold: true })] }),
+    new Paragraph('Modelled price elasticity across three categories.'),
+    new Paragraph({ children: [new TextRun({ text: 'Inventory Dashboard — Excel, Power BI', bold: true })] }),
+    new Paragraph('Tracked stock cover for the whole catalogue.'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'SKILLS', bold: true })] }),
+    new Paragraph('Excel, SQL, Python, Power BI, Pricing'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'CERTIFICATIONS', bold: true })] }),
+    new Paragraph('Microsoft Excel Specialist (2022)'),
+    new Paragraph('Google Data Analytics Certificate (2023)'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'COURSES', bold: true })] }),
+    new Paragraph('Financial Modelling — Coursera'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'LANGUAGES', bold: true })] }),
+    new Paragraph('Arabic (Native) · English (Fluent) · French (Basic)'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'AWARDS', bold: true })] }),
+    new Paragraph('Top Graduate Award — Alexandria University (2020)'),
+    new Paragraph(''),
+    new Paragraph({ children: [new TextRun({ text: 'PUBLICATIONS', bold: true })] }),
+    new Paragraph('Pricing elasticity in Egyptian retail — Journal of Applied Operations (2022)'),
+  ];
+  const doc = new Document({ sections: [{ properties: {}, children }] });
+  const buffer = await Packer.toBuffer(doc);
+  fs.writeFileSync(path.join(outDir, 'edge-cases-cv.docx'), buffer);
+  return { fileName: 'edge-cases-cv.docx', bytes: buffer.length };
+}
+
+/**
+ * A legacy Word document.
+ *
+ * The reader for these has to open a compound file and follow a piece table,
+ * so the fixture has to be one. The writer produces a real file.
+ */
+async function legacyDoc() {
+  const buffer = writeLegacyDoc([
+    'SARA HASSAN',
+    'Data Analyst',
+    'sara.hassan@example.com',
+    '+20 100 555 0142',
+    'Cairo, Egypt',
+    'PROFILE',
+    'Data analyst with four years of experience turning operational data into decisions.',
+    'EXPERIENCE',
+    'Senior Data Analyst — Nile Retail Group',
+    'Jan 2022 – Present | Cairo, Egypt',
+    'Built a churn model that reduced monthly churn by 12%.',
+    'Data Analyst — Delta Logistics',
+    'Jun 2020 – Dec 2021 | Alexandria, Egypt',
+    'Rebuilt the KPI dashboard in Tableau for 40+ operators.',
+    'EDUCATION',
+    'BSc Statistics — Cairo University',
+    '2016 – 2020 | GPA 3.7/4.0',
+    'SKILLS',
+    'SQL, Python, Tableau, Power BI, Excel',
+    'CERTIFICATIONS',
+    'Google Data Analytics Professional Certificate (2023)',
+  ]);
+  fs.writeFileSync(path.join(outDir, 'legacy-word.doc'), buffer);
+  return { fileName: 'legacy-word.doc', bytes: buffer.length };
+}
+
+/**
  * Writes every fixture into `destination` (created if needed) and returns the
  * files that were produced. Exported so the automated test can generate real
  * documents on a clean checkout instead of depending on committed binaries.
@@ -249,6 +534,12 @@ export async function generateCvFixtures(destination = path.resolve('.tmp-qa/fix
   results.push(await normalDocx());
   results.push(await ambiguousLocationDocx());
   results.push(await noContactDocx());
+  results.push(await arabicDocx());
+  results.push(await mixedLanguageDocx());
+  results.push(await multiPagePdf());
+  results.push(await tableLayoutDocx());
+  results.push(await edgeCaseDocx());
+  results.push(await legacyDoc());
   return { outDir, embeddedFont, results };
 }
 

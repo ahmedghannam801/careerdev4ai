@@ -25,6 +25,15 @@ import {
   type DocumentFormat,
 } from './server/cv/documentExtraction.ts';
 import { parseStructuredCv } from './server/cv/parseStructuredCv.ts';
+// The extraction review: the document, the evidence for every value in it,
+// and everything that is wrong with it. It is built without writing
+// anything, so the candidate can look before they commit.
+import { buildExtractionReview } from './server/cv/extractionReview.ts';
+// The write half of the review: the candidate's own records, filled in from
+// a document they have accepted.
+import { applyReviewedImport } from './server/cv/reviewedImport.ts';
+// The document the review screen produces and the import route writes.
+import type { CVProfile } from './src/types/career.ts';
 // The ATS evaluation lives in its own module because the background task runs
 // the same code. One implementation means the score shown in CV Studio and the
 // score stored on the version can never drift apart.
@@ -603,7 +612,7 @@ const jobDescriptionUpload = multer({
 // that extension, so a renamed or crafted upload cannot pass the format check
 // under a false identity.
 //
-// Supported formats: PDF, DOCX, TXT, JSON.
+// Supported formats: PDF, DOCX, DOC, TXT, JSON.
 const CV_UPLOAD_TYPES: Record<string, string[]> = {
   '.pdf': ['application/pdf'],
   '.docx': [
@@ -612,11 +621,16 @@ const CV_UPLOAD_TYPES: Record<string, string[]> = {
     'application/octet-stream',
     'application/x-zip-compressed',
   ],
+  '.doc': [
+    'application/msword',
+    'application/vnd.ms-word',
+    'application/octet-stream',
+  ],
   '.txt': ['text/plain'],
   '.json': ['application/json'],
 };
 const CV_UPLOAD_TYPE_ERROR =
-  'Unsupported file type. Please upload a .pdf, .docx, .txt, or .json file.';
+  'Unsupported file type. Please upload a .pdf, .docx, .doc, .txt, or .json file.';
 
 // Canonical skill lookup map built from CATALOG_SKILL_NAMES
 const CANONICAL_SKILL_MAP = new Map<string, string>();
@@ -1666,6 +1680,226 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
     // can carry internal paths, provider payloads or stack frames.
     return res.status(500).json({
       error: 'Failed to process and analyze CV upload',
+    });
+  }
+});
+
+// ============================================================
+// The extraction review.
+//
+// The upload route above imports a CV: it reads the document, writes the
+// candidate's records and stores a version. The routes below are the other
+// order, and they exist because the first one made the candidate a spectator
+// of a decision that had already been made.
+//
+//   extract  — reads the document and writes NOTHING. It returns every
+//              value it found, where it found it, how sure it is, and what
+//              is wrong with it.
+//   section  — reads ONE section again, for a candidate who does not like
+//              how the first reading came out.
+//   import   — writes the document the candidate has reviewed and accepted.
+//
+// The three are separate on purpose: the review is a pure function of the
+// document, so it can be produced, discarded and produced again without
+// touching the account.
+// ============================================================
+
+/** Reads the document out of a request, whether it was uploaded or pasted. */
+async function readCvDocument(
+  req: Request
+): Promise<{ extraction: DocumentExtraction; fileName?: string } | { error: string; code: string }> {
+  if (req.file) {
+    const originalName = req.file.originalname.toLowerCase();
+    const mimeType = req.file.mimetype.split(';')[0].trim().toLowerCase();
+    const dot = originalName.lastIndexOf('.');
+    const extension = dot > -1 ? originalName.slice(dot) : '';
+
+    const allowedMimeTypes = CV_UPLOAD_TYPES[extension];
+    if (!allowedMimeTypes || !allowedMimeTypes.includes(mimeType)) {
+      return { error: CV_UPLOAD_TYPE_ERROR, code: 'unsupported_type' };
+    }
+
+    const extraction = await extractDocument(
+      req.file.buffer,
+      extension.slice(1) as DocumentFormat
+    );
+    return { extraction, fileName: req.file.originalname };
+  }
+
+  const pastedText = str(req.body?.text, 200_000);
+  if (!pastedText) {
+    return { error: 'No CV file or text provided', code: 'no_document' };
+  }
+  return { extraction: extractTextDocument(pastedText) };
+}
+
+/**
+ * Reads a document and builds its review, without writing anything.
+ */
+app.post('/api/cv/extract', requireAuth, aiRateLimit, upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const read = await readCvDocument(req);
+    if ('error' in read) {
+      return res.status(400).json({ error: read.error, code: read.code });
+    }
+
+    const quality = assessDocumentQuality(read.extraction);
+    if (!quality.isAcceptable) {
+      return res.status(400).json({
+        error:
+          quality.errorMessage ||
+          'Unable to extract sufficient readable text from the document.',
+        code: quality.isScannedPdf ? 'scanned_pdf' : 'unreadable_document',
+        isScannedPdf: quality.isScannedPdf,
+      });
+    }
+
+    const parsed = parseStructuredCv(read.extraction);
+    const review = buildExtractionReview(read.extraction, parsed, {
+      fileName: read.fileName,
+    });
+
+    return res.json({ success: true, review, extractionQuality: quality.quality });
+  } catch (error) {
+    console.error('[cv/extract] failed', error);
+    return res.status(500).json({
+      error: 'The CV could not be read right now.',
+      code: 'extraction_failed',
+    });
+  }
+});
+
+/**
+ * Reads one section of a document again.
+ *
+ * The reader is deterministic, so the same document gives the same reading.
+ * What this route adds is the section on its own, with its evidence and its
+ * issues, so a candidate who is unhappy with one section can look at that
+ * section without scrolling past the rest of the document.
+ */
+app.post('/api/cv/extract/section', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const section = str(body.section, 40);
+    if (!section) {
+      return res.status(400).json({ error: 'A section is required', code: 'no_section' });
+    }
+
+    const text = str(body.text, 200_000);
+    if (!text) {
+      return res.status(400).json({
+        error: 'The document text is required to read a section again.',
+        code: 'no_document',
+      });
+    }
+
+    const extraction = extractTextDocument(text);
+    const quality = assessDocumentQuality(extraction);
+    if (!quality.isAcceptable) {
+      return res.status(400).json({
+        error: quality.errorMessage || 'The document text could not be read.',
+        code: 'unreadable_document',
+      });
+    }
+
+    const parsed = parseStructuredCv(extraction);
+    const review = buildExtractionReview(extraction, parsed);
+    const found = review.sections.find((entry) => entry.key === section);
+    if (!found) {
+      return res.status(404).json({
+        error: 'That section is not one this CV is read into.',
+        code: 'unknown_section',
+      });
+    }
+
+    const issues = review.validation.filter((issue) =>
+      issue.path.startsWith(`${section}[`) || issue.path.startsWith(`${section}.`)
+    );
+
+    return res.json({ success: true, section: found, issues, summary: review.summary });
+  } catch (error) {
+    console.error('[cv/extract/section] failed', error);
+    return res.status(500).json({
+      error: 'That section could not be read again right now.',
+      code: 'extraction_failed',
+    });
+  }
+});
+
+/**
+ * Writes the reviewed document into the candidate's records.
+ *
+ * The write is idempotent: every record is matched on its natural key, so
+ * sending the same review twice writes once. Nothing the candidate already
+ * has is overwritten.
+ */
+app.post('/api/cv/import/reviewed', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const cv = body.cv as CVProfile | undefined;
+    if (!cv || typeof cv !== 'object') {
+      return res.status(400).json({ error: 'A reviewed CV is required', code: 'no_cv' });
+    }
+
+    const selected =
+      body.selectedSections && typeof body.selectedSections === 'object'
+        ? (body.selectedSections as Record<string, boolean>)
+        : undefined;
+
+    const result = await applyReviewedImport(req.authUser!.id, cv, selected);
+
+    // The document itself is saved as a version.
+    //
+    // Some of what a CV carries — an internship, an award, a publication —
+    // has no record of its own in the platform, so the version is the only
+    // place it can live. Saving it here is what makes the reviewed document
+    // survive a refresh, and it is what the analysis is measured against
+    // straight afterwards.
+    const targetRoleTitle = str(body.targetRoleTitle, 200) ?? undefined;
+    const versionName = str(body.versionName, 120) ?? 'Reviewed CV';
+
+    let cvId: string | undefined;
+    try {
+      const existing = await listCvs(req.authUser!.id);
+      const active = existing.find((entry) => entry.isActive) ?? existing[0];
+      if (active) {
+        cvId = active.id;
+      } else {
+        const created = await createCv(req.authUser!.id, {
+          name: versionName,
+          targetRoleTitle,
+        });
+        cvId = created.id;
+      }
+      await setActiveCv(req.authUser!.id, cvId);
+      const version = await createCvVersion(req.authUser!.id, {
+        cvId,
+        name: versionName,
+        targetRoleTitle,
+        profileJson: cv,
+      });
+      return res.status(result.failed > 0 ? 207 : 200).json({
+        ...result,
+        cvId,
+        cvVersionId: version?.id ?? null,
+      });
+    } catch (versionError) {
+      // The records were written; only the snapshot of the document failed.
+      // The candidate is told what happened rather than being shown a
+      // failure for work that was done.
+      console.error('[cv/import/reviewed] version not saved', versionError);
+      return res.status(result.failed > 0 ? 207 : 200).json({
+        ...result,
+        cvId: cvId ?? null,
+        cvVersionId: null,
+        versionSaved: false,
+      });
+    }
+  } catch (error) {
+    console.error('[cv/import/reviewed] failed', error);
+    return res.status(500).json({
+      error: 'The reviewed CV could not be saved right now.',
+      code: 'import_failed',
     });
   }
 });
@@ -6852,6 +7086,7 @@ app.patch(
 /* Subscriptions, Payments & Credits Routes                                   */
 /* -------------------------------------------------------------------------- */
 registerSubscriptionRoutes(app);
+
 
 /* -------------------------------------------------------------------------- */
 /* Public SEO pages                                                           */

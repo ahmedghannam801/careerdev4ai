@@ -24,11 +24,20 @@
  * A scanned/image-only PDF is detected explicitly. OCR is NOT implemented, and
  * the result says so instead of pretending the document was unreadable for an
  * unrelated reason.
+ *
+ * A legacy Word document (`.doc`, Word 97-2003) is read out of its compound
+ * file container through its piece table. It has no layout to read, so it
+ * arrives as a single-column text document with a warning saying so.
  */
 import { extractTextItems, type StructuredTextItem } from 'unpdf';
 import { strFromU8, unzipSync } from 'fflate';
+import {
+  extractLegacyDocText,
+  hasLegacyDocSignature,
+  scanReadableText,
+} from './legacyDoc.ts';
 
-export type DocumentFormat = 'pdf' | 'docx' | 'txt' | 'json';
+export type DocumentFormat = 'pdf' | 'docx' | 'doc' | 'txt' | 'json';
 export type DocumentLayout = 'single-column' | 'two-column' | 'multi-column';
 export type DocumentStatus = 'ok' | 'scanned' | 'empty' | 'unsupported';
 
@@ -788,6 +797,98 @@ export function hasDocxSignature(buffer: Uint8Array): boolean {
   );
 }
 
+/** True when the bytes are a legacy Word (Word 97-2003) compound file. */
+export function hasDocSignature(buffer: Uint8Array): boolean {
+  return hasLegacyDocSignature(buffer);
+}
+
+/**
+ * Reads a legacy Word document.
+ *
+ * The binary format carries no layout, so the result is a single-column
+ * text document. When the piece table cannot be read the text is recovered
+ * approximately, and the warning says so rather than presenting a rough
+ * guess as a clean extraction.
+ */
+function extractLegacyDoc(buffer: Uint8Array): DocumentExtraction {
+  const empty: DocumentExtraction = {
+    format: 'doc',
+    status: 'empty',
+    text: '',
+    blocks: [],
+    pageCount: 0,
+    characterCount: 0,
+    wordCount: 0,
+    layout: 'single-column',
+    isScanned: false,
+    warnings: [],
+    errorMessage: EMPTY_DOCUMENT_MESSAGE,
+  };
+
+  let text: string | null = null;
+  const warnings: string[] = [];
+
+  try {
+    text = extractLegacyDocText(buffer);
+  } catch {
+    text = null;
+  }
+
+  if (!text || text.trim().length === 0) {
+    try {
+      const recovered = scanReadableText(buffer);
+      if (recovered.trim().length > 0) {
+        text = recovered;
+        warnings.push(
+          'This .doc file could not be read as a Word document, so the text was recovered approximately. Please check the extracted values carefully.'
+        );
+      }
+    } catch {
+      text = null;
+    }
+  }
+
+  if (!text) return empty;
+
+  const normalized = normalizeDocumentText(text);
+  const blocks = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => ({
+      text: line,
+      page: 1,
+      x: 0,
+      y: 0,
+      width: 0,
+      fontSize: 0,
+      heading: false,
+      source: 'text' as const,
+    }));
+  const readable = countReadableCharacters(normalized);
+
+  if (readable < MIN_READABLE_CHARACTERS) {
+    return { ...empty, warnings };
+  }
+
+  warnings.push(
+    'This .doc file carries no layout information, so it was read as a single column.'
+  );
+
+  return {
+    format: 'doc',
+    status: 'ok',
+    text: normalized,
+    blocks,
+    pageCount: 1,
+    characterCount: readable,
+    wordCount: wordCount(normalized),
+    layout: 'single-column',
+    isScanned: false,
+    warnings,
+  };
+}
+
 /**
  * Extracts text from a CV upload. The caller has already verified that the
  * extension and declared MIME type agree; this function verifies the bytes.
@@ -834,6 +935,26 @@ export async function extractDocument(
       };
     }
     return parseDocx(buffer);
+  }
+
+  if (format === 'doc') {
+    if (!hasDocSignature(buffer)) {
+      return {
+        format,
+        status: 'unsupported',
+        text: '',
+        blocks: [],
+        pageCount: 0,
+        characterCount: 0,
+        wordCount: 0,
+        layout: 'single-column',
+        isScanned: false,
+        warnings: [],
+        errorMessage:
+          'The file extension is .doc but the file content is not a Word document. Please upload the original .doc file.',
+      };
+    }
+    return extractLegacyDoc(buffer);
   }
 
   return extractPlainText(buffer, format);

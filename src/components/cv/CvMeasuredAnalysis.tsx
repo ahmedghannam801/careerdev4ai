@@ -336,7 +336,14 @@ export const CvMeasuredAnalysis: React.FC<{
   cv: MeasurableCv | null;
   targetRoleTitle: string;
   targetRoleSkills?: string[];
-}> = ({ cv, targetRoleTitle, targetRoleSkills }) => {
+  /**
+   * Called whenever the measurement changes.
+   *
+   * The studio puts the measurement's advice next to the section it is
+   * about, so the report has to reach it.
+   */
+  onMeasured?: (report: CvAnalysisReport | null) => void;
+}> = ({ cv, targetRoleTitle, targetRoleSkills, onMeasured }) => {
   const { t } = useCareer();
 
   const [report, setReport] = useState<CvAnalysisReport | null>(null);
@@ -356,6 +363,7 @@ export const CvMeasuredAnalysis: React.FC<{
   const measure = useCallback(async () => {
     if (!cv) {
       setReport(null);
+      onMeasured?.(null);
       return;
     }
     const request = requestRef.current + 1;
@@ -373,9 +381,11 @@ export const CvMeasuredAnalysis: React.FC<{
       });
       if (requestRef.current !== request) return;
       setReport(result.analysis);
+      onMeasured?.(result.analysis);
     } catch (failure) {
       if (requestRef.current !== request) return;
       setReport(null);
+      onMeasured?.(null);
       setError(
         failure instanceof Error ? failure.message : 'The CV could not be measured right now.'
       );
