@@ -448,6 +448,10 @@ npm run stripe:sync                 # safe to re-run
 
 # Local webhooks
 npm run stripe:listen               # put the printed whsec_… in .env
+
+# Delivery smoke test against the deployed endpoint: Stripe creates a real
+# signed test event and reports whether the endpoint accepted it.
+npx --yes @stripe/cli@latest trigger checkout.session.completed
 ```
 
 Production deploy:
