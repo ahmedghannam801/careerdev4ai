@@ -94,7 +94,10 @@ export const PaymentMethodCard: React.FC<PaymentMethodCardProps> = ({
         )}
       </span>
 
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">
+      {/* The mark sits in a strip across the top of the card. A round mark is
+          centred in it; a wordmark — the InstaPay one — fills it, because a
+          wordmark squeezed into a square is a wordmark nobody can read. */}
+      <span className="relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2">
         {mark}
       </span>
 

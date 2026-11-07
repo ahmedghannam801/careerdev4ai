@@ -104,9 +104,14 @@ export const MasterCardMark: React.FC<BrandMarkProps> = ({ className = 'h-5 w-5'
  *
  * The official mark is a raster image with a wide aspect ratio, so it is
  * sized by height and its intrinsic ratio is kept, which stops the layout
- * from jumping while it loads.
+ * from jumping while it loads. `shrink-0` matters: without it a flex parent
+ * squeezes the wordmark down to the width of a square, and a wordmark
+ * squeezed that far is no longer readable.
  */
-export const InstaPayMark: React.FC<BrandMarkProps> = ({ className = 'h-5 w-auto', title }) => (
+export const InstaPayMark: React.FC<BrandMarkProps> = ({
+  className = 'h-5 w-auto shrink-0',
+  title,
+}) => (
   <img
     src={instapayLogo}
     alt={title ?? ''}

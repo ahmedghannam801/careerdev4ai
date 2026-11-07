@@ -680,7 +680,7 @@ export const PricingView: React.FC = () => {
             <span className="text-xs font-bold text-foreground">Vodafone Cash</span>
           </div>
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
-            <InstaPayMark className="h-4 w-auto" />
+            <InstaPayMark className="h-4 w-auto shrink-0" />
             <span className="text-xs font-bold text-foreground">InstaPay</span>
           </div>
           {stripeReady && (

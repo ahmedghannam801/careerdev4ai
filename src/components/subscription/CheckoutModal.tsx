@@ -448,7 +448,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           />
 
           <PaymentMethodCard
-            mark={<InstaPayMark className="h-5 w-auto" />}
+            mark={<InstaPayMark className="h-auto w-full max-w-32 shrink-0" />}
             title={t('InstaPay')}
             subtitle="إنستاباي مصر"
             selected={paymentRail === 'instapay'}
