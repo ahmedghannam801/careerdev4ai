@@ -475,7 +475,8 @@ a test event.
 
 | Check | Result |
 | --- | --- |
-| Deployed commit | `d4eb5ec` (Stripe work `8fc6efd`) |
+| Deployed commit | `4127533` (Stripe work `8fc6efd`, CLI fix `d4eb5ec`, raw-body wiring restored after an unrelated commit dropped it) |
+| Deployment id | `30086f63-1b55-49dd-8468-f197961ec255` |
 | Production root | `200`, app shell served |
 | `/api/stripe/status` unauthenticated | `401` (route present, auth enforced) |
 | `/api/stripe/diagnostics` unauthenticated | `401` |
