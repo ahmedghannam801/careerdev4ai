@@ -427,6 +427,36 @@ The whole suite takes about twenty minutes — it runs its files one at a
 time against one server and the live database — so it is worth starting it
 and letting it finish rather than watching it.
 
+**The result of the run this work ended with:**
+
+```
+1370 assertions passed
+0 failed
+2 skipped
+```
+
+The two that were skipped are the contracts that only apply when no model is
+configured, and a model is configured on this server. Everything else ran:
+the security suite, the coverage suite, the CV pipeline, the studio suites,
+the new extraction suites, and the Stripe suites that landed on the branch
+alongside this work.
+
+The metrics the run printed:
+
+```
+section detection: precision 100%, recall 100%, F1 100%
+field values:      precision 100%, recall 100%, F1 100%
+list entries:      precision 100%, recall 100%, F1 100%
+localisation coverage: 1890/1890 source strings (100%)
+```
+
+The run also found one real problem, and the fix is in the commit: the
+security suite asserted that a legacy `.doc` upload is refused, which was
+true when `.doc` was not a format the reader knew. Now that it is, the
+assertion was rewritten to the contract that replaced it — the format gate
+accepts `.doc`, and what is refused is a file that claims to be a Word
+document and is not.
+
 ---
 
 ## 13. What was not done, and what is still hard
