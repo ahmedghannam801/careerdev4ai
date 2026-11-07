@@ -7,6 +7,19 @@
 import { apiRequest } from './apiClient';
 import type { CreditBalanceDTO, CreditLedgerDTO } from '../../shared/credits';
 
+/**
+ * The state of the daily free-credit allowance.
+ *
+ * The allowance is a separate pool from the subscription entitlement: it is
+ * granted once a day, it resets at midnight in the platform's timezone, and it
+ * does not accumulate. The interface shows it next to the balance so a
+ * candidate knows that a credit is coming back tomorrow.
+ *
+ * The shape is the shared domain model, re-exported here so the client has
+ * one name for it.
+ */
+export type { DailyCreditState } from '../../shared/credits';
+
 export interface CouponValidationResponse {
   success: boolean;
   valid: boolean;
@@ -29,6 +42,14 @@ export interface BirthdayRewardDTO {
   status: 'available' | 'redeemed' | 'expired' | 'revoked';
 }
 
+/**
+ * Reads the caller's credit balance.
+ *
+ * The response carries the subscription entitlement and — when the platform
+ * grants one — the daily free allowance. Both are passed on as they came:
+ * nothing is defaulted, so the interface can tell the difference between "no
+ * daily allowance" and "no daily allowance reported".
+ */
 export async function fetchCreditBalance(): Promise<CreditBalanceDTO> {
   const res = await apiRequest<{ success: boolean } & CreditBalanceDTO>('/api/credits/balance');
   return {
@@ -37,6 +58,7 @@ export async function fetchCreditBalance(): Promise<CreditBalanceDTO> {
     consumedThisMonth: res.consumedThisMonth,
     tier: res.tier,
     expiresAt: res.expiresAt,
+    ...(res.daily ? { daily: res.daily } : {}),
   };
 }
 

@@ -156,9 +156,15 @@ SELECT
 FROM auth.users u
 JOIN public.profiles p ON p.id = u.id
 WHERE lower(u.email) = lower('ahdabdalla77@gmail.com')
-ON CONFLICT (profile_id) DO UPDATE SET
-  email = EXCLUDED.email,
-  full_name = EXCLUDED.full_name,
-  role = 'super_admin',
-  status = 'active',
-  updated_at = now();
+  -- The account must have a confirmed email. An unconfirmed signup using this
+  -- address must never receive administrative rights.
+  AND u.email_confirmed_at IS NOT NULL
+ON CONFLICT (profile_id) DO UPDATE
+  SET email = EXCLUDED.email,
+      full_name = EXCLUDED.full_name,
+      updated_at = now()
+  -- The upsert only ever creates the bootstrap administrator. It never
+  -- re-promotes an existing row, so a demoted or disabled account stays
+  -- demoted when the migration is replayed.
+  WHERE admin_users.role = 'super_admin'
+    AND admin_users.status = 'active';

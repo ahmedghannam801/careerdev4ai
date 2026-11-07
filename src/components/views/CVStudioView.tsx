@@ -18,7 +18,7 @@ import { CvReviewWorkspace } from '../cv/CvReviewWorkspace';
 import { CvStudioWorkflow } from '../cv/CvStudioWorkflow';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
 import type { CvAnalysisReport } from '../../../shared/cvAnalysis';
-import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
+import { CV_STUDIO_TABS, cvStudioStepForTab, type CvStudioTab } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
@@ -53,7 +53,22 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   // The open tab is part of the page, so it lives in the URL: a refresh, a
   // shared link and the Back button all land on the same tab.
   const [activeTab, setActiveTab] = useRouteParam<CvStudioTab>('tab', CV_STUDIO_TABS, 'editor');
+  // The step the open tab belongs to. "My CV" owns the document, the records
+  // it is built from and its history, so those three tabs all highlight the
+  // same step.
+  const activeStep = cvStudioStepForTab(activeTab);
+  // The secondary views of the "My CV" step. They are revealed from inside
+  // the step rather than listed as a navigation of their own.
+  const secondaryViews: Array<{ tab: CvStudioTab; label: string }> = [
+    { tab: 'editor', label: t('Document Editor & Preview') },
+    { tab: 'data', label: t('My Data') },
+    { tab: 'versions', label: `${t('Version History')} (${cvVersions.length})` },
+  ];
   const [showVersionModal, setShowVersionModal] = useState(false);
+  // The evidence behind the ATS score is revealed on demand. The score is the
+  // answer; the breakdown, the keywords and the rewritten bullets are the
+  // reasoning behind it.
+  const [showAtsDetails, setShowAtsDetails] = useState(false);
   const [versionName, setVersionName] = useState('');
   // The measurement of this document. The editor shows the advice it holds
   // next to the section each piece of advice is about, so the two cannot
@@ -177,19 +192,24 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
             <Upload className="w-3.5 h-3.5" />
             <span>{t('Import / Paste')}</span>
           </button>
-          <button
-            onClick={handleRunAtsAudit}
-            disabled={isOptimizingCV || !aiWritingEnabled}
-            title={
-              aiWritingEnabled
-                ? undefined
-                : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
-            }
-            className="px-3.5 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--color-primary-text)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${isOptimizingCV ? 'animate-spin' : ''}`} />
-            <span>{isOptimizingCV ? t('Analyzing ATS Keywords...') : t('Run ATS Audit')}</span>
-          </button>
+
+          {/* The audit belongs to the step that reads its result, so it is
+              offered there rather than in every step of the studio. */}
+          {activeStep === 'analyze' && (
+            <button
+              onClick={handleRunAtsAudit}
+              disabled={isOptimizingCV || !aiWritingEnabled}
+              title={
+                aiWritingEnabled
+                  ? undefined
+                  : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
+              }
+              className="px-3.5 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--color-primary-text)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${isOptimizingCV ? 'animate-spin' : ''}`} />
+              <span>{isOptimizingCV ? t('Analyzing ATS Keywords...') : t('Run ATS Audit')}</span>
+            </button>
+          )}
 
           {/* Printing is offered only where there is a document to print.
               The print stylesheet keeps the paper preview and nothing else,
@@ -248,91 +268,43 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       )}
 
       {/* The path through the studio. Every step is a part of this workspace,
-          so a candidate never has to open somewhere else to finish the job. */}
+          so a candidate never has to open somewhere else to finish the job.
+          This is the studio's only navigation: the steps below are the whole
+          of it. */}
       <CvStudioWorkflow
         activeTab={activeTab}
         onSelectTab={(tab) => setActiveTab(tab)}
         t={t}
       />
 
-      {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
-        <button
-          onClick={() => setActiveTab('editor')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === 'editor'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
+      {/* The two secondary views of "My CV": the records the document is built
+          from and the history of its versions. They belong to the step, so
+          they are revealed from inside it rather than offered as a second
+          navigation of their own. */}
+      {activeStep === 'cv' && (
+        <div
+          role="group"
+          aria-label={t('My CV')}
+          className="flex flex-wrap items-center gap-x-1 gap-y-1 border-b border-[var(--border-subtle)] pb-2"
         >
-          {t('Document Editor & Preview')}
-        </button>
-        <button
-          onClick={() => setActiveTab('review')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === 'review'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {t('Import & Review')}
-        </button>
-        <button
-          data-tour="cv-data-tab"
-          onClick={() => setActiveTab('data')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === 'data'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {t('My Data')}
-        </button>
-        <button
-          data-tour="cv-tailor-tab"
-          onClick={() => setActiveTab('job')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === 'job'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {t('Job Description')}
-        </button>
-        <button
-          onClick={() => setActiveTab('ats')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === 'ats'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {t('ATS Analysis & Recommendations')}
-          {latestAnalysis
-            ? ` (${latestAnalysis.overallScore}%${analysisRole.isStale ? ` · ${t('previous role')}` : ''})`
-            : ''}
-        </button>
-        <button
-          onClick={() => setActiveTab('versions')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === 'versions'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {t('Version History')} ({cvVersions.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('built')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            activeTab === 'built'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {t('Built From My Data')}
-        </button>
-      </div>
+          {secondaryViews.map((view) => (
+            <button
+              key={view.tab}
+              type="button"
+              data-tour={view.tab === 'data' ? 'cv-data-tab' : undefined}
+              onClick={() => setActiveTab(view.tab)}
+              aria-current={activeTab === view.tab ? 'true' : undefined}
+              className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                activeTab === view.tab
+                  ? 'bg-[var(--surface-secondary)] text-[var(--text-primary)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {view.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* TAB 0: THE RECORDS THE CV IS BUILT FROM */}
       {activeTab === 'data' && <CvDataManager />}
@@ -397,12 +369,176 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         </div>
       )}
 
-      {/* TAB 2: ATS ANALYSIS */}
-      {/* The measured analysis comes first. It is counted from the document, so
-          it does not wait for a model and it does not change because a
-          provider was busy. */}
+      {/* STEP "Analyze": the two systems that read the document, kept apart.
+          The score for the target role is the answer the candidate came for,
+          so it comes first; the evidence behind it is revealed on demand. */}
       {activeTab === 'ats' && (
-        <>
+        <div className="space-y-6">
+          {latestAnalysis ? (
+            <>
+              {analysisRole.isStale && (
+                <div className="p-4 rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <AlertCircle className="w-4 h-4 text-[var(--color-warning)] shrink-0" />
+                  <div className="flex-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+                    <span className="font-bold text-[var(--text-primary)]">
+                      {t('This analysis is out of date for your target role.')}
+                    </span>{' '}
+                    {t('It was generated for')} {analysisRoleLabel}
+                    {t(', but your current target is')} {targetRole.title}
+                    {t('. The score below has not been applied to your current readiness.')}
+                  </div>
+                  <button
+                    onClick={handleRunAtsAudit}
+                    disabled={isOptimizingCV || !aiWritingEnabled}
+                    title={
+                      aiWritingEnabled
+                        ? undefined
+                        : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
+                    }
+                    className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-[11px] font-semibold whitespace-nowrap disabled:opacity-50"
+                  >
+                    {isOptimizingCV ? t('Analyzing…') : `${t('Audit for')} ${targetRole.title}`}
+                  </button>
+                </div>
+              )}
+              <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">{t('ATS Match Diagnostic')}</span>
+                    <h2 className="text-xl font-bold text-[var(--text-primary)] mt-0.5">
+                      {t('Alignment for')} {analysisRoleLabel}
+                    </h2>
+                    {analysisRole.isStale && (
+                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        {t('Current target:')} {targetRole.title}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-end">
+                    <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--color-primary-text)]">
+                      {latestAnalysis.overallScore} / 100
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)]">{t('Benchmark Passing Score: 75')}</div>
+                  </div>
+                </div>
+
+                {/* The score is the answer. The breakdown, the keywords and the
+                    rewritten bullets are the evidence behind it, so they are
+                    revealed when the candidate asks for them instead of
+                    crowding the answer. */}
+                <button
+                  type="button"
+                  onClick={() => setShowAtsDetails((open) => !open)}
+                  aria-expanded={showAtsDetails}
+                  className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
+                >
+                  {showAtsDetails ? t('Hide') : t('Show details')}
+                </button>
+
+                {showAtsDetails && (
+                  <div className="space-y-6">
+                    {/* Breakdown bars */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t border-[var(--border-subtle)]">
+                      {Object.entries(latestAnalysis.breakdown).map(([key, val]) => (
+                        <div key={key} className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)]">
+                          <div className="text-[11px] text-[var(--text-secondary)] capitalize">{key.replace(/([A-Z])/g, ' $1')}</div>
+                          <div className="text-xl font-bold font-mono tabular-nums text-[var(--text-primary)] mt-1">{val}%</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Matched vs Missing Keywords */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                      <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-2">
+                        <div className="text-xs font-bold text-[var(--color-success-strong)] flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{t('Matched Keywords')} ({latestAnalysis.matchedKeywords.length})</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {latestAnalysis.matchedKeywords.map((kw, i) => (
+                            <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-primary)]">
+                              {kw}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-2">
+                        <div className="text-xs font-bold text-[var(--color-warning)] flex items-center gap-1.5">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>{t('Missing Role Keywords')} ({latestAnalysis.missingKeywords.length})</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {latestAnalysis.missingKeywords.map((kw, i) => (
+                            <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--color-warning)] font-medium">
+                              + {kw}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bullet Point Improvements */}
+                    <div className="space-y-3 pt-2">
+                      <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Actionable Bullet Point Improvements')}</h3>
+                      <div className="space-y-3">
+                        {latestAnalysis.actionableImprovements.map((imp, i) => (
+                          <div key={i} className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-2 text-xs">
+                            {imp.currentText && (
+                              <div>
+                                <span className="font-semibold text-[var(--text-muted)]">{t('Current:')} </span>
+                                <span className="line-through text-[var(--text-secondary)]">{imp.currentText}</span>
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-semibold text-[var(--color-success-strong)]">{t('Suggested:')} </span>
+                              <span className="font-medium text-[var(--text-primary)]">{imp.suggestedText}</span>
+                            </div>
+                            <div className="text-[11px] text-[var(--color-primary-text)] font-medium pt-1">
+                              {t('Reason:')} {imp.reason}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* Empty ATS state: a missing analysis must be explained, not a
+               blank tab. */
+            <div className="p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-center space-y-3">
+              <Sparkles className="w-6 h-6 text-[var(--color-primary-text)] mx-auto" />
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('No ATS analysis yet')}</h2>
+              <p className="text-xs text-[var(--text-secondary)] max-w-lg mx-auto leading-relaxed">
+                {t('Run an ATS audit to compare this CV against the keywords and requirements for')}{' '}
+                {targetRole.title}.
+              </p>
+              <button
+                onClick={handleRunAtsAudit}
+                disabled={isOptimizingCV || !aiWritingEnabled}
+                title={
+                  aiWritingEnabled
+                    ? undefined
+                    : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
+                }
+                className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
+              >
+                {isOptimizingCV ? t('Analyzing…') : t('Run ATS Audit')}
+              </button>
+              {!aiWritingEnabled && (
+                <p className="text-[11px] text-[var(--color-warning)]">
+                  {t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings to run an audit.')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* The measured analysis is counted from the document itself, so it
+              does not wait for a model and it does not change because a
+              provider was busy. It is its own system, and it is not the AI ATS
+              score above. */}
           <CvMeasuredAnalysis
             cv={activeCV}
             targetRoleTitle={targetRole.title}
@@ -423,151 +559,6 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
             jobDescription={jobDescriptionState.jobDescription}
             showUpload
           />
-        </>
-      )}
-
-      {activeTab === 'ats' && latestAnalysis && (
-        <div className="space-y-6">
-          {analysisRole.isStale && (
-            <div className="p-4 rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 flex flex-col sm:flex-row sm:items-center gap-3">
-              <AlertCircle className="w-4 h-4 text-[var(--color-warning)] shrink-0" />
-              <div className="flex-1 text-xs text-[var(--text-secondary)] leading-relaxed">
-                <span className="font-bold text-[var(--text-primary)]">
-                  {t('This analysis is out of date for your target role.')}
-                </span>{' '}
-                {t('It was generated for')} {analysisRoleLabel}
-                {t(', but your current target is')} {targetRole.title}
-                {t('. The score below has not been applied to your current readiness.')}
-              </div>
-              <button
-                onClick={handleRunAtsAudit}
-                disabled={isOptimizingCV || !aiWritingEnabled}
-                title={
-                  aiWritingEnabled
-                    ? undefined
-                    : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
-                }
-                className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-[11px] font-semibold whitespace-nowrap disabled:opacity-50"
-              >
-                {isOptimizingCV ? t('Analyzing…') : `${t('Audit for')} ${targetRole.title}`}
-              </button>
-            </div>
-          )}
-          <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">{t('ATS Match Diagnostic')}</span>
-                <h2 className="text-xl font-bold text-[var(--text-primary)] mt-0.5">
-                  {t('Alignment for')} {analysisRoleLabel}
-                </h2>
-                {analysisRole.isStale && (
-                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    {t('Current target:')} {targetRole.title}
-                  </p>
-                )}
-              </div>
-              <div className="text-end">
-                <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--color-primary-text)]">
-                  {latestAnalysis.overallScore} / 100
-                </div>
-                <div className="text-xs text-[var(--text-muted)]">{t('Benchmark Passing Score: 75')}</div>
-              </div>
-            </div>
-
-            {/* Breakdown bars */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t border-[var(--border-subtle)]">
-              {Object.entries(latestAnalysis.breakdown).map(([key, val]) => (
-                <div key={key} className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)]">
-                  <div className="text-[11px] text-[var(--text-secondary)] capitalize">{key.replace(/([A-Z])/g, ' $1')}</div>
-                  <div className="text-xl font-bold font-mono tabular-nums text-[var(--text-primary)] mt-1">{val}%</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Matched vs Missing Keywords */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-              <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-2">
-                <div className="text-xs font-bold text-[var(--color-success-strong)] flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{t('Matched Keywords')} ({latestAnalysis.matchedKeywords.length})</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {latestAnalysis.matchedKeywords.map((kw, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-primary)]">
-                      {kw}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-2">
-                <div className="text-xs font-bold text-[var(--color-warning)] flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{t('Missing Role Keywords')} ({latestAnalysis.missingKeywords.length})</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {latestAnalysis.missingKeywords.map((kw, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--color-warning)] font-medium">
-                      + {kw}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Bullet Point Improvements */}
-            <div className="space-y-3 pt-2">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Actionable Bullet Point Improvements')}</h3>
-              <div className="space-y-3">
-                {latestAnalysis.actionableImprovements.map((imp, i) => (
-                  <div key={i} className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-2 text-xs">
-                    {imp.currentText && (
-                      <div>
-                        <span className="font-semibold text-[var(--text-muted)]">{t('Current:')} </span>
-                        <span className="line-through text-[var(--text-secondary)]">{imp.currentText}</span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="font-semibold text-[var(--color-success-strong)]">{t('Suggested:')} </span>
-                      <span className="font-medium text-[var(--text-primary)]">{imp.suggestedText}</span>
-                    </div>
-                    <div className="text-[11px] text-[var(--color-primary-text)] font-medium pt-1">
-                      {t('Reason:')} {imp.reason}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Empty ATS state: a missing analysis must be explained, not a blank tab. */}
-      {activeTab === 'ats' && !latestAnalysis && (
-        <div className="p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-center space-y-3">
-          <Sparkles className="w-6 h-6 text-[var(--color-primary-text)] mx-auto" />
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('No ATS analysis yet')}</h2>
-          <p className="text-xs text-[var(--text-secondary)] max-w-lg mx-auto leading-relaxed">
-            {t('Run an ATS audit to compare this CV against the keywords and requirements for')}{' '}
-            {targetRole.title}.
-          </p>
-          <button
-            onClick={handleRunAtsAudit}
-            disabled={isOptimizingCV || !aiWritingEnabled}
-            title={
-              aiWritingEnabled
-                ? undefined
-                : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
-            }
-            className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
-          >
-            {isOptimizingCV ? t('Analyzing…') : t('Run ATS Audit')}
-          </button>
-          {!aiWritingEnabled && (
-            <p className="text-[11px] text-[var(--color-warning)]">
-              {t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings to run an audit.')}
-            </p>
-          )}
         </div>
       )}
 

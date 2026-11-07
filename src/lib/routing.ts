@@ -32,7 +32,6 @@ export const APP_ROUTES = [
   'volunteer',
   'evidence',
   'cv-studio',
-  'cv-analyzer',
   'documents',
   'jobs',
   'applications',
@@ -40,6 +39,7 @@ export const APP_ROUTES = [
   'profile',
   'activity',
   'progress',
+  'referrals',
   'settings',
   'admin',
   'pricing',
@@ -55,8 +55,30 @@ export type AppRoute = (typeof APP_ROUTES)[number];
  */
 export const SESSION_ROUTES = ['landing', 'onboarding'] as const;
 
+/**
+ * Addresses that used to be a view of their own and are now an alias.
+ *
+ * These are deliberately NOT in `APP_ROUTES`: the screen behind them is gone,
+ * so the application must never open one as a view. They are still addresses
+ * the platform recognises, because a link to one exists in the wild — in
+ * shared CVs, in support messages and in the browser history — and it must
+ * lead somewhere instead of to a dead end.
+ *
+ * The distinction is the whole point of the two lists:
+ *
+ *   `isAppRoute('cv-analyzer')` is false — it is not a view of the
+ *   application any more, so nothing may render it.
+ *   `isKnownRoute('cv-analyzer')` is true — the platform still recognises the
+ *   legacy address and redirects it to where the work lives now.
+ */
+export const LEGACY_ALIASED_ROUTES = ['cv-analyzer'] as const;
+
 /** Every route the application recognises, signed in or not. */
-export const KNOWN_ROUTES: readonly string[] = [...APP_ROUTES, ...SESSION_ROUTES];
+export const KNOWN_ROUTES: readonly string[] = [
+  ...APP_ROUTES,
+  ...SESSION_ROUTES,
+  ...LEGACY_ALIASED_ROUTES,
+];
 
 /** Whether a string names a view of the signed-in application. */
 export function isAppRoute(value: string): value is AppRoute {
@@ -77,7 +99,9 @@ export function isKnownRoute(value: string): boolean {
  * of the studio, which is where the analyzer lives now.
  *
  * An alias is resolved rather than removed, because links to it exist in the
- * wild — in shared CVs, in support messages and in the browser history.
+ * wild — in shared CVs, in support messages and in the browser history. The
+ * alias is listed in `LEGACY_ALIASED_ROUTES`, so the address is still a route
+ * the application knows even though it is no longer a view of its own.
  */
 export const ROUTE_ALIASES: Readonly<
   Record<string, { route: string; params?: Record<string, string> }>
@@ -214,6 +238,44 @@ export const CV_STUDIO_TABS = [
   'built',
 ] as const;
 export type CvStudioTab = (typeof CV_STUDIO_TABS)[number];
+
+/**
+ * The five steps of the CV Studio's workflow.
+ *
+ * The studio is one workspace with one path through it, so it has one
+ * navigation rather than two. These steps are that path, and each one says
+ * which of the studio's tabs the work happens in:
+ *
+ *   My CV               the document, the records it is built from, its history
+ *   Import and review   reading a CV before anything is written
+ *   Analyze             the measurement of the document
+ *   Improve             the job the document is written for
+ *   Export              the finished document
+ *
+ * The tabs themselves did not change: a link to `?tab=versions` still opens
+ * the version history, and the two secondary views of "My CV" are still their
+ * own tabs. This is a way of arranging what already exists, not a new set of
+ * addresses — which is why every value of `CV_STUDIO_TABS` is still valid and
+ * every one of them belongs to exactly one step.
+ */
+export type CvStudioStepId = 'cv' | 'import' | 'analyze' | 'improve' | 'export';
+
+export const CV_STUDIO_STEPS: ReadonlyArray<{
+  id: CvStudioStepId;
+  tabs: readonly CvStudioTab[];
+}> = [
+  { id: 'cv', tabs: ['editor', 'data', 'versions'] },
+  { id: 'import', tabs: ['review'] },
+  { id: 'analyze', tabs: ['ats'] },
+  { id: 'improve', tabs: ['job'] },
+  { id: 'export', tabs: ['built'] },
+];
+
+/** The step a tab belongs to. */
+export function cvStudioStepForTab(tab: CvStudioTab): CvStudioStepId {
+  const step = CV_STUDIO_STEPS.find((entry) => entry.tabs.includes(tab));
+  return step ? step.id : 'cv';
+}
 
 /** The tabs of the learning hub. */
 export const LEARNING_TABS = [

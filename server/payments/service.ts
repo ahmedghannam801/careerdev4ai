@@ -16,7 +16,8 @@ import {
 } from '../db/payments.ts';
 import { getPlanByCode } from '../db/subscriptions.ts';
 import { validateCoupon } from '../coupons/service.ts';
-import { getActiveBirthdayReward } from '../birthday/service.ts';
+import { getActiveBirthdayReward, redeemBirthdayReward } from '../birthday/service.ts';
+import { assertReceiptFileIsAllowed } from './receiptFile.ts';
 import {
   type PaymentMethod,
   type PaymentRequestDTO,
@@ -107,11 +108,14 @@ export async function createCheckout(input: CreateCheckoutInput): Promise<Checko
     billingCycle === 'monthly' &&
     ['student', 'pro', 'career_plus'].includes(planCode);
 
+  let birthdayApplied = false;
+
   if (applyBirthdayReward && isEligibleMonthlySubscription && discountAmountPiasters === 0) {
     const birthdayReward = await getActiveBirthdayReward(profileId);
     if (birthdayReward && birthdayReward.status === 'available') {
       const bdayDiscount = Math.round((originalAmountPiasters * birthdayReward.discountPercentage) / 100);
       discountAmountPiasters = Math.min(bdayDiscount, birthdayReward.maxDiscountPiasters);
+      birthdayApplied = discountAmountPiasters > 0;
     }
   }
 
@@ -133,6 +137,14 @@ export async function createCheckout(input: CreateCheckoutInput): Promise<Checko
   });
 
   const instructions = getPaymentInstructions(paymentMethod, finalAmountPiasters);
+
+  // The birthday discount is claimed by this request. Recording it here means
+  // a second request on the same birthday cannot use the discount again, even
+  // before this payment is verified. An operator who rejects the request can
+  // release it again.
+  if (birthdayApplied) {
+    await redeemBirthdayReward(profileId, paymentRequest.id);
+  }
 
   return { paymentRequest, instructions };
 }
@@ -163,10 +175,18 @@ export async function submitEvidence(input: SubmitEvidenceInput): Promise<Paymen
     throw new Error(`Cannot submit evidence for request in '${existingRequest.status}' status`);
   }
 
-  // 1. Compute receipt SHA-256 hash
+  // 1. The receipt has to be what it claims to be. The declared content type
+  //    comes from the browser; the bytes decide.
+  assertReceiptFileIsAllowed({
+    buffer: receiptBuffer,
+    contentType,
+    filename,
+  });
+
+  // 2. Compute receipt SHA-256 hash
   const receiptHash = await computeSha256Hex(receiptBuffer);
 
-  // 2. Check duplicate reference and duplicate receipt hash
+  // 3. Check duplicate reference and duplicate receipt hash
   const [isDupRef, isDupHash] = await Promise.all([
     isTransactionReferenceDuplicate(
       existingRequest.paymentMethod,
@@ -176,7 +196,7 @@ export async function submitEvidence(input: SubmitEvidenceInput): Promise<Paymen
     isReceiptHashDuplicate(receiptHash, paymentRequestId),
   ]);
 
-  // 3. Compute Risk Score & Risk Flags
+  // 4. Compute Risk Score & Risk Flags
   let riskScore = 0;
   const riskFlags: string[] = [];
 

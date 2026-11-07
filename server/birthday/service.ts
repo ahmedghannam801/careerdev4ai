@@ -1,7 +1,21 @@
 /**
  * Birthday Reward Service (Egypt Law 151 Compliant).
- * Strictly limits personal data collection to birth month and birth day (NO birth year).
- * Stores verifiable privacy consent records and provisions promotional rewards.
+ *
+ * Strictly limits personal data collection to birth month and birth day (NO
+ * birth year). Stores verifiable privacy consent records and provisions the
+ * promotional reward.
+ *
+ * The eligibility rules are the important part:
+ *
+ *   * The reward belongs to ONE account, on ONE day: the account's own
+ *     birthday, in the account's own timezone. It is not a coupon anybody can
+ *     see, and it is not a week-long promotion.
+ *   * Eligibility is decided on the server, from the consent record the
+ *     candidate gave. The browser cannot ask for the discount, cannot move
+ *     the date and cannot ask for it on another account's behalf.
+ *   * The discount is 30%, capped at 100 EGP, and it never combines with a
+ *     coupon.
+ *   * A redemption is recorded, so the same birthday cannot be spent twice.
  */
 
 import { getSupabaseServer } from '../db/supabase.ts';
@@ -24,11 +38,153 @@ export interface BirthdayRewardDTO {
   maxDiscountPiasters: number;
   validFrom: string;
   validUntil: string;
-  status: 'available' | 'redeemed' | 'expired' | 'revoked';
+  status: 'available' | 'redeemed' | 'expired';
+}
+
+/** The platform's documented timezone. It is the fallback for a candidate whose profile names none. */
+export const DEFAULT_TIMEZONE = 'Africa/Cairo';
+
+/** The approved birthday discount. It is not configurable and it does not grow. */
+export const BIRTHDAY_DISCOUNT_PERCENTAGE = 30;
+
+/** The approved cap on the birthday discount, in piasters (100 EGP). */
+export const BIRTHDAY_MAX_DISCOUNT_PIASTERS = 10_000;
+
+/**
+ * The calendar date in a timezone.
+ *
+ * The platform decides the day boundary from the candidate's own timezone, so
+ * a candidate's birthday starts when it starts for them.
+ */
+export function calendarDateIn(timeZone: string, at: Date = new Date()): {
+  year: number;
+  month: number;
+  day: number;
+} {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(at);
+
+    const read = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+
+    const year = read('year');
+    const month = read('month');
+    const day = read('day');
+
+    if (!year || !month || !day) throw new Error('unreadable date');
+
+    return { year, month, day };
+  } catch {
+    // A timezone the runtime does not know falls back to the platform's own.
+    const utc = new Date(at.getTime() + at.getTimezoneOffset() * 60_000);
+    return {
+      year: utc.getFullYear(),
+      month: utc.getMonth() + 1,
+      day: utc.getDate(),
+    };
+  }
 }
 
 /**
- * Registers candidate consent and provisions an active or upcoming birthday reward.
+ * Whether today is the candidate's birthday, in their own timezone.
+ */
+export function isBirthdayToday(
+  birthMonth: number,
+  birthDay: number,
+  timeZone: string = DEFAULT_TIMEZONE,
+  at: Date = new Date()
+): boolean {
+  const today = calendarDateIn(timeZone, at);
+  return today.month === birthMonth && today.day === birthDay;
+}
+
+/**
+ * The first and the last moment of a calendar day in a timezone.
+ *
+ * The offset is read from the timezone itself, so daylight saving is handled
+ * by the platform's own calendar rather than by a fixed rule.
+ */
+function dayWindow(
+  year: number,
+  month: number,
+  day: number,
+  timeZone: string
+): { from: Date; until: Date } {
+  const offsetAt = (at: Date): number => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).formatToParts(at);
+
+    const read = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+    const hour = read('hour') === 24 ? 0 : read('hour');
+
+    const asUtc = Date.UTC(
+      read('year'),
+      read('month') - 1,
+      read('day'),
+      hour,
+      read('minute'),
+      read('second')
+    );
+
+    return asUtc - at.getTime() + (at.getTime() % 1000);
+  };
+
+  const midnightUtc = Date.UTC(year, month - 1, day, 0, 0, 0);
+  // Two passes: the offset of the guess, then the offset at the corrected
+  // instant. The second pass settles the answer for every real timezone.
+  let from = new Date(midnightUtc - offsetAt(new Date(midnightUtc)));
+  from = new Date(midnightUtc - offsetAt(from));
+
+  const until = new Date(from.getTime());
+  until.setUTCDate(until.getUTCDate() + 1);
+
+  return { from, until };
+}
+
+/**
+ * Reads the candidate's own timezone.
+ *
+ * A candidate who names one gets their own day boundary. A candidate who
+ * names none, or names one the runtime does not know, follows the platform's
+ * documented policy.
+ */
+export async function getProfileTimezone(profileId: string): Promise<string> {
+  const { data, error } = await getSupabaseServer()
+    .from('profiles')
+    .select('timezone')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (error) return DEFAULT_TIMEZONE;
+
+  const named = (data as { timezone?: string | null } | null)?.timezone?.trim();
+  if (!named) return DEFAULT_TIMEZONE;
+
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: named });
+    return named;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
+}
+
+/**
+ * Registers candidate consent and provisions the birthday reward.
+ *
+ * The reward is provisioned for the candidate's next birthday, and it is
+ * usable on that day only.
  */
 export async function saveBirthdayConsent(
   input: BirthdayConsentInput
@@ -39,8 +195,9 @@ export async function saveBirthdayConsent(
     return { success: false, error: 'Invalid birth month or day' };
   }
 
+  const timeZone = await getProfileTimezone(profileId);
   const now = new Date();
-  const currentYear = now.getUTCFullYear();
+  const today = calendarDateIn(timeZone, now);
 
   // 1. Record Law 151 Privacy Consent
   const { data: consentData, error: consentErr } = await getSupabaseServer()
@@ -68,20 +225,17 @@ export async function saveBirthdayConsent(
 
   const consentId = consentData.id;
 
-  // 2. BLK-06: Compute strictly 7-day birthday celebration window (valid for 7 days)
-  // Determine if this year's birthday window is active/upcoming, or schedule for next year
-  let rewardYear = currentYear;
-  let validFrom = new Date(Date.UTC(rewardYear, birthMonth - 1, birthDay));
-  let validUntil = new Date(validFrom.getTime() + 7 * 24 * 60 * 60 * 1000);
+  // 2. The reward covers the candidate's birthday and that day only.
+  //    A birthday that has already passed this year is next year's.
+  let rewardYear = today.year;
+  let window = dayWindow(rewardYear, birthMonth, birthDay, timeZone);
 
-  // If already expired for this year, schedule for next year
-  if (now > validUntil) {
-    rewardYear = currentYear + 1;
-    validFrom = new Date(Date.UTC(rewardYear, birthMonth - 1, birthDay));
-    validUntil = new Date(validFrom.getTime() + 7 * 24 * 60 * 60 * 1000);
+  if (now > window.until) {
+    rewardYear = today.year + 1;
+    window = dayWindow(rewardYear, birthMonth, birthDay, timeZone);
   }
 
-  // 3. Upsert reward definition
+  // 3. Upsert the reward definition
   const { data: rewardData, error: rewardErr } = await getSupabaseServer()
     .from('birthday_rewards')
     .upsert(
@@ -91,12 +245,14 @@ export async function saveBirthdayConsent(
         birth_month: birthMonth,
         birth_day: birthDay,
         reward_year: rewardYear,
-        discount_percentage: 30, // 30% discount
-        max_discount_piasters: 10000, // 100.00 EGP cap
-        valid_from: validFrom.toISOString(),
-        valid_until: validUntil.toISOString(),
+        discount_percentage: BIRTHDAY_DISCOUNT_PERCENTAGE,
+        max_discount_piasters: BIRTHDAY_MAX_DISCOUNT_PIASTERS,
+        valid_from: window.from.toISOString(),
+        valid_until: window.until.toISOString(),
         is_combinable: false,
         status: 'available',
+        redeemed_at: null,
+        redeemed_payment_id: null,
       },
       { onConflict: 'profile_id,reward_year' }
     )
@@ -142,11 +298,12 @@ export async function revokeBirthdayConsent(profileId: string): Promise<boolean>
     .eq('profile_id', profileId)
     .eq('consent_purpose', 'birthday_reward');
 
-  // Cancel unredeemed rewards
+  // Cancel unredeemed rewards. The stored vocabulary is
+  // available | redeemed | expired, so a cancelled reward is 'expired'.
   await getSupabaseServer()
     .from('birthday_rewards')
     .update({
-      status: 'revoked',
+      status: 'expired',
     })
     .eq('profile_id', profileId)
     .eq('status', 'available');
@@ -155,22 +312,30 @@ export async function revokeBirthdayConsent(profileId: string): Promise<boolean>
 }
 
 /**
- * Returns available birthday reward for user if currently active.
+ * The birthday reward the candidate may use right now, or `null`.
+ *
+ * The decision is made here, on the server, from the consent record and the
+ * candidate's own calendar. The browser is never asked whether today is
+ * somebody's birthday.
  */
 export async function getActiveBirthdayReward(
   profileId: string
 ): Promise<BirthdayRewardDTO | null> {
-  const now = new Date().toISOString();
   const { data, error } = await getSupabaseServer()
     .from('birthday_rewards')
     .select('*')
     .eq('profile_id', profileId)
     .eq('status', 'available')
-    .lte('valid_from', now)
-    .gte('valid_until', now)
     .maybeSingle();
 
   if (error || !data) return null;
+
+  const timeZone = await getProfileTimezone(profileId);
+
+  // Today has to be the candidate's birthday, in their own timezone.
+  if (!isBirthdayToday(data.birth_month, data.birth_day, timeZone)) {
+    return null;
+  }
 
   return {
     id: data.id,
@@ -186,3 +351,40 @@ export async function getActiveBirthdayReward(
   };
 }
 
+/**
+ * Records that the birthday discount was used.
+ *
+ * The reward row is claimed once: a second attempt in the same birthday cycle
+ * finds nothing to claim and changes nothing.
+ */
+export async function redeemBirthdayReward(
+  profileId: string,
+  paymentRequestId?: string | null
+): Promise<boolean> {
+  // The redemption points at the payment request when there is one. It is a
+  // foreign key, so only a real identifier is stored.
+  const reference =
+    paymentRequestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      paymentRequestId
+    )
+      ? paymentRequestId
+      : null;
+
+  const { data, error } = await getSupabaseServer()
+    .from('birthday_rewards')
+    .update({
+      status: 'redeemed',
+      redeemed_at: new Date().toISOString(),
+      ...(reference ? { redeemed_payment_id: reference } : {}),
+    })
+    .eq('profile_id', profileId)
+    .eq('status', 'available')
+    .select('id');
+
+  if (error) {
+    console.error('Failed to record the birthday redemption:', error.message);
+    return false;
+  }
+
+  return ((data ?? []) as { id: string }[]).length > 0;
+}

@@ -36,7 +36,7 @@ export class StripeError extends Error {
   }
 }
 
-type ParamValue =
+export type ParamValue =
   | string
   | number
   | boolean

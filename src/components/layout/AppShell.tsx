@@ -22,6 +22,7 @@ import {
   Target,
   User,
   Activity,
+  Users,
   FolderClosed,
   MoreHorizontal,
   LogOut,
@@ -29,7 +30,6 @@ import {
   ShieldCheck,
   ExternalLink,
   MessageSquare,
-  Gauge
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useFeedback } from '../../context/FeedbackContext';
@@ -155,7 +155,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       label: t('Career Tools'),
       items: [
         { id: 'cv-studio', label: t('navCV'), icon: FileText },
-        { id: 'cv-analyzer', label: t('CV Analyzer'), icon: Gauge },
         { id: 'jobs', label: t('navJobs'), icon: Briefcase },
         { id: 'applications', label: t('navApplications'), icon: Calendar },
         { id: 'interviews', label: t('navInterviews'), icon: Target },
@@ -168,6 +167,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       items: [
         { id: 'profile', label: t('My Profile'), icon: User },
         { id: 'activity', label: t('Recent Activity'), icon: Activity },
+        { id: 'referrals', label: t('Referrals'), icon: Users },
         { id: 'settings', label: t('navSettings'), icon: Settings },
       ],
     },

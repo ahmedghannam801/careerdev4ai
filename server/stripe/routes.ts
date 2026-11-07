@@ -141,6 +141,10 @@ export function registerStripeRoutes(app: Express): void {
         const promotionCode = req.body?.promotionCode
           ? String(req.body.promotionCode).trim()
           : null;
+        // The candidate may ask for their birthday discount. The server
+        // decides whether it applies and what it is worth; the request only
+        // carries the wish, never the amount.
+        const applyBirthdayReward = req.body?.applyBirthdayReward === true;
 
         if (!planCode) {
           return res.status(400).json({ error: 'planCode is required' });
@@ -162,6 +166,7 @@ export function registerStripeRoutes(app: Express): void {
           billingCycle,
           origin: resolveOrigin(req),
           promotionCode,
+          applyBirthdayReward,
         });
 
         return res.json({ success: true, ...result });

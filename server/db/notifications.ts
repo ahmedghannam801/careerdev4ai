@@ -19,6 +19,13 @@ export const NOTIFICATION_TYPES = [
   'achievement',
   'system',
   'announcement',
+  'subscription',
+  'payment',
+  'payment_success',
+  'payment_failed',
+  'subscription_expired',
+  'credits',
+  'referral',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -35,6 +42,14 @@ export interface NotificationDTO {
   announcementId: string | null;
   /** Announcement priority, so the bell can distinguish a critical notice. */
   priority: 'normal' | 'important' | 'critical' | null;
+  /**
+   * The translation key of the title, when the notification has one. The
+   * drawer renders this instead of the literal title, so the notification is
+   * shown in the reader's own language.
+   */
+  titleKey: string | null;
+  /** The values the translated title and message need. */
+  params: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -43,6 +58,10 @@ export interface CreateNotificationInput {
   message?: string;
   type?: NotificationType;
   linkView?: string;
+  /** The translation key of the title, so the drawer can localise it. */
+  titleKey?: string;
+  /** The values the translated title and message need. */
+  params?: Record<string, unknown>;
 }
 
 interface NotificationRow {
@@ -54,11 +73,13 @@ interface NotificationRow {
   clicked_at: string | null;
   link_view: string | null;
   announcement_id: string | null;
+  title_key: string | null;
+  params: Record<string, unknown> | null;
   created_at: string;
 }
 
 const COLUMNS =
-  'id, title, message, type, read_at, clicked_at, link_view, announcement_id, created_at';
+  'id, title, message, type, read_at, clicked_at, link_view, announcement_id, title_key, params, created_at';
 
 function toNotification(row: NotificationRow): NotificationDTO {
   return {
@@ -73,6 +94,8 @@ function toNotification(row: NotificationRow): NotificationDTO {
     linkView: row.link_view,
     announcementId: row.announcement_id,
     priority: null,
+    titleKey: row.title_key ?? null,
+    params: row.params ?? {},
     createdAt: row.created_at,
   };
 }
@@ -133,6 +156,8 @@ export async function createNotification(
       message: input.message ?? null,
       type: input.type ?? 'system',
       link_view: input.linkView ?? null,
+      title_key: input.titleKey ?? null,
+      params: input.params ?? {},
     })
     .select(COLUMNS)
     .single();

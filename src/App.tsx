@@ -8,6 +8,7 @@ import { CareerProvider, useCareer } from './context/CareerContext';
 import { FeedbackProvider } from './context/FeedbackContext';
 import { FeedbackInvitationHost } from './components/feedback/FeedbackInvitationHost';
 import { AppShell } from './components/layout/AppShell';
+import { AdminRouteGuard } from './components/admin/AdminRouteGuard';
 import { AuthModal } from './components/auth/AuthModal';
 import { ConsentGate } from './components/auth/ConsentGate';
 import { PasswordRecoveryModal } from './components/auth/PasswordRecoveryModal';
@@ -49,6 +50,7 @@ const JobsView = lazy(() => import('./components/views/JobsView').then((m) => ({
 const ApplicationsView = lazy(() => import('./components/views/ApplicationsView').then((m) => ({ default: m.ApplicationsView })));
 const InterviewsView = lazy(() => import('./components/views/InterviewsView').then((m) => ({ default: m.InterviewsView })));
 const ProgressView = lazy(() => import('./components/views/ProgressView').then((m) => ({ default: m.ProgressView })));
+const ReferralsView = lazy(() => import('./components/views/ReferralsView').then((m) => ({ default: m.ReferralsView })));
 const SettingsView = lazy(() => import('./components/views/SettingsView').then((m) => ({ default: m.SettingsView })));
 const PublicProfileView = lazy(() => import('./components/views/PublicProfileView').then((m) => ({ default: m.PublicProfileView })));
 const ProfileView = lazy(() => import('./components/views/ProfileView').then((m) => ({ default: m.ProfileView })));
@@ -410,10 +412,20 @@ function AppRoutes() {
         return <ActivityView onNavigate={navigateTo} />;
       case 'progress':
         return <ProgressView />;
+      case 'referrals':
+        return <ReferralsView />;
       case 'settings':
         return <SettingsView />;
       case 'admin':
-        return <AdminCenterView />;
+        // The administrative surface is mounted only for a verified
+        // administrator. The guard asks the server who the caller is, so a
+        // normal user and a signed-out visitor never reach admin
+        // functionality at all.
+        return (
+          <AdminRouteGuard>
+            <AdminCenterView />
+          </AdminRouteGuard>
+        );
       case 'pricing':
         return <PricingView />;
       default:

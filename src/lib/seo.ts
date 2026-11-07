@@ -189,6 +189,11 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
     description:
       'The CareerDev4AI administration centre: users, catalogue, communications and analytics.',
   },
+  referrals: {
+    title: `Referrals | ${SITE_NAME}`,
+    description:
+      'Your personal invitation link, the people who joined through it, and the credits your referrals have earned.',
+  },
 };
 
 /** The metadata of a public profile share link. */

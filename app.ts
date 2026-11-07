@@ -54,6 +54,7 @@ import {
 import { listCvMeasurements } from './server/db/cvMeasurements.ts';
 import { registerBackgroundJobRoutes } from './server/jobs/routes.ts';
 import { registerSubscriptionRoutes } from './server/subscriptions/routes.ts';
+import { registerReferralRoutes } from './server/referrals/routes.ts';
 import { registerStripeRoutes } from './server/stripe/routes.ts';
 import { requireEntitlement } from './server/subscriptions/entitlements.ts';
 import { requireCredits } from './server/credits/middleware.ts';
@@ -7108,6 +7109,11 @@ app.patch(
 /* Subscriptions, Payments & Credits Routes                                   */
 /* -------------------------------------------------------------------------- */
 registerSubscriptionRoutes(app);
+
+/* -------------------------------------------------------------------------- */
+/* Personal referral links and rewards                                        */
+/* -------------------------------------------------------------------------- */
+registerReferralRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* Stripe card payments, subscriptions, and webhooks                          */

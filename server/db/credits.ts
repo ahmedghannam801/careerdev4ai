@@ -9,8 +9,11 @@ import type {
   CreditBalanceDTO,
   CreditLedgerDTO,
   CreditOperation,
+  DailyCreditState,
 } from '../../shared/credits.ts';
+import { DAILY_CREDIT_ALLOWANCE } from '../../shared/credits.ts';
 import { getActiveSubscription } from './subscriptions.ts';
+import { createNotification } from './notifications.ts';
 
 interface CreditLedgerRow {
   id: string;
@@ -48,6 +51,94 @@ function toDTO(row: CreditLedgerRow): CreditLedgerDTO {
 }
 
 /**
+ * The daily free-credit allowance.
+ *
+ * The claim is idempotent per Africa/Cairo calendar day, so it is safe to
+ * call on every balance read: the first call of the day grants the
+ * allowance, every later call only reports the state. Yesterday's unused
+ * allowance is expired inside the same transaction, which is what keeps the
+ * allowance from accumulating.
+ *
+ * The grant is a courtesy, not a ledger of its own: a failure here must never
+ * stop the balance from being reported.
+ */
+export async function claimDailyCredits(
+  profileId: string
+): Promise<DailyCreditState | null> {
+  const { data, error } = await getSupabaseServer().rpc('claim_daily_credits', {
+    p_profile_id: profileId,
+    p_amount: DAILY_CREDIT_ALLOWANCE,
+  });
+
+  if (error) {
+    console.error('Failed to claim the daily credit allowance:', error.message);
+    return null;
+  }
+
+  const result = data as {
+    granted?: number;
+    daily_remaining?: number;
+    daily_allowance?: number;
+    expires_at?: string;
+    email_verified?: boolean;
+  } | null;
+
+  if (!result) return null;
+
+  // The candidate is told that the allowance arrived. This happens once a
+  // day, so it is informative rather than noisy.
+  if ((result.granted ?? 0) > 0) {
+    try {
+      await createNotification(profileId, {
+        title: 'Your daily credits are ready',
+        message: `You received ${result.daily_allowance ?? DAILY_CREDIT_ALLOWANCE} free credit for today.`,
+        type: 'credits',
+        titleKey: 'notification.dailyCredits',
+        params: { credits: result.daily_allowance ?? DAILY_CREDIT_ALLOWANCE },
+        linkView: 'pricing',
+      });
+    } catch (error) {
+      console.error('Failed to notify about the daily credits:', error);
+    }
+  }
+
+  return {
+    allowance: result.daily_allowance ?? 0,
+    remaining: result.daily_remaining ?? 0,
+    resetAt: result.expires_at ?? new Date(Date.now() + 86_400_000).toISOString(),
+    grantedToday: (result.granted ?? 0) > 0 || (result.daily_remaining ?? 0) > 0,
+  };
+}
+
+/**
+ * Reads the daily allowance without granting it.
+ */
+export async function readDailyCreditState(
+  profileId: string
+): Promise<DailyCreditState | null> {
+  const { data, error } = await getSupabaseServer().rpc('get_daily_credit_state', {
+    p_profile_id: profileId,
+  });
+
+  if (error) return null;
+
+  const result = data as {
+    daily_remaining?: number;
+    daily_allowance?: number;
+    expires_at?: string;
+  } | null;
+
+  if (!result) return null;
+
+  return {
+    allowance: result.daily_allowance ?? 0,
+    remaining: result.daily_remaining ?? 0,
+    resetAt: result.expires_at ?? new Date(Date.now() + 86_400_000).toISOString(),
+    grantedToday: (result.daily_remaining ?? 0) > 0,
+  };
+}
+
+/**
  * Returns the candidate's current running credit balance.
  * If candidate has never had a ledger row, grants 5 one-time trial credits.
  */
@@ -73,10 +164,15 @@ export async function getCreditBalance(profileId: string): Promise<CreditBalance
     balance = trialGrant.balance;
   }
 
-  // 3. Get active subscription info
+  // 3. The daily free allowance. It is claimed after the trial grant so the
+  //    two never race over the first ledger row, and it is the authoritative
+  //    balance once it has run.
+  const daily = await claimDailyCredits(profileId);
+
+  // 4. Get active subscription info
   const sub = await getActiveSubscription(profileId);
 
-  // 4. Calculate credits consumed this month
+  // 5. Calculate credits consumed this month
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
@@ -117,6 +213,7 @@ export async function getCreditBalance(profileId: string): Promise<CreditBalance
     expiresAt: sub ? sub.currentPeriodEndsAt : null,
     monthlyCreditsRemaining,
     purchasedCreditsRemaining,
+    daily: daily ?? undefined,
   };
 }
 

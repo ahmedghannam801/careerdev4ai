@@ -95,6 +95,46 @@ export interface CreditLedgerDTO {
   createdAt: string;
 }
 
+/**
+ * The daily free-credit allowance.
+ *
+ * Every eligible account may spend a small allowance of AI credits each day.
+ * The allowance is a separate pool from the subscription entitlement, it
+ * resets at midnight in the platform's documented timezone (Africa/Cairo), and
+ * it does not accumulate: yesterday's unused allowance simply expires.
+ *
+ * The size is deliberately conservative. One credit buys one lightweight
+ * operation (`job_description_analysis`, `ai_assist_inline`,
+ * `learning_recommendation`, `project_analysis` all cost 1). The heavier
+ * operations cost 2 to 5 credits — a CV ATS analysis costs 2, a CV generation
+ * or a roadmap costs 4, a mock interview costs 5 — so a candidate living on
+ * the daily allowance alone performs roughly one light action every two to
+ * five days. That is far below the cheapest paid plan (25 credits for 99 EGP)
+ * and it never unlocks a paid-only entitlement.
+ */
+export const DAILY_CREDIT_ALLOWANCE = 1;
+
+/**
+ * The reward a referrer receives for a verified referral.
+ *
+ * It is capped at one daily allowance, so a referral can never be worth more
+ * than a single day of the free allowance, and it can never be farmed into a
+ * subscription.
+ */
+export const REFERRAL_REWARD_CREDITS = 1;
+
+/** The state of the daily allowance for one account. */
+export interface DailyCreditState {
+  /** The allowance granted for the current day. */
+  allowance: number;
+  /** The credits still available inside today's allowance. */
+  remaining: number;
+  /** When today's allowance expires (the next Africa/Cairo midnight). */
+  resetAt: string;
+  /** Whether today's allowance has already been granted. */
+  grantedToday: boolean;
+}
+
 export interface CreditBalanceDTO {
   balance: number;
   monthlyAllocation: number;
@@ -103,5 +143,7 @@ export interface CreditBalanceDTO {
   expiresAt: string | null;
   monthlyCreditsRemaining?: number;
   purchasedCreditsRemaining?: number;
+  /** The daily free allowance, when the platform grants one. */
+  daily?: DailyCreditState;
 }
 

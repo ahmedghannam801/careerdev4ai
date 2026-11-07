@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useAdminAccess } from '../../lib/useAdminAccess';
+import { AdminAccessDenied } from '../admin/AdminRouteGuard';
 import { AnnouncementsPanel } from '../admin/AnnouncementsPanel';
 import { TrafficAnalyticsPanel } from '../admin/TrafficAnalyticsPanel';
 import { AdminSubscriptionsPanel } from '../admin/AdminSubscriptionsPanel';
@@ -1027,17 +1028,7 @@ export const AdminCenterView: React.FC = () => {
   }
 
   if (!admin || admin.status === 'disabled') {
-    return (
-      <div className={`${CARD} p-10 text-center`}>
-        <Shield className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
-        <h1 className="text-base font-bold text-[var(--text-primary)]">
-          {t('Administrator access required')}
-        </h1>
-        <p className="mx-auto mt-1 max-w-md text-xs text-[var(--text-secondary)]">
-          {t('This area is available to authorised administrators only. Ask a Super Admin if you believe you should have access.')}
-        </p>
-      </div>
-    );
+    return <AdminAccessDenied />;
   }
 
   return (

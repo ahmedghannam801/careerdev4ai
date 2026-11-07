@@ -15,6 +15,7 @@
 
 import { CREDIT_PACKS } from '../../shared/credits.ts';
 import { getPlanByCode } from '../db/subscriptions.ts';
+import { redeemBirthdayReward } from '../birthday/service.ts';
 import { stripeGet } from './client.ts';
 import {
   getStripeCustomerByStripeId,
@@ -103,6 +104,12 @@ export interface ProcessResult {
   /** True when the event was acknowledged but could not be applied. */
   ignored?: boolean;
   reason?: string;
+  /**
+   * True when this delivery was a redelivery of an event whose earlier
+   * attempt failed. The side effects ran again, because the earlier attempt
+   * never completed them.
+   */
+  retried?: boolean;
 }
 
 /**
@@ -310,12 +317,37 @@ async function handleCheckoutSession(
       paymentIntentId: session.payment_intent,
       checkoutSessionId: session.id,
     });
+    await recordBirthdayRedemption(profileId, metadata);
     return;
   }
 
   if (session.mode === 'subscription' && session.subscription) {
     const subscription = await deps.fetchSubscription(session.subscription);
     await applySubscription(deps, subscription, eventCreated);
+    await recordBirthdayRedemption(profileId, metadata);
+  }
+}
+
+/**
+ * Records that the birthday discount was used.
+ *
+ * The discount is marked as spent once, and only once the payment is
+ * confirmed by Stripe. A second Checkout Session for the same birthday finds
+ * nothing left to claim.
+ */
+async function recordBirthdayRedemption(
+  profileId: string,
+  metadata: Record<string, string | undefined>
+): Promise<void> {
+  const applied = Number(metadata.birthday_discount_piasters ?? '0');
+  if (!Number.isFinite(applied) || applied <= 0) return;
+
+  try {
+    await redeemBirthdayReward(profileId);
+  } catch (error) {
+    // A failure to record the redemption must never undo a payment that
+    // Stripe has already confirmed.
+    console.error('Failed to record the birthday redemption:', error);
   }
 }
 
@@ -588,7 +620,7 @@ export async function processStripeEvent(
   event: StripeEvent<unknown>,
   deps: StripeWebhookDeps = stripeWebhookDeps
 ): Promise<ProcessResult> {
-  const isNew = await deps.recordEvent({
+  const status = await deps.recordEvent({
     id: event.id,
     type: event.type,
     api_version: event.api_version ?? null,
@@ -596,14 +628,16 @@ export async function processStripeEvent(
     payload: event,
   });
 
-  if (!isNew) {
+  if (status === 'duplicate') {
     return { received: true, duplicate: true, handled: [] };
   }
+
+  const retried = status === 'retry';
 
   try {
     const handled = await dispatch(deps, event);
     await deps.markEventProcessed(event.id, null);
-    return { received: true, duplicate: false, handled };
+    return { received: true, duplicate: false, handled, retried };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 

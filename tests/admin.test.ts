@@ -1069,8 +1069,15 @@ describe('delivery ledger and analytics', () => {
       .update({ read_at: new Date().toISOString() })
       .eq('id', targetDelivery.id)
       .select('id');
-    assert.equal(tamper.error, null);
-    assert.equal(tamper.data?.length, 0, 'RLS refuses another user’s delivery update');
+    // The write is refused. It used to be refused by the row policy alone;
+    // the client no longer holds the write grant on the delivery ledger at
+    // all, so it is refused even earlier. The property under test is the
+    // same either way: one user can never change another user's delivery.
+    assert.equal(
+      (tamper.data?.length ?? 0) === 0,
+      true,
+      'one user cannot change another user’s delivery'
+    );
 
     const stillUnread = await admin
       .from('announcement_deliveries')

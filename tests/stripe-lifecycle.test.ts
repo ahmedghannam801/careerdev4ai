@@ -56,7 +56,10 @@ function plan(code: string) {
 }
 
 function makeDeps() {
-  const events = new Set<string>();
+  // The state of every event the handler has seen. A recorded event that
+  // failed is not the same as a processed one: Stripe redelivers a failed
+  // event, and the redelivery has to be processed again.
+  const events = new Map<string, 'recorded' | 'failed' | 'processed'>();
   const subscriptions = new Map<string, any>();
   const invoices = new Map<string, any>();
   const refunds = new Map<string, any>();
@@ -125,12 +128,23 @@ function makeDeps() {
 
   const deps: StripeWebhookDeps = {
     recordEvent: async (event) => {
-      if (events.has(event.id)) return false;
-      events.add(event.id);
-      return true;
+      const state = events.get(event.id);
+      if (!state) {
+        events.set(event.id, 'recorded');
+        return 'new';
+      }
+      // A previous attempt failed transiently: the side effects never
+      // completed, so this redelivery must be processed again.
+      if (state === 'failed') return 'retry';
+      return 'duplicate';
     },
     markEventProcessed: async (eventId, failure, acknowledged = false) => {
       processed.push({ id: eventId, failure, acknowledged: Boolean(acknowledged) });
+      if (failure && !acknowledged) {
+        events.set(eventId, 'failed');
+      } else {
+        events.set(eventId, 'processed');
+      }
     },
     getCustomerByStripeId: async (customerId) =>
       customerId === CUSTOMER_ID
@@ -293,8 +307,47 @@ describe('Stripe checkout lifecycle', () => {
     assert.equal(credits.length, 1);
   });
 
-  test('an unpaid asynchronous session grants nothing until Stripe confirms', async () => {
+  test('a redelivery after a transient failure is processed again, not swallowed', async () => {
+    // Stripe delivers at least once. When an attempt fails transiently the
+    // customer has paid but the side effects never ran, so the redelivery
+    // has to be processed again. Treating it as a duplicate would leave a
+    // paying customer without their entitlement, and Stripe stops retrying
+    // once the redelivery is acknowledged.
     const { deps, credits } = makeDeps();
+
+    let attempts = 0;
+    const flakyDeps: StripeWebhookDeps = {
+      ...deps,
+      grantCredits: async (input) => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('database timeout');
+        return deps.grantCredits(input);
+      },
+    };
+
+    await assert.rejects(
+      () =>
+        processStripeEvent(
+          event('evt_pack_retry', 'checkout.session.completed', checkoutSession()),
+          flakyDeps
+        ),
+      /database timeout/
+    );
+    assert.equal(credits.length, 0, 'a failed event grants nothing');
+
+    // Stripe redelivers the very same event id.
+    const redelivery = await processStripeEvent(
+      event('evt_pack_retry', 'checkout.session.completed', checkoutSession()),
+      flakyDeps
+    );
+
+    assert.equal(redelivery.duplicate, false, 'a redelivery of a failed event is not a duplicate');
+    assert.equal(redelivery.retried, true);
+    assert.equal(credits.length, 1, 'the redelivery grants the entitlement the failure lost');
+    assert.equal(credits[0].amount, 40);
+  });
+
+  test('an unpaid asynchronous session grants nothing until Stripe confirms', async () => {    const { deps, credits } = makeDeps();
     const pending = checkoutSession({ payment_status: 'unpaid' });
 
     await processStripeEvent(event('evt_async_1', 'checkout.session.completed', pending), deps);

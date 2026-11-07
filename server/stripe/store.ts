@@ -234,11 +234,30 @@ export async function getLatestStripeSubscription(
 }
 
 /**
- * Records an event id and reports whether it is new.
+ * What the webhook handler should do with an event it has seen before.
+ *
+ * `new`      — the event was recorded for the first time; process it.
+ * `retry`    — a previous attempt failed transiently and left the event
+ *              unprocessed; process it again.
+ * `duplicate`— the event was already processed, or another delivery is
+ *              handling it right now; acknowledge it without side effects.
+ */
+export type StripeEventRecordStatus = 'new' | 'retry' | 'duplicate';
+
+/**
+ * Records an event id and reports what the handler should do with it.
  *
  * Stripe delivers at least once and may retry for days. The primary key on the
  * event id makes the handler idempotent: a retry inserts nothing and is
  * acknowledged without running the side effects twice.
+ *
+ * A retry is NOT always a duplicate. When a previous attempt failed
+ * transiently, the row was left with `processed_at` null and the reason in
+ * `error`. Stripe then redelivers the event, and treating that redelivery as
+ * a duplicate would swallow it: the customer would have paid and never
+ * received the entitlement, and Stripe would stop retrying once it was
+ * acknowledged. Such a row is therefore reported as `retry`, so the event is
+ * processed again.
  */
 export async function recordStripeEvent(event: {
   id: string;
@@ -246,7 +265,7 @@ export async function recordStripeEvent(event: {
   api_version: string | null;
   livemode: boolean;
   payload: unknown;
-}): Promise<boolean> {
+}): Promise<StripeEventRecordStatus> {
   const { error } = await getSupabaseServer()
     .from('stripe_webhook_events')
     .insert({
@@ -257,9 +276,25 @@ export async function recordStripeEvent(event: {
       payload: event.payload as Record<string, unknown>,
     });
 
-  if (!error) return true;
-  if (error.code === '23505') return false;
-  throw new Error(`Failed to record stripe webhook event: ${error.message}`);
+  if (!error) return 'new';
+  if (error.code !== '23505') {
+    throw new Error(`Failed to record stripe webhook event: ${error.message}`);
+  }
+
+  // The event is already known. Was the earlier attempt finished?
+  const { data: existing } = await getSupabaseServer()
+    .from('stripe_webhook_events')
+    .select('processed_at, error')
+    .eq('id', event.id)
+    .maybeSingle();
+
+  const row = existing as { processed_at: string | null; error: string | null } | null;
+
+  // Unprocessed with a recorded reason: the earlier attempt failed
+  // transiently and the side effects never completed. Process it again.
+  if (row && row.processed_at === null && row.error) return 'retry';
+
+  return 'duplicate';
 }
 
 export async function markStripeEventProcessed(

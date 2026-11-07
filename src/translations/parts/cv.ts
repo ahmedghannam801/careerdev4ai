@@ -38,6 +38,11 @@ export const cvAr: Record<string, string> = {
   // The studio's workflow: the path through it, in the order a candidate
   // actually takes it.
   'CV Studio workflow': 'مسار عمل استوديو السيرة الذاتية',
+  // The five steps of the studio. They are the whole navigation of the page.
+  'My CV': 'سيرتي الذاتية',
+  'Import and review': 'استيراد ومراجعة',
+  'Analyze': 'تحليل',
+  'Improve': 'تحسين',
   'Upload or select a CV': 'ارفع سيرة ذاتية أو اختر واحدة',
   'Review what was extracted': 'راجع ما تم استخراجه',
   'Edit and confirm it': 'حرّره وأكّده',

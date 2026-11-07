@@ -34,12 +34,14 @@ import { jobsAr } from './parts/jobs.ts';
 import { landingAr } from './parts/landing.ts';
 import { learningAr } from './parts/learning.ts';
 import { profileAr } from './parts/profile.ts';
+import { processingAr } from './parts/processing.ts';
 import { projectsAr } from './parts/projects.ts';
 import { roadmapAr } from './parts/roadmap.ts';
 import { settingsAr } from './parts/settings.ts';
 import { skillsAr } from './parts/skills.ts';
 import { volunteerAr } from './parts/volunteer.ts';
 import { tourAr } from './parts/tour.ts';
+import { referralsAr } from './parts/referrals.ts';
 import { cvStudioDataAr } from './parts/cvStudioData.ts';
 import { subscriptionsAr } from './parts/subscriptions.ts';
 
@@ -67,6 +69,8 @@ export const AR_STRINGS: Record<string, string> = {
   ...cvAr,
   ...cvExtractionAr,
   ...profileAr,
+  ...processingAr,
+  ...referralsAr,
   ...settingsAr,
   ...tourAr,
   ...cvStudioDataAr,

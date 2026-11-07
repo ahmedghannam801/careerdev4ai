@@ -7,9 +7,10 @@
  */
 
 import { getPlanByCode } from '../db/subscriptions.ts';
+import { getActiveBirthdayReward } from '../birthday/service.ts';
 import { CREDIT_PACKS } from '../../shared/credits.ts';
 import { stripeGet, stripePost, StripeError } from './client.ts';
-import type { StripeParams } from './client.ts';
+import type { ParamValue, StripeParams } from './client.ts';
 import {
   assertStripeCheckoutReady,
   describeStripeConfig,
@@ -136,6 +137,13 @@ export interface CheckoutInput {
   origin: string;
   /** A Stripe promotion code (not a database coupon). */
   promotionCode?: string | null;
+  /**
+   * The candidate asks for their birthday discount.
+   *
+   * This is a request, not an entitlement. The server decides whether it
+   * applies, and it decides the amount.
+   */
+  applyBirthdayReward?: boolean;
 }
 
 export interface CheckoutResult {
@@ -143,6 +151,31 @@ export interface CheckoutResult {
   sessionId: string;
   mode: 'payment' | 'subscription';
   lookupKey: string;
+  /** The birthday discount that was applied, in piasters. Zero when none was. */
+  birthdayDiscountPiasters?: number;
+}
+
+/**
+ * One line of a Checkout Session.
+ *
+ * A line names a Price, or it carries the price inline. The inline form is
+ * used for the birthday discount, so the reduced amount belongs to that one
+ * Checkout Session and to nobody else.
+ */
+export interface CheckoutLineItem {
+  price?: string;
+  quantity?: number;
+  price_data?: {
+    currency: string;
+    unit_amount: number;
+    product_data: {
+      name: string;
+      description?: string;
+    };
+    recurring?: { interval: string };
+  };
+  /** The index signature keeps the item assignable to Stripe's parameter type. */
+  [key: string]: ParamValue;
 }
 
 interface ResolvedTargetBase {
@@ -237,6 +270,54 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
   const mode: 'payment' | 'subscription' =
     target.kind === 'subscription' ? 'subscription' : 'payment';
 
+  /**
+   * The birthday discount.
+   *
+   * The browser may only ask for the discount; it never says what the
+   * discount is. The amount is worked out here, on the server, from the
+   * catalogue price, and only when the server has confirmed that today is the
+   * candidate's own birthday. A candidate who is not eligible, or who tries
+   * to move the date, gets the ordinary price.
+   *
+   * The discounted line is built inline, so the reduced amount belongs to
+   * this Checkout Session and to nobody else. There is no global coupon
+   * anywhere in the system.
+   */
+  let lineItem: CheckoutLineItem = { price: priceId, quantity: 1 };
+  let birthdayDiscountPiasters = 0;
+
+  if (input.applyBirthdayReward && !input.promotionCode) {
+    const reward = await getActiveBirthdayReward(input.profileId);
+
+    if (reward) {
+      const gross = target.expected.unitAmount;
+      const discount = Math.min(
+        Math.floor((gross * reward.discountPercentage) / 100),
+        reward.maxDiscountPiasters
+      );
+      const net = gross - discount;
+
+      if (discount > 0 && net > 0) {
+        birthdayDiscountPiasters = discount;
+
+        lineItem = {
+          price_data: {
+            currency: target.expected.currency,
+            unit_amount: net,
+            product_data: {
+              name: target.expected.productName,
+              description: target.expected.productDescription,
+            },
+            ...(target.expected.recurring
+              ? { recurring: { interval: target.expected.recurring.interval } }
+              : {}),
+          },
+          quantity: 1,
+        };
+      }
+    }
+  }
+
   const successUrl = `${input.origin}/#/pricing?stripe=success&session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${input.origin}/#/pricing?stripe=cancelled`;
 
@@ -244,10 +325,17 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     mode,
     customer: customerId,
     client_reference_id: input.profileId,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [lineItem],
     success_url: successUrl,
     cancel_url: cancelUrl,
-    metadata: target.metadata,
+    metadata: {
+      ...target.metadata,
+      // The discount that was applied to this session, so the webhook can
+      // record the redemption against the right account.
+      ...(birthdayDiscountPiasters > 0
+        ? { birthday_discount_piasters: String(birthdayDiscountPiasters) }
+        : {}),
+    },
     locale: 'auto',
     billing_address_collection: 'auto',
     ...buildCheckoutStudioParams({ mode }),
@@ -317,6 +405,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     sessionId: session.id,
     mode,
     lookupKey: target.lookupKey,
+    birthdayDiscountPiasters,
   };
 }
 

@@ -3,8 +3,12 @@
 // The analyzer used to be a page that did the measuring on its own, while
 // the studio had a second implementation of the same measurement. It is now
 // one panel — `CvAnalysisPanel` — rendered by the studio's analysis tab.
-// The route that named the old page is kept as an alias, so a link to it
-// still lands the candidate on the measurement.
+//
+// The navigation entry was removed by product decision: the analyzer is not a
+// destination of its own any more, it is the "Analyze" step of the CV Studio.
+// The address is still kept as an alias, so a link to it — in a shared CV, in
+// a support message or in the browser history — still lands the candidate on
+// the measurement instead of on a broken page.
 //
 // These tests hold that to the rules the platform already follows:
 //
@@ -50,8 +54,10 @@ const serverApp = readFileSync(join(REPO_ROOT, 'app.ts'), 'utf-8');
 describe('the CV Analyzer is reachable from the CV Studio', () => {
   test('the old link still names a route the application knows', () => {
     // Links to the analyzer exist in shared CVs, in support messages and in
-    // browser history. The route is kept so none of them breaks.
-    assert.equal(isAppRoute('cv-analyzer'), true);
+    // browser history. The address is kept so none of them breaks — but the
+    // analyzer is no longer a view of the application, so the application
+    // must never open one.
+    assert.equal(isAppRoute('cv-analyzer'), false);
     assert.equal(isKnownRoute('cv-analyzer'), true);
     assert.equal(buildRouteHash('cv-analyzer'), '#/cv-analyzer');
     assert.equal(parseRouteHash('#/cv-analyzer').route, 'cv-analyzer');
@@ -79,8 +85,10 @@ describe('the CV Analyzer is reachable from the CV Studio', () => {
     );
   });
 
-  test('it is in the navigation', () => {
-    assert.match(shell, /id: 'cv-analyzer'/);
+  test('it is not in the navigation', () => {
+    // The navigation entry was removed by product decision: the analyzer is
+    // the "Analyze" step of the CV Studio, not a destination of its own.
+    assert.doesNotMatch(shell, /id: 'cv-analyzer'/);
   });
 });
 

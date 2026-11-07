@@ -16,13 +16,16 @@ import { describe, it } from 'node:test';
 
 import {
   APP_ROUTES,
+  CV_STUDIO_STEPS,
   CV_STUDIO_TABS,
   DOCUMENT_TABS,
+  LEGACY_ALIASED_ROUTES,
   LEARNING_LEVELS,
   LEARNING_TABS,
   ROADMAP_STATUS_FILTERS,
   ROUTE_ALIASES,
   buildRouteHash,
+  cvStudioStepForTab,
   isAppRoute,
   isKnownRoute,
   parseRouteHash,
@@ -36,7 +39,6 @@ describe('the route vocabulary', () => {
     for (const route of [
       'profile',
       'cv-studio',
-      'cv-analyzer',
       'roadmap',
       'learning',
       'projects',
@@ -78,8 +80,10 @@ describe('a route that has moved inside another view', () => {
 
   it('is still a route the application knows', () => {
     // The alias is resolved, not removed: the link is in shared CVs, in
-    // support messages and in browser history.
-    assert.equal(isAppRoute('cv-analyzer'), true);
+    // support messages and in browser history. The address is recognised so
+    // it can be redirected — but the analyzer is no longer a view of the
+    // application, so nothing may open one.
+    assert.equal(isAppRoute('cv-analyzer'), false);
     assert.equal(isKnownRoute('cv-analyzer'), true);
     assert.equal(parseRouteHash('#/cv-analyzer').route, 'cv-analyzer');
   });
@@ -92,11 +96,25 @@ describe('a route that has moved inside another view', () => {
 
   it('only ever points at a route that exists', () => {
     for (const [from, to] of Object.entries(ROUTE_ALIASES)) {
-      assert.equal(isAppRoute(from), true, `${from} must stay a known route`);
+      // The address the alias replaces must stay an address the application
+      // recognises — as a legacy address, if the view behind it is gone — and
+      // it must point at a route that is a view of the application today.
+      assert.equal(isKnownRoute(from), true, `${from} must stay a known route`);
       assert.equal(isAppRoute(to.route), true, `${from} must point at a real route`);
       for (const [key, value] of Object.entries(to.params ?? {})) {
         assert.ok(value.length > 0, `the parameter ${key} of ${from} must have a value`);
       }
+    }
+  });
+
+  it('keeps the legacy addresses in the list of addresses it recognises', () => {
+    // The platform recognises an address so it can redirect it. That is a
+    // different thing from opening it as a view.
+    assert.ok(LEGACY_ALIASED_ROUTES.includes('cv-analyzer'));
+    for (const route of LEGACY_ALIASED_ROUTES) {
+      assert.equal(isAppRoute(route), false, `${route} must not be a view of the application`);
+      assert.equal(isKnownRoute(route), true, `${route} must still be a known route`);
+      assert.ok(resolveRouteAlias(route), `${route} must be redirected somewhere`);
     }
   });
 });
@@ -254,5 +272,39 @@ describe('a tab or a filter the page understands', () => {
 
     const documents = parseRouteHash('#/documents?tab=cv-versions').params;
     assert.equal(readRouteParam(documents, 'tab', DOCUMENT_TABS, 'documents'), 'cv-versions');
+  });
+});
+
+describe('the workflow of the CV Studio', () => {
+  it('is one path of five steps', () => {
+    assert.deepEqual(
+      CV_STUDIO_STEPS.map((step) => step.id),
+      ['cv', 'import', 'analyze', 'improve', 'export']
+    );
+  });
+
+  it('gives every tab of the studio to exactly one step', () => {
+    const owned = CV_STUDIO_STEPS.flatMap((step) => [...step.tabs]);
+    assert.deepEqual([...owned].sort(), [...CV_STUDIO_TABS].sort());
+    assert.equal(new Set(owned).size, owned.length, 'a tab belongs to one step only');
+  });
+
+  it('says which step a tab belongs to', () => {
+    // "My CV" owns the document, the records it is built from and its
+    // history; the rest of the tabs each belong to their own step.
+    assert.equal(cvStudioStepForTab('editor'), 'cv');
+    assert.equal(cvStudioStepForTab('data'), 'cv');
+    assert.equal(cvStudioStepForTab('versions'), 'cv');
+    assert.equal(cvStudioStepForTab('review'), 'import');
+    assert.equal(cvStudioStepForTab('ats'), 'analyze');
+    assert.equal(cvStudioStepForTab('job'), 'improve');
+    assert.equal(cvStudioStepForTab('built'), 'export');
+  });
+
+  it('keeps every deep link of the studio working', () => {
+    for (const tab of CV_STUDIO_TABS) {
+      const params = parseRouteHash(buildRouteHash('cv-studio', { tab })).params;
+      assert.equal(readRouteParam(params, 'tab', CV_STUDIO_TABS, 'editor'), tab);
+    }
   });
 });

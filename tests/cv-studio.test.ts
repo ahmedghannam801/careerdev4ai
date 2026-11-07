@@ -16,6 +16,8 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   CV_ASSIST_FIELDS,
@@ -541,5 +543,63 @@ describe('cv document from the platform records', () => {
     assert.equal(cvLinkLabel('something_new'), 'Link');
     // A label the candidate gave is kept.
     assert.equal(cvLinkLabel('linkedin', 'My Profile'), 'My Profile');
+  });
+});
+
+describe('the workflow of the CV Studio', () => {
+  // The studio used to carry two navigations: a stepper and a row of tabs
+  // beside it, both describing the same seven screens. It now has one
+  // navigation of five steps, and everything the studio can do is one of
+  // them.
+  const REPO_ROOT = join(import.meta.dirname, '..');
+  const studio = readFileSync(
+    join(REPO_ROOT, 'src', 'components', 'views', 'CVStudioView.tsx'),
+    'utf-8'
+  );
+  const workflow = readFileSync(
+    join(REPO_ROOT, 'src', 'components', 'cv', 'CvStudioWorkflow.tsx'),
+    'utf-8'
+  );
+
+  it('has one navigation, not two', () => {
+    // The stepper is the navigation, and the studio does not add a second
+    // one beside it.
+    assert.equal((workflow.match(/<nav/g) ?? []).length, 1);
+    assert.doesNotMatch(studio, /<nav/);
+    assert.doesNotMatch(studio, /role="tablist"/);
+    // The row of seven tabs is gone.
+    assert.doesNotMatch(studio, /ATS Analysis & Recommendations/);
+  });
+
+  it('names its five steps in the order a candidate takes them', () => {
+    const steps = ['My CV', 'Import and review', 'Analyze', 'Improve', 'Export'];
+    for (const step of steps) {
+      assert.ok(workflow.includes(`t('${step}')`), `the step "${step}" must be named`);
+    }
+    const order = steps.map((step) => workflow.indexOf(`t('${step}')`));
+    assert.deepEqual(
+      [...order].sort((a, b) => a - b),
+      order,
+      'the steps must be in the order the candidate takes them'
+    );
+  });
+
+  it('keeps every capability of the studio', () => {
+    // The header action that opens the import.
+    assert.match(studio, /setActiveTab\('review'\)/);
+    // The upload and the analyzer's own run.
+    assert.match(studio, /<CvAnalysisPanel[\s\S]*?cv=\{activeCV\}[\s\S]*?showUpload/);
+    // The finished document.
+    assert.match(studio, /BuiltCvPanel/);
+  });
+
+  it('opens the secondary views of "My CV" from inside the step', () => {
+    // The records the document is built from and the history of its
+    // versions belong to the first step, so they are revealed from there
+    // rather than offered as a navigation of their own.
+    assert.match(studio, /activeStep === 'cv'/);
+    assert.match(studio, /tab: 'data'/);
+    assert.match(studio, /tab: 'versions'/);
+    assert.match(studio, /tab: 'editor'/);
   });
 });

@@ -318,6 +318,12 @@ async function main() {
     // grants an entitlement, grants credits once, or is acknowledged because
     // retrying cannot fix it. Dependency-injected: no key or database.
     join(TESTS_DIR, 'stripe-lifecycle.test.ts'),
+    // The daily credit allowance, the referral programme and the birthday
+    // discount, against the live database: the daily grant happens once, the
+    // expiring bucket is spent first, a replay is refused, a referral pays
+    // exactly once, a birthday belongs to one day in the candidate's own
+    // timezone, and a signed-in client cannot write the tables that hold money.
+    join(TESTS_DIR, 'credits-referrals-birthday.test.ts'),
     // The Checkout Studio parameters sent to Stripe, and the rule that picks
     // the hosted checkout's user-interface mode from the account's API
     // version. Pure: no key and no database are needed.
@@ -366,9 +372,13 @@ async function main() {
     // The measured analysis route: the score the candidate sees is counted from
     // their own CV, it needs no model, and it is private to them.
     join(TESTS_DIR, 'cv-analysis-route.test.ts'),
-    // The CV Analyzer page: a real route, a real view, and a stage list that
-    // comes from the server rather than from a timer.
+    // The CV Analyzer: the address is an alias of the studio's analysis step,
+    // and the stage list comes from the server rather than from a timer.
     join(TESTS_DIR, 'cv-analyzer.test.ts'),
+    // The guard on the administrative route: the answer comes from the
+    // server, the Admin Center is mounted only for an administrator, and the
+    // interface says "checking" until the server has answered. Pure.
+    join(TESTS_DIR, 'admin-route-guard.test.ts'),
     // The project advisor: what it recommends and what it finds wrong with
     // the projects the candidate already has. Pure.
     join(TESTS_DIR, 'project-recommendation.test.ts'),

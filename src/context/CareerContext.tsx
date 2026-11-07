@@ -207,6 +207,12 @@ import {
   fetchCreditBalance,
 } from '../lib/creditsApi';
 import type { CreditBalanceDTO } from '../../shared/credits';
+import {
+  captureReferralCodeFromUrl,
+  claimStoredReferral,
+  readStoredReferralCode,
+} from '../lib/referralApi';
+import { ProcessingProvider } from '../components/processing/ProcessingProvider';
 
 export interface UserProfile {
   name: string;
@@ -3013,6 +3019,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // The form does not let an account be created without the acceptance,
       // and the metadata is only written when it was actually given.
       const consentAccepted = consent?.accepted === true;
+      // A visitor who arrived through somebody else's invitation carries that
+      // code into the account, so the server can attribute the signup and
+      // grant the inviter their credit. A signup without a code is untouched.
+      const referralCode = readStoredReferralCode();
       const { data, error } = await getBrowserSupabase().auth.signUp({
         email,
         password,
@@ -3021,6 +3031,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           // always auth.users.id (== public.profiles.id).
           data: {
             name,
+            ...(referralCode ? { ref: referralCode } : {}),
             ...(consentAccepted
               ? {
                   consent_accepted: true,
@@ -3071,6 +3082,24 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return { success: false, error: e.message || 'Connection failed' };
     }
   };
+
+  /**
+   * The referral code that arrived with the invitation.
+   *
+   * The code is captured from the URL as soon as the application loads, and
+   * it is kept until the account exists so the signup can carry it. Once the
+   * candidate is authenticated the code is claimed — once — and then
+   * forgotten. Neither step can block the signup: a claim that fails is
+   * simply not made, and the candidate still gets their account.
+   */
+  useEffect(() => {
+    captureReferralCodeFromUrl();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    void claimStoredReferral().catch(() => {});
+  }, [currentUser]);
 
   // Clears every domain that belongs to the signed-in user. It is called by
   // the explicit logout button AND by the auth listener when the Supabase
@@ -5147,7 +5176,10 @@ Skills: ${activeCV.skillsList.join(', ')}
         refreshCredits,
       }}
     >
-      {children}
+      {/* The global processing layer lives inside the career provider, so the
+          surface it renders is translated with the application's own
+          translator. */}
+      <ProcessingProvider>{children}</ProcessingProvider>
     </CareerContext.Provider>
   );
 };
