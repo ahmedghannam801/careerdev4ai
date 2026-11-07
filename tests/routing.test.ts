@@ -21,11 +21,13 @@ import {
   LEARNING_LEVELS,
   LEARNING_TABS,
   ROADMAP_STATUS_FILTERS,
+  ROUTE_ALIASES,
   buildRouteHash,
   isAppRoute,
   isKnownRoute,
   parseRouteHash,
   readRouteParam,
+  resolveRouteAlias,
   resolveRouteId,
 } from '../src/lib/routing.ts';
 
@@ -60,6 +62,42 @@ describe('the route vocabulary', () => {
     assert.equal(isKnownRoute('landing'), true);
     assert.equal(isKnownRoute('onboarding'), true);
     assert.equal(isAppRoute('landing'), false);
+  });
+});
+
+describe('a route that has moved inside another view', () => {
+  it('resolves to where it lives now', () => {
+    // The CV Analyzer is the CV Studio's analysis tab. A link to the old
+    // address still works because the address is an alias, not a dead end.
+    const alias = resolveRouteAlias('cv-analyzer');
+    assert.ok(alias);
+    assert.equal(alias.route, 'cv-studio');
+    assert.equal(alias.params.tab, 'ats');
+    assert.equal(buildRouteHash(alias.route, alias.params), '#/cv-studio?tab=ats');
+  });
+
+  it('is still a route the application knows', () => {
+    // The alias is resolved, not removed: the link is in shared CVs, in
+    // support messages and in browser history.
+    assert.equal(isAppRoute('cv-analyzer'), true);
+    assert.equal(isKnownRoute('cv-analyzer'), true);
+    assert.equal(parseRouteHash('#/cv-analyzer').route, 'cv-analyzer');
+  });
+
+  it('leaves an ordinary route alone', () => {
+    assert.equal(resolveRouteAlias('cv-studio'), null);
+    assert.equal(resolveRouteAlias('dashboard'), null);
+    assert.equal(resolveRouteAlias('nonsense'), null);
+  });
+
+  it('only ever points at a route that exists', () => {
+    for (const [from, to] of Object.entries(ROUTE_ALIASES)) {
+      assert.equal(isAppRoute(from), true, `${from} must stay a known route`);
+      assert.equal(isAppRoute(to.route), true, `${from} must point at a real route`);
+      for (const [key, value] of Object.entries(to.params ?? {})) {
+        assert.ok(value.length > 0, `the parameter ${key} of ${from} must have a value`);
+      }
+    }
   });
 });
 

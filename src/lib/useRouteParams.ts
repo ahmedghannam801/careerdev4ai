@@ -25,7 +25,7 @@ function readHash(): ParsedRoute {
 }
 
 /** Re-reads the hash and tells every subscriber. */
-function refresh(): ParsedRoute {
+export function refreshRoute(): ParsedRoute {
   snapshot = readHash();
   for (const listener of listeners) listener(snapshot);
   return snapshot;
@@ -35,7 +35,7 @@ function ensureHashListener(): void {
   if (hashListenerInstalled || typeof window === 'undefined') return;
   hashListenerInstalled = true;
   window.addEventListener('hashchange', () => {
-    refresh();
+    refreshRoute();
   });
 }
 
@@ -51,7 +51,7 @@ export function useRoute(): ParsedRoute {
   useEffect(() => {
     ensureHashListener();
     // The hash may have changed between the first render and this effect.
-    const current = refresh();
+    const current = refreshRoute();
     setState(current);
 
     listeners.add(setState);
@@ -98,7 +98,7 @@ export function useRouteParam<T extends string>(
         merged[key] = next;
       }
       window.history.replaceState(null, '', buildRouteHash(current.route, merged));
-      refresh();
+      refreshRoute();
     },
     [key, fallback]
   );

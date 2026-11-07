@@ -20,6 +20,12 @@ import {
   type StripeConfigStatus,
 } from './config.ts';
 import { buildCatalog, validatePriceAgainstCatalog } from './catalog.ts';
+import {
+  alternateCheckoutUiMode,
+  buildCheckoutStudioParams,
+  isCheckoutUiModeRejection,
+  type CheckoutUiMode,
+} from './checkoutParams.ts';
 import type { CatalogEntry } from './catalog.ts';
 import {
   getActiveStripeSubscription,
@@ -244,7 +250,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     metadata: target.metadata,
     locale: 'auto',
     billing_address_collection: 'auto',
-    tax_id_collection: { enabled: true },
+    ...buildCheckoutStudioParams({ mode }),
   };
 
   if (mode === 'subscription') {
@@ -268,20 +274,39 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
 
   if (input.promotionCode) {
     params.discounts = [{ promotion_code: input.promotionCode }];
-  } else {
-    params.allow_promotion_codes = true;
-  }
-
-  if (getStripeConfig().automaticTax) {
-    params.automatic_tax = { enabled: true };
   }
 
   const bucket = Math.floor(Date.now() / 120_000);
-  const session = await stripePost<StripeCheckoutSession>(
-    '/v1/checkout/sessions',
-    params,
-    { idempotencyKey: `checkout:${input.profileId}:${target.lookupKey}:${bucket}` }
-  );
+  const idempotencyKey = `checkout:${input.profileId}:${target.lookupKey}:${bucket}`;
+
+  let session: StripeCheckoutSession;
+  try {
+    session = await stripePost<StripeCheckoutSession>(
+      '/v1/checkout/sessions',
+      params,
+      { idempotencyKey }
+    );
+  } catch (error) {
+    // Stripe renamed the hosted checkout's user-interface mode and rejects the
+    // name that does not match the account's API version. The version is read
+    // from Stripe's own responses, but the very first session of a cold
+    // process can be created before any response has been seen. When Stripe
+    // says the value is the problem, the other name is the one it accepts, so
+    // the session is created again with it.
+    if (!isCheckoutUiModeRejection(error)) throw error;
+
+    const alternate = alternateCheckoutUiMode(params.ui_mode as CheckoutUiMode);
+    console.warn(
+      `Stripe refused ui_mode="${params.ui_mode}" on this account; retrying with ui_mode="${alternate}".`
+    );
+    session = await stripePost<StripeCheckoutSession>(
+      '/v1/checkout/sessions',
+      { ...params, ui_mode: alternate },
+      // A different key: the rejected request must never be confused with
+      // this one by Stripe's idempotency store.
+      { idempotencyKey: `${idempotencyKey}:${alternate}` }
+    );
+  }
 
   if (!session.url) {
     throw new StripeError('Stripe created a Checkout Session without a URL.', 502);

@@ -68,6 +68,32 @@ export function isKnownRoute(value: string): boolean {
   return KNOWN_ROUTES.includes(value);
 }
 
+/**
+ * Routes that used to be a page of their own and now live inside another view.
+ *
+ * The CV Analyzer was a separate screen. Its measurement now happens inside the
+ * CV Studio, on the `ats` tab, so `#/cv-analyzer` is an alias rather than a
+ * dead end: the link still works and lands the candidate on the analysis tab
+ * of the studio, which is where the analyzer lives now.
+ *
+ * An alias is resolved rather than removed, because links to it exist in the
+ * wild — in shared CVs, in support messages and in the browser history.
+ */
+export const ROUTE_ALIASES: Readonly<
+  Record<string, { route: string; params?: Record<string, string> }>
+> = {
+  'cv-analyzer': { route: 'cv-studio', params: { tab: 'ats' } },
+};
+
+/** Where an aliased route now lives, or `null` when the route is not an alias. */
+export function resolveRouteAlias(
+  route: string
+): { route: string; params: Record<string, string> } | null {
+  const alias = ROUTE_ALIASES[route];
+  if (!alias) return null;
+  return { route: alias.route, params: { ...(alias.params ?? {}) } };
+}
+
 /** A hash broken into the parts the application cares about. */
 export interface ParsedRoute {
   /** The route id. Empty when the hash names nothing. */

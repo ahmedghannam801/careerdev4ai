@@ -2,18 +2,18 @@
 //
 // The analyzer used to be a page that did the measuring on its own, while
 // the studio had a second implementation of the same measurement. It is now
-// one panel — `CvAnalysisPanel` — rendered by the studio's analysis tab and
-// by the analyzer page.
+// one panel — `CvAnalysisPanel` — rendered by the studio's analysis tab.
+// The route that named the old page is kept as an alias, so a link to it
+// still lands the candidate on the measurement.
 //
 // These tests hold that to the rules the platform already follows:
 //
-//   * it is reachable — a real route, a real view, a real navigation entry;
+//   * it is reachable — the old link still works and lands inside the studio;
+//   * there is one implementation, so the two cannot drift apart;
 //   * it never shows a score it cannot explain;
 //   * it does not fake progress: the stage list comes from the server's real
 //     stage events, and the interface has no timer that moves it;
-//   * the ATS score of the model stays a separate, labelled system;
-//   * the page and the studio share one implementation, so they cannot
-//     drift apart.
+//   * the ATS score of the model stays a separate, labelled system.
 //
 // The behavioural guarantees are asserted against the file that now holds
 // the behaviour, which is the point of the merge: a guarantee that lives in
@@ -24,14 +24,16 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { isAppRoute, isKnownRoute, buildRouteHash, parseRouteHash } from '../src/lib/routing.ts';
+import {
+  isAppRoute,
+  isKnownRoute,
+  buildRouteHash,
+  parseRouteHash,
+  resolveRouteAlias,
+} from '../src/lib/routing.ts';
 
 const REPO_ROOT = join(import.meta.dirname, '..');
 
-const analyzer = readFileSync(
-  join(REPO_ROOT, 'src', 'components', 'views', 'CvAnalyzerView.tsx'),
-  'utf-8'
-);
 const panel = readFileSync(
   join(REPO_ROOT, 'src', 'components', 'cv', 'CvAnalysisPanel.tsx'),
   'utf-8'
@@ -45,17 +47,36 @@ const shell = readFileSync(join(REPO_ROOT, 'src', 'components', 'layout', 'AppSh
 const api = readFileSync(join(REPO_ROOT, 'src', 'lib', 'cvAnalysisApi.ts'), 'utf-8');
 const serverApp = readFileSync(join(REPO_ROOT, 'app.ts'), 'utf-8');
 
-describe('the CV Analyzer is a page of the application', () => {
-  test('it has a route', () => {
+describe('the CV Analyzer is reachable from the CV Studio', () => {
+  test('the old link still names a route the application knows', () => {
+    // Links to the analyzer exist in shared CVs, in support messages and in
+    // browser history. The route is kept so none of them breaks.
     assert.equal(isAppRoute('cv-analyzer'), true);
     assert.equal(isKnownRoute('cv-analyzer'), true);
     assert.equal(buildRouteHash('cv-analyzer'), '#/cv-analyzer');
     assert.equal(parseRouteHash('#/cv-analyzer').route, 'cv-analyzer');
   });
 
-  test('the application opens it', () => {
-    assert.match(app, /case 'cv-analyzer':/);
-    assert.match(app, /CvAnalyzerView/);
+  test('the old link lands on the studio analysis tab', () => {
+    const alias = resolveRouteAlias('cv-analyzer');
+    assert.ok(alias, 'the analyzer route must resolve to where the analyzer lives');
+    assert.equal(alias.route, 'cv-studio');
+    assert.equal(alias.params.tab, 'ats');
+    assert.equal(buildRouteHash(alias.route, alias.params), '#/cv-studio?tab=ats');
+  });
+
+  test('the application follows the alias instead of rendering a second page', () => {
+    assert.match(app, /resolveRouteAlias/);
+    assert.doesNotMatch(app, /CvAnalyzerView/);
+    assert.doesNotMatch(app, /case 'cv-analyzer':/);
+  });
+
+  test('there is no second analyzer implementation on disk', () => {
+    assert.equal(
+      existsSync(join(REPO_ROOT, 'src', 'components', 'views', 'CvAnalyzerView.tsx')),
+      false,
+      'the standalone analyzer page must not come back'
+    );
   });
 
   test('it is in the navigation', () => {
@@ -64,20 +85,27 @@ describe('the CV Analyzer is a page of the application', () => {
 });
 
 describe('the analyzer is merged into CV Studio', () => {
-  test('the page and the studio render the same panel', () => {
+  test('the studio renders the one panel', () => {
     // One implementation. If the studio grew its own copy of the
     // measurement, the two would drift apart and the candidate would get
     // two different answers to the same question.
-    assert.match(analyzer, /CvAnalysisPanel/);
     assert.match(studio, /CvAnalysisPanel/);
+    assert.doesNotMatch(studio, /streamMeasuredAnalysis/);
   });
 
   test('the studio measures the document it is working on', () => {
     assert.match(studio, /cv=\{activeCV\}/);
   });
 
-  test('the analyzer page points back into the studio', () => {
-    assert.match(analyzer, /cv-studio/);
+  test('the studio also offers the upload and the saved-CV picker', () => {
+    // "Upload or select an existing CV" is part of the studio now, so the
+    // candidate never has to leave it to measure a document they have not
+    // imported yet.
+    assert.match(studio, /showUpload/);
+  });
+
+  test('the studio does not send the candidate out to another analyzer page', () => {
+    assert.doesNotMatch(studio, /onNavigate\?\.\('cv-analyzer'\)/);
   });
 });
 

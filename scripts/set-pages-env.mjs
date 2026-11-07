@@ -54,6 +54,20 @@ const SECRET_KEYS = [
 ];
 
 /**
+ * The card-payment secrets.
+ *
+ * They are optional on purpose. Card payments are off until a deployment has
+ * both a Stripe key and a webhook signing secret, and a deployment that has
+ * neither must still be able to ship. So these are sent when `.env` names
+ * them and left out when it does not, rather than being required.
+ *
+ * When they are absent the card option does not appear anywhere in the
+ * product: the server reports that card checkout is not ready and the
+ * interface hides the rail. The Egyptian wallet rails are unaffected.
+ */
+const OPTIONAL_SECRET_KEYS = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
+
+/**
  * The build-time variables. They are public by design — they already ship
  * inside the browser bundle — and they are plain text so the build can read
  * them.
@@ -198,6 +212,13 @@ async function call(method, body) {
 function buildEnvVars() {
   const vars = {};
   for (const key of SECRET_KEYS) vars[key] = { type: 'secret_text', value: env[key] };
+  for (const key of OPTIONAL_SECRET_KEYS) {
+    // Only a key that is actually configured is sent. A half-configured
+    // deployment — a key without a webhook secret — is worse than an
+    // unconfigured one, because the server would refuse every session
+    // instead of hiding the option.
+    if (env[key]) vars[key] = { type: 'secret_text', value: env[key] };
+  }
   for (const key of PLAIN_KEYS) vars[key] = { type: 'plain_text', value: env[key] };
   return vars;
 }
@@ -234,7 +255,7 @@ function buildBuildVars() {
  * silently left behind.
  */
 function staleEnvVars(current) {
-  const keep = new Set([...SECRET_KEYS, ...PLAIN_KEYS]);
+  const keep = new Set([...SECRET_KEYS, ...OPTIONAL_SECRET_KEYS, ...PLAIN_KEYS]);
   return Object.keys(current ?? {}).filter((name) => !keep.has(name));
 }
 

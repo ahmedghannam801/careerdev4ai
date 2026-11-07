@@ -10,9 +10,6 @@ import {
   Sparkles,
   Zap,
   Shield,
-  Smartphone,
-  CreditCard,
-  Landmark,
   ArrowRight,
   ArrowLeft,
   AlertCircle,
@@ -20,6 +17,12 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CheckoutModal } from '../subscription/CheckoutModal';
+import {
+  CardNetworkMarks,
+  InstaPayMark,
+  StripeMark,
+  VodafoneCashMark,
+} from '../payment/PaymentBrandMarks';
 import { formatEgpPrice } from '../../../shared/subscriptions';
 import { CREDIT_PACKS } from '../../../shared/credits';
 import {
@@ -436,8 +439,8 @@ export const PricingView: React.FC = () => {
               : 'border-border bg-surface-raised'
           }`}
         >
-          <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
-            <CreditCard className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-xl bg-surface border border-border flex items-center justify-center shrink-0">
+            <StripeMark className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0 text-sm">
             <div className="font-bold text-foreground flex flex-wrap items-center gap-2">
@@ -673,17 +676,18 @@ export const PricingView: React.FC = () => {
         </div>
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
-            <Smartphone className="w-5 h-5 text-red-600" />
+            <VodafoneCashMark className="h-5 w-5" />
             <span className="text-xs font-bold text-foreground">Vodafone Cash</span>
           </div>
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
-            <Landmark className="w-5 h-5 text-purple-600" />
+            <InstaPayMark className="h-4 w-auto" />
             <span className="text-xs font-bold text-foreground">InstaPay</span>
           </div>
           {stripeReady && (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
-              <CreditCard className="w-5 h-5 text-blue-600" />
+              <StripeMark className="h-5 w-5" />
               <span className="text-xs font-bold text-foreground">Visa / Mastercard</span>
+              <CardNetworkMarks className="h-3.5 w-auto" />
             </div>
           )}
         </div>

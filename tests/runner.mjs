@@ -318,6 +318,21 @@ async function main() {
     // grants an entitlement, grants credits once, or is acknowledged because
     // retrying cannot fix it. Dependency-injected: no key or database.
     join(TESTS_DIR, 'stripe-lifecycle.test.ts'),
+    // The Checkout Studio parameters sent to Stripe, and the rule that picks
+    // the hosted checkout's user-interface mode from the account's API
+    // version. Pure: no key and no database are needed.
+    join(TESTS_DIR, 'checkout-studio-params.test.ts'),
+    // The payment accounts: the authoritative Vodafone Cash wallet and InstaPay
+    // address, the one place they are written down, and a scan of the whole
+    // repository for an identifier that was wrong. Pure.
+    join(TESTS_DIR, 'payment-accounts.test.ts'),
+    // The payment brand marks: the real Simple Icons and InstaPay assets, and
+    // the proof that the checkout and the pricing page render them. Pure.
+    join(TESTS_DIR, 'payment-brand-marks.test.ts'),
+    // The checkout interface: the state machine, the truthfulness of the
+    // outcome screen, the guard against a second submission, the fail-closed
+    // card rail, and the reduced-motion, theme and direction rules. Pure.
+    join(TESTS_DIR, 'payment-checkout-ui.test.ts'),
     // The CV studio's writing assistant and the document it builds from the
     // platform's records. Pure, like the two above: no database needed.
     join(TESTS_DIR, 'cv-studio.test.ts'),

@@ -17,7 +17,8 @@ import { Skeleton } from './components/ui/Skeleton';
 import { GuidedTour, GUIDES, type GuideDefinition, type GuideKey } from './components/onboarding/GuidedTour';
 import { InteractiveTourModal } from './components/onboarding/InteractiveTourModal';
 import { fetchDismissedGuides } from './lib/personalizationApi';
-import { buildRouteHash, isKnownRoute, parseRouteHash, resolveRouteId } from './lib/routing';
+import { buildRouteHash, isKnownRoute, parseRouteHash, resolveRouteAlias, resolveRouteId } from './lib/routing';
+import { refreshRoute } from './lib/useRouteParams';
 import { analyticsPathForRoute, trackPageView } from './lib/analytics';
 import { applyRouteMeta, routeMetaFor } from './lib/seo';
 import { shouldForceOnboarding } from '../shared/onboarding';
@@ -44,7 +45,6 @@ const ProjectsView = lazy(() => import('./components/views/ProjectsView').then((
 const VolunteerView = lazy(() => import('./components/views/VolunteerView').then((m) => ({ default: m.VolunteerView })));
 const EvidenceView = lazy(() => import('./components/views/EvidenceView').then((m) => ({ default: m.EvidenceView })));
 const CVStudioView = lazy(() => import('./components/views/CVStudioView').then((m) => ({ default: m.CVStudioView })));
-const CvAnalyzerView = lazy(() => import('./components/views/CvAnalyzerView').then((m) => ({ default: m.CvAnalyzerView })));
 const JobsView = lazy(() => import('./components/views/JobsView').then((m) => ({ default: m.JobsView })));
 const ApplicationsView = lazy(() => import('./components/views/ApplicationsView').then((m) => ({ default: m.ApplicationsView })));
 const InterviewsView = lazy(() => import('./components/views/InterviewsView').then((m) => ({ default: m.InterviewsView })));
@@ -104,6 +104,10 @@ function AppRoutes() {
     // the known routes on the very first render — before the session has
     // even been restored. A hash that names nothing falls back to the
     // landing page until hydration says otherwise.
+    // A route that has moved inside another view (the CV Analyzer, which now
+    // lives on the CV Studio's analysis tab) resolves to where it lives.
+    const alias = resolveRouteAlias(parseRouteHash(window.location.hash).route);
+    if (alias) return alias.route;
     const resolved = resolveRouteId(window.location.hash, '');
     if (resolved) return resolved;
     return profile.onboardingCompleted ? 'dashboard' : 'landing';
@@ -114,6 +118,15 @@ function AppRoutes() {
   const [tourOpen, setTourOpen] = useState(false);
 
   const navigateTo = (view: string) => {
+    // A view that has moved inside another one is navigated to where it
+    // lives now, so the navigation never points at a screen that is gone.
+    const alias = resolveRouteAlias(view);
+    if (alias) {
+      setCurrentView(alias.route);
+      setActiveView(alias.route);
+      window.location.hash = buildRouteHash(alias.route, alias.params);
+      return;
+    }
     setCurrentView(view);
     setActiveView(view);
     window.location.hash = buildRouteHash(view);
@@ -129,6 +142,18 @@ function AppRoutes() {
       if (publicName) {
         setCurrentView('profile');
         setActiveView('profile');
+        return;
+      }
+
+      // A route that has moved inside another view is followed to where it
+      // lives now. The URL is rewritten so the address bar, a refresh and a
+      // shared link all agree with what is on screen.
+      const alias = resolveRouteAlias(parsed.route);
+      if (alias) {
+        window.history.replaceState(null, '', buildRouteHash(alias.route, alias.params));
+        refreshRoute();
+        setCurrentView(alias.route);
+        setActiveView(alias.route);
         return;
       }
 
@@ -153,6 +178,17 @@ function AppRoutes() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [currentView, setActiveView]);
+
+  // A link to a view that has moved inside another one is corrected on the
+  // first render as well. The hash-change listener above only fires when the
+  // address changes, so a page opened straight from such a link would keep the
+  // old address even though the right screen is already on it.
+  useEffect(() => {
+    const alias = resolveRouteAlias(parseRouteHash(window.location.hash).route);
+    if (!alias) return;
+    window.history.replaceState(null, '', buildRouteHash(alias.route, alias.params));
+    refreshRoute();
+  }, []);
 
   // Document metadata and the page view of the current route.
   //
@@ -360,8 +396,6 @@ function AppRoutes() {
         return <EvidenceView />;
       case 'cv-studio':
         return <CVStudioView onNavigate={navigateTo} />;
-      case 'cv-analyzer':
-        return <CvAnalyzerView onNavigate={navigateTo} />;
       case 'documents':
         return <DocumentsView onNavigate={navigateTo} />;
       case 'jobs':

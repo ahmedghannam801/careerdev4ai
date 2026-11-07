@@ -47,6 +47,22 @@ type ParamValue =
 
 export type StripeParams = Record<string, ParamValue>;
 
+/**
+ * The API version Stripe answered with.
+ *
+ * Every Stripe response carries a `Stripe-Version` header describing the
+ * version the account is actually on. That matters because Stripe renamed
+ * several Checkout Session parameters between versions — the `ui_mode` value
+ * `hosted` became `hosted_page`, and setting the old name now fails. Rather
+ * than guess, the client remembers what Stripe said.
+ */
+let observedApiVersion: string | null = null;
+
+/** The API version the last Stripe response was served with, if any. */
+export function getObservedStripeApiVersion(): string | null {
+  return observedApiVersion;
+}
+
 function isPlainObject(value: unknown): value is Record<string, ParamValue> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -125,6 +141,8 @@ async function request<T>(
   clearTimeout(timeout);
 
   const text = await response.text();
+  const servedVersion = response.headers.get('stripe-version');
+  if (servedVersion) observedApiVersion = servedVersion;
   let body: unknown = null;
   if (text) {
     try {

@@ -191,4 +191,47 @@ export const subscriptionsAr: Record<string, string> = {
     'معاملات المحافظ (فودافون كاش / إنستاباي)',
   'No wallet transactions in this period.': 'لا توجد معاملات محافظ في هذه الفترة.',
   'No reference': 'بدون رقم مرجعي',
+
+  // Checkout state machine & premium checkout surface
+  'Method': 'الطريقة',
+  'Instructions': 'التعليمات',
+  'Checkout progress': 'مراحل الدفع',
+  'Select a payment method to continue': 'اختر طريقة الدفع للمتابعة',
+  'Secure checkout': 'صفحة دفع آمنة',
+  'Checking…': 'جارٍ التحقق…',
+  'Preparing checkout…': 'جارٍ تجهيز الدفع…',
+  'Please wait…': 'يرجى الانتظار…',
+  'Invalid coupon': 'كود خصم غير صالح',
+  'Validation failed': 'فشل التحقق',
+  'Failed to initialize payment': 'تعذر بدء عملية الدفع',
+  'Failed to submit payment evidence': 'تعذر إرسال إثبات الدفع',
+  'Wallet number': 'رقم المحفظة',
+  'InstaPay address': 'عنوان إنستاباي',
+  'Account holder': 'اسم المستلم',
+  'Copy the account details and complete the transfer from your banking app.':
+    'انسخ بيانات الحساب وأكمل التحويل من تطبيق البنك.',
+  'The reference number shown in the confirmation message or the transfer receipt':
+    'الرقم المرجعي الظاهر في رسالة تأكيد العملية أو في إيصال التحويل',
+  'Receipt preview': 'معاينة الإيصال',
+  'PNG, JPG up to 5 MB': 'صيغة PNG أو JPG حتى ٥ ميجابايت',
+  'Receipt file size must be less than 5 MB': 'يجب أن يكون حجم ملف الإيصال أقل من ٥ ميجابايت',
+  'Transaction reference is required': 'الرقم المرجعي للعملية مطلوب',
+  'Sender phone or handle is required': 'رقم أو حساب الراسل مطلوب',
+  'Please upload a screenshot or photo of your transfer receipt':
+    'يرجى رفع لقطة شاشة أو صورة لإيصال التحويل',
+  'Submitting the receipt unlocks provisional access for 24 hours while the team confirms the transfer.':
+    'إرسال الإيصال يفعّل الوصول المؤقت لمدة ٢٤ ساعة بينما يؤكد الفريق عملية التحويل.',
+  'Submitting your payment evidence…': 'جارٍ إرسال إثبات الدفع…',
+  'Please keep this window open for a moment.': 'يرجى إبقاء هذه النافذة مفتوحة لفترة وجيزة.',
+  'Your payment has been confirmed and your subscription is now active.':
+    'تم تأكيد الدفع الخاص بك وأصبح اشتراكك فعالاً الآن.',
+  'The payment could not be confirmed. Nothing was charged — you can try again or contact support.':
+    'لم يتم تأكيد الدفع. لم يتم خصم أي مبلغ — يمكنك المحاولة مرة أخرى أو التواصل مع الدعم.',
+  'Payment request expired': 'انتهت صلاحية طلب الدفع',
+  'This payment request expired before it was completed. Please start a new checkout.':
+    'انتهت صلاحية طلب الدفع قبل اكتماله. يرجى بدء عملية دفع جديدة.',
+  'Payment refunded': 'تم استرداد المبلغ',
+  'The payment was refunded, so nothing was charged for your subscription.':
+    'تم استرداد مبلغ الدفع، لذلك لم يتم خصم أي مبلغ لاشتراكك.',
+  'Start a new checkout': 'ابدأ عملية دفع جديدة',
 };

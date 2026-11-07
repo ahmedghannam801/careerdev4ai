@@ -4,8 +4,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Upload,
-  Printer,
-  Gauge
+  Printer
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { BuiltCvPanel } from '../cv/BuiltCvPanel';
@@ -16,6 +15,7 @@ import { Reveal } from '../motion/Motion';
 import { CvMeasuredAnalysis } from '../cv/CvMeasuredAnalysis';
 import { CvAnalysisPanel } from '../cv/CvAnalysisPanel';
 import { CvReviewWorkspace } from '../cv/CvReviewWorkspace';
+import { CvStudioWorkflow } from '../cv/CvStudioWorkflow';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
 import type { CvAnalysisReport } from '../../../shared/cvAnalysis';
 import { CV_STUDIO_TABS, type CvStudioTab } from '../../lib/routing';
@@ -26,7 +26,7 @@ import { CvDataManager } from '../cv/studio/CvDataManager';
 import { ResumeLanguagePicker } from '../cv/studio/ResumeLanguagePicker';
 import { CareerImage } from '../ui/CareerImage';
 
-export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
+export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = () => {
   const {
     activeCV,
     updateCV,
@@ -247,6 +247,14 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         </div>
       )}
 
+      {/* The path through the studio. Every step is a part of this workspace,
+          so a candidate never has to open somewhere else to finish the job. */}
+      <CvStudioWorkflow
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        t={t}
+      />
+
       {/* Tabs */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
         <button
@@ -405,21 +413,16 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               The CV Analyzer page used to be a separate place with a
               separate upload; this is the same measurement, with the same
               stages and the same history, reachable without leaving the
-              document the candidate is working on. */}
+              document the candidate is working on. The upload and the
+              saved-CV picker come with it, so a candidate can measure a
+              document they have not imported yet without leaving the studio
+              either — and measuring a file never replaces the CV they are
+              working on. */}
           <CvAnalysisPanel
             cv={activeCV}
             jobDescription={jobDescriptionState.jobDescription}
+            showUpload
           />
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => onNavigate?.('cv-analyzer')}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
-            >
-              <Gauge className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-              {t('Open the CV Analyzer')}
-            </button>
-          </div>
         </>
       )}
 

@@ -31,6 +31,7 @@ import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../
 import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
 import { SUPPORT_EMAIL } from '../../../shared/contact.ts';
+import { CONTACT_PHONE } from '../../../shared/paymentAccounts.ts';
 
 /**
  * A short, honest description of the browser this session is running in.
@@ -878,7 +879,7 @@ export const SettingsView: React.FC = () => {
                 </a>
 
                 <a
-                  href="tel:+201027053876"
+                  href={`tel:${CONTACT_PHONE}`}
                   className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] hover:border-[var(--color-primary-text)]/30 transition-all flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -888,7 +889,7 @@ export const SettingsView: React.FC = () => {
                     <div className="min-w-0">
                       <div className="font-semibold text-[var(--text-primary)]">{t('Phone')}</div>
                       <div className="text-[11px] text-[var(--text-secondary)] truncate font-mono">
-                        +201027053876
+                        {CONTACT_PHONE}
                       </div>
                     </div>
                   </div>

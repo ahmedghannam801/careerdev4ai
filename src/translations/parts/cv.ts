@@ -35,6 +35,18 @@ export const cvAr: Record<string, string> = {
   'Import / Paste': 'استيراد / لصق',
   'Print / Export PDF': 'طباعة / تصدير PDF',
   'ATS audit unavailable': 'تدقيق ATS غير متاح',
+  // The studio's workflow: the path through it, in the order a candidate
+  // actually takes it.
+  'CV Studio workflow': 'مسار عمل استوديو السيرة الذاتية',
+  'Upload or select a CV': 'ارفع سيرة ذاتية أو اختر واحدة',
+  'Review what was extracted': 'راجع ما تم استخراجه',
+  'Edit and confirm it': 'حرّره وأكّده',
+  'Run the analysis': 'شغّل التحليل',
+  'See the results': 'اطّلع على النتائج',
+  'Improve the CV': 'حسّن السيرة الذاتية',
+  'Export it': 'صدّرها',
+  'Step': 'الخطوة',
+  'of': 'من',
   'Contact & Header': 'التواصل والترويسة',
   'Target Role Headline': 'عنوان الدور المستهدف',
   'Executive Summary': 'الملخّص التنفيذي',

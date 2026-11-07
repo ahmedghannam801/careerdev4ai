@@ -11,6 +11,7 @@ import type {
   PaymentStatus,
   PaymentVerificationDTO,
 } from '../../shared/payments.ts';
+import { getPaymentAccount } from '../../shared/paymentAccounts.ts';
 
 interface PaymentRequestRow {
   id: string;
@@ -396,9 +397,20 @@ export function getPaymentInstructions(
 ): PaymentInstructionsDTO {
   const egp = (amountPiasters / 100).toFixed(0);
 
+  // Identifiers come from the centralized account registry (shared/paymentAccounts.ts).
+  // Environment variables may override the committed default at runtime for
+  // operational flexibility; no identifier is hardcoded in this module.
+  const vodafoneAccount = getPaymentAccount('vodafone_cash');
+  const instapayAccount = getPaymentAccount('instapay');
+  if (!vodafoneAccount || !instapayAccount) {
+    throw new Error('Payment account registry is misconfigured');
+  }
+
   if (method === 'vodafone_cash') {
-    const vfWallet = process.env.VODAFONE_CASH_WALLET?.trim() || '01012345678';
-    const holder = process.env.VODAFONE_CASH_HOLDER?.trim() || 'CareerDev4AI Operations';
+    const vfWallet =
+      process.env.VODAFONE_CASH_WALLET?.trim() || vodafoneAccount.identifier;
+    const holder =
+      process.env.VODAFONE_CASH_HOLDER?.trim() || vodafoneAccount.accountHolderName;
     return {
       method: 'vodafone_cash',
       recipientAccount: vfWallet,
@@ -420,8 +432,8 @@ export function getPaymentInstructions(
     };
   }
 
-  const instapayHandle = process.env.INSTAPAY_HANDLE?.trim() || 'careerdev4ai@instapay';
-  const instapayHolder = process.env.INSTAPAY_HOLDER?.trim() || 'CareerDev4AI Commercial';
+  const instapayHandle = process.env.INSTAPAY_HANDLE?.trim() || instapayAccount.identifier;
+  const instapayHolder = process.env.INSTAPAY_HOLDER?.trim() || instapayAccount.accountHolderName;
 
   return {
     method: 'instapay',
