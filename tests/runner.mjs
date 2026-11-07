@@ -256,6 +256,12 @@ async function main() {
     : [];
   const testFiles = [
     join(TESTS_DIR, 'auth.test.ts'),
+    // The authentication surface and the configuration the browser bundle is
+    // built from: that the public values resolve in a clean checkout, that the
+    // interface still offers every sign-in method, and that the Supabase
+    // project still has the providers enabled. The regression this covers
+    // shipped a site with every sign-in method removed.
+    join(TESTS_DIR, 'auth-config.test.ts'),
     join(TESTS_DIR, 'domains.test.ts'),
     join(TESTS_DIR, 'persistence.test.ts'),
     join(TESTS_DIR, 'regression.test.ts'),

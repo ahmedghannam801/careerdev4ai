@@ -60,6 +60,26 @@ const SECRET_KEYS = [
  */
 const PLAIN_KEYS = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'OPENROUTER_MODEL'];
 
+/**
+ * The variables the BUILD needs, as opposed to the variables the deployed
+ * worker needs at request time.
+ *
+ * Cloudflare Pages keeps these two sets apart. `env_vars` are handed to the
+ * deployed worker when it runs; `build_vars` are handed to the build container
+ * while the bundle is produced. The browser bundle needs the public Supabase
+ * values at BUILD time — they are inlined into it — and a Pages project that
+ * builds from Git has no `.env` file to read them from, because `.env` is
+ * gitignored.
+ *
+ * A Pages project without these build variables produced a bundle without the
+ * Supabase configuration, and the application shipped with every sign-in
+ * method disabled. The build now also reads the committed `vars` block of
+ * `wrangler.jsonc`, so it no longer depends on this setting — but the project
+ * is configured with them as well, so that a build and a deployment cannot
+ * disagree about which Supabase project the site talks to.
+ */
+const BUILD_KEYS = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY'];
+
 function fail(message) {
   console.error(`[pages-env] ${message}`);
   process.exit(1);
@@ -183,6 +203,24 @@ function buildEnvVars() {
 }
 
 /**
+ * The variables the build container receives.
+ *
+ * Only the two public values the browser bundle inlines. They are plain text:
+ * the publishable key is the anonymous key and the project URL is in every
+ * request the browser makes, so neither is a secret.
+ */
+function buildBuildVars() {
+  const vars = {};
+  for (const key of BUILD_KEYS) {
+    // The committed value, so the build reads exactly what the deployment
+    // declares. The script has already refused to run when `.env` and
+    // `wrangler.jsonc` disagree.
+    vars[key] = { type: 'plain_text', value: declared[key] ?? env[key] };
+  }
+  return vars;
+}
+
+/**
  * The variables the project still has that `.env` no longer names.
  *
  * The Cloudflare API MERGES the map it is given into the project's existing
@@ -213,8 +251,16 @@ const stale = {
 
 await call('PATCH', {
   deployment_configs: {
-    production: { ...configs.production, env_vars: buildEnvVars() },
-    preview: { ...configs.preview, env_vars: buildEnvVars() },
+    production: {
+      ...configs.production,
+      env_vars: buildEnvVars(),
+      build_vars: buildBuildVars(),
+    },
+    preview: {
+      ...configs.preview,
+      env_vars: buildEnvVars(),
+      build_vars: buildBuildVars(),
+    },
   },
 });
 
@@ -227,6 +273,18 @@ for (const environment of ['production', 'preview']) {
   console.log(
     `[pages-env] ${environment}: ${secrets.length} secrets, ${plain.length} plain-text variables`,
   );
+  const buildVars = after.deployment_configs?.[environment]?.build_vars ?? {};
+  const buildNames = Object.keys(buildVars).sort();
+  console.log(
+    `[pages-env] ${environment}: build variables — ${buildNames.join(', ') || 'none stored by the project'}`,
+  );
+  if (buildNames.length === 0) {
+    console.log(
+      `[pages-env] ${environment}: the project stores no build variables, so the build does not ` +
+        'depend on them: it reads the committed `vars` block of wrangler.jsonc. A build ' +
+        'therefore always carries the public Supabase configuration.',
+    );
+  }
   if (stale[environment].length > 0) {
     console.log(
       `[pages-env] ${environment}: ${stale[environment].join(', ')} are no longer in .env. ` +

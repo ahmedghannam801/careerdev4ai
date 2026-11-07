@@ -8,7 +8,7 @@
     "dev": "npx --yes tsx server.ts",
     "start": "tsx server.ts",
     "prebuild": "node scripts/generate-favicon-ico.mjs",
-    "build": "vite build && node scripts/build-worker.mjs",
+    "build": "vite build && node scripts/build-worker.mjs && node scripts/verify-bundle-auth-config.mjs",
     "prebuild:android": "node scripts/generate-favicon-ico.mjs",
     "build:android": "vite build --mode android --outDir dist-android",
     "android:assets": "node scripts/generate-android-assets.mjs",
