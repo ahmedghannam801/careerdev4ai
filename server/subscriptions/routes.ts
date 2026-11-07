@@ -38,6 +38,15 @@ import {
   getActiveBirthdayReward,
 } from '../birthday/service.ts';
 import type { PaymentMethod } from '../../shared/payments.ts';
+import { isTestMode } from '../stripe/config.ts';
+import {
+  computeAdminRevenue,
+  parseRevenueDateRange,
+  type OfflinePaymentRow,
+  type StripeDisputeRevenueRow,
+  type StripeInvoiceRevenueRow,
+  type StripeRefundRevenueRow,
+} from '../stripe/revenue.ts';
 
 const receiptUpload = multer({
   storage: multer.memoryStorage(),
@@ -485,50 +494,138 @@ export function registerSubscriptionRoutes(app: Express): void {
     requireAuth,
     requireAdmin,
     requirePermission('revenue.read'),
-    async (_req: AdminRequest, res: Response) => {
+    async (req: AdminRequest, res: Response) => {
+      // An invalid filter is a client error, not a silent all-time total.
+      const parsedRange = parseRevenueDateRange(req.query.from, req.query.to);
+      if ('error' in parsedRange) {
+        return res.status(400).json({ error: parsedRange.error, code: 'INVALID_DATE_RANGE' });
+      }
+
       try {
-        const { data: paidPayments, error } = await getSupabaseServer()
+        // The query is intentionally unbounded: the totals have to be exact,
+        // and Supabase has no aggregate helper without an RPC. At real volume
+        // this becomes a `sum(...)` RPC plus a limited list query; capping the
+        // rows here would silently understate revenue. The arithmetic lives in
+        // `server/stripe/revenue.ts` so the refund and double-counting rules
+        // are testable.
+        const { data: paymentRows, error: paymentError } = await getSupabaseServer()
           .from('payment_requests')
           .select(`
-            amount_piasters, payment_method, billing_cycle, paid_at,
-            subscription_plans(code)
+            amount_piasters, payment_method, billing_cycle, paid_at, created_at,
+            status, transaction_reference, subscription_plans(code)
           `)
-          .eq('status', 'paid');
+          .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (paymentError) throw paymentError;
 
-        const payments = paidPayments ?? [];
-        let totalPiasters = 0;
-        const byMethod: Record<string, number> = { vodafone_cash: 0, instapay: 0 };
-        const byPlan: Record<string, number> = {};
-        const byCycle: Record<string, number> = { monthly: 0, annual: 0 };
-
-        for (const p of payments) {
-          const amount = Number(p.amount_piasters ?? 0);
-          totalPiasters += amount;
-
-          const method = p.payment_method || 'other';
-          byMethod[method] = (byMethod[method] ?? 0) + amount;
-
-          const planPlans = p.subscription_plans as { code?: string } | { code?: string }[] | null;
-          const planCode = (Array.isArray(planPlans) ? planPlans[0]?.code : planPlans?.code) || 'unknown';
-          byPlan[planCode] = (byPlan[planCode] ?? 0) + amount;
-
-          const cycle = p.billing_cycle || 'monthly';
-          byCycle[cycle] = (byCycle[cycle] ?? 0) + amount;
-        }
-
-        return res.json({
-          success: true,
-          metrics: {
-            totalCollectedPiasters: totalPiasters,
-            totalCollectedEgp: Math.round(totalPiasters / 100),
-            transactionCount: payments.length,
-            breakdownByMethodPiasters: byMethod,
-            breakdownByPlanPiasters: byPlan,
-            breakdownByCyclePiasters: byCycle,
-          },
+        const payments: OfflinePaymentRow[] = (paymentRows ?? []).map((row: any) => {
+          const relation = row.subscription_plans as { code?: string } | { code?: string }[] | null;
+          const planCode = (Array.isArray(relation) ? relation[0]?.code : relation?.code) || null;
+          return {
+            amount_piasters: row.amount_piasters,
+            payment_method: row.payment_method,
+            billing_cycle: row.billing_cycle,
+            paid_at: row.paid_at,
+            created_at: row.created_at,
+            status: String(row.status ?? ''),
+            transaction_reference: row.transaction_reference ?? null,
+            plan_code: planCode,
+          };
         });
+
+        // Stripe invoices are a mirror written by the signed webhook. The
+        // mirror is optional: a deployment that has not applied the Stripe
+        // migration must still render this page, so a failure is logged and
+        // reported rather than thrown.
+        const { data: stripeInvoiceRows, error: stripeInvoiceError } = await getSupabaseServer()
+          .from('stripe_invoices')
+          .select(`
+            id, number, status, amount_paid, amount_due, currency, livemode, paid,
+            plan_code, billing_cycle, purchase_kind, subscription_id,
+            hosted_invoice_url, invoice_created_at, created_at
+          `)
+          .order('created_at', { ascending: false });
+
+        if (stripeInvoiceError) {
+          console.error('Admin revenue: Stripe invoice query failed:', stripeInvoiceError);
+        }
+        const invoices: StripeInvoiceRevenueRow[] = stripeInvoiceError
+          ? []
+          : (stripeInvoiceRows ?? []).map((row: any) => ({
+              id: String(row.id),
+              number: row.number ?? null,
+              status: row.status ?? null,
+              amount_paid: row.amount_paid,
+              amount_due: row.amount_due,
+              currency: row.currency ?? 'egp',
+              livemode: row.livemode === true,
+              paid: row.paid === true,
+              plan_code: row.plan_code ?? null,
+              purchase_kind: row.purchase_kind ?? null,
+              billing_cycle: row.billing_cycle ?? null,
+              subscription_id: row.subscription_id ?? null,
+              hosted_invoice_url: row.hosted_invoice_url ?? null,
+              invoice_created_at: row.invoice_created_at ?? null,
+              created_at: row.created_at ?? null,
+            }));
+
+        const { data: refundRows, error: refundError } = await getSupabaseServer()
+          .from('stripe_refunds')
+          .select(`
+            id, amount, currency, status, livemode, reason, invoice_id,
+            payment_intent, refund_created_at, created_at
+          `)
+          .order('created_at', { ascending: false });
+
+        if (refundError) {
+          console.error('Admin revenue: Stripe refund query failed:', refundError);
+        }
+        const refunds: StripeRefundRevenueRow[] = refundError
+          ? []
+          : (refundRows ?? []).map((row: any) => ({
+              id: String(row.id),
+              amount: row.amount,
+              currency: row.currency ?? 'egp',
+              status: row.status ?? null,
+              livemode: row.livemode === true,
+              reason: row.reason ?? null,
+              invoice_id: row.invoice_id ?? null,
+              payment_intent: row.payment_intent ?? null,
+              refund_created_at: row.refund_created_at ?? null,
+              created_at: row.created_at ?? null,
+            }));
+
+        const { data: disputeRows, error: disputeError } = await getSupabaseServer()
+          .from('stripe_disputes')
+          .select('id, amount, currency, status, livemode, reason, dispute_created_at, created_at')
+          .order('created_at', { ascending: false });
+
+        if (disputeError) {
+          console.error('Admin revenue: Stripe dispute query failed:', disputeError);
+        }
+        const disputes: StripeDisputeRevenueRow[] = disputeError
+          ? []
+          : (disputeRows ?? []).map((row: any) => ({
+              id: String(row.id),
+              amount: row.amount,
+              currency: row.currency ?? 'egp',
+              status: row.status ?? null,
+              livemode: row.livemode === true,
+              reason: row.reason ?? null,
+              dispute_created_at: row.dispute_created_at ?? null,
+              created_at: row.created_at ?? null,
+            }));
+
+        const metrics = computeAdminRevenue(
+          { payments, invoices, refunds, disputes },
+          {
+            testMode: isTestMode(),
+            range: parsedRange.range,
+            stripeAvailable: !stripeInvoiceError,
+          }
+        );
+
+        return res.json({ success: true, metrics });
       } catch (error) {
         console.error('Admin revenue query failed:', error);
         return res.status(500).json({ error: 'Failed to compute revenue metrics' });

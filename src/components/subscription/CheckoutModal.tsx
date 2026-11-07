@@ -1,7 +1,16 @@
 /**
- * Checkout & Payment Modal for Egyptian Payment Rails (Vodafone Cash & InstaPay).
- * Multi-step guided checkout with promo coupon validation, Law 151 birthday reward claiming,
- * automated instructions, receipt image upload, and 24-hr provisional access feedback.
+ * Checkout & Payment Modal.
+ *
+ * Two kinds of rail share one modal:
+ *
+ *   * the Egyptian wallet rails (Vodafone Cash & InstaPay), which are a
+ *     multi-step manual flow — amount, recipient, transfer, receipt upload;
+ *   * Stripe-hosted card checkout, which leaves the application entirely.
+ *
+ * The manual flow keeps its promo-coupon and provisional-access behaviour
+ * untouched. A card payment deliberately skips all of it: the coupon rules
+ * live in this database while Stripe has its own promotion codes, and card
+ * access is granted by the signed webhook, not by a reviewer.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -18,6 +27,7 @@ import {
   ArrowLeft,
   Smartphone,
   CreditCard,
+  Landmark,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import {
@@ -26,8 +36,12 @@ import {
   type CheckoutResponse,
 } from '../../lib/paymentApi';
 import { validateCoupon } from '../../lib/creditsApi';
+import { beginCardCheckout, fetchStripeBillingStatus } from '../../lib/stripeApi';
 import type { PaymentMethod } from '../../../shared/payments';
 import { formatEgpPrice } from '../../../shared/subscriptions';
+
+/** A payment rail is either one of the wallet rails or a card. */
+type PaymentRail = PaymentMethod | 'card';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -57,7 +71,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const [step, setStep] = useState<'config' | 'instructions' | 'evidence' | 'success'>('config');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('vodafone_cash');
+  const [paymentRail, setPaymentRail] = useState<PaymentRail>('vodafone_cash');
+  // Fail closed. The card rail is shown only after the server confirms both a
+  // key and a webhook signing secret; a deployment that cannot activate a
+  // payment must not offer to take one.
+  const [cardAvailable, setCardAvailable] = useState(false);
 
   // Coupons & Promo
   const [couponCode, setCouponCode] = useState('');
@@ -87,6 +105,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setStep('config');
+      setPaymentRail('vodafone_cash');
       setCouponCode('');
       setCouponDiscountPiasters(0);
       setCouponMessage(null);
@@ -101,7 +120,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isOpen, planCode]);
 
+  // The card option only exists when this deployment has a Stripe key. Asking
+  // the authenticated status endpoint beats offering a button that always
+  // answers 503.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    void fetchStripeBillingStatus()
+      .then((status) => {
+        if (cancelled) return;
+        const ready = Boolean(status.configured && status.checkoutReady);
+        setCardAvailable(ready);
+        if (!ready) {
+          setPaymentRail((rail) => (rail === 'card' ? 'vodafone_cash' : rail));
+        }
+      })
+      .catch(() => {
+        // Fail closed: keep the card rail hidden and let the wallet rails work.
+        setCardAvailable(false);
+        setPaymentRail((rail) => (rail === 'card' ? 'vodafone_cash' : rail));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const isCard = paymentRail === 'card';
 
   const originalAmountPiasters = billingCycle === 'annual' ? annualPiasters : monthlyPiasters;
   const currentFinalPiasters = Math.max(0, originalAmountPiasters - couponDiscountPiasters);
@@ -130,13 +176,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleCreateCheckout = async () => {
+    if (paymentRail === 'card') {
+      setLoading(true);
+      setError(null);
+      try {
+        // The browser leaves this document for Stripe's hosted page. The
+        // session is created server-side, so the secret key never reaches
+        // the client and no card field is ever rendered here.
+        await beginCardCheckout({ planCode, billingCycle });
+      } catch (err: any) {
+        setError(
+          err?.code === 'STRIPE_NOT_CONFIGURED'
+            ? t('Card payments are not available right now. Please choose Vodafone Cash or InstaPay.')
+            : err?.message || t('Failed to start card checkout')
+        );
+      } finally {
+        // In a Capacitor build the system browser returns control here; on
+        // the web the document is already navigating away.
+        setLoading(false);
+      }
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       const data = await createPaymentCheckout({
         planCode,
         billingCycle,
-        paymentMethod,
+        paymentMethod: paymentRail,
         couponCode: couponDiscountPiasters > 0 ? couponCode : undefined,
         applyBirthdayReward,
       });
@@ -289,77 +357,125 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <label className="block text-sm font-semibold text-foreground mb-2">
                   {t('Select Payment Method')}
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div
+                  className={`grid grid-cols-1 gap-2.5 ${
+                    cardAvailable ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+                  }`}
+                >
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('vodafone_cash')}
-                    className={`p-4 rounded-xl border text-start flex items-center gap-3 transition-all ${
-                      paymentMethod === 'vodafone_cash'
+                    onClick={() => setPaymentRail('vodafone_cash')}
+                    className={`p-3 rounded-xl border text-start flex items-center gap-2.5 transition-all ${
+                      paymentRail === 'vodafone_cash'
                         ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
                         : 'border-border bg-surface hover:border-muted'
                     }`}
                   >
-                    <div className="w-10 h-10 rounded-lg bg-red-600/10 text-red-600 flex items-center justify-center shrink-0">
-                      <Smartphone className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-lg bg-red-600/10 text-red-600 flex items-center justify-center shrink-0">
+                      <Smartphone className="w-4 h-4" />
                     </div>
-                    <div>
-                      <div className="font-semibold text-sm text-foreground">{t('Vodafone Cash')}</div>
-                      <div className="text-xs text-muted">فودافون كاش</div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-xs text-foreground">
+                        {t('Vodafone Cash')}
+                      </div>
+                      <div className="text-[11px] text-muted truncate">فودافون كاش</div>
                     </div>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('instapay')}
-                    className={`p-4 rounded-xl border text-start flex items-center gap-3 transition-all ${
-                      paymentMethod === 'instapay'
+                    onClick={() => setPaymentRail('instapay')}
+                    className={`p-3 rounded-xl border text-start flex items-center gap-2.5 transition-all ${
+                      paymentRail === 'instapay'
                         ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
                         : 'border-border bg-surface hover:border-muted'
                     }`}
                   >
-                    <div className="w-10 h-10 rounded-lg bg-purple-600/10 text-purple-600 flex items-center justify-center shrink-0">
-                      <CreditCard className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-lg bg-purple-600/10 text-purple-600 flex items-center justify-center shrink-0">
+                      <Landmark className="w-4 h-4" />
                     </div>
-                    <div>
-                      <div className="font-semibold text-sm text-foreground">{t('InstaPay')}</div>
-                      <div className="text-xs text-muted">إنستاباي مصر</div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-xs text-foreground">
+                        {t('InstaPay')}
+                      </div>
+                      <div className="text-[11px] text-muted truncate">إنستاباي مصر</div>
                     </div>
                   </button>
+
+                  {cardAvailable && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentRail('card');
+                        // Application coupons and Stripe promotion codes are
+                        // different systems; carrying one over would silently
+                        // quote a discount the card page cannot honour.
+                        setCouponDiscountPiasters(0);
+                        setCouponMessage(null);
+                      }}
+                      className={`p-3 rounded-xl border text-start flex items-center gap-2.5 transition-all ${
+                        paymentRail === 'card'
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'border-border bg-surface hover:border-muted'
+                      }`}
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
+                        <CreditCard className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-xs text-foreground">
+                          {isAr ? 'بطاقة بنكية' : t('Card')}
+                        </div>
+                        <div className="text-[11px] text-muted truncate">Visa / Mastercard</div>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Coupon Code Input */}
-              <div className="pt-2 border-t border-border">
-                <label className="block text-xs font-semibold text-foreground mb-1.5">
-                  {t('Have a promo coupon?')}
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="E.g. EGYPT2026"
-                    className="flex-1 px-3 py-2 rounded-lg bg-surface border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase tracking-wider"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyCoupon}
-                    disabled={couponLoading || !couponCode.trim()}
-                    className="px-4 py-2 rounded-lg bg-surface-raised border border-border text-sm font-medium text-foreground hover:bg-border/60 disabled:opacity-50 transition-colors"
-                  >
-                    {couponLoading ? '...' : t('Apply Coupon')}
-                  </button>
+              {/* Coupon Code Input (wallet rails only) */}
+              {isCard ? (
+                <div className="pt-2 border-t border-border flex items-start gap-2 text-[11px] text-muted leading-relaxed">
+                  <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
+                  <span>
+                    {t(
+                      'You will enter your card details and any promotion code on Stripe’s secure page. We never see or store your card number.'
+                    )}
+                  </span>
                 </div>
-                {couponMessage && (
-                  <p
-                    className={`text-xs mt-1.5 font-medium ${
-                      couponMessage.type === 'success' ? 'text-emerald-600' : 'text-red-500'
-                    }`}
-                  >
-                    {couponMessage.text}
-                  </p>
-                )}
-              </div>
+              ) : (
+                <div className="pt-2 border-t border-border">
+                  <label className="block text-xs font-semibold text-foreground mb-1.5">
+                    {t('Have a promo coupon?')}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      placeholder="E.g. EGYPT2026"
+                      className="flex-1 px-3 py-2 rounded-lg bg-surface border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase tracking-wider"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponCode.trim()}
+                      className="px-4 py-2 rounded-lg bg-surface-raised border border-border text-sm font-medium text-foreground hover:bg-border/60 disabled:opacity-50 transition-colors"
+                    >
+                      {couponLoading ? '...' : t('Apply Coupon')}
+                    </button>
+                  </div>
+                  {couponMessage && (
+                    <p
+                      className={`text-xs mt-1.5 font-medium ${
+                        couponMessage.type === 'success' ? 'text-emerald-600' : 'text-red-500'
+                      }`}
+                    >
+                      {couponMessage.text}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Pricing Summary Card */}
               <div className="p-4 rounded-xl bg-surface-raised border border-border space-y-2">
@@ -383,6 +499,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     {formatEgpPrice(currentFinalPiasters)}
                   </span>
                 </div>
+                {isCard && (
+                  <p className="text-[11px] text-muted leading-relaxed">
+                    {t(
+                      'Charged in Egyptian pounds on Stripe. Your bank may add a cross-border or currency-conversion fee.'
+                    )}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -398,7 +521,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   {checkoutData.instructions.amountFormatted}
                 </div>
                 <div className="text-xs text-muted mt-1">
-                  {paymentMethod === 'vodafone_cash' ? t('Vodafone Cash') : t('InstaPay')}
+                  {paymentRail === 'vodafone_cash' ? t('Vodafone Cash') : t('InstaPay')}
                 </div>
               </div>
 
@@ -407,7 +530,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-xs text-muted">
-                      {paymentMethod === 'vodafone_cash' ? 'Wallet Number / المحفظة' : 'InstaPay IPA / العنوان'}
+                      {paymentRail === 'vodafone_cash' ? 'Wallet Number / المحفظة' : 'InstaPay IPA / العنوان'}
                     </div>
                     <div className="text-lg font-mono font-bold text-foreground">
                       {checkoutData.instructions.recipientAccount}
@@ -468,7 +591,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   required
                   value={transactionReference}
                   onChange={(e) => setTransactionReference(e.target.value)}
-                  placeholder={paymentMethod === 'vodafone_cash' ? 'E.g. 1234567890' : 'E.g. IPN2611061234'}
+                  placeholder={paymentRail === 'vodafone_cash' ? 'E.g. 1234567890' : 'E.g. IPN2611061234'}
                   className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm text-foreground focus:ring-2 focus:ring-primary focus:outline-none"
                 />
                 <p className="text-[11px] text-muted mt-1">
@@ -485,7 +608,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   required
                   value={senderPhoneOrHandle}
                   onChange={(e) => setSenderPhoneOrHandle(e.target.value)}
-                  placeholder={paymentMethod === 'vodafone_cash' ? '010XXXXXXXX' : 'username@instapay'}
+                  placeholder={paymentRail === 'vodafone_cash' ? '010XXXXXXXX' : 'username@instapay'}
                   className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm text-foreground focus:ring-2 focus:ring-primary focus:outline-none"
                 />
               </div>
@@ -603,7 +726,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 disabled={loading}
                 className="px-6 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow hover:bg-primary-hover disabled:opacity-50 flex items-center gap-1.5 transition-all"
               >
-                <span>{loading ? '...' : t('Next')}</span>
+                <span>
+                  {loading
+                    ? '...'
+                    : isCard
+                    ? t('Continue to secure card payment')
+                    : t('Next')}
+                </span>
                 {isAr ? <ArrowLeft className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
               </button>
             </>

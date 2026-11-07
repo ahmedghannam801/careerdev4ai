@@ -1,10 +1,10 @@
 /**
  * PricingView — Production SaaS Pricing & Subscription Center.
  * Comprehensive Egyptian-pound tier catalog (Student, Pro, Career Plus), credit packs,
- * billing cycle toggles, and seamless Vodafone Cash / InstaPay checkout.
+ * billing cycle toggles, and checkout over Vodafone Cash / InstaPay or a Stripe-hosted card page.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Check,
   Sparkles,
@@ -12,13 +12,24 @@ import {
   Shield,
   Smartphone,
   CreditCard,
+  Landmark,
   ArrowRight,
   ArrowLeft,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CheckoutModal } from '../subscription/CheckoutModal';
 import { formatEgpPrice } from '../../../shared/subscriptions';
 import { CREDIT_PACKS } from '../../../shared/credits';
+import {
+  fetchStripeBillingStatus,
+  openStripePortal,
+  goToStripe,
+  type StripeBillingStatus,
+} from '../../lib/stripeApi';
+import { useRoute } from '../../lib/useRouteParams';
+import { buildRouteHash } from '../../lib/routing';
 
 interface PlanDefinition {
   code: string;
@@ -151,20 +162,143 @@ const PLANS: PlanDefinition[] = [
 ];
 
 export const PricingView: React.FC = () => {
-  const { t, settings, subscription } = useCareer();
+  const { t, settings, subscription, refreshSubscription, refreshCredits } = useCareer();
   const isAr = settings.language === 'ar';
+  const { params } = useRoute();
 
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<PlanDefinition | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
+  // A Stripe redirect lands on `#/pricing?stripe=success|cancelled`. The result
+  // is copied into local state and stripped from the URL so a refresh does not
+  // replay the banner.
+  const [checkoutNotice, setCheckoutNotice] = useState<'success' | 'cancelled' | null>(null);
+  const [stripeStatus, setStripeStatus] = useState<StripeBillingStatus | null>(null);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [portalNotice, setPortalNotice] = useState(false);
+
   const currentPlanCode = subscription?.planCode ?? 'free';
+
+  const loadStripeStatus = useCallback(async () => {
+    try {
+      setStripeStatus(await fetchStripeBillingStatus());
+    } catch {
+      // Card billing is optional. A failure here must not break the page.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStripeStatus();
+  }, [loadStripeStatus]);
+
+  useEffect(() => {
+    const result = params.stripe;
+    if (result !== 'success' && result !== 'cancelled') return;
+
+    setCheckoutNotice(result);
+    window.history.replaceState(null, '', buildRouteHash('pricing'));
+
+    if (result !== 'success') return;
+
+    // The webhook and the browser redirect race each other: refresh now, then
+    // once more when the event has almost certainly been processed.
+    void refreshSubscription();
+    void refreshCredits();
+    void loadStripeStatus();
+    const timer = window.setTimeout(() => {
+      void refreshSubscription();
+      void refreshCredits();
+      void loadStripeStatus();
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [params.stripe, refreshSubscription, refreshCredits, loadStripeStatus]);
+
+  // The Customer Portal returns to this page after a cancellation or a card
+  // change. Refresh both the entitlement and the billing mirror, otherwise the
+  // page would keep showing the state from before the candidate left.
+  useEffect(() => {
+    if (params.billing !== 'portal') return;
+    setPortalNotice(true);
+    window.history.replaceState(null, '', buildRouteHash('pricing'));
+    void refreshSubscription();
+    void refreshCredits();
+    void loadStripeStatus();
+  }, [params.billing, refreshSubscription, refreshCredits, loadStripeStatus]);
+
+  const handleManageBilling = async () => {
+    setBillingBusy(true);
+    setBillingError(null);
+    try {
+      const portal = await openStripePortal();
+      await goToStripe(portal.url);
+    } catch (err: any) {
+      setBillingError(err?.message || t('Failed to open the billing portal'));
+    } finally {
+      setBillingBusy(false);
+    }
+  };
 
   const handleSelectPlan = (plan: PlanDefinition) => {
     if (plan.code === 'free') return;
     setSelectedPlan(plan);
     setCheckoutOpen(true);
   };
+
+  // `subscription` is the entitlement (active/trialing/past_due). The latest
+  // row also covers `unpaid`, `incomplete` and `canceled`, so the page can
+  // explain why access stopped instead of simply hiding the card section.
+  const activeCardSubscription = stripeStatus?.latestSubscription ?? stripeStatus?.subscription ?? null;
+  const activeCardPlan = PLANS.find((plan) => plan.code === activeCardSubscription?.plan_code);
+  const cardPlanLabel = activeCardPlan
+    ? isAr
+      ? activeCardPlan.nameAr
+      : activeCardPlan.nameEn
+    : activeCardSubscription?.plan_code ?? '';
+  const cardRenewalLabel = activeCardSubscription
+    ? new Date(activeCardSubscription.current_period_end).toLocaleDateString(
+        isAr ? 'ar-EG' : 'en-GB',
+        { year: 'numeric', month: 'long', day: 'numeric' }
+      )
+    : '';
+
+  const cardStatus = activeCardSubscription?.status ?? null;
+  const cardStatusLabel =
+    cardStatus === 'active' || cardStatus === 'trialing'
+      ? t('Active')
+      : cardStatus === 'past_due'
+        ? t('Payment failed')
+        : cardStatus === 'unpaid'
+          ? t('Unpaid')
+          : cardStatus === 'incomplete'
+            ? t('Payment incomplete')
+            : cardStatus === 'incomplete_expired'
+              ? t('Expired')
+              : cardStatus === 'canceled'
+                ? t('Cancelled')
+                : cardStatus === 'paused'
+                  ? t('Paused')
+                  : null;
+  const cardStatusTone =
+    cardStatus === 'active' || cardStatus === 'trialing'
+      ? 'bg-emerald-500/15 text-emerald-600'
+      : cardStatus === 'past_due' || cardStatus === 'unpaid' || cardStatus === 'incomplete'
+        ? 'bg-amber-500/15 text-amber-600'
+        : 'bg-surface-raised text-muted';
+  const cardNeedsPaymentMethod =
+    cardStatus === 'past_due' || cardStatus === 'unpaid' || cardStatus === 'incomplete';
+  const cardPeriodLabel = activeCardSubscription
+    ? activeCardSubscription.cancel_at_period_end
+      ? `${t('Cancels on')} ${cardRenewalLabel}`
+      : cardStatus === 'active' || cardStatus === 'trialing'
+        ? `${t('Renews on')} ${cardRenewalLabel}`
+        : cardStatus === 'canceled' || cardStatus === 'incomplete_expired'
+          ? `${t('Ended on')} ${cardRenewalLabel}`
+          : `${t('Current period ends')} ${cardRenewalLabel}`
+    : t('Your saved card can be reused for future purchases.');
+
+  const stripeReady = Boolean(stripeStatus?.checkoutReady);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
@@ -178,7 +312,13 @@ export const PricingView: React.FC = () => {
           {t('Choose the plan that fits your career ambitions')}
         </h1>
         <p className="text-base sm:text-lg text-muted leading-relaxed">
-          خطط عادلة وبسيطة بالجنيه المصري، تقبل التحويل الفوري عبر فودافون كاش وإنستاباي مع تفعيل فوري بدون بطاقات ائتمان بنكية دولية.
+          {stripeReady
+            ? isAr
+              ? 'خطط عادلة وبسيطة بالجنيه المصري: تحويل فوري عبر فودافون كاش وإنستاباي، أو دفع آمن بالبطاقة البنكية عبر Stripe.'
+              : 'Fair, simple plans in Egyptian pounds: instant Vodafone Cash or InstaPay transfer, or secure card payment via Stripe.'
+            : isAr
+              ? 'خطط عادلة وبسيطة بالجنيه المصري مع تحويل فوري عبر فودافون كاش أو إنستاباي.'
+              : 'Fair, simple plans in Egyptian pounds with instant Vodafone Cash or InstaPay transfer.'}
         </p>
 
         {/* Billing Cycle Switcher */}
@@ -212,6 +352,135 @@ export const PricingView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Post-checkout banner */}
+      {checkoutNotice && (
+        <div
+          className={`max-w-3xl mx-auto w-full rounded-2xl border p-4 flex items-start gap-3 ${
+            checkoutNotice === 'success'
+              ? 'border-emerald-500/25 bg-emerald-500/10'
+              : 'border-amber-500/25 bg-amber-500/10'
+          }`}
+          role="status"
+        >
+          <div
+            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+              checkoutNotice === 'success'
+                ? 'bg-emerald-500/15 text-emerald-600'
+                : 'bg-amber-500/15 text-amber-600'
+            }`}
+          >
+            {checkoutNotice === 'success' ? (
+              <Check className="w-5 h-5" />
+            ) : (
+              <AlertCircle className="w-5 h-5" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0 text-sm leading-relaxed">
+            <div className="font-bold text-foreground">
+              {checkoutNotice === 'success'
+                ? t('Payment received')
+                : t('Card checkout cancelled')}
+            </div>
+            <p className="text-xs text-muted mt-0.5">
+              {checkoutNotice === 'success'
+                ? t(
+                    'Your plan and credits activate as soon as Stripe confirms the payment — usually within a few seconds.'
+                  )
+                : t('Nothing was charged. You can try again, or pay with Vodafone Cash or InstaPay.')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCheckoutNotice(null)}
+            className="p-1 rounded-lg text-muted hover:text-foreground transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Return from the Customer Portal: state has been refreshed above. */}
+      {portalNotice && (
+        <div
+          className="max-w-3xl mx-auto w-full rounded-2xl border border-blue-500/25 bg-blue-500/10 p-4 flex items-start gap-3"
+          role="status"
+        >
+          <div className="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-600 flex items-center justify-center shrink-0">
+            <Check className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0 text-sm leading-relaxed">
+            <div className="font-bold text-foreground">{t('Billing updated')}</div>
+            <p className="text-xs text-muted mt-0.5">
+              {t('Your subscription and payment method changes have been refreshed from Stripe.')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPortalNotice(false)}
+            className="p-1 rounded-lg text-muted hover:text-foreground transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Card subscription & billing portal */}
+      {(activeCardSubscription || stripeStatus?.customerId) && (
+        <div
+          className={`max-w-3xl mx-auto w-full rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${
+            cardNeedsPaymentMethod
+              ? 'border-amber-500/30 bg-amber-500/10'
+              : 'border-border bg-surface-raised'
+          }`}
+        >
+          <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
+            <CreditCard className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0 text-sm">
+            <div className="font-bold text-foreground flex flex-wrap items-center gap-2">
+              <span>
+                {activeCardSubscription ? `${t('Card subscription')} · ${cardPlanLabel}` : t('Card billing')}
+              </span>
+              {cardStatusLabel && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${cardStatusTone}`}>
+                  {cardStatusLabel}
+                </span>
+              )}
+              {stripeStatus?.testMode && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] font-extrabold uppercase tracking-wider">
+                  {t('Test mode')}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted mt-0.5">{cardPeriodLabel}</p>
+            {cardNeedsPaymentMethod && (
+              <p className="text-xs text-amber-700 mt-1">
+                {t('Stripe could not collect the latest payment. Update your card to restore access.')}
+              </p>
+            )}
+            {billingError && (
+              <p className="text-xs text-red-500 mt-1">{billingError}</p>
+            )}
+          </div>
+          {stripeStatus?.customerId && (
+            <button
+              type="button"
+              onClick={handleManageBilling}
+              disabled={billingBusy}
+              className="px-4 py-2 rounded-xl border border-border bg-surface text-xs font-bold text-foreground hover:bg-border/60 disabled:opacity-50 transition-colors shrink-0"
+            >
+              {billingBusy
+                ? '...'
+                : cardNeedsPaymentMethod
+                  ? t('Update payment method')
+                  : t('Manage billing')}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Pricing Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
@@ -381,28 +650,42 @@ export const PricingView: React.FC = () => {
         </div>
       </div>
 
-      {/* Egyptian Payment Methods Banner */}
+      {/* Payment Methods Banner */}
       <div className="p-8 rounded-3xl bg-gradient-to-r from-primary/5 via-surface to-primary/5 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-2 text-start">
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary shrink-0" />
             <h3 className="text-lg font-bold text-foreground">
-              طرق دفع محلية آمنة ١٠٠٪ بدون بطاقات ائتمانية دولية
+              {stripeReady
+                ? t('Secure local payment methods — and card payment via Stripe')
+                : t('Secure local payment methods')}
             </h3>
           </div>
           <p className="text-xs text-muted max-w-xl leading-relaxed">
-            ادفع مباشرة عبر محفظة فودافون كاش أو تطبيق إنستاباي. يتم تفعيل الوصول المؤقت فور رفع إيصال التحويل مع المراجعة البشرية الدقيقة لضمان أمان كل عملية.
+            {stripeReady
+              ? t(
+                  'Pay directly with Vodafone Cash or InstaPay, or by card on Stripe’s secure page. Wallet access is activated after the receipt is reviewed; a card subscription activates as soon as Stripe confirms the payment.'
+                )
+              : t(
+                  'Pay directly with Vodafone Cash or InstaPay. Access is activated after the receipt is reviewed.'
+                )}
           </p>
         </div>
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
             <Smartphone className="w-5 h-5 text-red-600" />
             <span className="text-xs font-bold text-foreground">Vodafone Cash</span>
           </div>
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
-            <CreditCard className="w-5 h-5 text-purple-600" />
+            <Landmark className="w-5 h-5 text-purple-600" />
             <span className="text-xs font-bold text-foreground">InstaPay</span>
           </div>
+          {stripeReady && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
+              <CreditCard className="w-5 h-5 text-blue-600" />
+              <span className="text-xs font-bold text-foreground">Visa / Mastercard</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -427,6 +710,15 @@ export const PricingView: React.FC = () => {
               بمجرد إدخال الرقم المرجعي للتحويل ورفع لقطة الشاشة للإيصال، يمنحك النظام وصولاً مؤقتاً لمدة ٢٤ ساعة لمتابعة مهامك على الفور، بينما يقوم المشرف بالتأكيد النهائي خلال ساعات العمل.
             </p>
           </div>
+
+          {stripeReady && (
+            <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
+              <h4 className="font-bold text-sm text-foreground">هل يمكنني الدفع بالبطاقة البنكية؟</h4>
+              <p className="text-xs text-muted leading-relaxed">
+                نعم. اختر «بطاقة بنكية» عند الاشتراك لتنتقل إلى صفحة Stripe الآمنة لإدخال بيانات البطاقة. المنصة لا ترى رقم بطاقتك ولا تخزنه، ويتفعل الاشتراك تلقائياً بعد تأكيد الدفع، ويمكنك إدارة البطاقة أو إلغاء التجديد من زر «إدارة الفواتير» في صفحة الأسعار.
+              </p>
+            </div>
+          )}
 
           <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
             <h4 className="font-bold text-sm text-foreground">ماذا يحدث إذا فشل استدعاء الذكاء الاصطناعي؟ هل أخسر رصيدي؟</h4>

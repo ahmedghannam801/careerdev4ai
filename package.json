@@ -30,7 +30,9 @@
     "cf:jobs:secrets": "node scripts/prepare-worker-secrets.mjs && wrangler secret bulk .wrangler-secrets.json -c worker/jobs/wrangler.jsonc",
     "cf:jobs:dev": "npm run build:jobs && wrangler dev -c worker/jobs/wrangler.jsonc",
     "cf:jobs:deploy": "npm run build:jobs && wrangler deploy -c worker/jobs/wrangler.jsonc",
-    "cf:jobs:tail": "wrangler tail -c worker/jobs/wrangler.jsonc"
+    "cf:jobs:tail": "wrangler tail -c worker/jobs/wrangler.jsonc",
+    "stripe:sync": "tsx scripts/stripe-sync-catalog.ts",
+    "stripe:listen": "npx --yes stripe@latest listen --forward-to localhost:3000/api/stripe/webhook"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

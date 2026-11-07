@@ -104,4 +104,91 @@ export const subscriptionsAr: Record<string, string> = {
   'Grant Credits': 'منح الرصيد',
   'Amount (Credits)': 'الكمية (نقطة)',
   'Reason for Grant': 'سبب المنح',
+
+  // Card payments (Stripe)
+  'Card': 'بطاقة بنكية',
+  'Continue to secure card payment': 'المتابعة إلى الدفع الآمن بالبطاقة',
+  'Card payments are not available right now. Please choose Vodafone Cash or InstaPay.':
+    'الدفع بالبطاقة غير متاح حالياً. يرجى اختيار فودافون كاش أو إنستاباي.',
+  'Failed to start card checkout': 'تعذر بدء الدفع بالبطاقة',
+  'You will enter your card details and any promotion code on Stripe’s secure page. We never see or store your card number.':
+    'ستُدخل بيانات بطاقتك وأي كود خصم في صفحة Stripe الآمنة. نحن لا نرى رقم بطاقتك ولا نخزنه.',
+  'Charged in Egyptian pounds on Stripe. Your bank may add a cross-border or currency-conversion fee.':
+    'يُحصَّل المبلغ بالجنيه المصري عبر Stripe. قد يضيف بنكك رسوم تحويل دولي أو فرق عملة.',
+  'Payment received': 'تم استلام الدفع',
+  'Card checkout cancelled': 'تم إلغاء الدفع بالبطاقة',
+  'Your plan and credits activate as soon as Stripe confirms the payment — usually within a few seconds.':
+    'يتم تفعيل خطتك ورصيدك بمجرد تأكيد Stripe للدفع — عادةً خلال ثوانٍ.',
+  'Nothing was charged. You can try again, or pay with Vodafone Cash or InstaPay.':
+    'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى، أو الدفع عبر فودافون كاش أو إنستاباي.',
+  'Card subscription': 'اشتراك البطاقة',
+  'Cancels on': 'يُلغى في',
+  'Renews on': 'يتجدد في',
+  'Test mode': 'وضع الاختبار',
+  'Manage billing': 'إدارة الفواتير',
+  'Failed to open the billing portal': 'تعذر فتح بوابة إدارة الفواتير',
+  'Card invoices (Stripe)': 'فواتير البطاقات (Stripe)',
+  'paid invoices': 'فواتير مدفوعة',
+  'test-mode invoices are excluded from revenue': 'فاتورة اختبار مستبعدة من الإيرادات',
+  'Stripe invoice history is not available on this deployment.':
+    'سجل فواتير Stripe غير متاح على هذا الإصدار.',
+  'No card invoices yet. Test-mode invoices are listed here but excluded from revenue.':
+    'لا توجد فواتير بطاقات بعد. تُعرض فواتير وضع الاختبار هنا لكنها مستبعدة من الإيرادات.',
+  'Test': 'اختبار',
+  'Open invoice': 'فتح الفاتورة',
+
+  // Card subscription states and portal return
+  'Card billing': 'فواتير البطاقة',
+  'Payment failed': 'فشل الدفع',
+  'Unpaid': 'غير مدفوع',
+  'Payment incomplete': 'الدفع غير مكتمل',
+  'Expired': 'منتهي',
+  'Cancelled': 'ملغي',
+  'Paused': 'متوقف مؤقتاً',
+  'Ended on': 'انتهى في',
+  'Current period ends': 'تنتهي الفترة الحالية في',
+  'Your saved card can be reused for future purchases.':
+    'يمكن إعادة استخدام بطاقتك المحفوظة للمشتريات القادمة.',
+  'Billing updated': 'تم تحديث الفواتير',
+  'Your subscription and payment method changes have been refreshed from Stripe.':
+    'تم تحديث حالة اشتراكك وطريقة الدفع من Stripe.',
+  'Stripe could not collect the latest payment. Update your card to restore access.':
+    'تعذر على Stripe تحصيل الدفعة الأخيرة. حدّث بطاقتك لاستعادة الوصول.',
+  'Update payment method': 'تحديث طريقة الدفع',
+  'Secure local payment methods — and card payment via Stripe':
+    'طرق دفع محلية آمنة — ودفع بالبطاقة عبر Stripe',
+  'Secure local payment methods': 'طرق دفع محلية آمنة',
+  'Pay directly with Vodafone Cash or InstaPay, or by card on Stripe’s secure page. Wallet access is activated after the receipt is reviewed; a card subscription activates as soon as Stripe confirms the payment.':
+    'ادفع مباشرة عبر فودافون كاش أو إنستاباي، أو بالبطاقة على صفحة Stripe الآمنة. يتم تفعيل الوصول بعد مراجعة الإيصال، ويتفعل اشتراك البطاقة بمجرد تأكيد Stripe للدفع.',
+  'Pay directly with Vodafone Cash or InstaPay. Access is activated after the receipt is reviewed.':
+    'ادفع مباشرة عبر فودافون كاش أو إنستاباي. يتم تفعيل الوصول بعد مراجعة الإيصال.',
+
+  // Admin revenue additions
+  'Refresh': 'تحديث',
+  'From date': 'من تاريخ',
+  'To date': 'إلى تاريخ',
+  'Apply': 'تطبيق',
+  'All time': 'كل الفترات',
+  'Net collected revenue': 'صافي الإيرادات المحصلة',
+  'After refunds': 'بعد خصم المبالغ المستردة',
+  'Gross collected': 'إجمالي التحصيل',
+  'Before refunds': 'قبل المبالغ المستردة',
+  'Refunds': 'المبالغ المستردة',
+  'refunds': 'عملية استرداد',
+  'pending': 'قيد الانتظار',
+  'failed': 'فاشلة',
+  'refunded': 'مستردة',
+  'Revenue by payment method': 'الإيرادات حسب طريقة الدفع',
+  'Subscription revenue': 'إيرادات الاشتراكات',
+  'Credit pack revenue': 'إيرادات حزم النقاط',
+  'Credit packs': 'حزم النقاط',
+  'Credit pack': 'حزمة نقاط',
+  'Pending': 'قيد الانتظار',
+  'Failed': 'فاشلة',
+  'Disputes': 'النزاعات',
+  'Recent card refunds': 'أحدث عمليات استرداد البطاقات',
+  'Wallet transactions (Vodafone Cash / InstaPay)':
+    'معاملات المحافظ (فودافون كاش / إنستاباي)',
+  'No wallet transactions in this period.': 'لا توجد معاملات محافظ في هذه الفترة.',
+  'No reference': 'بدون رقم مرجعي',
 };

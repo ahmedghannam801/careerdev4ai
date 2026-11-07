@@ -457,13 +457,83 @@ export interface AdminPaymentRow {
   };
 }
 
+export interface AdminStripeInvoiceRow {
+  id: string;
+  number: string | null;
+  status: string | null;
+  amountPaidPiasters: number;
+  amountDuePiasters: number;
+  currency: string;
+  livemode: boolean;
+  paid: boolean;
+  planCode: string | null;
+  purchaseKind: string | null;
+  paidAt: string | null;
+  hostedInvoiceUrl: string | null;
+}
+
+export interface AdminStripeRefundRow {
+  id: string;
+  amountPiasters: number;
+  currency: string;
+  status: string | null;
+  reason: string | null;
+  livemode: boolean;
+  createdAt: string | null;
+  invoiceId: string | null;
+}
+
+export interface AdminStripeRevenue {
+  available: boolean;
+  /** True when the server is using a `sk_test_...` key. */
+  testMode: boolean;
+  paidInvoiceCount: number;
+  paidGrossPiasters: number;
+  refundedPiasters: number;
+  testInvoiceCount: number;
+  pendingInvoiceCount: number;
+  failedInvoiceCount: number;
+  subscriptionRevenuePiasters: number;
+  packRevenuePiasters: number;
+  recentInvoices: AdminStripeInvoiceRow[];
+  recentRefunds: AdminStripeRefundRow[];
+  disputeCount: number;
+  disputedPiasters: number;
+}
+
+export interface AdminOfflineTransaction {
+  reference: string | null;
+  method: string;
+  amountPiasters: number;
+  status: string;
+  paidAt: string | null;
+  createdAt: string | null;
+}
+
+export interface AdminOfflineRevenue {
+  refundedPiasters: number;
+  refundCount: number;
+  pendingCount: number;
+  failedCount: number;
+  recentTransactions: AdminOfflineTransaction[];
+}
+
 export interface AdminRevenueMetrics {
+  dateRange: { from: string | null; to: string | null };
   totalCollectedPiasters: number;
+  grossCollectedPiasters: number;
+  refundedPiasters: number;
   totalCollectedEgp: number;
   transactionCount: number;
   breakdownByMethodPiasters: Record<string, number>;
   breakdownByPlanPiasters: Record<string, number>;
   breakdownByCyclePiasters: Record<string, number>;
+  breakdownBySourcePiasters: Record<string, number>;
+  pendingPaymentCount: number;
+  failedPaymentCount: number;
+  refundCount: number;
+  stripe?: AdminStripeRevenue;
+  offline?: AdminOfflineRevenue;
 }
 
 export async function fetchAdminSubscriptions(): Promise<AdminSubscriptionRow[]> {
@@ -517,8 +587,15 @@ export async function restoreAdminPayment(
   );
 }
 
-export async function fetchAdminRevenue(): Promise<AdminRevenueMetrics> {
-  const data = await request<{ metrics: AdminRevenueMetrics }>('/api/admin/revenue');
+export async function fetchAdminRevenue(filter?: {
+  from?: string;
+  to?: string;
+}): Promise<AdminRevenueMetrics> {
+  const params = new URLSearchParams();
+  if (filter?.from) params.set('from', filter.from);
+  if (filter?.to) params.set('to', filter.to);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const data = await request<{ metrics: AdminRevenueMetrics }>(`/api/admin/revenue${query}`);
   return data.metrics;
 }
 

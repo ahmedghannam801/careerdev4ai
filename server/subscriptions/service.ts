@@ -11,6 +11,7 @@ import {
   cancelSubscription,
 } from '../db/subscriptions.ts';
 import { getActiveTemporaryAccessPayment } from '../db/payments.ts';
+import { getActiveStripeSubscription } from '../stripe/store.ts';
 import type {
   SubscriptionDTO,
   SubscriptionPlanDTO,
@@ -35,11 +36,30 @@ export interface UserSubscriptionSummary {
 export async function getUserSubscriptionSummary(
   profileId: string
 ): Promise<UserSubscriptionSummary> {
-  const [activeSub, tempPayment, history] = await Promise.all([
+  const [activeSub, tempPayment, history, stripeSub] = await Promise.all([
     getActiveSubscription(profileId),
     getActiveTemporaryAccessPayment(profileId),
     listSubscriptionsForUser(profileId),
+    getActiveStripeSubscription(profileId),
   ]);
+
+  // Card subscriptions live in their own mirror because Stripe, not an
+  // administrator, owns their lifecycle. Reporting them here keeps the pricing
+  // page and the settings page correct without a second API call.
+  if (stripeSub) {
+    const plan = await getPlanByCode(stripeSub.plan_code);
+    return {
+      planCode: stripeSub.plan_code as SubscriptionPlanCode,
+      planNameEn: plan?.nameEn ?? stripeSub.plan_code,
+      planNameAr: plan?.nameAr ?? stripeSub.plan_code,
+      status: 'active',
+      activeSubscription: null,
+      temporaryPaymentId: null,
+      expiresAt: stripeSub.current_period_end,
+      autoRenew: !stripeSub.cancel_at_period_end,
+      history,
+    };
+  }
 
   if (activeSub && activeSub.status === 'active') {
     return {

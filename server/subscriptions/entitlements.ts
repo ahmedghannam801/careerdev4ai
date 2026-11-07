@@ -8,6 +8,7 @@ import type { Response, NextFunction } from 'express';
 import type { AuthedRequest } from '../auth/require-auth.ts';
 import { getActiveSubscription } from '../db/subscriptions.ts';
 import { getActiveTemporaryAccessPayment } from '../db/payments.ts';
+import { getActiveStripeSubscription } from '../stripe/store.ts';
 import {
   type EntitlementFeature,
   type SubscriptionPlanCode,
@@ -44,6 +45,19 @@ const HIGH_RISK_TEMPORARY_RESTRICTIONS = new Set<EntitlementFeature>([
  */
 export async function getUserEffectivePlan(profileId: string): Promise<EffectivePlanState> {
   try {
+    // A card subscription bought through Stripe is the strongest signal: Stripe
+    // has already collected the money and manages the renewal. It is checked
+    // before the manual rails so a candidate who pays by card unlocks the plan
+    // the moment the webhook lands.
+    const stripeSub = await getActiveStripeSubscription(profileId);
+    if (stripeSub) {
+      return {
+        planCode: stripeSub.plan_code as SubscriptionPlanCode,
+        isTemporary: false,
+        expiresAt: stripeSub.current_period_end,
+      };
+    }
+
     const activeSub = await getActiveSubscription(profileId);
     if (activeSub && activeSub.status === 'active') {
       return {

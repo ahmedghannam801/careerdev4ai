@@ -305,6 +305,13 @@ async function main() {
     // events, the rejected values, and one account's history staying private
     // from another.
     join(TESTS_DIR, 'feedback-api.test.ts'),
+    // Stripe: the form encoder, the catalogue, the lookup keys and webhook
+    // signature verification. Pure: no key and no database are needed.
+    join(TESTS_DIR, 'stripe-billing.test.ts'),
+    // Stripe lifecycle: the exact rules that decide whether a verified event
+    // grants an entitlement, grants credits once, or is acknowledged because
+    // retrying cannot fix it. Dependency-injected: no key or database.
+    join(TESTS_DIR, 'stripe-lifecycle.test.ts'),
     // The CV studio's writing assistant and the document it builds from the
     // platform's records. Pure, like the two above: no database needed.
     join(TESTS_DIR, 'cv-studio.test.ts'),
