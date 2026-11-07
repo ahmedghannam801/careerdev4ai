@@ -3,9 +3,9 @@
 **This file is the single source of truth for the Stripe configuration of
 CareerDev4AI.** If a Stripe value is set anywhere, it is described here.
 
-Status: **integrated, configured locally in test mode, and verified against the
-live Stripe test API.** Not yet live — the production activation steps are in
-[Going live](#going-live).
+Status: **integrated, configured in production in test mode, and verified
+against the live Stripe test API.** Not live — the production key is a test
+key, and the production activation steps are in [Going live](#9-going-live).
 
 ---
 
@@ -267,8 +267,10 @@ guess.
 
 ## 8. Test mode
 
-The local `.env` carries a test key and a test webhook secret, and both were
-verified against the live Stripe test API:
+The local `.env` carries a test key and a test webhook secret, and so does
+the production deployment — which is why the card option is already visible
+in production and why it takes a test card there. Both were verified
+against the live Stripe test API:
 
 - the key authenticates (`GET /v1/prices` → `200`);
 - the account serves API version `2026-10-28.endive`;
@@ -294,8 +296,10 @@ CVC and postal code.
 
 ## 9. Going live
 
-**Stripe is not live.** These steps are still to be done, and until they are
-done the card option stays hidden in production.
+**Stripe is not live.** The card option is available in production, but it
+runs against Stripe's *test* account: the key on the deployment is a test
+key, so a card entered there is a test card and no money moves. These steps
+are still to be done before a real payment can be taken.
 
 1. **Create the live products and prices.** Run `npm run stripe:sync` with a
    live key so the lookup keys exist in live mode too. Live Price IDs are
@@ -309,7 +313,9 @@ done the card option stays hidden in production.
    `STRIPE_ALLOW_LIVE=true`. The last one is required: a live key without it
    is a configuration error and card payments stay off.
 4. **Deploy the environment**: `node scripts/set-pages-env.mjs`, then
-   `npm run cf:deploy`.
+   `npm run cf:deploy`. The script sends the two Stripe secrets when `.env`
+   names them and leaves them out when it does not, so a deployment without
+   card payments can still ship.
 5. **Verify the live endpoint** before announcing it:
    - `GET /api/stripe/status` reports `mode: "live"`, `configured: true`,
      `checkoutReady: true` and no errors;
@@ -327,12 +333,12 @@ done the card option stays hidden in production.
 
 | Item | State |
 | --- | --- |
-| Live Stripe key | **Not set.** Only a test key exists, and it is not deployed to Cloudflare. |
-| Live webhook signing secret | **Not set.** The Dashboard endpoint for production has not been created. |
-| `STRIPE_ALLOW_LIVE=true` | **Not set.** Deliberately. |
+| Production Stripe key | **Present, and it is a test key.** `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are set as secrets on the Cloudflare Pages project, so the card option appears in production. |
+| Production Stripe mode | **Test.** The mode is decided by the key: `sk_test_` means test. A `sk_live_` key is refused unless `STRIPE_ALLOW_LIVE=true`, so production cannot take a real card payment by accident. |
+| `STRIPE_ALLOW_LIVE=true` | **Not set.** Deliberately. Card payments in production therefore run against Stripe's test account. |
 | Live Price IDs | **Not created.** The test Prices exist; run `npm run stripe:sync` with a live key. |
-| Live webhook endpoint | **Not created.** |
-| Stripe in the production deployment | **Not enabled.** `scripts/set-pages-env.mjs` now sends the two Stripe secrets when `.env` names them; until `.env` names a live pair, the card option stays hidden in production and the wallet rails are unaffected. |
+| Live webhook endpoint | **Not created.** The endpoint that exists was built for the test key. |
+| Live webhook signing secret | **Not set.** The one on the deployment belongs to the test endpoint. |
 
 Everything else — the client, the routes, the signature verification, the
 idempotent grants, the Checkout Studio parameters, the Prices, the catalogue

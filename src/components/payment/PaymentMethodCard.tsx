@@ -47,7 +47,7 @@ export const PaymentMethodCard: React.FC<PaymentMethodCardProps> = ({
       onClick={onSelect}
       disabled={disabled}
       aria-pressed={selected}
-      className={`group relative isolate flex w-full items-center gap-3 overflow-hidden rounded-2xl border p-3 text-start transition-[border-color,box-shadow,background-color] duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`group relative isolate flex w-full flex-col items-start gap-2.5 overflow-hidden rounded-2xl border p-3 text-start transition-[border-color,box-shadow,background-color] duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
         selected
           ? 'border-[var(--accent-primary)] ring-2 ring-[var(--accent-primary)]/25'
           : 'border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-secondary)]'
@@ -68,20 +68,11 @@ export const PaymentMethodCard: React.FC<PaymentMethodCardProps> = ({
         />
       )}
 
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">
-        {mark}
-      </span>
-
-      <span className="relative min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold text-[var(--text-primary)]">{title}</span>
-        {subtitle ? (
-          <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{subtitle}</span>
-        ) : null}
-      </span>
-
+      {/* The tick sits in the corner of the card, so the name of the method
+          gets the whole width of the card under its mark. */}
       <span
         aria-hidden="true"
-        className={`relative ms-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${
+        className={`absolute end-3 top-3 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${
           selected
             ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
             : 'border-[var(--border-subtle)]'
@@ -101,6 +92,25 @@ export const PaymentMethodCard: React.FC<PaymentMethodCardProps> = ({
             <Check className="h-3 w-3" />
           </motion.span>
         )}
+      </span>
+
+      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">
+        {mark}
+      </span>
+
+      {/* The name of the method is on its own line under the mark, because a
+          three-column grid is not wide enough to hold a mark, a radio and a
+          brand name side by side — and a brand name that is cut in half is
+          the one thing the customer needs to read. */}
+      <span className="relative block w-full min-w-0">
+        <span className="block text-sm font-bold leading-tight text-[var(--text-primary)] break-words">
+          {title}
+        </span>
+        {subtitle ? (
+          <span className="mt-0.5 block text-[11px] font-medium leading-tight text-[var(--text-muted)] break-words">
+            {subtitle}
+          </span>
+        ) : null}
       </span>
     </motion.button>
   );
