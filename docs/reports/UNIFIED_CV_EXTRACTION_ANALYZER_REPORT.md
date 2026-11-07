@@ -543,15 +543,17 @@ this work's; the message is not.
 ## 15. The deployment
 
 `main` is what Cloudflare Pages serves. The deployment that carries this work
-is `30086f63` on the `careerdev4ai` project, and the canonical
+is `c4db4019` on the `careerdev4ai` project, and the canonical
 `careerdev4ai.pages.dev` serves it.
 
 What was verified against the live site:
 
 - `GET /` answers 200 and loads the application.
-- The served entry chunk carries the new review screen — `Import & Review`,
-  `Read again`, `Where this came from`, `Apply this CV` and `Accept the
-  high-confidence values`.
+- The served entry chunk is `index-p1l9CEkl.js`, which is the chunk the build
+  of the final commit produced — the same bytes, not merely the same commit.
+- That chunk carries the new review screen — `Import & Review`, `Read again`,
+  `Where this came from`, `Apply this CV` and `Accept the high-confidence
+  values`.
 - `POST /api/cv/extract`, `POST /api/cv/extract/section`,
   `POST /api/cv/import/reviewed`, `POST /api/cv/analysis` and
   `POST /api/resumes/upload` all answer **401** without a session. That is
