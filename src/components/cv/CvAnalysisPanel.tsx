@@ -11,6 +11,10 @@
  * measures it, streams the stages as they happen, shows the report, and
  * lists the measurements that have been taken before.
  *
+ * A file is only read. Measuring a file does not put it in the account and
+ * does not make it the candidate's CV: the file the candidate already has
+ * stays where it is until they accept a document in the review screen.
+ *
  * The measurement itself is deterministic: it is counted from the document,
  * not described by a model, so the same CV always produces the same score
  * and the score never depends on a provider being available. The model's own
@@ -41,6 +45,7 @@ import {
   streamMeasuredAnalysis,
   type MeasurementRecord,
 } from '../../lib/cvAnalysisApi';
+import { extractCv } from '../../lib/cvExtractionApi';
 import { useCareer } from '../../context/CareerContext';
 import { CvMeasurementReport } from './CvMeasuredAnalysis';
 
@@ -71,8 +76,13 @@ interface CvAnalysisPanelProps {
   onMeasured?: (report: CvAnalysisReport) => void;
 }
 
-const ACCEPTED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-const ACCEPTED_EXTENSIONS = ['.pdf', '.docx'];
+const ACCEPTED_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'application/vnd.ms-word',
+];
+const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.doc'];
 
 function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -87,7 +97,7 @@ export const CvAnalysisPanel: React.FC<CvAnalysisPanelProps> = ({
   showUpload = false,
   onMeasured,
 }) => {
-  const { t, targetRole, cvVersions, uploadCvFile } = useCareer();
+  const { t, targetRole, cvVersions } = useCareer();
   const [stageStates, setStageStates] = useState<Record<string, StageState>>({});
   const [report, setReport] = useState<CvAnalysisReport | null>(null);
   const [history, setHistory] = useState<MeasurementRecord[]>([]);
@@ -179,36 +189,36 @@ export const CvAnalysisPanel: React.FC<CvAnalysisPanelProps> = ({
     [jobDescription, onMeasured, onStage, refreshHistory, resetStages, t, targetRole.title]
   );
 
-  /** Uploads the chosen file, then measures the version it produced. */
+  /**
+   * Reads the chosen file and measures the document it holds.
+   *
+   * The file is only read. It is not uploaded into the account and it does
+   * not become the candidate's CV: measuring a file must not replace the CV
+   * they already have. Adopting a document is the review screen's job, and
+   * that is where the candidate decides.
+   */
   const analyseUploadedFile = useCallback(async () => {
     if (!file) return;
     setError(null);
     setPhase('analysing');
 
-    const uploaded = await uploadCvFile(file);
-    if (!uploaded.success) {
-      setError(uploaded.error ?? t('This CV could not be read. Please try another file.'));
+    let document: CVProfile;
+    try {
+      const read = await extractCv({ file });
+      document = read.document;
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : t('This CV could not be read. Please try another file.')
+      );
       setPhase('upload');
       return;
     }
-    if (uploaded.atsAnalysis?.overallScore !== undefined) {
-      setAtsScore(uploaded.atsAnalysis.overallScore);
-    }
-    // The stored version is measured when the upload produced one, so the run
-    // joins the CV's history. Otherwise the document itself is measured.
-    if (uploaded.cvVersionId) {
-      const next = { cvVersionId: uploaded.cvVersionId };
-      setSubject(next);
-      await measure(next);
-    } else if (uploaded.cv) {
-      const next = { cv: uploaded.cv };
-      setSubject(next);
-      await measure(next);
-    } else {
-      setError(t('The CV was uploaded but could not be measured.'));
-      setPhase('upload');
-    }
-  }, [file, measure, t, uploadCvFile]);
+
+    setSubject({ cv: document });
+    await measure({ cv: document });
+  }, [file, measure, t]);
 
   const analyseSavedCv = useCallback(async () => {
     if (!versionId) return;
@@ -331,11 +341,11 @@ export const CvAnalysisPanel: React.FC<CvAnalysisPanelProps> = ({
             <p className="text-sm text-[var(--text-secondary)]">
               {t('or click anywhere to choose a PDF file')}
             </p>
-            <p className="text-xs text-[var(--text-muted)]">{t('PDF or Word (.docx)')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('PDF or Word (.docx, .doc)')}</p>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept={[...ACCEPTED_EXTENSIONS, ...ACCEPTED_TYPES].join(',')}
               className="hidden"
               onChange={(event) => acceptFile(event.target.files?.[0] ?? null)}
             />

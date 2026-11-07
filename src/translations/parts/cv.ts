@@ -358,7 +358,7 @@ export const cvAr: Record<string, string> = {
   'Upload your CV': 'ارفع سيرتك الذاتية',
   'Drag your CV here': 'اسحب سيرتك هنا',
   'or click anywhere to choose a PDF file': 'أو انقر في أي مكان لاختيار ملف PDF',
-  'PDF or Word (.docx)': 'PDF أو Word (.docx)',
+  'PDF or Word (.docx, .doc)': 'PDF أو Word (.docx، .doc)',
   'Remove the file': 'إزالة الملف',
   'Your Profession / Job Title': 'ملك / مسمّى وظيفتك',
   'Job Type / Field You Want': 'نوع الوظيفة / المجال المطلوب',

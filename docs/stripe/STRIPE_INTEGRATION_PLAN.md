@@ -471,6 +471,27 @@ Webhook verification is confirmed from the Stripe Dashboard → Developers →
 Webhooks → the endpoint above → recent deliveries (all `200`) and by resending
 a test event.
 
+### Production verification (2026-11-07)
+
+| Check | Result |
+| --- | --- |
+| Deployed commit | `d4eb5ec` (Stripe work `8fc6efd`) |
+| Production root | `200`, app shell served |
+| `/api/stripe/status` unauthenticated | `401` (route present, auth enforced) |
+| `/api/stripe/diagnostics` unauthenticated | `401` |
+| `/api/stripe/checkout-session` unauthenticated | `401` |
+| `/api/stripe/webhook` with a forged signature | `400` (secret configured, signature enforced) |
+| Pages secrets | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_ACCOUNT_ID` stored encrypted |
+| Real signed test event (`stripe trigger checkout.session.completed`) | `pending_webhooks = 0`; recorded in `stripe_webhook_events` and acknowledged as `permanent:unknown_customer` because a trigger event carries no `profile_id` — the expected, safe outcome |
+| Deployed bundle | contains the new pricing (`Billing updated`, `Update payment method`, `checkoutReady`) and admin (`Net collected revenue`, `Recent card refunds`) strings |
+
+Note: the project's Git-connected Pages build fails on every commit (it
+precedes this work). Production is deployed with the direct-upload workflow
+(`npm run cf:deploy`, i.e. `wrangler pages deploy dist`), which is what
+produced the successful deployment above. The Git build should be fixed in
+the Cloudflare dashboard (build command and environment) before relying on
+push-to-deploy.
+
 ---
 
 ## 14. Test plan

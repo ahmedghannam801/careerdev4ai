@@ -21,7 +21,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { isAppRoute, isKnownRoute, buildRouteHash, parseRouteHash } from '../src/lib/routing.ts';
@@ -43,6 +43,7 @@ const studio = readFileSync(
 const app = readFileSync(join(REPO_ROOT, 'src', 'App.tsx'), 'utf-8');
 const shell = readFileSync(join(REPO_ROOT, 'src', 'components', 'layout', 'AppShell.tsx'), 'utf-8');
 const api = readFileSync(join(REPO_ROOT, 'src', 'lib', 'cvAnalysisApi.ts'), 'utf-8');
+const serverApp = readFileSync(join(REPO_ROOT, 'app.ts'), 'utf-8');
 
 describe('the CV Analyzer is a page of the application', () => {
   test('it has a route', () => {
@@ -148,6 +149,49 @@ describe('the analyzer handles the awkward cases', () => {
       button,
       /analyseUploadedFile/,
       'a re-analysis must not upload the file again: that would create a second CV'
+    );
+  });
+});
+
+describe('there is one way to bring a CV into the product', () => {
+  test('the studio sends the candidate to the review', () => {
+    // The header button used to open a modal that wrote the CV without
+    // showing anything first. It now opens the review tab, which is the
+    // journey that reads the document, shows what was found, and only then
+    // writes what the candidate accepted.
+    assert.match(studio, /setActiveTab\('review'\)/);
+    assert.doesNotMatch(studio, /CVImportModal/);
+  });
+
+  test('the modal that imported without review is gone', () => {
+    assert.equal(
+      existsSync(join(REPO_ROOT, 'src', 'components', 'cv', 'CVImportModal.tsx')),
+      false,
+      'the modal that wrote a CV without a review must not come back'
+    );
+  });
+
+  test('measuring a file does not put it in the account', () => {
+    // The analyzer's upload used to post to the upload route, which created
+    // a CV and made it the active one. A file that arrives is a file the
+    // candidate may want to look at; it must not replace the CV they have.
+    assert.match(panel, /extractCv/);
+    assert.doesNotMatch(panel, /uploadCvFile/);
+    assert.doesNotMatch(panel, /resumes\/upload/);
+  });
+
+  test('the upload route does not take over as the active CV', () => {
+    // The route stays: it is a public API and the production security check
+    // asks it for a 401. What it must not do is make its CV the candidate's
+    // active one behind their back.
+    const start = serverApp.indexOf("app.post('/api/resumes/upload'");
+    const end = serverApp.indexOf("app.post('/api/cv/extract'", start);
+    assert.ok(start >= 0 && end > start, 'the upload route must be present');
+    const route = serverApp.slice(start, end);
+    assert.doesNotMatch(
+      route,
+      /setActiveCv/,
+      "an upload must not replace the candidate's active CV"
     );
   });
 });

@@ -32,6 +32,15 @@ export interface ExtractCvOptions {
 
 export interface ExtractCvResponse {
   review: CvExtractionReview;
+  /**
+   * The document the reader found, in the shape the studio works with.
+   *
+   * It is a reading and not a change: the candidate's CV has not been
+   * touched. A caller that only wants to look at the CV — the analyzer
+   * measuring a file — uses this; a caller that wants the candidate to adopt
+   * it uses the review, and the import route.
+   */
+  document: CVProfile;
   extractionQuality: 'high' | 'medium' | 'low' | 'failed';
 }
 
@@ -62,6 +71,7 @@ export async function extractCv(
   const response = await apiRequest<{
     success: boolean;
     review: CvExtractionReview;
+    document: CVProfile;
     extractionQuality: ExtractCvResponse['extractionQuality'];
   }>('/api/cv/extract', {
     method: 'POST',
@@ -72,6 +82,7 @@ export async function extractCv(
 
   return {
     review: response.review,
+    document: response.document,
     extractionQuality: response.extractionQuality,
   };
 }

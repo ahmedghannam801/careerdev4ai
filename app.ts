@@ -29,6 +29,10 @@ import { parseStructuredCv } from './server/cv/parseStructuredCv.ts';
 // and everything that is wrong with it. It is built without writing
 // anything, so the candidate can look before they commit.
 import { buildExtractionReview } from './server/cv/extractionReview.ts';
+// The reading turned into the document shape, so a caller that only wants to
+// look at a CV — the analyzer measuring a file — can have it without the
+// candidate adopting anything.
+import { parsedCvToProfile } from './server/cv/parsedCvToProfile.ts';
 // The write half of the review: the candidate's own records, filled in from
 // a document they have accepted.
 import { applyReviewedImport } from './server/cv/reviewedImport.ts';
@@ -50,7 +54,6 @@ import {
 import { listCvMeasurements } from './server/db/cvMeasurements.ts';
 import { registerBackgroundJobRoutes } from './server/jobs/routes.ts';
 import { registerSubscriptionRoutes } from './server/subscriptions/routes.ts';
-import { registerStripeRoutes } from './server/stripe/routes.ts';
 import { requireEntitlement } from './server/subscriptions/entitlements.ts';
 import { requireCredits } from './server/credits/middleware.ts';
 import { boundedList } from './server/ai/boundedList.ts';
@@ -509,9 +512,6 @@ app.use((req: Request, res: Response, next: () => void) => {
 
   collectRequestBody(req)
     .then((buffer) => {
-      // Stripe signs the raw payload; re-serialising the parsed JSON would
-      // change whitespace and key order and invalidate the signature.
-      (req as Request & { rawBody?: Buffer }).rawBody = buffer;
       const text = buffer.toString('utf8');
       if (contentType === 'application/json') {
         if (text.length === 0) {
@@ -1647,7 +1647,11 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
       targetRoleTitle: req.body.targetRoleTitle || undefined,
       storagePath: storedFile?.path,
     });
-    await setActiveCv(userId, cvRow.id);
+    // The upload does not take over as the candidate's CV. A file that
+    // arrives is a file they may want to look at; making it the active CV
+    // would replace the one they already have without them asking. The
+    // reviewed import is where a document becomes the candidate's CV, and it
+    // says so in the response which CV it used.
     const version = await createCvVersion(userId, {
       cvId: cvRow.id,
       name: cvName,
@@ -1763,7 +1767,16 @@ app.post('/api/cv/extract', requireAuth, aiRateLimit, upload.single('file'), asy
       fileName: read.fileName,
     });
 
-    return res.json({ success: true, review, extractionQuality: quality.quality });
+    // The document comes back as well as the review. The review is what the
+    // candidate corrects; the document is what a caller that only wants to
+    // look at the CV needs. Both are readings: nothing has been written, and
+    // the candidate's own CV has not been touched.
+    return res.json({
+      success: true,
+      review,
+      document: parsedCvToProfile(parsed.cv),
+      extractionQuality: quality.quality,
+    });
   } catch (error) {
     console.error('[cv/extract] failed', error);
     return res.status(500).json({
@@ -7091,11 +7104,6 @@ app.patch(
 /* -------------------------------------------------------------------------- */
 registerSubscriptionRoutes(app);
 
-
-/* -------------------------------------------------------------------------- */
-/* Stripe card payments, subscriptions, and webhooks                          */
-/* -------------------------------------------------------------------------- */
-registerStripeRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* Public SEO pages                                                           */

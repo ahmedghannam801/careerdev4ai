@@ -11,7 +11,7 @@
 //   * the legacy JSON auth surface is gone (M-3)
 //   * a CV version can never be attached to another user's CV (S-3)
 //   * a CV upload must match its extension AND its declared MIME type (S-4),
-//     and .docx is not an accepted format (S-5)
+//     and a file that only claims to be a Word document is refused (S-5)
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -24,6 +24,7 @@ import {
   type TestUser,
 } from './helpers.ts';
 import { createCvVersion } from '../server/db/cvVersions.ts';
+import { writeLegacyDoc } from './fixtures/legacyDocWriter.mjs';
 
 let user: TestUser;
 
@@ -310,6 +311,58 @@ async function uploadCv(
   return { status: res.status, body };
 }
 
+/**
+ * Posts a file to the review route, which only reads.
+ *
+ * The review route is the one that answers what the reader found without
+ * writing anything, so it is the right place to prove that a document is
+ * read: no CV is created, no version is stored and no credit is spent.
+ */
+async function extractCv(
+  token: string,
+  fileName: string,
+  contentType: string,
+  content: Buffer | string
+): Promise<{ status: number; body: any }> {
+  const form = new FormData();
+  const bytes = typeof content === 'string' ? Buffer.from(content) : content;
+  form.append('file', new Blob([bytes], { type: contentType }), fileName);
+  const res = await fetch(`${process.env.TEST_API_BASE_URL}/api/cv/extract`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  let body: any = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  return { status: res.status, body };
+}
+
+/**
+ * A genuine legacy Word document.
+ *
+ * It is a real OLE2 compound file rather than a file with a .doc name, so
+ * the reader is exercised on the bytes it has to work with.
+ */
+function legacyDocBytes(): Buffer {
+  return writeLegacyDoc([
+    'NADIA HASSAN',
+    'Data Analyst',
+    'nadia.hassan@example.com',
+    '+20 100 555 7788',
+    'Cairo, Egypt',
+    '',
+    'EXPERIENCE',
+    'Data Analyst',
+    'Nile Analytics',
+    'March 2021 - Present',
+    'Built the reporting layer the sales team used every morning.',
+  ]);
+}
+
 describe('a CV version cannot be attached to another user\'s CV (S-3)', () => {
   test('the persistence layer refuses to write a version for an unowned CV', async () => {
     // The route checks the ownership before it calls the persistence layer,
@@ -413,15 +466,32 @@ describe('the CV upload format check (S-4, S-5)', () => {
     await deleteTestUser(uploadUser);
   });
 
-  test('a legacy .doc upload is rejected', async () => {
-    // Legacy binary .doc format is rejected; modern .docx or .pdf is required.
-    const res = await uploadCv(
+  test('a legacy .doc is read, and a file that only claims to be one is refused', async () => {
+    // The legacy Word format is a format the studio reads now, so the format
+    // check no longer turns it away. What is refused is a file that says it
+    // is a Word document and is not: the reader checks the compound-file
+    // signature before it reads anything out of it.
+    const fake = await uploadCv(
       uploadUser.token,
       'cv.doc',
       'application/msword'
     );
-    assert.equal(res.status, 400);
-    assert.match(res.body?.error ?? '', /\.pdf, \.docx, \.txt, or \.json/);
+    assert.equal(fake.status, 400);
+    assert.match(fake.body?.error ?? '', /not a Word document/);
+
+    // A real one is read. The review route only reads, so nothing is written
+    // and the candidate's CV is not touched.
+    const real = await extractCv(
+      uploadUser.token,
+      'cv.doc',
+      'application/msword',
+      legacyDocBytes()
+    );
+    assert.equal(real.status, 200);
+    const preview = (real.body?.review?.preview ?? [])
+      .map((block: { text?: string }) => block?.text ?? '')
+      .join('\n');
+    assert.match(preview, /NADIA HASSAN/, 'the reader must return the text it was given');
   });
 
   test('a file whose MIME type does not match its extension is rejected', async () => {

@@ -13,7 +13,6 @@ import { JobDescriptionPanel, type JobDescriptionPanelState } from '../cv/JobDes
 import { CvPreview } from '../cv/CvPreview';
 import { CvSectionEditor } from '../cv/CvSectionEditor';
 import { Reveal } from '../motion/Motion';
-import { CVImportModal } from '../cv/CVImportModal';
 import { CvMeasuredAnalysis } from '../cv/CvMeasuredAnalysis';
 import { CvAnalysisPanel } from '../cv/CvAnalysisPanel';
 import { CvReviewWorkspace } from '../cv/CvReviewWorkspace';
@@ -56,7 +55,6 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const [activeTab, setActiveTab] = useRouteParam<CvStudioTab>('tab', CV_STUDIO_TABS, 'editor');
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionName, setVersionName] = useState('');
-  const [showUploadModal, setShowUploadModal] = useState(false);
   // The measurement of this document. The editor shows the advice it holds
   // next to the section each piece of advice is about, so the two cannot
   // drift apart: they come from the same report.
@@ -173,7 +171,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowUploadModal(true)}
+            onClick={() => setActiveTab('review')}
             className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors"
           >
             <Upload className="w-3.5 h-3.5" />
@@ -641,11 +639,6 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         </div>
       )}
 
-      {/* Import / Paste Modal */}
-      <CVImportModal
-        isOpen={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-      />
       {aiProcessingModal}
     </Reveal>
   );
