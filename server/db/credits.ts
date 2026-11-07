@@ -64,7 +64,7 @@ function toDTO(row: CreditLedgerRow): CreditLedgerDTO {
  */
 export async function claimDailyCredits(
   profileId: string
-): Promise<DailyCreditState | null> {
+): Promise<(DailyCreditState & { balance: number }) | null> {
   const { data, error } = await getSupabaseServer().rpc('claim_daily_credits', {
     p_profile_id: profileId,
     p_amount: DAILY_CREDIT_ALLOWANCE,
@@ -81,6 +81,7 @@ export async function claimDailyCredits(
     daily_allowance?: number;
     expires_at?: string;
     email_verified?: boolean;
+    balance?: number;
   } | null;
 
   if (!result) return null;
@@ -107,6 +108,9 @@ export async function claimDailyCredits(
     remaining: result.daily_remaining ?? 0,
     resetAt: result.expires_at ?? new Date(Date.now() + 86_400_000).toISOString(),
     grantedToday: (result.granted ?? 0) > 0 || (result.daily_remaining ?? 0) > 0,
+    // The authoritative balance after the claim. The caller uses it, so the
+    // number the candidate sees is the number the ledger holds.
+    balance: result.balance ?? 0,
   };
 }
 
@@ -168,6 +172,9 @@ export async function getCreditBalance(profileId: string): Promise<CreditBalance
   //    two never race over the first ledger row, and it is the authoritative
   //    balance once it has run.
   const daily = await claimDailyCredits(profileId);
+  if (daily) {
+    balance = daily.balance;
+  }
 
   // 4. Get active subscription info
   const sub = await getActiveSubscription(profileId);

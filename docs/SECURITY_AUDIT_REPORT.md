@@ -17,13 +17,13 @@ server and the real database.
 
 | | |
 |---|---|
-| Findings raised | 12 |
-| Fixed and verified | 11 |
+| Findings raised | 13 |
+| Fixed and verified | 12 |
 | Accepted / documented | 1 (requires a Stripe Dashboard action) |
 | Critical | 1 (fixed) |
 | High | 3 (fixed) |
 | Medium | 5 (fixed) |
-| Low | 3 (fixed) |
+| Low | 4 (fixed) |
 
 ---
 
@@ -346,6 +346,38 @@ USD 15 one-time prices with **no lookup key**. They are not part of the
 catalogue and nothing in the application can select them, so they are inert.
 They should be archived from the Stripe Dashboard so the catalogue is the
 whole picture.
+
+---
+
+## F-13 — The balance the interface showed was one credit short
+
+**Severity: Low — fixed**
+
+**Affected:** `server/db/credits.ts`.
+
+**Finding.** Found by the production probe
+(`scripts/probe-deployed-api.mjs`) rather than by a unit test: the daily
+allowance was granted correctly and written to the ledger correctly, but the
+balance the candidate was shown was the one from *before* the grant. A new
+account reported 5 credits while its ledger held 6.
+
+The cause was ordering inside `getCreditBalance`: the trial grant set the
+balance, the daily claim then ran and returned the authoritative balance, but
+that returned balance was never assigned back to the value the response
+carried.
+
+**Why it mattered.** The number was wrong in the direction that is safe — it
+under-reported — so it could not be used to spend credits. But a candidate
+whose balance is shown short of what they hold cannot tell whether a payment
+has landed, which is exactly the doubt a payment screen exists to remove.
+
+**Fix.** The claim now carries the authoritative balance, and the response
+takes it.
+
+**Verification.** `scripts/probe-credit-balance.mjs` compares the reported
+balance with the ledger's `running_balance` on a real account: the reported
+balance, the second read and the ledger all read 6, and the ledger rows are
+the 5-credit trial grant followed by the 1-credit daily grant.
 
 ---
 
