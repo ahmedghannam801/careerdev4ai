@@ -458,45 +458,63 @@ and letting it finish rather than watching it.
 
 ---
 
-## 14. The commit, and what is not in it
+## 14. The commits
 
-A Stripe billing feature was written into this working tree by another piece
-of work while this one was in progress: `server/stripe/`,
-`src/lib/stripeApi.ts`, `scripts/stripe-sync-catalog.ts`, two Supabase
-migrations, and edits to `package.json`, the subscription modules,
-`PricingView`, `CheckoutModal`, `AdminRevenuePanel` and `adminApi`.
+The CV work is one commit:
 
-None of it is in this commit. Two files are shared, though — `app.ts` and
-`tests/runner.mjs` — and the Stripe work had put an import, a raw-body
-capture and a route registration into `app.ts`, and a test registration into
-the runner. Committing those files whole would have pushed a `main` whose
-`app.ts` imported a directory that was not committed.
+```
+eaac3f2  feat(cv): one workflow from an uploaded CV to the CV the candidate reviews
+```
 
-So the two shared files were staged without the other work's blocks. The
-copies were written with the same line-ending filter `git add` applies
-(`core.autocrlf=true`, no `.gitattributes`), hashed with `git hash-object
---path`, and put into the index with `git update-index`. The working tree was
-never edited: the other work's lines are still in `app.ts` and in the runner,
-exactly as they were found, and `git status` still shows them as uncommitted.
+It holds the contract, the engine, the review screen, the three routes, the
+merged analyzer, the dataset and the metric suite — thirty-six files.
 
-What was checked afterwards, on the commit itself rather than on the working
-tree:
+**The Stripe billing work happened alongside it.** It was written into this
+working tree by another piece of work while this work was in progress, and it
+is now on `main` in its own right:
 
-- `tsc --noEmit` passes on the pushed tree. It was run in a separate
-  worktree checked out at the commit, so the Stripe files were not present to
-  satisfy anything.
+```
+8fc6efd  feat(stripe): card checkout, subscription lifecycle and revenue reporting
+d4eb5ec  fix(stripe): forward local webhooks with the Stripe CLI package
+7f4e366  docs(stripe): record the production verification of the card integration
+4127533  fix(stripe): wire the raw body and the webhook routes into app.ts
+```
+
+For most of this work the two shared files — `app.ts` and `tests/runner.mjs`
+— had to be staged without the other work's blocks, because committing them
+whole would have pushed a `main` whose `app.ts` imported a directory that was
+not committed. The copies were written with the same line-ending filter
+`git add` applies (`core.autocrlf=true`, no `.gitattributes`), hashed with
+`git hash-object --path`, and put into the index with `git update-index`. The
+working tree was never edited: the other work's lines stayed where they were
+found.
+
+`7f4e366` is the exception, and it is worth being precise about. That commit
+belongs to the Stripe work, and its message is its own. It also carries the
+second half of this work — the removal of the superseded import modal, the
+client methods that only it used, the change that stops an upload replacing
+the candidate's active CV, the `.doc` test, and this report — because that
+workstream committed an index this work had already staged. The code in it is
+this work's; the message is not.
+
+**What was checked, on the commits rather than on the working tree:**
+
+- `tsc --noEmit` passes on the pushed tree. It was run in a separate worktree
+  checked out at the commit, so nothing could be satisfied by a file that was
+  not committed.
 - The build was made in that same worktree, and the bundle was searched for
-  the billing code: the only occurrences of the word are the pre-existing
+  the billing code: the only occurrences of the word were the pre-existing
   `"e.g. Stripe, Linear, Vercel"` example in the business-tools field.
-- The deployed bundle was compared with the built one, and the new routes were
+- The deployed bundle was compared with the built one, and the routes were
   called against the live site.
 
 ---
 
 ## 15. The deployment
 
-`main` carries the commit, and Cloudflare Pages carries the build made from
-it, on the `careerdev4ai` project.
+`main` is what Cloudflare Pages serves. The deployment that carries this work
+is `30086f63` on the `careerdev4ai` project, and the canonical
+`careerdev4ai.pages.dev` serves it.
 
 What was verified against the live site:
 
@@ -504,7 +522,13 @@ What was verified against the live site:
 - The served entry chunk carries the new review screen — `Import & Review`,
   `Read again`, `Where this came from`, `Apply this CV` and `Accept the
   high-confidence values`.
-- `POST /api/cv/extract`, `POST /api/cv/extract/section` and
-  `POST /api/cv/import/reviewed` all answer **401** without a session. That
-  is the answer a route that exists and is private gives; a route that was
-  not deployed would answer 404.
+- `POST /api/cv/extract`, `POST /api/cv/extract/section`,
+  `POST /api/cv/import/reviewed`, `POST /api/cv/analysis` and
+  `POST /api/resumes/upload` all answer **401** without a session. That is
+  the answer a route that exists and is private gives; a route that was not
+  deployed would answer 404.
+
+The deployment carries the Stripe work as well, because `main` does: the
+Stripe work was committed and pushed by the work that owns it, and a
+deployment that left it out would be serving something other than the
+branch.
