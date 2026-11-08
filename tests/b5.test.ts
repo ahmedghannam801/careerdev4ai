@@ -733,14 +733,26 @@ describe('B.5 RLS and catalogue protection', () => {
       .update({ status: 'dismissed' })
       .eq('profile_id', user.id)
       .select('id');
-    assert.deepEqual(forgedUpdate.data, []);
+    // The write is refused. It used to be refused by the row policy alone;
+    // the client no longer holds the write grant on this table at all, so it
+    // is refused even earlier. The property is the same either way: another
+    // user cannot change another user's learning state.
+    assert.equal(
+      (forgedUpdate.data?.length ?? 0) === 0,
+      true,
+      'another user cannot change my learning state'
+    );
 
     const forgedDelete = await otherUser.client
       .from('user_learning_items')
       .delete()
       .eq('profile_id', user.id)
       .select('id');
-    assert.deepEqual(forgedDelete.data, []);
+    assert.equal(
+      (forgedDelete.data?.length ?? 0) === 0,
+      true,
+      'another user cannot delete my learning state'
+    );
 
     const { data: rows, error } = await admin
       .from('user_learning_items')
