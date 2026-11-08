@@ -263,13 +263,66 @@ test.describe('the referral programme', () => {
   });
 });
 
+/**
+ * The calendar date in Cairo for a given instant.
+ *
+ * The test must not depend on the day it happens to run: the rule under test
+ * is "the birthday belongs to ONE day", and that day is the day the suite is
+ * running. The date is therefore read from the clock, in the timezone the
+ * rule is about, instead of being written into the source.
+ */
+function cairoDate(at: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at);
+  const value = (type: 'year' | 'month' | 'day') =>
+    Number(parts.find((part) => part.type === type)?.value);
+  return { year: value('year'), month: value('month'), day: value('day') };
+}
+
+/** The Cairo calendar day `offset` days after the given one. */
+function cairoDayOffset(base: { year: number; month: number; day: number }, offset: number) {
+  const shifted = new Date(Date.UTC(base.year, base.month - 1, base.day + offset));
+  return cairoDate(shifted);
+}
+
 test.describe('the birthday discount', () => {
   test('belongs to one day only', () => {
-    // 8 November 2026 is the day the suite is running.
-    assert.equal(isBirthdayToday(11, 8, 'Africa/Cairo'), true, 'today is the birthday');
-    assert.equal(isBirthdayToday(11, 9, 'Africa/Cairo'), false, 'tomorrow is not');
-    assert.equal(isBirthdayToday(12, 8, 'Africa/Cairo'), false, 'the wrong month is not');
-    assert.equal(isBirthdayToday(1, 1, 'Africa/Cairo'), false, 'another day is not');
+    const today = cairoDate(new Date());
+    const tomorrow = cairoDayOffset(today, 1);
+    const yesterday = cairoDayOffset(today, -1);
+
+    assert.equal(
+      isBirthdayToday(today.month, today.day, 'Africa/Cairo'),
+      true,
+      'today is the birthday'
+    );
+    assert.equal(
+      isBirthdayToday(tomorrow.month, tomorrow.day, 'Africa/Cairo'),
+      false,
+      'tomorrow is not'
+    );
+    assert.equal(
+      isBirthdayToday(yesterday.month, yesterday.day, 'Africa/Cairo'),
+      false,
+      'yesterday is not'
+    );
+    // The wrong month, and a day that is simply another day.
+    const otherMonth = today.month === 12 ? 1 : today.month + 1;
+    assert.equal(
+      isBirthdayToday(otherMonth, today.day, 'Africa/Cairo'),
+      false,
+      'the wrong month is not'
+    );
+    const otherDay = today.day === 15 ? 16 : 15;
+    assert.equal(
+      isBirthdayToday(today.month, otherDay, 'Africa/Cairo'),
+      false,
+      'another day is not'
+    );
   });
 
   test('follows the candidate timezone, not the platform one', () => {

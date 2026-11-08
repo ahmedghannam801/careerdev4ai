@@ -57,24 +57,32 @@ describe('rate limiting on the AI routes (P-1)', () => {
     // The budget is 30 requests per minute, keyed on the verified user id.
     // These routes fail fast on a missing body, so a request is rejected
     // before it ever reaches Gemini.
-    let sawTooMany = false;
-    let lastStatus = 0;
+    //
+    // The requests are sent CONCURRENTLY on purpose. The limiter counts a
+    // request when it enters the route, but the entitlement and credit
+    // checks that follow each cost a round trip to the database. Issued one
+    // after the other, forty requests take longer than the one-minute
+    // window, the bucket resets halfway through, and the caller never
+    // reaches the limit. Issued together, the whole burst lands inside a
+    // single window, which is the situation the limiter exists for.
+    const responses = await Promise.all(
+      Array.from({ length: 40 }, () =>
+        api('POST', '/api/copilot', {
+          token: user.token,
+          body: { userPrompt: 'x' },
+        })
+      )
+    );
 
-    for (let i = 0; i < 40; i++) {
-      const res = await api('POST', '/api/copilot', {
-        token: user.token,
-        body: { userPrompt: 'x' },
-      });
-      lastStatus = res.status;
-      if (res.status === 429) {
-        sawTooMany = true;
-        break;
-      }
-    }
+    const limited = responses.filter(
+      (res) => res.status === 429 && res.body?.code === 'rate_limit'
+    );
 
     assert.ok(
-      sawTooMany,
-      `the limiter must eventually answer 429 (last status ${lastStatus})`
+      limited.length > 0,
+      `the limiter must eventually answer 429 (statuses: ${responses
+        .map((res) => res.status)
+        .join(',')})`
     );
   });
 
