@@ -20,12 +20,17 @@ import {
   normalizeResumeLanguage,
   type ResumeLanguage,
 } from '../../shared/resumeLanguage';
+import {
+  normalizeCvTemplateId,
+} from '../../shared/cvTemplates';
 
 export interface PreferencesDTO {
   theme: string | null;
   language: string | null;
   /** The language the CV is written in. Independent of `language`. */
   resumeLanguage: ResumeLanguage;
+  /** The CV template the account chose. */
+  cvTemplateId: string;
   notificationsEnabled: boolean | null;
 }
 
@@ -39,6 +44,7 @@ export async function fetchPreferences(): Promise<PreferencesDTO | null> {
     // The server normalises this too, but a stale row or a cached response
     // must never put the document into a language the studio cannot render.
     resumeLanguage: normalizeResumeLanguage(data.preferences.resumeLanguage),
+    cvTemplateId: normalizeCvTemplateId(data.preferences.cvTemplateId),
   };
 }
 
@@ -57,5 +63,6 @@ export async function patchPreferences(
   return {
     ...data.preferences,
     resumeLanguage: normalizeResumeLanguage(data.preferences.resumeLanguage),
+    cvTemplateId: normalizeCvTemplateId(data.preferences.cvTemplateId),
   };
 }

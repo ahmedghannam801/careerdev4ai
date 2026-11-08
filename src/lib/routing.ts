@@ -230,6 +230,7 @@ export function resolveRouteId(hash: string, fallback: string): string {
  */
 export const CV_STUDIO_TABS = [
   'editor',
+  'templates',
   'review',
   'data',
   'job',
@@ -264,7 +265,7 @@ export const CV_STUDIO_STEPS: ReadonlyArray<{
   id: CvStudioStepId;
   tabs: readonly CvStudioTab[];
 }> = [
-  { id: 'cv', tabs: ['editor', 'data', 'versions'] },
+  { id: 'cv', tabs: ['editor', 'templates', 'data', 'versions'] },
   { id: 'import', tabs: ['review'] },
   { id: 'analyze', tabs: ['ats'] },
   { id: 'improve', tabs: ['job'] },

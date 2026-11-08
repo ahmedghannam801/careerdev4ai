@@ -36,6 +36,7 @@ import {
   CreditCard,
   Smartphone,
   DollarSign,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useAdminAccess } from '../../lib/useAdminAccess';
@@ -45,6 +46,7 @@ import { TrafficAnalyticsPanel } from '../admin/TrafficAnalyticsPanel';
 import { AdminSubscriptionsPanel } from '../admin/AdminSubscriptionsPanel';
 import { AdminPaymentsPanel } from '../admin/AdminPaymentsPanel';
 import { AdminRevenuePanel } from '../admin/AdminRevenuePanel';
+import { CvTemplatesPanel } from '../admin/CvTemplatesPanel';
 import {
   createAdmin,
   deleteAdmin,
@@ -81,7 +83,8 @@ type AdminTab =
   | 'audit'
   | 'subscriptions'
   | 'payments'
-  | 'revenue';
+  | 'revenue'
+  | 'cv-templates';
 
 const ROLE_OPTIONS: AdminRole[] = [
   'super_admin',
@@ -996,6 +999,9 @@ export const AdminCenterView: React.FC = () => {
     if (permissions.has('revenue.read')) {
       entries.push({ id: 'revenue', label: t('Revenue & Finance'), icon: DollarSign });
     }
+    if (permissions.has('plans.manage')) {
+      entries.push({ id: 'cv-templates', label: t('CV templates'), icon: LayoutTemplate });
+    }
     return entries;
   }, [permissions, t]);
 
@@ -1139,6 +1145,9 @@ export const AdminCenterView: React.FC = () => {
       {tab === 'subscriptions' && <AdminSubscriptionsPanel />}
       {tab === 'payments' && <AdminPaymentsPanel />}
       {tab === 'revenue' && <AdminRevenuePanel />}
+      {tab === 'cv-templates' && (
+        <CvTemplatesPanel canWrite={permissions.has('plans.manage')} />
+      )}
 
       {tabs.length === 1 && (
         <div className={`${CARD} p-6 text-center text-xs text-[var(--text-secondary)]`}>

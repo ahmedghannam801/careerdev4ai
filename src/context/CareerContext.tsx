@@ -56,6 +56,10 @@ import {
   DEFAULT_RESUME_LANGUAGE,
   normalizeResumeLanguage,
 } from '../../shared/resumeLanguage';
+import {
+  DEFAULT_CV_TEMPLATE_ID,
+  normalizeCvTemplateId,
+} from '../../shared/cvTemplates';
 import type { CvSourceData } from '../../shared/cvDocument';
 import {
   isAtsAnalysisForRole,
@@ -1362,6 +1366,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               // is the language the CV is written in, and it is deliberately
               // not the interface language.
               resumeLanguage: normalizeResumeLanguage(record.resumeLanguage),
+              cvTemplateId: normalizeCvTemplateId(record.cvTemplateId),
             }));
           })
           .catch(() => {
@@ -2540,6 +2545,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       interviewReminders: true,
       weeklyProgressSummary: true,
       allowAiContextLearning: true,
+      cvTemplateId: DEFAULT_CV_TEMPLATE_ID,
     };
     if (saved) {
       try {
@@ -2548,6 +2554,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           ...defaults,
           ...parsed,
           resumeLanguage: normalizeResumeLanguage(parsed.resumeLanguage),
+          cvTemplateId: normalizeCvTemplateId(parsed.cvTemplateId),
         };
       } catch {}
     }
@@ -4902,6 +4909,11 @@ Skills: ${activeCV.skillsList.join(', ')}
     // so that changing one can never move the other.
     if (updates.resumeLanguage !== undefined) {
       accountOwned.resumeLanguage = normalizeResumeLanguage(updates.resumeLanguage);
+    }
+    // The chosen template belongs to the account too. The server validates
+    // the id and, when premium enforcement is on, the entitlement.
+    if (updates.cvTemplateId !== undefined) {
+      accountOwned.cvTemplateId = normalizeCvTemplateId(updates.cvTemplateId);
     }
     // Only an account can own a preference. A visitor who is browsing the
     // landing page before signing up still gets the change immediately — the

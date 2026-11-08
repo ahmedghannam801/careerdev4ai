@@ -4,12 +4,15 @@ import {
   CheckCircle2,
   AlertCircle,
   Upload,
-  Printer
+  Printer,
+  Download,
+  Loader2
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { BuiltCvPanel } from '../cv/BuiltCvPanel';
 import { JobDescriptionPanel, type JobDescriptionPanelState } from '../cv/JobDescriptionPanel';
 import { CvPreview } from '../cv/CvPreview';
+import { CvTemplateLibrary } from '../cv/templates/CvTemplateLibrary';
 import { CvSectionEditor } from '../cv/CvSectionEditor';
 import { Reveal } from '../motion/Motion';
 import { CvMeasuredAnalysis } from '../cv/CvMeasuredAnalysis';
@@ -25,6 +28,10 @@ import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
 import { CvDataManager } from '../cv/studio/CvDataManager';
 import { ResumeLanguagePicker } from '../cv/studio/ResumeLanguagePicker';
 import { CareerImage } from '../ui/CareerImage';
+import {
+  authorizeCvTemplateExport,
+  downloadCvTemplateDocx,
+} from '../../lib/cvTemplatesApi';
 
 export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = () => {
   const {
@@ -61,6 +68,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   // the step rather than listed as a navigation of their own.
   const secondaryViews: Array<{ tab: CvStudioTab; label: string }> = [
     { tab: 'editor', label: t('Document Editor & Preview') },
+    { tab: 'templates', label: t('Templates') },
     { tab: 'data', label: t('My Data') },
     { tab: 'versions', label: `${t('Version History')} (${cvVersions.length})` },
   ];
@@ -151,8 +159,58 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   // choose from these and from nothing else: a skill the candidate has not
   // claimed is not theirs to put on a CV.
   const ratedSkills = ownedSkills.map((skill) => skill.name);
-  const handlePrint = () => {
-    window.print();
+  // Export state. A PDF is produced by the browser printing the real
+  // template, so the server is asked first; a DOCX is built by the server.
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
+
+  /**
+   * Prints the CV.
+   *
+   * The paper is the browser's print of the real rendered template — that is
+   * what preserves Arabic shaping, the selected text and the exact layout. The
+   * server still decides whether this candidate may export the template, so
+   * the print starts only after the authorisation route says yes.
+   */
+  const handlePrint = async () => {
+    setExportError(null);
+    try {
+      const result = await authorizeCvTemplateExport(settings.cvTemplateId);
+      if (!result.allowed) {
+        setExportError(t('This template is not available on your plan.'));
+        return;
+      }
+      window.print();
+    } catch (error) {
+      setExportError(
+        error instanceof Error
+          ? error.message
+          : t('The PDF export could not be authorised. Please try again.')
+      );
+    }
+  };
+
+  /** Downloads the editable Word file built by the server. */
+  const handleDocxExport = async () => {
+    if (isExportingDocx) return;
+    setIsExportingDocx(true);
+    setExportError(null);
+    try {
+      await downloadCvTemplateDocx({
+        templateId: settings.cvTemplateId,
+        cv: activeCV,
+        language: settings.resumeLanguage,
+        fileName: `${activeCV.fullName?.trim() || 'CV'}.docx`,
+      });
+    } catch (error) {
+      setExportError(
+        error instanceof Error
+          ? error.message
+          : t('The Word export could not be completed. Please try again.')
+      );
+    } finally {
+      setIsExportingDocx(false);
+    }
   };
 
   const handleSaveVersion = (e: React.FormEvent) => {
@@ -211,17 +269,32 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
             </button>
           )}
 
-          {/* Printing is offered only where there is a document to print.
-              The print stylesheet keeps the paper preview and nothing else,
-              so a print started from another tab would come out blank. */}
+          {/* Printing and the editable Word file are offered only where
+              there is a document to export. The print stylesheet keeps the
+              paper preview and nothing else, so an export started from
+              another tab would come out blank. */}
           {activeTab === 'editor' && (
-            <button
-              onClick={handlePrint}
-              className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>{t('Print / Export PDF')}</span>
-            </button>
+            <>
+              <button
+                onClick={handleDocxExport}
+                disabled={isExportingDocx}
+                className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                {isExportingDocx ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
+                <span>{isExportingDocx ? t('Preparing Word file...') : t('Download Word (DOCX)')}</span>
+              </button>
+              <button
+                onClick={handlePrint}
+                className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>{t('Print / Export PDF')}</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -236,6 +309,22 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           server, so a CV that finished while the tab was closed is still
           here when the studio is opened again. */}
       <BackgroundJobsPanel />
+
+      {exportError && (
+        <div
+          role="alert"
+          className="p-4 rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 flex items-start gap-3"
+        >
+          <AlertCircle className="w-4 h-4 text-[var(--color-danger)] shrink-0 mt-0.5" />
+          <p className="flex-1 text-xs text-[var(--text-secondary)] leading-relaxed">{exportError}</p>
+          <button
+            onClick={() => setExportError(null)}
+            className="px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            {t('Dismiss')}
+          </button>
+        </div>
+      )}
 
       {/* A failed audit is shown where the user started it, with the real
           provider reason and any retry window. It is never only logged. */}
@@ -309,6 +398,12 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       {/* TAB 0: THE RECORDS THE CV IS BUILT FROM */}
       {activeTab === 'data' && <CvDataManager />}
 
+      {/* The structure of the document. Choosing a template changes the
+          presentation only; the content is rebuilt from the same records. */}
+      {activeTab === 'templates' && (
+        <CvTemplateLibrary onOpenEditor={() => setActiveTab('editor')} />
+      )}
+
       {/* The import that is also a review. The document is read first and
           nothing is written until the candidate has looked at it. */}
       {activeTab === 'review' && (
@@ -364,7 +459,11 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
           {/* Right Clean Paper Preview (7 cols) */}
           <div className="lg:col-span-7">
-            <CvPreview cv={activeCV} language={settings.resumeLanguage} />
+            <CvPreview
+              cv={activeCV}
+              language={settings.resumeLanguage}
+              templateId={settings.cvTemplateId}
+            />
           </div>
         </div>
       )}

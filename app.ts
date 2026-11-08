@@ -54,6 +54,7 @@ import {
 import { listCvMeasurements } from './server/db/cvMeasurements.ts';
 import { registerBackgroundJobRoutes } from './server/jobs/routes.ts';
 import { registerSubscriptionRoutes } from './server/subscriptions/routes.ts';
+import { registerCvTemplateRoutes } from './server/cvTemplates/routes.ts';
 import { registerReferralRoutes } from './server/referrals/routes.ts';
 import { registerStripeRoutes } from './server/stripe/routes.ts';
 import { requireEntitlement } from './server/subscriptions/entitlements.ts';
@@ -146,6 +147,10 @@ import {
   isResumeLanguage,
   normalizeResumeLanguage,
 } from './shared/resumeLanguage.ts';
+import {
+  isCvTemplateIdShape,
+  normalizeCvTemplateId,
+} from './shared/cvTemplates.ts';
 import {
   getFeedbackState,
   recordFeedbackEvent,
@@ -5722,6 +5727,7 @@ app.get('/api/preferences', requireAuth, async (req: Request, res: Response) => 
             theme: preferences.theme,
             language: preferences.language,
             resumeLanguage: normalizeResumeLanguage(preferences.resume_language),
+            cvTemplateId: normalizeCvTemplateId(preferences.cv_template_id),
             notificationsEnabled: preferences.notifications_enabled,
           }
         : null,
@@ -5739,6 +5745,7 @@ app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) =
       theme?: string;
       language?: string;
       resume_language?: string;
+      cv_template_id?: string;
       notifications_enabled?: boolean;
     } = {};
 
@@ -5764,6 +5771,15 @@ app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) =
       }
       updates.resume_language = body.resumeLanguage;
     }
+    // The template is validated by shape here. Whether this candidate may use
+    // it is a separate, server-owned entitlement decision made by the apply
+    // route; the preferences route only records the choice.
+    if (body.cvTemplateId !== undefined) {
+      if (!isCvTemplateIdShape(body.cvTemplateId)) {
+        return res.status(400).json({ error: 'Invalid CV template' });
+      }
+      updates.cv_template_id = body.cvTemplateId;
+    }
     if (body.notificationsEnabled !== undefined) {
       if (typeof body.notificationsEnabled !== 'boolean') {
         return res.status(400).json({ error: 'Invalid notificationsEnabled' });
@@ -5781,6 +5797,7 @@ app.patch('/api/preferences', requireAuth, async (req: Request, res: Response) =
         theme: saved.theme,
         language: saved.language,
         resumeLanguage: normalizeResumeLanguage(saved.resume_language),
+        cvTemplateId: normalizeCvTemplateId(saved.cv_template_id),
         notificationsEnabled: saved.notifications_enabled,
       },
     });
@@ -7104,6 +7121,11 @@ app.patch(
     }
   }
 );
+
+/* -------------------------------------------------------------------------- */
+/* CV templates: catalogue, apply, export and administration                  */
+/* -------------------------------------------------------------------------- */
+registerCvTemplateRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* Subscriptions, Payments & Credits Routes                                   */

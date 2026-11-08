@@ -10,6 +10,9 @@ export interface PreferencesRow {
   // The language the CV is written in. Independent of `language`, which is
   // the interface language. See shared/resumeLanguage.ts.
   resume_language: string | null;
+  // The CV template the account chose. See shared/cvTemplates.ts. It is a
+  // preference, not a document: changing it never changes the CV's facts.
+  cv_template_id: string | null;
   notifications_enabled: boolean | null;
   // Feedback invitation state. It lives here rather than in its own table so
   // the existing owner-only row-level security covers it without a new
@@ -27,7 +30,7 @@ export interface PreferencesRow {
 export type PreferencesUpdate = Partial<
   Pick<
     PreferencesRow,
-    'theme' | 'language' | 'resume_language' | 'notifications_enabled'
+    'theme' | 'language' | 'resume_language' | 'cv_template_id' | 'notifications_enabled'
   >
 >;
 

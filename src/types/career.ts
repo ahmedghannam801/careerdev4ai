@@ -562,6 +562,13 @@ export interface UserSettings {
   interviewReminders: boolean;
   weeklyProgressSummary: boolean;
   allowAiContextLearning: boolean;
+  /**
+   * The CV template the candidate chose.
+   *
+   * It belongs to the account, like the resume language: a candidate who picks
+   * a structure on their laptop expects the same document on their phone.
+   */
+  cvTemplateId: string;
 }
 
 export interface CopilotMessage {

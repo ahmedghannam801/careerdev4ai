@@ -354,6 +354,15 @@ async function main() {
     // the account and refused when it is a language the studio cannot
     // render, and the order of the entries survives a reload.
     join(TESTS_DIR, 'cv-studio-persistence.test.ts'),
+    // The CV template library: that no two templates are the same template
+    // (structurally and in the document they render), that exactly one is free,
+    // that a candidate without a paid plan cannot apply, export or download a
+    // premium template even by calling the API directly, that an expired or
+    // cancelled subscription loses the library, that changing the template
+    // never changes the CV, and that the DOCX export is editable text. Pure
+    // for the catalogue and the documents; the access rules run against the
+    // API.
+    join(TESTS_DIR, 'cv-templates.test.ts'),
     // The document the CV studio shows is a projection of the platform's
     // records, so a change to a record reaches the CV on its own. Pure.
     join(TESTS_DIR, 'cv-projection.test.ts'),
@@ -496,6 +505,12 @@ async function main() {
       env: {
         ...env,
         ADMIN_SCHEDULER_DISABLED: 'true',
+        // The CV template premium rules are enforced ON in the test server so
+        // that the access control is exercised the way it will behave once the
+        // product owner turns the paywall on. Production keeps the flag off
+        // (the platform is currently free) — this changes nothing outside this
+        // run's own server.
+        CV_TEMPLATE_PREMIUM_ENFORCEMENT: 'true',
       },
     });
     activeServer = server;
