@@ -18,6 +18,7 @@ import type { ResumeLanguage } from '../../../../shared/resumeLanguage';
 import {
   type CvTemplateDefinition,
   type CvTemplateStructure,
+  type CvTemplateLayout,
   type CvDensity,
   type CvHeadingStyle,
   type CvEntryStyle,
@@ -35,6 +36,17 @@ import {
   type CvDocumentSectionKind,
 } from '../../../../shared/cvTemplateDocument';
 
+/**
+ * A sheet of A4 at 96dpi.
+ *
+ * The renderer lays the document out at this width, and the preview scales it
+ * to whatever space it has. The page box is a real A4 sheet rather than a
+ * guessed minimum, so a preview can say how many pages a document will print
+ * as and a thumbnail can show the whole document rather than a cropped top.
+ */
+export const A4_WIDTH = 794;
+export const A4_HEIGHT = 1123;
+
 interface CvTemplateRendererProps {
   cv: CVProfile;
   language?: ResumeLanguage;
@@ -43,8 +55,6 @@ interface CvTemplateRendererProps {
   template?: CvTemplateDefinition;
   /** The catalogue the id is resolved against. */
   catalog?: readonly CvTemplateDefinition[];
-  /** A compact preview used in the library cards. */
-  preview?: boolean;
   /**
    * Whether this is the document the print stylesheet should keep.
    *
@@ -55,7 +65,16 @@ interface CvTemplateRendererProps {
   printable?: boolean;
 }
 
-const DENSITY: Record<CvDensity, { font: number; line: number; gap: number; pad: number }> = {
+/**
+ * The measurements a density describes.
+ *
+ * Exported so that the preview can work out how many sheets of A4 a document
+ * would print as: the page's own margin is part of the measurement.
+ */
+export const CV_TEMPLATE_DENSITY: Record<
+  CvDensity,
+  { font: number; line: number; gap: number; pad: number }
+> = {
   compact: { font: 10.2, line: 1.36, gap: 9, pad: 26 },
   standard: { font: 11.4, line: 1.46, gap: 14, pad: 34 },
   spacious: { font: 12.3, line: 1.6, gap: 19, pad: 42 },
@@ -270,12 +289,14 @@ function EntryBlock({
   accent,
   density,
   typography,
+  layout,
 }: {
   entry: CvDocumentEntry;
   structure: CvTemplateStructure;
   accent: string;
   density: CvDensity;
   typography: CvTypography;
+  layout: CvTemplateLayout;
 }) {
   const entryStyle: CvEntryStyle = structure.entryStyle;
   const titleStyle: React.CSSProperties = {
@@ -382,6 +403,55 @@ function EntryBlock({
     marginBottom: density === 'compact' ? 7 : density === 'spacious' ? 12 : 9,
     fontSize: '1em',
   };
+
+  // An academic record is set as a record: what the thing was on the left,
+  // what it involved on the right. It is a different way of reading the same
+  // facts, not a different set of facts.
+  if (layout === 'academic') {
+    return (
+      <div
+        style={{
+          ...common,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 0.95fr) minmax(0, 1.5fr)',
+          gap: 10,
+          alignItems: 'start',
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ ...titleStyle, fontSize: '0.98em' }}>{entry.title}</div>
+          {entry.subtitle && (
+            <div style={{ color: '#475569', fontSize: '0.93em' }}>{entry.subtitle}</div>
+          )}
+          {meta && <div style={{ marginTop: 2 }}>{meta}</div>}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          {location}
+          {description}
+          <Bullets bullets={entry.bullets} structure={structure} accent={accent} />
+          {tags}
+          {url}
+        </div>
+      </div>
+    );
+  }
+
+  if (layout === 'cards') {
+    return (
+      <div
+        style={{
+          ...common,
+          border: '1px solid #e2e8f0',
+          borderInlineStart: `3px solid ${accent}`,
+          borderRadius: 6,
+          padding: density === 'compact' ? 7 : 10,
+          backgroundColor: '#ffffff',
+        }}
+      >
+        {content}
+      </div>
+    );
+  }
 
   if (entryStyle === 'card') {
     return (
@@ -531,12 +601,14 @@ function SectionBody({
   accent,
   density,
   typography,
+  layout,
 }: {
   section: CvDocumentSection;
   structure: CvTemplateStructure;
   accent: string;
   density: CvDensity;
   typography: CvTypography;
+  layout: CvTemplateLayout;
 }) {
   if (section.kind === 'text') {
     return (
@@ -552,11 +624,61 @@ function SectionBody({
       />
     );
   }
+
+  // A card grid is the layout, not a decoration: the entries are set as
+  // cards whether or not the entry style says so.
+  const isCardGrid = layout === 'cards' && section.key !== 'links';
   const isGrid = structure.entryStyle === 'grid' && section.key !== 'links';
+
+  // A timeline is the layout, so the rail is drawn whatever the entry style
+  // says. Two consecutive entries share one continuous line.
+  if (layout === 'timeline') {
+    return (
+      <div style={{ display: 'grid', gap: density === 'compact' ? 6 : 10 }}>
+        {section.entries.map((entry) => (
+          <div key={entry.id} style={{ display: 'flex', gap: 10, breakInside: 'avoid' }}>
+            <div
+              aria-hidden="true"
+              style={{
+                flexShrink: 0,
+                width: 9,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 99,
+                  border: `2px solid ${accent}`,
+                  backgroundColor: '#ffffff',
+                  marginTop: 4,
+                }}
+              />
+              <span style={{ flex: 1, width: 1, backgroundColor: '#cbd5e1', marginTop: 3 }} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <EntryBlock
+                entry={entry}
+                structure={structure}
+                accent={accent}
+                density={density}
+                typography={typography}
+                layout={layout}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div
       style={
-        isGrid
+        isCardGrid || isGrid
           ? {
               display: 'grid',
               gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
@@ -573,6 +695,7 @@ function SectionBody({
           accent={accent}
           density={density}
           typography={typography}
+          layout={layout}
         />
       ))}
     </div>
@@ -586,6 +709,7 @@ function SectionList({
   density,
   typography,
   startIndex = 0,
+  layout,
 }: {
   sections: CvDocumentSection[];
   structure: CvTemplateStructure;
@@ -593,9 +717,10 @@ function SectionList({
   density: CvDensity;
   typography: CvTypography;
   startIndex?: number;
+  layout: CvTemplateLayout;
 }) {
   return (
-    <div style={{ display: 'grid', gap: DENSITY[density].gap }}>
+    <div style={{ display: 'grid', gap: CV_TEMPLATE_DENSITY[density].gap }}>
       {sections.map((section, index) => (
         <section key={section.key} className="cv-section" style={{ breakInside: 'avoid-page' }}>
           <SectionHeading
@@ -611,6 +736,7 @@ function SectionList({
             accent={accent}
             density={density}
             typography={typography}
+            layout={layout}
           />
         </section>
       ))}
@@ -683,7 +809,7 @@ function Header({
   switch (structure.header) {
     case 'left':
       return (
-        <header style={{ marginBottom: DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
           <h1 style={{ ...nameStyle, fontSize: 30 }}>{document.fullName}</h1>
           {document.title && <p style={titleStyle}>{document.title}</p>}
           <div style={{ marginTop: 6 }}>
@@ -696,11 +822,11 @@ function Header({
       return (
         <header
           style={{
-            margin: `-${DENSITY[structure.density].pad}px -${DENSITY[structure.density].pad}px 0`,
-            padding: `${Math.max(20, DENSITY[structure.density].pad - 6)}px ${DENSITY[structure.density].pad}px`,
+            margin: `-${CV_TEMPLATE_DENSITY[structure.density].pad}px -${CV_TEMPLATE_DENSITY[structure.density].pad}px 0`,
+            padding: `${Math.max(20, CV_TEMPLATE_DENSITY[structure.density].pad - 6)}px ${CV_TEMPLATE_DENSITY[structure.density].pad}px`,
             backgroundColor: accent,
             color: '#ffffff',
-            marginBottom: DENSITY[structure.density].gap,
+            marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap,
           }}
         >
           <h1 style={{ ...nameStyle, fontSize: 33, color: '#ffffff' }}>{document.fullName}</h1>
@@ -714,7 +840,7 @@ function Header({
       );
     case 'split':
       return (
-        <header style={{ marginBottom: DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
           <div
             style={{
               display: 'flex',
@@ -748,7 +874,7 @@ function Header({
             display: 'flex',
             gap: 12,
             alignItems: 'center',
-            marginBottom: DENSITY[structure.density].gap,
+            marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap,
           }}
         >
           <div
@@ -781,7 +907,7 @@ function Header({
     }
     case 'stacked':
       return (
-        <header style={{ marginBottom: DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
           <div style={{ height: 5, backgroundColor: accent, marginBottom: 9 }} />
           <h1 style={{ ...nameStyle, fontSize: 30 }}>{document.fullName}</h1>
           {document.title && <p style={titleStyle}>{document.title}</p>}
@@ -792,7 +918,7 @@ function Header({
       );
     case 'editorial':
       return (
-        <header style={{ marginBottom: DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
           <h1
             style={{
               ...nameStyle,
@@ -823,7 +949,7 @@ function Header({
       );
     case 'compact':
       return (
-        <header style={{ marginBottom: DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
           <div
             style={{
               display: 'flex',
@@ -850,7 +976,7 @@ function Header({
       return (
         <header
           style={{
-            marginBottom: DENSITY[structure.density].gap,
+            marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap,
             textAlign: 'center',
             borderBottom: '1px solid #e2e8f0',
             paddingBottom: 9,
@@ -893,6 +1019,7 @@ function AsideBlock({
         accent={accent}
         density={density}
         typography={typography}
+        layout={structure.layout}
       />
     </aside>
   );
@@ -904,13 +1031,12 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
   templateId,
   template,
   catalog,
-  preview = false,
   printable = true,
 }) => {
   const resolved = template ?? resolveCvTemplate(templateId, catalog);
   const structure = resolved.structure;
   const density = structure.density;
-  const metrics = DENSITY[density];
+  const metrics = CV_TEMPLATE_DENSITY[density];
   const accent = resolved.accent;
   const document = buildCvTemplateDocument(cv, language);
   const ordered = orderCvSections(document.sections, structure.sectionOrder);
@@ -932,10 +1058,10 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
     padding: metrics.pad,
     width: '100%',
     boxSizing: 'border-box',
-    // A preview is shown in a scaled frame; the real paper is A4.
-    minHeight: preview ? 520 : 900,
+    // The page is a sheet of A4. A document longer than one sheet grows, and
+    // the preview counts the sheets it would print as.
+    minHeight: A4_HEIGHT,
     position: 'relative',
-    overflow: 'hidden',
   };
 
   const asideFirst =
@@ -968,6 +1094,7 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
           accent={accent}
           density={density}
           typography={resolved.typography}
+          layout={structure.layout}
         />
       </div>
       {!asideFirst && (
@@ -987,7 +1114,27 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
       accent={accent}
       density={density}
       typography={resolved.typography}
+      layout={structure.layout}
     />
+  );
+
+  // A split or an editorial document reads across two columns rather than
+  // down one. It is the difference between a wide sheet of text and a page
+  // that behaves like a newspaper, and it is what makes the layout the
+  // template's own rather than a wrapper around a list.
+  const twoColumn = !hasAside && (structure.layout === 'split' || structure.layout === 'editorial');
+  const columnedBody = twoColumn ? (
+    <div
+      style={{
+        columnCount: 2,
+        columnGap: density === 'compact' ? 16 : 24,
+        columnRule: structure.layout === 'editorial' ? `1px solid ${accent}33` : undefined,
+      }}
+    >
+      {body}
+    </div>
+  ) : (
+    body
   );
 
   const accentEdge =
@@ -1012,7 +1159,7 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
         accent={accent}
         typography={resolved.typography}
       />
-      {body}
+      {columnedBody}
     </div>
   );
 };

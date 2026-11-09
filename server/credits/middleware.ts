@@ -14,6 +14,7 @@ import {
   chargeAiAction,
   refundAiAction,
 } from './service.ts';
+import { recordAiCreditFailure } from '../db/credits.ts';
 
 export interface CreditReservation {
   profileId: string;
@@ -21,6 +22,12 @@ export interface CreditReservation {
   amount: number;
   idempotencyKey: string;
   refunded: boolean;
+  /**
+   * The balance the ledger held immediately after the reservation was taken.
+   * The route hands it back to the candidate, so the number on the screen is
+   * the number the ledger holds and not the one from before the operation.
+   */
+  remainingBalance: number;
 }
 
 declare global {
@@ -34,33 +41,65 @@ declare global {
 /**
  * Explicitly triggers a refund for the credit reservation on this request.
  * Safe to call multiple times (idempotent via reservation.refunded guard).
+ *
+ * Returns the balance the ledger holds after the refund, so a route that
+ * gives a credit back can tell the candidate what they have left.
  */
 export async function refundAiCreditReservation(
   req: AuthedRequest,
   reason = 'Downstream AI execution error'
-): Promise<void> {
+): Promise<{ refunded: boolean; newBalance: number }> {
   const reservation = req.aiCreditReservation;
   if (!reservation || reservation.refunded) {
-    return;
+    return {
+      refunded: false,
+      newBalance: reservation?.remainingBalance ?? 0,
+    };
   }
 
   reservation.refunded = true;
   try {
     const refundKey = `refund_${reservation.idempotencyKey}`;
-    await refundAiAction({
+    const outcome = await refundAiAction({
       profileId: reservation.profileId,
       amount: reservation.amount,
       reason,
       idempotencyKey: refundKey,
     });
+    reservation.remainingBalance = outcome.newBalance;
+
+    // The attempt is written down as well as undone. An administrator needs
+    // to see which operation failed and why, not only that the credits came
+    // back.
+    await recordAiCreditFailure({
+      profileId: reservation.profileId,
+      action: reservation.action,
+      creditsAttempted: reservation.amount,
+      refunded: true,
+      reason,
+    });
+
+    return { refunded: true, newBalance: outcome.newBalance };
   } catch (err) {
     console.error('Failed to refund AI credits for reservation:', reservation, err);
+    await recordAiCreditFailure({
+      profileId: reservation.profileId,
+      action: reservation.action,
+      creditsAttempted: reservation.amount,
+      refunded: false,
+      reason: `The refund itself failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return { refunded: false, newBalance: reservation.remainingBalance };
   }
 }
 
 /**
  * Express middleware that checks credit balance, performs atomic pre-deduction,
- * and attaches automatic refund hooks if the route finishes with an error status (5xx/429).
+ * and gives the credit back if the route does not succeed.
+ *
+ * A credit is spent on a result, not on an attempt: any response that is not
+ * a success returns the reservation, whether the request was refused by
+ * validation, failed, timed out or was rejected by the model.
  */
 export function requireCredits(action: AICreditAction) {
   return async (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -115,14 +154,25 @@ export function requireCredits(action: AICreditAction) {
         amount: required,
         idempotencyKey,
         refunded: false,
+        remainingBalance: chargeResult.remainingBalance,
       };
 
-      // 4. Hook response finish to auto-refund on server or provider failure
+      // 4. Hook response finish to auto-refund when the request did not
+      //    succeed.
+      //
+      //    A credit is spent on a RESULT, not on an attempt. A request that
+      //    was refused by validation, that failed, that timed out or that was
+      //    rejected by the provider produced nothing for the candidate, so the
+      //    reservation is given back. Only a successful request keeps it.
+      //
+      //    The 402 case never reaches this hook: a request that could not be
+      //    charged returns before a reservation exists, so there is nothing to
+      //    give back.
       res.on('finish', () => {
-        if ((res.statusCode >= 500 || res.statusCode === 429) && req.aiCreditReservation && !req.aiCreditReservation.refunded) {
+        if (res.statusCode >= 400 && req.aiCreditReservation && !req.aiCreditReservation.refunded) {
           void refundAiCreditReservation(
             req,
-            `Automatic refund on HTTP status ${res.statusCode}`
+            `Automatic refund: the request failed with HTTP status ${res.statusCode}`
           );
         }
       });

@@ -14,9 +14,20 @@ import type {
   CvTemplateAdminRow,
   CvTemplateCategory,
   CvTemplateDefinition,
+  CvTemplateStructure,
 } from '../../shared/cvTemplates';
 
-export interface CvTemplateWithAccess extends CvTemplateDefinition {
+/**
+ * A template as the catalogue presents it.
+ *
+ * The LAYOUT is absent for a template the candidate may not use: the server
+ * sends the name and the description of a premium template so the library can
+ * show what it is, but not the layout that makes it. The browser therefore
+ * cannot draw a locked template, which is a stronger lock than a badge.
+ */
+export interface CvTemplateWithAccess
+  extends Omit<CvTemplateDefinition, 'structure'> {
+  structure: CvTemplateStructure | null;
   access: CvTemplateAccessResult;
 }
 
@@ -30,6 +41,19 @@ export interface CvTemplateCatalogResponse {
 
 export async function fetchCvTemplateCatalog(): Promise<CvTemplateCatalogResponse> {
   return apiRequest<CvTemplateCatalogResponse>('/api/cv-templates');
+}
+
+/**
+ * Asks the server for a template's layout so that it can be previewed.
+ *
+ * The layout is the product, so a premium template's layout is not handed to
+ * the browser without an entitlement: the server decides, and a refusal comes
+ * back as a refusal rather than as a layout.
+ */
+export async function fetchCvTemplatePreview(
+  templateId: string
+): Promise<{ success: boolean; templateId: string; structure: CvTemplateStructure }> {
+  return apiRequest(`/api/cv-templates/${encodeURIComponent(templateId)}/preview`);
 }
 
 export async function applyCvTemplate(

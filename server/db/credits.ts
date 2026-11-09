@@ -51,6 +51,41 @@ function toDTO(row: CreditLedgerRow): CreditLedgerDTO {
 }
 
 /**
+ * Records a credit operation that did not produce a result.
+ *
+ * The ledger holds the balance, so a failed operation that was given back
+ * leaves no trace there beyond the refund itself. An administrator looking
+ * at the failures needs to know WHICH operation failed and WHY, not only that
+ * some credits came back, so the attempt is written down here.
+ *
+ * The write is best-effort: a monitoring record must never turn a working
+ * request into a failed one.
+ */
+export async function recordAiCreditFailure(input: {
+  profileId: string;
+  action?: string | null;
+  creditsAttempted: number;
+  refunded: boolean;
+  reason: string;
+  httpStatus?: number | null;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await getSupabaseServer().from('ai_credit_failures').insert({
+      profile_id: input.profileId,
+      ai_action_type: input.action ?? null,
+      credits_attempted: input.creditsAttempted,
+      refunded: input.refunded,
+      failure_reason: input.reason.slice(0, 500),
+      http_status: input.httpStatus ?? null,
+      metadata: input.metadata ?? {},
+    });
+  } catch (error) {
+    console.error('Failed to record the credit failure:', error);
+  }
+}
+
+/**
  * The daily free-credit allowance.
  *
  * The claim is idempotent per Africa/Cairo calendar day, so it is safe to
@@ -59,24 +94,50 @@ function toDTO(row: CreditLedgerRow): CreditLedgerDTO {
  * allowance is expired inside the same transaction, which is what keeps the
  * allowance from accumulating.
  *
+ * A bucket that was created under a smaller allowance is topped up to the
+ * full allowance, so an account that was under-granted is not left short
+ * until tomorrow.
+ *
  * The grant is a courtesy, not a ledger of its own: a failure here must never
- * stop the balance from being reported.
+ * stop the balance from being reported. The scheduled sweep
+ * (`grant_daily_credits_to_all`) covers the accounts a failing claim did not
+ * reach.
  */
 export async function claimDailyCredits(
   profileId: string
 ): Promise<(DailyCreditState & { balance: number }) | null> {
-  const { data, error } = await getSupabaseServer().rpc('claim_daily_credits', {
+  // The allowance size is owned by the database. The application still sends
+  // its own constant so that a mismatch is visible in the logs rather than
+  // silent, but the database grants what it promises.
+  const request = {
     p_profile_id: profileId,
     p_amount: DAILY_CREDIT_ALLOWANCE,
-  });
+  };
 
-  if (error) {
-    console.error('Failed to claim the daily credit allowance:', error.message);
-    return null;
+  let data: unknown = null;
+  let lastError: { message: string } | null = null;
+
+  // One retry: a transient failure must not cost the candidate the day's
+  // allowance, and the claim is idempotent, so a retry is free of charge.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const outcome = await getSupabaseServer().rpc('claim_daily_credits', request);
+    if (!outcome.error) {
+      data = outcome.data;
+      lastError = null;
+      break;
+    }
+    lastError = outcome.error;
+    console.error(
+      `Failed to claim the daily credit allowance (attempt ${attempt + 1}):`,
+      outcome.error.message
+    );
   }
+
+  if (lastError) return null;
 
   const result = data as {
     granted?: number;
+    topped_up?: number;
     daily_remaining?: number;
     daily_allowance?: number;
     expires_at?: string;
@@ -89,13 +150,14 @@ export async function claimDailyCredits(
   // The candidate is told that the allowance arrived. This happens once a
   // day, so it is informative rather than noisy.
   if ((result.granted ?? 0) > 0) {
+    const allowance = result.daily_allowance ?? DAILY_CREDIT_ALLOWANCE;
     try {
       await createNotification(profileId, {
         title: 'Your daily credits are ready',
-        message: `You received ${result.daily_allowance ?? DAILY_CREDIT_ALLOWANCE} free credit for today.`,
+        message: `You received ${allowance} free credit${allowance === 1 ? '' : 's'} for today.`,
         type: 'credits',
         titleKey: 'notification.dailyCredits',
-        params: { credits: result.daily_allowance ?? DAILY_CREDIT_ALLOWANCE },
+        params: { credits: allowance },
         linkView: 'pricing',
       });
     } catch (error) {
@@ -150,11 +212,16 @@ export async function getCreditBalance(profileId: string): Promise<CreditBalance
   const supabase = getSupabaseServer();
 
   // 1. Get latest ledger entry
+  //
+  // The tie-break on the id matters: the database reads the balance with
+  // `created_at DESC, id DESC`, and a reader that ordered the rows any other
+  // way could report a balance the ledger does not hold.
   const { data: latest, error: ledgerError } = await supabase
     .from('ai_credit_ledger')
     .select(LEDGER_COLUMNS)
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -207,10 +274,18 @@ export async function getCreditBalance(profileId: string): Promise<CreditBalance
     : 5;
 
   // BLK-08: Isolate monthly subscription credits remaining from purchased credits
-  const monthlyCreditsRemaining = sub && sub.status === 'active'
-    ? Math.max(0, monthlyAllocation - consumedThisMonth)
-    : 0;
-  const purchasedCreditsRemaining = Math.max(0, balance - monthlyCreditsRemaining);
+  //
+  // The daily allowance is neither of them: it is a third, expiring pool. It
+  // is subtracted first so that it is never reported as purchased credits or
+  // as part of the monthly allocation.
+  const dailyRemaining = daily?.remaining ?? 0;
+  const generalBalance = Math.max(0, balance - dailyRemaining);
+
+  const monthlyCreditsRemaining =
+    sub && sub.status === 'active'
+      ? Math.max(0, Math.min(monthlyAllocation - consumedThisMonth, generalBalance))
+      : 0;
+  const purchasedCreditsRemaining = Math.max(0, generalBalance - monthlyCreditsRemaining);
 
   return {
     balance,
@@ -225,51 +300,37 @@ export async function getCreditBalance(profileId: string): Promise<CreditBalance
 }
 
 /**
- * Grants 5 one-time trial credits to a candidate.
- * Enforces strict idempotency via unique key `trial_initial_{profileId}`.
+ * Grants the one-time trial credits to a candidate.
+ *
+ * The grant is done by the database, which takes the candidate's own advisory
+ * lock and adds the credits to the balance the ledger actually holds. An
+ * earlier version wrote a hard-coded running balance of 5, which invented
+ * credits for an account whose real balance was 0 and broke the relationship
+ * between the ledger and the daily bucket.
+ *
+ * The idempotency key is derived from the profile id, so the grant is paid
+ * once per account and a replay pays nothing.
  */
 export async function grantTrialCredits(
-  profileId: string
+  profileId: string,
+  amount = 5
 ): Promise<{ granted: boolean; balance: number }> {
-  const idempotencyKey = `trial_initial_${profileId}`;
-
-  const { data: existing } = await getSupabaseServer()
-    .from('ai_credit_ledger')
-    .select('running_balance')
-    .eq('idempotency_key', idempotencyKey)
-    .maybeSingle();
-
-  if (existing) {
-    return { granted: false, balance: (existing as { running_balance: number }).running_balance };
-  }
-
-  const { data, error } = await getSupabaseServer()
-    .from('ai_credit_ledger')
-    .insert({
-      profile_id: profileId,
-      amount: 5,
-      running_balance: 5,
-      operation: 'grant',
-      source_type: 'trial',
-      idempotency_key: idempotencyKey,
-      description: 'One-time initial free trial credits (5 credits)',
-    })
-    .select('running_balance')
-    .single();
+  const { data, error } = await getSupabaseServer().rpc('grant_trial_credits', {
+    p_profile_id: profileId,
+    p_amount: amount,
+  });
 
   if (error) {
-    // If concurrent insert occurred, re-query latest
-    const { data: retry } = await getSupabaseServer()
-      .from('ai_credit_ledger')
-      .select('running_balance')
-      .eq('profile_id', profileId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    return { granted: false, balance: retry ? (retry as { running_balance: number }).running_balance : 0 };
+    console.error('Failed to grant the trial credits:', error.message);
+    return { granted: false, balance: 0 };
   }
 
-  return { granted: true, balance: (data as { running_balance: number }).running_balance };
+  const result = data as { granted?: boolean; balance?: number } | null;
+
+  return {
+    granted: result?.granted === true,
+    balance: result?.balance ?? 0,
+  };
 }
 
 /**

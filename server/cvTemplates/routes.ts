@@ -11,7 +11,7 @@ import type { Express, Response } from 'express';
 import type { AuthedRequest } from '../auth/require-auth.ts';
 import { requireAuth } from '../auth/require-auth.ts';
 import { requireAdmin, requirePermission, type AdminRequest } from '../admin/permissions.ts';
-import { getCv, listCvs } from '../db/cvs.ts';
+import { getCv, listCvs, updateCv } from '../db/cvs.ts';
 import { getCvVersion, listCvVersions } from '../db/cvVersions.ts';
 import { upsertPreferences } from '../db/preferences.ts';
 import { logAdminAction } from '../db/admin.ts';
@@ -138,6 +138,51 @@ export function registerCvTemplateRoutes(app: Express): void {
   });
 
   /**
+   * Authorises a template preview and hands back the layout to draw.
+   *
+   * The layout is the product. A premium template's structure is not something
+   * the browser may hold without an entitlement, so the preview of a premium
+   * template goes through the server: it answers with the layout only for a
+   * candidate who may use the template, and refuses otherwise.
+   *
+   * The three free templates are answered without a subscription, which is
+   * the whole point of there being three of them.
+   */
+  app.get(
+    '/api/cv-templates/:id/preview',
+    requireAuth,
+    async (req: AuthedRequest, res: Response) => {
+      res.setHeader('Cache-Control', 'no-store');
+      const templateId = str(req.params.id, 64);
+      if (!isCvTemplateIdShape(templateId)) {
+        return res.status(400).json({ error: 'Invalid CV template' });
+      }
+      try {
+        const result = await getCvTemplateForUser(req.authUser!.id, templateId);
+        if (!result) {
+          return res.status(404).json({ error: 'This template is not available.' });
+        }
+        if (!result.access.allowed) {
+          return res.status(403).json({
+            error: result.access.reason,
+            code: 'UPGRADE_REQUIRED',
+            access: result.access,
+          });
+        }
+        return res.json({
+          success: true,
+          templateId,
+          structure: result.template.structure,
+          access: result.access,
+        });
+      } catch (error) {
+        console.error('Failed to authorise the CV template preview:', error);
+        return res.status(500).json({ error: 'Failed to authorise the CV template preview' });
+      }
+    }
+  );
+
+  /**
    * Authorises a PDF export.
    *
    * The PDF itself is produced by the browser printing the real rendered
@@ -241,6 +286,21 @@ export function registerCvTemplateRoutes(app: Express): void {
         const language = isResumeLanguage(req.body?.language) ? req.body.language : 'en';
         const buffer = await buildCvDocx({ cv, language, template: result.template });
         const filename = `${safeFileName(cv.fullName)}-${result.template.id}.docx`;
+
+        // The template is recorded against the CV the document was produced
+        // from. This is the moment the document really was made with that
+        // layout, so it is the honest place to say which templates are used
+        // and whether the premium ones earn their keep.
+        if (cvId) {
+          try {
+            await updateCv(req.authUser!.id, cvId, {
+              templateId: result.template.id,
+              templateTier: result.template.tier,
+            });
+          } catch (error) {
+            console.error('Failed to record the CV template in use:', error);
+          }
+        }
 
         res.setHeader(
           'Content-Type',

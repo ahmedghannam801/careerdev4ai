@@ -30,8 +30,10 @@ import {
   CV_TEMPLATES,
   CV_TEMPLATE_CATEGORIES,
   FREE_CV_TEMPLATE_ID,
+  FREE_CV_TEMPLATE_IDS,
   cvTemplateStructuralSignature,
   isCvTemplatePremiumEnforcementEnabled,
+  isFreeCvTemplateId,
   resolveCvTemplateAccess,
   type CvTemplateDefinition,
 } from '../shared/cvTemplates.ts';
@@ -89,21 +91,41 @@ describe('the template catalogue', () => {
     );
   });
 
-  test('exactly one template is free, and it is the ATS one', () => {
+  test('exactly three templates are free, and they are three different documents', () => {
     const free = CV_TEMPLATES.filter((template) => template.tier === 'free');
-    assert.equal(free.length, 1, 'there must be exactly one free template');
-    assert.equal(free[0].id, FREE_CV_TEMPLATE_ID);
     assert.equal(
-      free[0].atsFriendly,
-      true,
-      'the free template must be ATS-friendly: it is the one every candidate can reach'
+      free.length,
+      FREE_CV_TEMPLATE_IDS.length,
+      'the number of free templates must match the list the product promises'
     );
-    assert.equal(free[0].supportsRtl, true, 'the free template must support Arabic');
+    assert.deepEqual(
+      free.map((template) => template.id).sort(),
+      [...FREE_CV_TEMPLATE_IDS].sort(),
+      'the free templates must be the ones the product promises'
+    );
+
+    // The three must be three genuinely different documents, not one design
+    // in three colours: their structural signatures have to differ.
+    const signatures = new Set(free.map((template) => cvTemplateStructuralSignature(template.structure)));
+    assert.equal(
+      signatures.size,
+      free.length,
+      'the free templates must be structurally different from one another'
+    );
+
+    const ats = free.find((template) => template.id === FREE_CV_TEMPLATE_ID);
+    assert.ok(ats, 'the default template must be one of the free ones');
+    assert.equal(ats.atsFriendly, true, 'the default template must be ATS-friendly');
+    assert.equal(ats.supportsRtl, true, 'the default template must support Arabic');
+
+    for (const template of free) {
+      assert.equal(template.supportsRtl, true, `${template.id} must support Arabic`);
+    }
   });
 
   test('every other template is premium', () => {
     for (const template of CV_TEMPLATES) {
-      if (template.id === FREE_CV_TEMPLATE_ID) continue;
+      if (isFreeCvTemplateId(template.id)) continue;
       assert.equal(
         template.tier,
         'premium',
@@ -389,11 +411,15 @@ describe('the template access rule', () => {
     assert.equal(access.access, 'included');
   });
 
-  test('the enforcement flag is off unless it is explicitly turned on', () => {
-    assert.equal(isCvTemplatePremiumEnforcementEnabled({}), false);
-    assert.equal(isCvTemplatePremiumEnforcementEnabled({ CV_TEMPLATE_PREMIUM_ENFORCEMENT: '' }), false);
+  test('the enforcement flag is on unless it is explicitly turned off', () => {
+    assert.equal(isCvTemplatePremiumEnforcementEnabled({}), true);
+    assert.equal(isCvTemplatePremiumEnforcementEnabled({ CV_TEMPLATE_PREMIUM_ENFORCEMENT: '' }), true);
     assert.equal(
       isCvTemplatePremiumEnforcementEnabled({ CV_TEMPLATE_PREMIUM_ENFORCEMENT: 'false' }),
+      false
+    );
+    assert.equal(
+      isCvTemplatePremiumEnforcementEnabled({ CV_TEMPLATE_PREMIUM_ENFORCEMENT: '0' }),
       false
     );
     assert.equal(
@@ -442,6 +468,54 @@ describe('the template API', () => {
     }
     const free = res.body.templates.find((t: any) => t.id === FREE_CV_TEMPLATE_ID);
     assert.equal(free?.access.allowed, true, 'the free template is always available');
+  });
+
+  test('the catalogue withholds the layout of a template the candidate may not use', async () => {
+    const res = await api('GET', '/api/cv-templates', { token: freeUser.token });
+    assert.equal(res.status, 200);
+
+    const freeTemplate = res.body.templates.find((t: any) => t.id === FREE_CV_TEMPLATE_ID);
+    const premiumTemplate = res.body.templates.find((t: any) => t.access?.allowed === false);
+
+    assert.ok(freeTemplate, 'the catalogue holds the free template');
+    assert.ok(freeTemplate.structure, 'a template the candidate may use carries its layout');
+    assert.ok(premiumTemplate, 'the catalogue holds a template the candidate may not use');
+    assert.equal(
+      premiumTemplate.structure,
+      null,
+      'the layout of a locked template must not reach the browser'
+    );
+    assert.ok(
+      premiumTemplate.name,
+      'the locked template is still shown — the candidate can see what it is'
+    );
+  });
+
+  test('the preview of a free template is allowed, and a premium one is refused', async () => {
+    const allowed = await api('GET', `/api/cv-templates/${FREE_CV_TEMPLATE_ID}/preview`, {
+      token: freeUser.token,
+    });
+    assert.equal(allowed.status, 200);
+    assert.ok(allowed.body?.structure, 'the layout is handed over for a free template');
+
+    const refused = await api('GET', '/api/cv-templates/modern-gradient/preview', {
+      token: freeUser.token,
+    });
+    assert.equal(refused.status, 403, 'the server must refuse the preview of a premium template');
+    assert.equal(refused.body?.code, 'UPGRADE_REQUIRED');
+    assert.equal(
+      refused.body?.structure,
+      undefined,
+      'a refused preview must not carry the layout'
+    );
+  });
+
+  test('a candidate with an active paid plan may preview a premium template', async () => {
+    const res = await api('GET', '/api/cv-templates/modern-gradient/preview', {
+      token: paidUser.token,
+    });
+    assert.equal(res.status, 200);
+    assert.ok(res.body?.structure, 'the layout is handed over to a paying candidate');
   });
 
   test('a candidate without a paid plan cannot apply a premium template', async () => {

@@ -55,10 +55,12 @@ import { listCvMeasurements } from './server/db/cvMeasurements.ts';
 import { registerBackgroundJobRoutes } from './server/jobs/routes.ts';
 import { registerSubscriptionRoutes } from './server/subscriptions/routes.ts';
 import { registerCvTemplateRoutes } from './server/cvTemplates/routes.ts';
+import { currentCvTemplateRecord } from './server/cvTemplates/service.ts';
+import { registerCreditMonitorRoutes } from './server/admin/creditMonitor.ts';
 import { registerReferralRoutes } from './server/referrals/routes.ts';
 import { registerStripeRoutes } from './server/stripe/routes.ts';
 import { requireEntitlement } from './server/subscriptions/entitlements.ts';
-import { requireCredits } from './server/credits/middleware.ts';
+import { requireCredits, refundAiCreditReservation } from './server/credits/middleware.ts';
 import { boundedList } from './server/ai/boundedList.ts';
 import { generateCoverLetter } from './server/cv/coverLetter.ts';
 import { universalAi, isAnyAiConfigured, getDefaultProvider } from './server/ai/provider.ts';
@@ -82,7 +84,7 @@ declare global {
     }
   }
 }
-import { requireAuth, requireSession } from './server/auth/require-auth.ts';
+import { requireAuth, requireSession, type AuthedRequest } from './server/auth/require-auth.ts';
 import { findProfileByUsername } from './server/db/profiles.ts';
 import { changePassword, changeEmail, deleteAccount } from './server/db/account.ts';
 import { saveState, loadState, unmappedStateFields } from './server/db/state.ts';
@@ -3939,6 +3941,10 @@ app.post('/api/cvs', requireAuth, async (req: Request, res: Response) => {
       name,
       targetRoleTitle: str(body.targetRoleTitle, 200) ?? undefined,
       storagePath,
+      // The template the account is using is recorded with the CV, so that
+      // the platform can tell which layouts are actually used. It is the
+      // template at the moment the CV was made, not a live preference.
+      ...(await currentCvTemplateRecord(req.authUser!.id)),
     });
     return res.status(201).json({ success: true, cv });
   } catch (error) {
@@ -6218,6 +6224,23 @@ app.delete('/api/learning/items/:courseId', requireAuth, async (req: Request, re
  * state, and the AI only sees the already-ranked candidates.
  */
 app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredits('learning_recommendation'), async (req: Request, res: Response) => {
+  /**
+   * Refuses the request, giving the credit back first.
+   *
+   * The credit is spent on a RESULT. A request that is refused produced
+   * nothing, so the reservation is returned — and it is returned BEFORE the
+   * refusal is sent, so that a candidate who reads their balance straight
+   * afterwards sees the credits already back rather than waiting for the
+   * refund to land.
+   */
+  const refuse = async (status: number, error: string) => {
+    await refundAiCreditReservation(
+      req as AuthedRequest,
+      `The Learning Hub request was refused with HTTP ${status}: ${error}`
+    );
+    return res.status(status).json({ error });
+  };
+
   try {
     const body = req.body ?? {};
 
@@ -6225,12 +6248,12 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredi
     const weeklyHours =
       weeklyHoursRaw === undefined || weeklyHoursRaw === null ? undefined : Number(weeklyHoursRaw);
     if (weeklyHours !== undefined && (!Number.isFinite(weeklyHours) || weeklyHours < 1 || weeklyHours > 40)) {
-      return res.status(400).json({ error: 'weeklyHours must be between 1 and 40' });
+      return await refuse(400, 'weeklyHours must be between 1 and 40');
     }
 
     const budget = body.budget === undefined ? undefined : str(body.budget, 20);
     if (budget !== undefined && !LEARNING_BUDGETS.includes(budget as (typeof LEARNING_BUDGETS)[number])) {
-      return res.status(400).json({ error: 'Invalid budget preference' });
+      return await refuse(400, 'Invalid budget preference');
     }
 
     const preferredFormat =
@@ -6240,12 +6263,12 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredi
       preferredFormat !== 'any' &&
       !LEARNING_FORMATS.includes(preferredFormat as LearningFormat)
     ) {
-      return res.status(400).json({ error: 'Invalid learning format preference' });
+      return await refuse(400, 'Invalid learning format preference');
     }
 
     const language = body.language === undefined ? undefined : str(body.language, 5);
     if (language !== undefined && language !== 'en' && language !== 'ar') {
-      return res.status(400).json({ error: 'language must be en or ar' });
+      return await refuse(400, 'language must be en or ar');
     }
 
     // The AI explanation language is an explicit choice. An unknown code is
@@ -6257,7 +6280,7 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredi
     const limitRaw = body.limit;
     const limit = limitRaw === undefined || limitRaw === null ? undefined : Number(limitRaw);
     if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 20)) {
-      return res.status(400).json({ error: 'limit must be between 1 and 20' });
+      return await refuse(400, 'limit must be between 1 and 20');
     }
 
     const built = await buildLearningContext(req.authUser!.id, {
@@ -6274,6 +6297,11 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredi
 
     const deterministic = rankCourses(built.courses, built.context, { limit: built.limit });
     let result;
+    // Whether a model was actually asked. The distinction matters for the
+    // credit: a request that never reached a model did not consume the AI
+    // service the credit pays for.
+    let aiAttempted = false;
+
     if (body.ai === false) {
       result = {
         recommendations: deterministic,
@@ -6287,15 +6315,31 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredi
       // returned. It still draws on the daily budget, so it cannot be used to
       // drain the project's allowance.
       const aiBudget = tryConsumeAiBudget(req.authUser!.id);
+      const aiConfigured = isAnyAiConfigured();
+      aiAttempted = aiConfigured && aiBudget;
       result = await enrichRecommendationsWithAi(deterministic, built.context, {
-        ai:
-          isAnyAiConfigured() && aiBudget ? universalAi : null,
+        ai: aiAttempted ? universalAi : null,
         model: getGeminiModel(),
       });
     }
 
+    // The credit pays for a RESULT. When a model was asked and its answer was
+    // rejected — a timeout, a provider error, a payload that failed
+    // validation — the candidate got the deterministic ranking instead, and
+    // the reservation is given back. The refund is idempotent, so it cannot
+    // return the same credit twice.
+    let creditBalance = req.aiCreditReservation?.remainingBalance ?? 0;
+    if (aiAttempted && !result.aiUsed) {
+      const refund = await refundAiCreditReservation(
+        req as AuthedRequest,
+        `The Learning Hub AI answer was rejected: ${result.aiFallbackReason ?? 'unknown reason'}`
+      );
+      creditBalance = refund.newBalance;
+    }
+
     return res.json({
       ...result,
+      creditBalance,
       context: {
         careerGoal: built.context.careerGoal,
         targetRoleSlug: built.context.targetRole?.slug ?? null,
@@ -6310,6 +6354,12 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredi
     });
   } catch (error) {
     console.error('Failed to generate learning recommendations:', error);
+    // The request produced nothing, so the credit is given back before the
+    // failure is reported.
+    await refundAiCreditReservation(
+      req as AuthedRequest,
+      'The Learning Hub request failed before it produced a result'
+    );
     return res.status(500).json({ error: 'Failed to generate learning recommendations' });
   }
 });
@@ -7126,6 +7176,11 @@ app.patch(
 /* CV templates: catalogue, apply, export and administration                  */
 /* -------------------------------------------------------------------------- */
 registerCvTemplateRoutes(app);
+
+/* -------------------------------------------------------------------------- */
+/* Admin: the credit economy and the CV activity                              */
+/* -------------------------------------------------------------------------- */
+registerCreditMonitorRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* Subscriptions, Payments & Credits Routes                                   */

@@ -154,6 +154,14 @@ export interface RecommendationResult {
   aiFallbackReason: string | null;
   generatedAt: string;
   context?: RecommendationContextSummary;
+  /**
+   * The credits the account holds after this request.
+   *
+   * The server sends the balance it actually holds, so the number on the
+   * badge is the number in the ledger and not the one from before the
+   * request.
+   */
+  creditBalance?: number;
 }
 
 export interface LearningPreferences {

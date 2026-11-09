@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Sparkles,
   CheckCircle2,
@@ -32,6 +32,9 @@ import {
   authorizeCvTemplateExport,
   downloadCvTemplateDocx,
 } from '../../lib/cvTemplatesApi';
+import { takeTailoredCv } from '../../lib/tailoredCvHandoff';
+import { fetchCvTemplateCatalog } from '../../lib/cvTemplatesApi';
+import type { CvTemplateDefinition } from '../../../shared/cvTemplates';
 
 export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = () => {
   const {
@@ -101,6 +104,36 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
     });
   };
 
+  /**
+   * The catalogue the studio draws from.
+   *
+   * It is the catalogue the SERVER sent, not the one the bundle carries: the
+   * server withholds the layout of a template the candidate may not use, so
+   * the studio cannot draw a premium template for an account that has not
+   * paid for it. An account whose stored choice is such a template simply
+   * sees the free one.
+   */
+  const [studioTemplateCatalog, setStudioTemplateCatalog] = useState<CvTemplateDefinition[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCvTemplateCatalog()
+      .then((catalog) => {
+        if (cancelled) return;
+        setStudioTemplateCatalog(
+          catalog.templates
+            .filter((template) => template.structure !== null)
+            .map((template) => ({ ...template, structure: template.structure! }))
+        );
+      })
+      .catch((error) => {
+        console.error('Failed to load the CV template catalogue for the studio:', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // The job description and its analysis live here rather than inside the
   // panel, so a trip to the editor tab does not throw away the advertisement
   // the candidate pasted or the result they already read.
@@ -111,11 +144,40 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
     match: null,
     generated: null,
     isAnalyzing: false,
-    isGenerating: false,
-    error: null,
+    isGenerating: false,    error: null,
     applied: false,
     packageId: null,
   });
+
+  // A vacancy handed over from the Live Jobs screen.
+  //
+  // The posting arrives with its description and its employer, so the studio
+  // opens ready to tailor rather than ready to be told what the job is. The
+  // candidate can still change any of it: the panel edits the same state.
+  const [tailoredCvNotice, setTailoredCvNotice] = useState<{
+    title: string;
+    company: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const request = takeTailoredCv();
+    if (!request) return;
+
+    setJobDescriptionState((previous) => ({
+      ...previous,
+      // The panel is the place the candidate edits, so the handover fills
+      // the fields rather than replacing the panel's own state.
+      jobDescription: request.description,
+      company: request.company,
+      // A posting that has not been analysed yet must not look as though it
+      // had been: the analysis belongs to the posting that was pasted.
+      analysis: null,
+      match: null,
+      generated: null,
+      applied: false,
+    }));
+    setTailoredCvNotice({ title: request.title, company: request.company });
+  }, []);
 
   const latestVersion = cvVersions[0];
   const latestAnalysis = latestVersion?.atsAnalysis;
@@ -419,7 +481,32 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
       {/* TAB 1: THE JOB DESCRIPTION */}
       {activeTab === 'job' && (
-        <JobDescriptionPanel state={jobDescriptionState} setState={setJobDescriptionState} />
+        <div className="space-y-4">
+          {/* The posting that came from the Live Jobs screen. It says where
+              the description came from, because a description the candidate
+              did not write themselves must look different from one they
+              pasted. */}
+          {tailoredCvNotice && (
+            <div
+              role="status"
+              className="flex items-start gap-3 rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--accent-surface)] px-4 py-3"
+            >
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
+              <div className="min-w-0 text-xs">
+                <p className="font-semibold text-[var(--text-primary)]">
+                  {t('Brought over from Live Jobs')}
+                </p>
+                <p className="mt-0.5 text-[var(--text-secondary)]">
+                  {t('{title} at {company}').replace('{title}', tailoredCvNotice.title).replace('{company}', tailoredCvNotice.company)}
+                </p>
+                <p className="mt-1 text-[var(--text-muted)]">
+                  {t('The posting has been filled in for you. Edit it here if you want to change anything before the CV is tailored to it.')}
+                </p>
+              </div>
+            </div>
+          )}
+          <JobDescriptionPanel state={jobDescriptionState} setState={setJobDescriptionState} />
+        </div>
       )}
 
       {/* TAB 1: DOCUMENT EDITOR */}
@@ -463,6 +550,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               cv={activeCV}
               language={settings.resumeLanguage}
               templateId={settings.cvTemplateId}
+              catalog={studioTemplateCatalog}
             />
           </div>
         </div>

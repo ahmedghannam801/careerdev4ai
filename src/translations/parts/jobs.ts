@@ -87,6 +87,18 @@ export const jobsAr: Record<string, string> = {
   'This application could not be saved. Try again.':
     'تعذّر حفظ هذا الطلب. حاول مرة أخرى.',
 
+  // Tailored CV
+  'Create Tailored CV': 'إنشاء سيرة ذاتية مخصصة',
+  'Create a tailored CV for {title}': 'إنشاء سيرة ذاتية مخصصة لوظيفة {title}',
+  'This posting gives no description, so there is nothing to tailor a CV from.':
+    'لا يذكر هذا الإعلان أي وصف، لذلك لا يوجد ما تُبنى عليه سيرة ذاتية مخصصة.',
+  'Opening the CV Studio with this posting…':
+    'جارٍ فتح استوديو السيرة الذاتية بهذا الإعلان…',
+  'Brought over from Live Jobs': 'مُنقول من الوظائف المباشرة',
+  '{title} at {company}': '{title} لدى {company}',
+  'The posting has been filled in for you. Edit it here if you want to change anything before the CV is tailored to it.':
+    'تم ملء الإعلان نيابةً عنك. عدّله هنا إذا أردت تغيير أي شيء قبل تخصيص السيرة الذاتية له.',
+
   // Countries
   'Egypt': 'مصر',
   'Saudi Arabia': 'السعودية',

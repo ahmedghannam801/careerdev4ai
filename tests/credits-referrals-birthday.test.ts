@@ -11,7 +11,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { admin, createTestUser, deleteTestUser, type TestUser } from './helpers.ts';
+import { admin, api, createTestUser, deleteTestUser, type TestUser } from './helpers.ts';
 import {
   DAILY_CREDIT_ALLOWANCE,
   REFERRAL_REWARD_CREDITS,
@@ -168,12 +168,114 @@ test.describe('the daily credit allowance', () => {
     assert.equal(await runningBalance(user.id), 0, 'the balance stayed at zero');
   });
 
-  test('the allowance is one credit and the referral reward cannot exceed it', () => {
-    assert.equal(DAILY_CREDIT_ALLOWANCE, 1, 'the daily allowance is a single credit');
+  test('the allowance is three credits and the referral reward cannot exceed it', async () => {
+    assert.equal(DAILY_CREDIT_ALLOWANCE, 3, 'the daily allowance is three credits');
     assert.ok(
       REFERRAL_REWARD_CREDITS <= DAILY_CREDIT_ALLOWANCE,
       'a referral reward is never worth more than one daily allowance'
     );
+
+    // The allowance lives in the database as well as in the application, so
+    // that the two can never disagree about what the product promises.
+    const { data, error } = await admin.rpc('careerpilot_daily_credit_allowance');
+    assert.equal(error, null, error?.message);
+    assert.equal(
+      data as number,
+      DAILY_CREDIT_ALLOWANCE,
+      'the database grants the same allowance the application promises'
+    );
+  });
+
+  test('tops up an account that was granted under the old, smaller allowance', async () => {
+    await clearCredits(user.id);
+
+    // A bucket created under the old one-credit allowance, on today's
+    // Africa/Cairo day — the day the claim uses. The ledger entry that came
+    // with it is written too, because that is the state the old allowance
+    // really left behind: a grant row and a matching credit.
+    const cairoToday = cairoDate(new Date());
+    const day = `${cairoToday.year}-${String(cairoToday.month).padStart(2, '0')}-${String(cairoToday.day).padStart(2, '0')}`;
+    await admin.from('daily_credit_grants').insert({
+      profile_id: user.id,
+      grant_date: day,
+      granted_amount: 1,
+      remaining: 1,
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+    });
+    await admin.from('ai_credit_ledger').insert({
+      profile_id: user.id,
+      amount: 1,
+      running_balance: 1,
+      operation: 'grant',
+      source_type: 'daily_allowance',
+      idempotency_key: `daily-grant:${user.id}:${day}`,
+      description: 'Daily free credits',
+    });
+
+    const claimed = await admin.rpc('claim_daily_credits', {
+      p_profile_id: user.id,
+      p_amount: DAILY_CREDIT_ALLOWANCE,
+    });
+    assert.equal(claimed.error, null, claimed.error?.message);
+
+    const row = claimed.data as {
+      granted: number;
+      daily_remaining: number;
+      daily_allowance: number;
+      balance: number;
+    };
+    assert.equal(row.daily_allowance, DAILY_CREDIT_ALLOWANCE, 'the bucket is at the full allowance');
+    assert.equal(row.daily_remaining, DAILY_CREDIT_ALLOWANCE, 'the extra credits are usable');
+    assert.equal(row.balance, DAILY_CREDIT_ALLOWANCE, 'the balance matches the ledger');
+
+    // A second claim in the same day tops up nothing more.
+    const again = await admin.rpc('claim_daily_credits', {
+      p_profile_id: user.id,
+      p_amount: DAILY_CREDIT_ALLOWANCE,
+    });
+    const againRow = again.data as { granted: number; balance: number };
+    assert.equal(againRow.granted, 0, 'the top-up is not repeated');
+    assert.equal(againRow.balance, DAILY_CREDIT_ALLOWANCE, 'the balance did not grow');
+  });
+
+  test('the sweep reaches every eligible account, not only the ones that read their balance', async () => {
+    // A second account that has never touched the credit system.
+    const untouched = await createTestUser('daily-credits-sweep');
+    try {
+      await clearCredits(untouched.id);
+
+      const { data: before } = await admin
+        .from('daily_credit_grants')
+        .select('id')
+        .eq('profile_id', untouched.id);
+      assert.equal((before ?? []).length, 0, 'the account starts with no allowance');
+
+      const swept = await admin.rpc('grant_daily_credits_to_all');
+      assert.equal(swept.error, null, swept.error?.message);
+
+      const { data: after } = await admin
+        .from('daily_credit_grants')
+        .select('granted_amount, remaining')
+        .eq('profile_id', untouched.id);
+      assert.equal((after ?? []).length, 1, 'the sweep granted the allowance');
+      assert.equal(
+        (after ?? [])[0]?.granted_amount,
+        DAILY_CREDIT_ALLOWANCE,
+        'the sweep granted the full allowance'
+      );
+
+      // The sweep is idempotent.
+      const again = await admin.rpc('grant_daily_credits_to_all');
+      assert.equal(again.error, null, again.error?.message);
+      const { data: afterAgain } = await admin
+        .from('daily_credit_grants')
+        .select('id')
+        .eq('profile_id', untouched.id);
+      assert.equal((afterAgain ?? []).length, 1, 'a second sweep grants nothing more');
+    } finally {
+      await clearCredits(untouched.id);
+      await deleteTestUser(untouched);
+    }
   });
 });
 
@@ -288,6 +390,95 @@ function cairoDayOffset(base: { year: number; month: number; day: number }, offs
   const shifted = new Date(Date.UTC(base.year, base.month - 1, base.day + offset));
   return cairoDate(shifted);
 }
+
+test.describe('the Learning Hub and the credit it spends', () => {
+  let user: TestUser;
+
+  test.before(async () => {
+    user = await createTestUser('learning-hub-credits');
+  });
+
+  test.after(async () => {
+    await clearCredits(user.id);
+    await deleteTestUser(user);
+  });
+
+  /**
+   * The balance the API reports.
+   *
+   * The number on the screen is the number the ledger holds, so the test
+   * compares the two rather than trusting either.
+   */
+  async function reportedBalance(): Promise<number> {
+    const res = await api('GET', '/api/credits/balance', { token: user.token });
+    assert.equal(res.status, 200, res.body?.error);
+    return res.body?.balance as number;
+  }
+
+  test('the daily allowance is enough to use the Learning Hub', async () => {
+    await clearCredits(user.id);
+
+    const before = await reportedBalance();
+    assert.ok(
+      before >= DAILY_CREDIT_ALLOWANCE,
+      `the daily allowance of ${DAILY_CREDIT_ALLOWANCE} must be available, found ${before}`
+    );
+
+    // The Learning Hub is one credit. With the allowance it can be used and
+    // the balance afterwards must be exactly one credit lower.
+    const hub = await api('POST', '/api/learning/recommendations', {
+      token: user.token,
+      body: { ai: false },
+    });
+    assert.equal(hub.status, 200, hub.body?.error);
+
+    const after = await reportedBalance();
+    assert.equal(
+      after,
+      before - 1,
+      'a successful Learning Hub request costs exactly one credit'
+    );
+    assert.equal(
+      hub.body?.creditBalance,
+      after,
+      'the balance the request reports must be the balance the ledger holds'
+    );
+  });
+
+  test('a refused request does not spend a credit', async () => {
+    await clearCredits(user.id);
+    const before = await reportedBalance();
+    assert.ok(before > 0, 'the account starts with credits');
+
+    // The request is refused by validation: there is no weekly-hours figure
+    // and no role. Nothing was produced, so nothing may be charged.
+    const refused = await api('POST', '/api/learning/recommendations', {
+      token: user.token,
+      body: { weeklyHours: 'not-a-number' },
+    });
+    assert.ok(refused.status >= 400, 'the request is refused');
+
+    const after = await reportedBalance();
+    assert.equal(after, before, 'a failed request must not spend a credit');
+  });
+
+  test('the allowance is spent before anything else, and the ledger agrees', async () => {
+    await clearCredits(user.id);
+    const before = await reportedBalance();
+
+    const hub = await api('POST', '/api/learning/recommendations', {
+      token: user.token,
+      body: { ai: false },
+    });
+    assert.equal(hub.status, 200, hub.body?.error);
+
+    assert.equal(
+      await runningBalance(user.id),
+      before - 1,
+      'the ledger must hold the same balance the API reported'
+    );
+  });
+});
 
 test.describe('the birthday discount', () => {
   test('belongs to one day only', () => {

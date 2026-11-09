@@ -38,7 +38,12 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     HeadingLevel,
     Packer,
     Paragraph,
+    Table,
+    TableCell,
+    TableRow,
     TextRun,
+    VerticalAlign,
+    WidthType,
   } = await import('docx');
 
   const document = buildCvTemplateDocument(input.cv, input.language);
@@ -47,9 +52,24 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   const alignment = rtl ? AlignmentType.RIGHT : AlignmentType.LEFT;
   const headingAlignment = rtl ? AlignmentType.RIGHT : AlignmentType.LEFT;
 
-  const children: InstanceType<typeof Paragraph>[] = [];
+  /**
+   * The blocks of the document.
+   *
+   * A paragraph for most of it, and a table for the two-column layouts: the
+   * page is a table when the template has a sidebar.
+   */
+  const children: Array<
+    InstanceType<typeof Paragraph> | InstanceType<typeof Table>
+  > = [];
+  /**
+   * The masthead: the name, the title and the contact line.
+   *
+   * It is kept apart from the sections because a template with a sidebar
+   * puts it in the wide column, not above both.
+   */
+  const headerBlocks: InstanceType<typeof Paragraph>[] = [];
 
-  children.push(
+  headerBlocks.push(
     new Paragraph({
       heading: HeadingLevel.TITLE,
       alignment,
@@ -67,7 +87,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   );
 
   if (document.title) {
-    children.push(
+    headerBlocks.push(
       new Paragraph({
         alignment,
         bidirectional: rtl,
@@ -85,7 +105,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   }
 
   if (document.contact.length > 0) {
-    children.push(
+    headerBlocks.push(
       new Paragraph({
         alignment,
         bidirectional: rtl,
@@ -105,43 +125,57 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     );
   }
 
+  /**
+   * The heading of a section.
+   *
+   * The numbering and the capitals are the template's, so a document exported
+   * with a numbered design is numbered in Word as well as on the screen.
+   */
   const heading = (section: CvDocumentSection, index: number) => {
     const prefix =
       input.template.structure.headingStyle === 'numbered'
         ? `${String(index + 1).padStart(2, '0')}  `
         : '';
-    children.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        alignment: headingAlignment,
-        bidirectional: rtl,
-        spacing: { before: 220, after: 80 },
-        border: {
-          bottom: {
-            color: input.template.accent.replace('#', ''),
-            size: 8,
-            style: BorderStyle.SINGLE,
-            space: 4,
-          },
+    return new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      alignment: headingAlignment,
+      bidirectional: rtl,
+      spacing: { before: 220, after: 80 },
+      border: {
+        bottom: {
+          color: input.template.accent.replace('#', ''),
+          size: 8,
+          style: BorderStyle.SINGLE,
+          space: 4,
         },
-        children: [
-          new TextRun({
-            text: `${prefix}${section.heading}`,
-            bold: true,
-            size: 21,
-            allCaps: input.template.structure.headingStyle === 'uppercase',
-            rightToLeft: rtl,
-          }),
-        ],
-      })
-    );
+      },
+      children: [
+        new TextRun({
+          text: `${prefix}${section.heading}`,
+          bold: true,
+          size: 21,
+          allCaps: input.template.structure.headingStyle === 'uppercase',
+          rightToLeft: rtl,
+        }),
+      ],
+    });
   };
 
-  sections.forEach((section, index) => {
-    heading(section, index);
+  /**
+   * The blocks of one section.
+   *
+   * They are collected per section rather than pushed straight onto the
+   * document, because a template with a sidebar needs to know which blocks
+   * belong in the narrow column before it can lay the page out.
+   */
+  const sectionBlocks = (
+    section: CvDocumentSection,
+    index: number
+  ): InstanceType<typeof Paragraph>[] => {
+    const blocks: InstanceType<typeof Paragraph>[] = [heading(section, index)];
 
     if (section.kind === 'text') {
-      children.push(
+      blocks.push(
         new Paragraph({
           alignment,
           bidirectional: rtl,
@@ -149,11 +183,11 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           children: [new TextRun({ text: section.text ?? '', size: 21, rightToLeft: rtl })],
         })
       );
-      return;
+      return blocks;
     }
 
     if (section.kind === 'inline') {
-      children.push(
+      blocks.push(
         new Paragraph({
           alignment,
           bidirectional: rtl,
@@ -163,12 +197,12 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           ],
         })
       );
-      return;
+      return blocks;
     }
 
     for (const entry of section.entries) {
       const titleParts = [entry.title, entry.subtitle].filter(Boolean).join(' — ');
-      children.push(
+      blocks.push(
         new Paragraph({
           alignment,
           bidirectional: rtl,
@@ -191,7 +225,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       );
 
       if (entry.location) {
-        children.push(
+        blocks.push(
           new Paragraph({
             alignment,
             bidirectional: rtl,
@@ -204,7 +238,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       }
 
       if (entry.description) {
-        children.push(
+        blocks.push(
           new Paragraph({
             alignment,
             bidirectional: rtl,
@@ -217,7 +251,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       }
 
       for (const bullet of entry.bullets) {
-        children.push(
+        blocks.push(
           new Paragraph({
             alignment,
             bidirectional: rtl,
@@ -229,7 +263,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       }
 
       if (entry.tags.length > 0) {
-        children.push(
+        blocks.push(
           new Paragraph({
             alignment,
             bidirectional: rtl,
@@ -247,7 +281,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       }
 
       if (entry.url) {
-        children.push(
+        blocks.push(
           new Paragraph({
             alignment,
             bidirectional: rtl,
@@ -270,7 +304,78 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         );
       }
     }
-  });
+
+    return blocks;
+  };
+
+  const rendered = sections.map((section, index) => ({
+    section,
+    blocks: sectionBlocks(section, index),
+  }));
+
+  /**
+   * The layout of the page.
+   *
+   * A template with a sidebar puts the short sections — the skills, the
+   * languages, the certificates — in a narrow column and the evidence in a
+   * wide one. Word carries that as a two-cell table, which is why the
+   * exported document has the same shape as the preview rather than the same
+   * words in a different arrangement.
+   */
+  const sidebarSections = input.template.structure.sidebarSections ?? [];
+  const hasSidebar =
+    (input.template.structure.layout === 'sidebar-left' ||
+      input.template.structure.layout === 'sidebar-right') &&
+    sidebarSections.length > 0;
+
+  if (hasSidebar) {
+    const inSidebar = new Set(sidebarSections);
+    const sidebarBlocks = rendered
+      .filter((entry) => inSidebar.has(entry.section.key))
+      .flatMap((entry) => entry.blocks);
+    const mainBlocks = [
+      ...headerBlocks,
+      ...rendered.filter((entry) => !inSidebar.has(entry.section.key)).flatMap((entry) => entry.blocks),
+    ];
+
+    const sidebarCell = new TableCell({
+      width: { size: 28, type: WidthType.PERCENTAGE },
+      verticalAlign: VerticalAlign.TOP,
+      margins: { top: 0, bottom: 0, left: 0, right: 200 },
+      children: sidebarBlocks,
+    });
+    const mainCell = new TableCell({
+      width: { size: 72, type: WidthType.PERCENTAGE },
+      verticalAlign: VerticalAlign.TOP,
+      margins: { top: 0, bottom: 0, left: 200, right: 0 },
+      children: mainBlocks,
+    });
+
+    const row = new TableRow({
+      children:
+        input.template.structure.layout === 'sidebar-left'
+          ? [sidebarCell, mainCell]
+          : [mainCell, sidebarCell],
+    });
+
+    children.push(
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+          top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        },
+        rows: [row],
+      })
+    );
+  } else {
+    children.push(...headerBlocks);
+    for (const entry of rendered) children.push(...entry.blocks);
+  }
 
   const doc = new Document({
     creator: 'CareerDev4AI',

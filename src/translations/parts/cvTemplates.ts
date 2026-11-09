@@ -107,6 +107,14 @@ export const cvTemplatesAr: Record<string, string> = {
     'تعذّر إكمال تصدير Word. يُرجى المحاولة مرة أخرى.',
   'This template is not available on your plan.':
     'هذا القالب غير متاح في خطتك.',
+  'This template is part of a paid plan.':
+    'هذا القالب ضمن خطة مدفوعة.',
+  'The preview of this template is not available on your plan.':
+    'معاينة هذا القالب غير متاحة في خطتك.',
+  'Upgrade to see the layout of this template.':
+    'اشترك لرؤية تخطيط هذا القالب.',
+  '{count} pages': '{count} صفحات',
+  '1 page': 'صفحة واحدة',
 
   // Administration.
   'CV templates': 'قوالب السيرة الذاتية',

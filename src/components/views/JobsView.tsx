@@ -34,6 +34,9 @@ import { EmptyState } from '../ui/EmptyState';
 import { LiveJobCard } from '../jobs/LiveJobCard';
 import { fetchLiveJobs, type JobQuota, type JobSearchFilters, type MatchedJob } from '../../lib/jobsApi';
 import { ApiRequestError } from '../../lib/apiClient';
+import { buildRouteHash } from '../../lib/routing';
+import { refreshRoute } from '../../lib/useRouteParams';
+import { stageTailoredCv } from '../../lib/tailoredCvHandoff';
 import {
   JOB_COUNTRIES,
   JOB_COUNTRY_LABELS,
@@ -60,6 +63,14 @@ const EMPLOYMENT_LABELS: Record<string, string> = {
   CONTRACTOR: 'Contract',
   INTERN: 'Internship',
 };
+
+/**
+ * How long the screen waits before it hands the candidate to the studio.
+ *
+ * The studio replaces this screen, so the confirmation of the request is
+ * given during a short pause rather than being lost in the change of view.
+ */
+const TAILOR_HANDOFF_DELAY_MS = 400;
 
 interface JobsViewProps {
   onNavigate: (view: string) => void;
@@ -132,9 +143,15 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const [trackingId, setTrackingId] = useState<string | null>(null);
   /** The outcome of the last application the user tracked from this screen. */
   const [trackNotice, setTrackNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  /** The vacancy that is on its way to the CV Studio. */
+  const [tailoringId, setTailoringId] = useState<string | null>(null);
+  /** The outcome of the last request for a tailored CV. */
+  const [tailorNotice, setTailorNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   /** The first search runs once, after the profile has loaded. */
   const startedRef = useRef(false);
+  /** The pending trip to the studio, so it can be called off. */
+  const tailorTimerRef = useRef<number | null>(null);
 
   const runSearch = useCallback(async (next: JobSearchFilters) => {
     setLoading(true);
@@ -255,6 +272,59 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       setTrackingId(null);
     }
   };
+
+  /**
+   * Hands a vacancy to the CV Studio, to be tailored for it.
+   *
+   * The posting is staged rather than put in the address bar: its
+   * description is long and does not belong in a URL. The studio is opened
+   * on its "improve" step, which is the tab where a job is tailored.
+   */
+  const handleCreateTailoredCv = (item: MatchedJob) => {
+    const { job } = item;
+    const description = (job.description ?? '').trim();
+    if (!description) {
+      setTailorNotice({
+        ok: false,
+        text: t('This posting gives no description, so there is nothing to tailor a CV from.'),
+      });
+      return;
+    }
+
+    stageTailoredCv({
+      jobId: job.id,
+      title: job.title,
+      company: job.company,
+      description,
+      location: job.location ?? null,
+      applyUrl: job.applyUrl ?? null,
+      url: job.url ?? null,
+    });
+
+    setTailoringId(job.id);
+    setTailorNotice({ ok: true, text: t('Opening the CV Studio with this posting…') });
+
+    if (tailorTimerRef.current !== null) window.clearTimeout(tailorTimerRef.current);
+    tailorTimerRef.current = window.setTimeout(() => {
+      tailorTimerRef.current = null;
+      setTailoringId(null);
+      // The view change comes first: `onNavigate` writes the route into the
+      // address bar itself, so the studio's tab is written afterwards, with
+      // the router's own helper, onto the same entry.
+      onNavigate('cv-studio');
+      window.history.replaceState(null, '', buildRouteHash('cv-studio', { tab: 'job' }));
+      refreshRoute();
+    }, TAILOR_HANDOFF_DELAY_MS);
+  };
+
+  // The trip to the studio is made on a timer, so a screen that is left
+  // before it fires does not pull the candidate away from where they went.
+  useEffect(
+    () => () => {
+      if (tailorTimerRef.current !== null) window.clearTimeout(tailorTimerRef.current);
+    },
+    [],
+  );
 
   const inputClass =
     'w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] focus:outline-none transition-colors';
@@ -571,7 +641,9 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               bookmarked={bookmarkedJobIds.includes(item.job.id)}
               onToggleBookmark={toggleBookmarkJob}
               onTrackApplication={(entry) => void handleTrackApplication(entry)}
+              onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
               tracking={trackingId === item.job.id}
+              tailoring={tailoringId === item.job.id}
               t={t}
             />
           ))}
@@ -589,6 +661,20 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           }`}
         >
           {trackNotice.text}
+        </p>
+      )}
+
+      {/* The outcome of the last request for a tailored CV. */}
+      {tailorNotice && (
+        <p
+          role="status"
+          className={`rounded-xl border px-4 py-2.5 text-xs font-semibold ${
+            tailorNotice.ok
+              ? 'border-[var(--color-success)]/25 bg-[var(--color-success)]/10 text-[var(--color-success)]'
+              : 'border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
+          }`}
+        >
+          {tailorNotice.text}
         </p>
       )}
 

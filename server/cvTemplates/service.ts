@@ -26,10 +26,26 @@ import {
   type CvTemplateAccessContext,
   type CvTemplateAdminRow,
   type CvTemplateDefinition,
+  type CvTemplateStructure,
 } from '../../shared/cvTemplates.ts';
 
 export interface CvTemplateCatalogResult {
-  templates: Array<CvTemplateDefinition & { access: ReturnType<typeof resolveCvTemplateAccess> }>;
+  /**
+   * Every template the candidate may see, with the access decision attached.
+   *
+   * The LAYOUT of a locked template is not included. The layout is the
+   * product: a premium template's structure is handed to the browser only
+   * when the server has decided that this candidate may use it. The metadata
+   * — the name, the description, the picture of it — is always included, so
+   * the library can show what a premium template is and why it is worth
+   * having.
+   */
+  templates: Array<
+    Omit<CvTemplateDefinition, 'structure'> & {
+      structure: CvTemplateStructure | null;
+      access: ReturnType<typeof resolveCvTemplateAccess>;
+    }
+  >;
   enforcementEnabled: boolean;
   currentTemplateId: string;
   /** False when the `cv_templates` table has not been migrated yet. */
@@ -142,7 +158,14 @@ export async function getCvTemplateCatalog(
   }
 
   return {
-    templates: applyCvTemplateAccess(catalog, accessContext),
+    templates: applyCvTemplateAccess(catalog, accessContext).map((template) =>
+      // The layout of a template the candidate may not use is not sent. The
+      // browser cannot draw what it does not have, so a premium template is
+      // locked by the absence of its layout and not only by a badge.
+      template.access.allowed
+        ? { ...template, structure: template.structure }
+        : { ...template, structure: null }
+    ),
     enforcementEnabled: accessContext.enforcementEnabled,
     currentTemplateId,
     adminTableAvailable: available,
@@ -183,6 +206,32 @@ export async function resolveCvTemplateForUser(
   const template = resolveCvTemplate(templateId, catalog);
   const accessContext = await getCvTemplateAccessContext(profileId);
   return { template, access: resolveCvTemplateAccess(template, accessContext) };
+}
+
+/**
+ * The template the account is using, recorded as a fact about a document.
+ *
+ * The tier is read from the LIVE catalogue rather than from the built-in
+ * list, so that an administrator who changes a template's tier is reflected
+ * in what the platform reports about the templates that were used.
+ */
+export async function currentCvTemplateRecord(
+  profileId: string
+): Promise<{ templateId: string | null; templateTier: string | null }> {
+  try {
+    const preferences = await getPreferences(profileId);
+    const templateId = normalizeCvTemplateId(preferences?.cv_template_id);
+    const { rows } = await listCvTemplateRows();
+    const catalog = buildCvTemplateCatalog(rows);
+    const template = catalog.find((entry) => entry.id === templateId);
+    return {
+      templateId: template?.id ?? null,
+      templateTier: template?.tier ?? null,
+    };
+  } catch (error) {
+    console.error('Failed to read the CV template in use:', error);
+    return { templateId: null, templateTier: null };
+  }
 }
 
 /* -------------------------------------------------------------------------- */

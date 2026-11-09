@@ -4036,6 +4036,18 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         roadmapSkillCount: result.context?.roadmapSkillCount ?? prev.roadmapSkillCount,
       }));
       setLearningError(null);
+
+      // The balance the server reports after the operation is the balance the
+      // ledger holds, so the badge is corrected straight away rather than on
+      // the next visit. The request reads the balance again as a safety net
+      // for a server that did not report one.
+      if (typeof result.creditBalance === 'number') {
+        setCreditBalance((previous) =>
+          previous ? { ...previous, balance: result.creditBalance as number } : previous
+        );
+      } else {
+        void refreshCredits();
+      }
     } catch (error) {
       setLearningError(error instanceof Error ? error.message : 'Failed to load recommendations');
     } finally {

@@ -103,16 +103,21 @@ export interface CreditLedgerDTO {
  * resets at midnight in the platform's documented timezone (Africa/Cairo), and
  * it does not accumulate: yesterday's unused allowance simply expires.
  *
- * The size is deliberately conservative. One credit buys one lightweight
- * operation (`job_description_analysis`, `ai_assist_inline`,
- * `learning_recommendation`, `project_analysis` all cost 1). The heavier
- * operations cost 2 to 5 credits — a CV ATS analysis costs 2, a CV generation
- * or a roadmap costs 4, a mock interview costs 5 — so a candidate living on
- * the daily allowance alone performs roughly one light action every two to
- * five days. That is far below the cheapest paid plan (25 credits for 99 EGP)
- * and it never unlocks a paid-only entitlement.
+ * The size is three credits. That is the number the product promises, and it
+ * is the number the database grants: `claim_daily_credits` reads the
+ * allowance from `careerpilot_daily_credit_allowance()` rather than from this
+ * constant, so the two can never disagree. This constant is the application
+ * side of the same promise, and the two are asserted to be equal by the test
+ * suite.
+ *
+ * Three credits buy three lightweight operations (`job_description_analysis`,
+ * `ai_assist_inline`, `learning_recommendation`, `project_analysis` all cost
+ * 1), or one heavier one — a CV ATS analysis costs 2, a CV generation or a
+ * roadmap costs 4, a mock interview costs 5. The allowance is still far below
+ * the cheapest paid plan (25 credits for 99 EGP) and it never unlocks a
+ * paid-only entitlement.
  */
-export const DAILY_CREDIT_ALLOWANCE = 1;
+export const DAILY_CREDIT_ALLOWANCE = 3;
 
 /**
  * The reward a referrer receives for a verified referral.

@@ -36,6 +36,7 @@ import { useCareer } from '../../../context/CareerContext';
 import {
   applyCvTemplate,
   fetchCvTemplateCatalog,
+  fetchCvTemplatePreview,
   type CvTemplateCatalogResponse,
   type CvTemplateWithAccess,
 } from '../../../lib/cvTemplatesApi';
@@ -44,6 +45,7 @@ import {
   filterCvTemplates,
   recommendCvTemplates,
   type CvTemplateCategoryFilter,
+  type CvTemplateStructure,
   type CvTemplateTierFilter,
 } from '../../../../shared/cvTemplates';
 import { CvTemplatePreview } from './CvTemplatePreview';
@@ -89,9 +91,47 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
   const [category, setCategory] = useState<CvTemplateCategoryFilter>('all');
   const [tier, setTier] = useState<CvTemplateTierFilter>('all');
   const [preview, setPreview] = useState<CvTemplateWithAccess | null>(null);
+  /**
+   * The layout of the template being previewed.
+   *
+   * The catalogue does not carry the layout of a template the candidate may
+   * not use, so a preview of one asks the server for it. The server answers
+   * with the layout or with a refusal, and the refusal is shown as such: a
+   * premium template that cannot be previewed is not quietly previewed
+   * anyway.
+   */
+  const [previewStructure, setPreviewStructure] = useState<CvTemplateStructure | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+
+  /**
+   * Opens the preview of a template.
+   *
+   * The layout comes from the server whenever the catalogue did not carry
+   * it, which is exactly when the candidate's entitlement has to be checked
+   * by the server rather than assumed.
+   */
+  const openPreview = useCallback(async (template: CvTemplateWithAccess) => {
+    setPreview(template);
+    setPreviewError(null);
+    setPreviewStructure(template.structure);
+
+    if (template.structure) return;
+
+    try {
+      const result = await fetchCvTemplatePreview(template.id);
+      setPreviewStructure(result.structure);
+    } catch (error) {
+      setPreviewStructure(null);
+      setPreviewError(
+        error instanceof Error
+          ? error.message
+          : 'This template could not be previewed.'
+      );
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -208,7 +248,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
       <article key={template.id} className={CARD}>
         <button
           type="button"
-          onClick={() => setPreview(template)}
+          onClick={() => void openPreview(template)}
           className="relative block w-full text-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
           aria-label={`${t('Preview')}: ${displayName(template)}`}
         >
@@ -216,6 +256,10 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
             template={template}
             language={settings.resumeLanguage}
             loadingLabel={t('Loading preview')}
+            lockedLabel={t('This template is part of a paid plan.')}
+            pageCountLabel={(pages) =>
+              pages === 1 ? t('1 page') : t('{count} pages').replace('{count}', String(pages))
+            }
           />
           <span className="absolute start-2 top-2 flex flex-wrap gap-1">
             {isCurrent && (
@@ -264,7 +308,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
           <div className="mt-auto flex items-center gap-2 pt-1">
             <button
               type="button"
-              onClick={() => setPreview(template)}
+              onClick={() => void openPreview(template)}
               className="rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
             >
               {t('Preview')}
@@ -564,12 +608,32 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--surface-secondary)] p-3 sm:p-5">
-              <CvTemplatePreview
-                template={preview}
-                language={settings.resumeLanguage}
-                mode="full"
-                loadingLabel={t('Loading preview')}
-              />
+              {previewStructure ? (
+                <CvTemplatePreview
+                  template={{ ...preview, structure: previewStructure }}
+                  language={settings.resumeLanguage}
+                  mode="full"
+                  loadingLabel={t('Loading preview')}
+                  lockedLabel={t('This template is part of a paid plan.')}
+                  pageCountLabel={(pages) =>
+                    pages === 1 ? t('1 page') : t('{count} pages').replace('{count}', String(pages))
+                  }
+                />
+              ) : (
+                // The server refused to hand over the layout. The refusal is
+                // the answer: a premium template that cannot be previewed is
+                // not previewed by another route.
+                <div className="flex min-h-[420px] flex-col items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)]/60 px-6 text-center">
+                  <Lock className="h-5 w-5 text-[var(--text-muted)]" aria-hidden="true" />
+                  <p className="text-xs font-semibold text-[var(--text-secondary)]">
+                    {previewError ?? t('This template is part of a paid plan.')}
+                  </p>
+                  <p className="max-w-sm text-[11px] leading-relaxed text-[var(--text-muted)]">
+                    {previewError
+                      ? t('The preview of this template is not available on your plan.')
+                      : t('Upgrade to see the layout of this template.')}
+                  </p>                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] p-4 sm:flex-row sm:items-center sm:justify-between">

@@ -12,13 +12,17 @@
  *     looking at colour or typography;
  *   - the server can authorise a template without importing React.
  *
- * Exactly one template is permanently free. Everything else is premium. The
- * platform's current policy is 100% free, so premium ENFORCEMENT is a server
- * flag that defaults to off: the catalogue still marks one free and the rest
- * premium, but until the flag is switched on every candidate can use every
- * template and simply sees the Premium badge. When the flag is on, a premium
- * template requires an active, verified paid plan — never a client flag and
- * never a temporary-access payment that an administrator has not verified.
+ * Exactly THREE templates are free — an ATS-safe plain one, a modern
+ * two-column one and a timeline one — so that a candidate with no plan can
+ * still choose between genuinely different documents. Every other template is
+ * premium and the SERVER decides: a premium template needs an active,
+ * verified paid plan, never a client flag and never a temporary-access
+ * payment that an administrator has not verified.
+ *
+ * Enforcement is therefore ON by default. It can be switched off with
+ * `CV_TEMPLATE_PREMIUM_ENFORCEMENT=false` for a launch that is free for
+ * everyone, but the product's own rule is the one that applies unless the
+ * owner says otherwise.
  */
 
 import type { SubscriptionPlanCode } from './subscriptions.ts';
@@ -289,6 +293,16 @@ export interface CvTemplateDefinition {
   disabled?: boolean;
 }
 
+/**
+ * A template without its layout.
+ *
+ * The server sends the name, the description and the category of every
+ * template, so the library can show what a template is, but it sends the
+ * LAYOUT only to a candidate who may use it. The parts of the catalogue that
+ * only read metadata — the filter, the recommendation — work on this shape.
+ */
+export type CvTemplateMetadata = Omit<CvTemplateDefinition, 'structure'>;
+
 interface TemplateSeed {
   id: string;
   name: string;
@@ -477,8 +491,8 @@ const SEEDS: readonly TemplateSeed[] = [
   /* ---- ATS Essentials ---------------------------------------------------- */
   {
     id: 'ats-classic',
-    name: 'Classic ATS',
-    nameAr: 'كلاسيكية ATS',
+    name: 'Minimal ATS-Friendly',
+    nameAr: 'ATS بسيط وآمن',
     category: 'ats',
     tier: 'free',
     featured: true,
@@ -620,6 +634,7 @@ const SEEDS: readonly TemplateSeed[] = [
     name: 'Professional Timeline',
     nameAr: 'الخط الزمني المهني',
     category: 'professional',
+    tier: 'free',
     featured: true,
     description:
       'A vertical rail runs the length of the career, making progression and tenure the first thing a reader sees.',
@@ -749,6 +764,36 @@ const SEEDS: readonly TemplateSeed[] = [
   },
 
   /* ---- Modern ------------------------------------------------------------ */
+  {
+    id: 'modern-professional',
+    name: 'Modern Professional',
+    nameAr: 'احترافية عصرية',
+    category: 'modern',
+    tier: 'free',
+    featured: true,
+    description:
+      'A wide banner header over a two-column body: the profile and the evidence sit side by side, and the evidence column stays full width for the long entries.',
+    descriptionAr:
+      'ترويسة عريضة فوق متن من عمودين: الملف والأدلة جنبًا إلى جنب، ويبقى عمود الأدلة بعرض كامل للبنود الطويلة.',
+    bestFor: 'A candidate who wants their CV to look designed without looking decorated.',
+    tags: ['modern', 'two column', 'banner', 'free'],
+    accent: '#4f46e5',
+    typography: 'sans',
+    structure: {
+      layout: 'sidebar-left',
+      header: 'banner',
+      sectionOrder: ORDER_TECHNICAL,
+      sidebarSections: ['skills', 'languages', 'certifications'],
+      dividers: 'accent',
+      headingStyle: 'bar',
+      bulletStyle: 'arrow',
+      entryStyle: 'stacked',
+      skillsStyle: 'chips',
+      density: 'standard',
+      accentPosition: 'heading',
+      showIcons: true,
+    },
+  },
   {
     id: 'modern-minimal',
     name: 'Minimal Modern',
@@ -1020,6 +1065,35 @@ const SEEDS: readonly TemplateSeed[] = [
   },
 
   /* ---- Executive --------------------------------------------------------- */
+  {
+    id: 'executive-premium',
+    name: 'Executive / Premium',
+    nameAr: 'تنفيذية / مميزة',
+    category: 'executive',
+    featured: true,
+    description:
+      'A dark masthead over a narrow evidence rail, with every leadership role set as a bordered card. Built for a board, a partner or a director panel.',
+    descriptionAr:
+      'ترويسة داكنة فوق مسار أدلة ضيق، مع ضبط كل دور قيادي في بطاقة مؤطّرة. مصممة لمجلس أو شريك أو لجنة مديرين.',
+    bestFor: 'Directors, partners and candidates at board level.',
+    tags: ['executive', 'leadership', 'cards', 'impact'],
+    accent: '#0f172a',
+    typography: 'serif',
+    structure: {
+      layout: 'sidebar-right',
+      header: 'editorial',
+      sectionOrder: ORDER_CORPORATE,
+      sidebarSections: ['skills', 'languages', 'certifications', 'awards'],
+      dividers: 'block',
+      headingStyle: 'numbered',
+      bulletStyle: 'none',
+      entryStyle: 'card',
+      skillsStyle: 'bars',
+      density: 'spacious',
+      accentPosition: 'top',
+      showIcons: true,
+    },
+  },
   {
     id: 'executive-summary',
     name: 'Executive Summary',
@@ -1429,11 +1503,28 @@ export const CV_TEMPLATES: readonly CvTemplateDefinition[] = SEEDS.map((seed, in
   defineTemplate(seed, index + 1)
 );
 
+/**
+ * The templates every candidate may use without a subscription.
+ *
+ * There are three, and they are three genuinely different documents rather
+ * than three colour schemes: a plain single-column page a parser reads
+ * cleanly, a two-column modern page, and a timeline that runs the length of
+ * the career. A candidate with no plan can therefore still choose a
+ * structure that suits the posting rather than being handed the one ATS
+ * template.
+ */
+export const FREE_CV_TEMPLATE_IDS = ['ats-classic', 'modern-professional', 'professional-timeline'] as const;
+
 /** The one template that is free for everyone, forever. */
 export const FREE_CV_TEMPLATE_ID = 'ats-classic';
 
 /** The template a candidate gets before they have chosen one. */
 export const DEFAULT_CV_TEMPLATE_ID = FREE_CV_TEMPLATE_ID;
+
+/** True when a template is one of the free ones. */
+export function isFreeCvTemplateId(id: string): boolean {
+  return (FREE_CV_TEMPLATE_IDS as readonly string[]).includes(id);
+}
 
 /**
  * Turns anything into a usable template id.
@@ -1508,10 +1599,10 @@ export interface CvTemplateFilter {
  * "أكاديمي" finds the academic templates just as one who types "academic"
  * does.
  */
-export function filterCvTemplates(
-  catalog: readonly CvTemplateDefinition[],
+export function filterCvTemplates<T extends CvTemplateMetadata>(
+  catalog: readonly T[],
   filter: CvTemplateFilter
-): CvTemplateDefinition[] {
+): T[] {
   const query = (filter.query ?? '').trim().toLowerCase();
   const category = filter.category ?? 'all';
   const tier = filter.tier ?? 'all';
@@ -1571,7 +1662,7 @@ export interface CvTemplateRecommendation {
  */
 export function recommendCvTemplates(
   context: CvTemplateRecommendationContext,
-  catalog: readonly CvTemplateDefinition[] = CV_TEMPLATES
+  catalog: readonly CvTemplateMetadata[] = CV_TEMPLATES
 ): CvTemplateRecommendation[] {
   const available = new Set(catalog.map((template) => template.id));
   const role = (context.targetRoleTitle ?? '').toLowerCase();
@@ -1661,20 +1752,24 @@ export function recommendCvTemplates(
 /**
  * The server flag that turns premium template enforcement on.
  *
- * It is deliberately OFF by default. The platform's current policy is that
- * everything is free; the catalogue still records which templates are premium
- * so the product can be switched to paid without a migration, but no
- * candidate is locked out until the owner explicitly sets this flag.
+ * Enforcement is ON unless the owner explicitly turns it off. The product's
+ * rule is that a candidate with no paid plan reaches the three free templates
+ * and no others, so the default is the rule rather than the exception. A
+ * launch that is free for everyone sets
+ * `CV_TEMPLATE_PREMIUM_ENFORCEMENT=false` and the whole catalogue becomes
+ * available; the tiers are still recorded either way.
  */
 export const CV_TEMPLATE_PREMIUM_ENFORCEMENT_ENV = 'CV_TEMPLATE_PREMIUM_ENFORCEMENT';
 
-/** Reads the enforcement flag. Only an explicit true-like value turns it on. */
+/** Reads the enforcement flag. Only an explicit false-like value turns it off. */
 export function isCvTemplatePremiumEnforcementEnabled(
   env: Record<string, string | undefined> = {}
 ): boolean {
   const raw = env[CV_TEMPLATE_PREMIUM_ENFORCEMENT_ENV];
-  if (typeof raw !== 'string') return false;
-  return ['true', '1', 'on', 'yes'].includes(raw.trim().toLowerCase());
+  if (typeof raw !== 'string') return true;
+  const value = raw.trim().toLowerCase();
+  if (!value) return true;
+  return !['false', '0', 'off', 'no'].includes(value);
 }
 
 export type CvTemplateAccess = 'free' | 'included' | 'premium' | 'locked';
@@ -1710,7 +1805,10 @@ export function resolveCvTemplateAccess(
   template: CvTemplateDefinition,
   context: CvTemplateAccessContext
 ): CvTemplateAccessResult {
-  if (template.tier === 'free') {
+  // The three free templates are free because the CODE says so. An
+  // administrator's metadata row can rename, reorder or disable a template,
+  // but it cannot take away the one every candidate is entitled to.
+  if (template.tier === 'free' || isFreeCvTemplateId(template.id)) {
     return {
       templateId: template.id,
       allowed: true,

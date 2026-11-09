@@ -7,6 +7,10 @@
  * candidate's own record is shown next to it, so the fit is explained rather
  * than asserted, and the application itself always happens on the employer's
  * own page.
+ *
+ * The card is also where a candidate decides to tailor their CV for this
+ * posting, so that decision is one button rather than a copy of the
+ * description into another screen.
  */
 
 import React, { useState } from 'react';
@@ -17,6 +21,7 @@ import {
   Briefcase,
   Calendar,
   ExternalLink,
+  FileText,
   MapPin,
   Sparkles,
 } from 'lucide-react';
@@ -31,8 +36,12 @@ interface LiveJobCardProps {
   onToggleBookmark: (jobId: string) => void;
   /** Starts tracking an application for this vacancy. */
   onTrackApplication: (item: MatchedJob) => void;
+  /** Hands this vacancy to the CV Studio, to be tailored for it. */
+  onCreateTailoredCv: (item: MatchedJob) => void;
   /** True while this vacancy's application is being created. */
   tracking: boolean;
+  /** True while this vacancy is on its way to the CV Studio. */
+  tailoring: boolean;
   /** Translates a source string. */
   t: (key: string) => string;
 }
@@ -65,7 +74,9 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
   bookmarked,
   onToggleBookmark,
   onTrackApplication,
+  onCreateTailoredCv,
   tracking,
+  tailoring,
   t,
 }) => {
   const { job, match } = item;
@@ -81,6 +92,12 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
   const description = job.description ?? '';
   const isLong = description.length > 320;
   const shownDescription = expanded || !isLong ? description : `${description.slice(0, 320).trimEnd()}…`;
+
+  // A CV can only be tailored for a posting that describes the job, so a
+  // posting without a description cannot be handed to the studio. The reason
+  // is said in the card rather than left to be found out later.
+  const hasDescription = description.trim().length > 0;
+  const tailorReasonId = `tailored-cv-reason-${job.id}`;
 
   const scoreTone =
     match.score === null
@@ -229,7 +246,7 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
       </div>
 
       {/* Description */}
-      {description && (
+      {hasDescription ? (
         <div className="space-y-1">
           <p className="whitespace-pre-line text-[11px] leading-relaxed text-[var(--text-primary)]">
             {shownDescription}
@@ -244,6 +261,10 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
             </button>
           )}
         </div>
+      ) : (
+        <p id={tailorReasonId} className="text-[11px] leading-relaxed text-[var(--text-muted)]">
+          {t('This posting gives no description, so there is nothing to tailor a CV from.')}
+        </p>
       )}
 
       {/* Facts the posting stated */}
@@ -309,6 +330,23 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40"
         >
           <span>{t('Track application')}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onCreateTailoredCv(item)}
+          disabled={!hasDescription || tailoring}
+          aria-describedby={hasDescription ? undefined : tailorReasonId}
+          aria-label={t('Create a tailored CV for {title}').replace('{title}', job.title)}
+          title={
+            hasDescription
+              ? undefined
+              : t('This posting gives no description, so there is nothing to tailor a CV from.')
+          }
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[11px] font-semibold text-[var(--color-primary-text)] transition-colors hover:bg-[var(--accent-surface)] disabled:opacity-40 disabled:hover:bg-transparent"
+        >
+          <FileText className="h-3.5 w-3.5" />
+          <span>{t('Create Tailored CV')}</span>
         </button>
       </footer>
     </article>
