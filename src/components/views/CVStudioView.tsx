@@ -6,7 +6,11 @@ import {
   Upload,
   Printer,
   Download,
-  Loader2
+  Loader2,
+  PenLine,
+  LayoutTemplate,
+  Database,
+  History
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { BuiltCvPanel } from '../cv/BuiltCvPanel';
@@ -26,6 +30,7 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
 import { CvDataManager } from '../cv/studio/CvDataManager';
+import { CvStudioSectionNav, type CvStudioSection } from '../cv/studio/CvStudioSectionNav';
 import { ResumeLanguagePicker } from '../cv/studio/ResumeLanguagePicker';
 import { CareerImage } from '../ui/CareerImage';
 import {
@@ -68,12 +73,15 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   // same step.
   const activeStep = cvStudioStepForTab(activeTab);
   // The secondary views of the "My CV" step. They are revealed from inside
-  // the step rather than listed as a navigation of their own.
-  const secondaryViews: Array<{ tab: CvStudioTab; label: string }> = [
-    { tab: 'editor', label: t('Document Editor & Preview') },
-    { tab: 'templates', label: t('Templates') },
-    { tab: 'data', label: t('My Data') },
-    { tab: 'versions', label: `${t('Version History')} (${cvVersions.length})` },
+  // the step rather than listed as a navigation of their own, and each one
+  // is a button the candidate can press: an icon tells them apart, the
+  // open one is filled with the brand colour, and the history carries the
+  // number of snapshots it holds.
+  const secondarySections: CvStudioSection[] = [
+    { tab: 'editor', label: t('Document Editor & Preview'), icon: PenLine },
+    { tab: 'templates', label: t('Templates'), icon: LayoutTemplate },
+    { tab: 'data', label: t('My Data'), icon: Database },
+    { tab: 'versions', label: t('Version History'), icon: History, badge: cvVersions.length },
   ];
   const [showVersionModal, setShowVersionModal] = useState(false);
   // The evidence behind the ATS score is revealed on demand. The score is the
@@ -433,28 +441,12 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           they are revealed from inside it rather than offered as a second
           navigation of their own. */}
       {activeStep === 'cv' && (
-        <div
-          role="group"
-          aria-label={t('My CV')}
-          className="flex flex-wrap items-center gap-x-1 gap-y-1 border-b border-[var(--border-subtle)] pb-2"
-        >
-          {secondaryViews.map((view) => (
-            <button
-              key={view.tab}
-              type="button"
-              data-tour={view.tab === 'data' ? 'cv-data-tab' : undefined}
-              onClick={() => setActiveTab(view.tab)}
-              aria-current={activeTab === view.tab ? 'true' : undefined}
-              className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
-                activeTab === view.tab
-                  ? 'bg-[var(--surface-secondary)] text-[var(--text-primary)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              {view.label}
-            </button>
-          ))}
-        </div>
+        <CvStudioSectionNav
+          sections={secondarySections}
+          activeTab={activeTab}
+          onSelectTab={(tab) => setActiveTab(tab)}
+          t={t}
+        />
       )}
 
       {/* TAB 0: THE RECORDS THE CV IS BUILT FROM */}
