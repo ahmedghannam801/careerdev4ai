@@ -11,9 +11,17 @@
  *     feature or disable one);
  *   - whether this candidate may use one.
  *
- * The client draws the badge and the lock the server describes. Applying a
- * template is a server call, and a refused apply leaves the candidate's
- * current document untouched.
+ * The client draws the badge the server describes. Applying a template is a
+ * server call, and a refused apply leaves the candidate's current document
+ * untouched.
+ *
+ * LOOKING AT A TEMPLATE IS FREE. A premium template is drawn in full, exactly
+ * like a free one: no lock over the document, no blur, no dimming, no crop. A
+ * candidate who cannot see the layout cannot judge it, and a placeholder is
+ * not a preview. What the lock decides is whether the candidate may USE the
+ * template — and even then it is not a dead end, because a premium template
+ * can be unlocked with AI credits, and the price is on the card before
+ * anything is spent.
  *
  * Switching a template is presentation only: the document is rebuilt from the
  * same CV data, so no fact can be lost by changing the layout.
@@ -21,22 +29,27 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowUpRight,
   Check,
+  Coins,
   Crown,
   LayoutTemplate,
   Loader2,
-  Lock,
+  Maximize2,
   RefreshCw,
   Search,
+  ShieldCheck,
   Sparkles,
   Star,
   X,
+  Zap,
 } from 'lucide-react';
 import { useCareer } from '../../../context/CareerContext';
 import {
   applyCvTemplate,
   fetchCvTemplateCatalog,
   fetchCvTemplatePreview,
+  unlockCvTemplateWithCredits,
   type CvTemplateCatalogResponse,
   type CvTemplateWithAccess,
 } from '../../../lib/cvTemplatesApi';
@@ -53,6 +66,8 @@ import { CvTemplatePreview } from './CvTemplatePreview';
 interface CvTemplateLibraryProps {
   /** Opens the editor, so the candidate can see the new layout on their CV. */
   onOpenEditor?: () => void;
+  /** Opens the plans, so the candidate can buy one instead of the template. */
+  onUpgrade?: () => void;
 }
 
 function categoryLabel(id: CvTemplateWithAccess['category'], arabic: boolean): string {
@@ -61,6 +76,12 @@ function categoryLabel(id: CvTemplateWithAccess['category'], arabic: boolean): s
   return arabic ? category.labelAr : category.label;
 }
 
+/**
+ * The tier of a template, as a small label.
+ *
+ * It sits beside the template's name rather than over its document: the
+ * document itself is never covered by anything.
+ */
 function TierBadge({ template }: { template: CvTemplateWithAccess }) {
   const { t } = useCareer();
   if (template.tier === 'free') {
@@ -80,8 +101,18 @@ function TierBadge({ template }: { template: CvTemplateWithAccess }) {
 const CARD =
   'group flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] transition-colors hover:border-[var(--color-accent-strong)]/40';
 
-export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEditor }) => {
-  const { settings, updateSettings, t, profile, targetRole } = useCareer();
+const PRIMARY_BUTTON =
+  'inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)] disabled:cursor-not-allowed disabled:opacity-50';
+
+const SECONDARY_BUTTON =
+  'inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50';
+
+export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
+  onOpenEditor,
+  onUpgrade,
+}) => {
+  const { settings, updateSettings, t, profile, targetRole, creditBalance, refreshCredits } =
+    useCareer();
   const arabic = settings.language === 'ar';
 
   const [catalog, setCatalog] = useState<CvTemplateCatalogResponse | null>(null);
@@ -94,24 +125,24 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
   /**
    * The layout of the template being previewed.
    *
-   * The catalogue does not carry the layout of a template the candidate may
-   * not use, so a preview of one asks the server for it. The server answers
-   * with the layout or with a refusal, and the refusal is shown as such: a
-   * premium template that cannot be previewed is not quietly previewed
-   * anyway.
+   * The catalogue carries the layout of every template, so this is normally the
+   * template's own layout. It is kept apart because a catalogue that arrives
+   * without one can still be completed from the server.
    */
   const [previewStructure, setPreviewStructure] = useState<CvTemplateStructure | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  /** The premium template whose unlock is being offered. */
+  const [unlockTarget, setUnlockTarget] = useState<CvTemplateWithAccess | null>(null);
 
   /**
    * Opens the preview of a template.
    *
-   * The layout comes from the server whenever the catalogue did not carry
-   * it, which is exactly when the candidate's entitlement has to be checked
-   * by the server rather than assumed.
+   * The layout comes from the catalogue, and from the server when the
+   * catalogue did not carry it. Either way the document is drawn: looking at a
+   * template is free.
    */
   const openPreview = useCallback(async (template: CvTemplateWithAccess) => {
     setPreview(template);
@@ -154,9 +185,11 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
   // The preview dialog is a dialog: Escape closes it and the page behind it
   // does not scroll while it is open.
   useEffect(() => {
-    if (!preview) return;
+    if (!preview && !unlockTarget) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPreview(null);
+      if (event.key !== 'Escape') return;
+      setPreview(null);
+      setUnlockTarget(null);
     };
     document.addEventListener('keydown', onKeyDown);
     const previousOverflow = document.body.style.overflow;
@@ -165,7 +198,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [preview]);
+  }, [preview, unlockTarget]);
 
   const templates = catalog?.templates ?? [];
   const currentTemplateId = catalog?.currentTemplateId ?? settings.cvTemplateId;
@@ -240,9 +273,73 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
   const displayLayout = (template: CvTemplateWithAccess) =>
     arabic ? template.layoutLabelAr : template.layoutLabel;
 
+  /**
+   * The action row of a card.
+   *
+   * A template the candidate may use gets one button. A premium template gets
+   * the two ways to obtain it: the price in credits, and the plan. Both are
+   * shown side by side, because one of them is right for a candidate who wants
+   * this template and the other is right for a candidate who wants the whole
+   * library.
+   */
+  const actions = (template: CvTemplateWithAccess) => {
+    const isCurrent = template.id === currentTemplateId;
+    const busy = applyingId === template.id;
+
+    if (isCurrent) {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-primary-text)]">
+          <Check className="h-3.5 w-3.5" aria-hidden="true" /> {t('Current')}
+        </span>
+      );
+    }
+
+    if (template.access.allowed) {
+      return (
+        <button
+          type="button"
+          onClick={() => void apply(template)}
+          disabled={applyingId !== null}
+          className={PRIMARY_BUTTON}
+        >
+          {busy ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <LayoutTemplate className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
+          {busy ? t('Applying...') : t('Use Template')}
+        </button>
+      );
+    }
+
+    const price = template.access.unlockCredits;
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setUnlockTarget(template)}
+          disabled={applyingId !== null}
+          className={PRIMARY_BUTTON}
+        >
+          <Coins className="h-3.5 w-3.5" aria-hidden="true" />
+          {t('Unlock with {count} Credits').replace('{count}', String(price))}
+        </button>
+        {onUpgrade && (
+          <button
+            type="button"
+            onClick={onUpgrade}
+            disabled={applyingId !== null}
+            className={SECONDARY_BUTTON}
+          >
+            {t('Upgrade Plan')}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   const card = (template: CvTemplateWithAccess, reason?: string) => {
     const isCurrent = template.id === currentTemplateId;
-    const locked = !template.access.allowed;
     const busy = applyingId === template.id;
     return (
       <article key={template.id} className={CARD}>
@@ -256,31 +353,38 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
             template={template}
             language={settings.resumeLanguage}
             loadingLabel={t('Loading preview')}
-            lockedLabel={t('This template is part of a paid plan.')}
+            lockedLabel={t('This preview could not be loaded.')}
             pageCountLabel={(pages) =>
               pages === 1 ? t('1 page') : t('{count} pages').replace('{count}', String(pages))
             }
           />
-          <span className="absolute start-2 top-2 flex flex-wrap gap-1">
+          {/* A hint that the document can be opened. The document itself is
+              never covered by anything that would hide it. */}
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100">
+            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+              <Maximize2 className="h-3 w-3" aria-hidden="true" /> {t('Full preview')}
+            </span>
+          </span>
+        </button>
+
+        <div className="flex flex-1 flex-col gap-2 p-3">
+          {/* The badges sit with the name, not over the document. A template
+              with the name at its top left would otherwise have a badge
+              printed across the candidate's name. */}
+          <div className="flex flex-wrap items-center gap-1.5">
             {isCurrent && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-primary)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-on-primary)] shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-primary)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-on-primary)]">
                 <Check className="h-2.5 w-2.5" aria-hidden="true" /> {t('Current')}
               </span>
             )}
             {template.featured && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">
                 <Star className="h-2.5 w-2.5" aria-hidden="true" /> {t('Featured')}
               </span>
             )}
-          </span>
-          {locked && (
-            <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-              <Lock className="h-2.5 w-2.5" aria-hidden="true" /> {t('Premium')}
-            </span>
-          )}
-        </button>
+            <TierBadge template={template} />
+          </div>
 
-        <div className="flex flex-1 flex-col gap-2 p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="truncate text-sm font-bold text-[var(--text-primary)]">
@@ -291,7 +395,6 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
                 {template.atsFriendly ? ` · ${t('ATS friendly')}` : ''}
               </p>
             </div>
-            <TierBadge template={template} />
           </div>
 
           {reason && (
@@ -305,43 +408,14 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
             {displayDescription(template)}
           </p>
 
-          <div className="mt-auto flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => void openPreview(template)}
-              className="rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-            >
-              {t('Preview')}
-            </button>
-            {isCurrent ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-primary-text)]">
-                <Check className="h-3 w-3" aria-hidden="true" /> {t('Current')}
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void apply(template)}
-                disabled={locked || applyingId !== null}
-                title={locked ? t(template.access.reason) : undefined}
-                className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-primary)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busy ? (
-                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                ) : locked ? (
-                  <Lock className="h-3 w-3" aria-hidden="true" />
-                ) : (
-                  <LayoutTemplate className="h-3 w-3" aria-hidden="true" />
-                )}
-                {busy ? t('Applying...') : locked ? t('Upgrade to use') : t('Use this template')}
-              </button>
-            )}
-          </div>
+          <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">{actions(template)}</div>
 
-          {locked && (
+          {!template.access.allowed && (
             <p className="text-[10px] leading-relaxed text-[var(--text-muted)]">
               {t(template.access.reason)}
             </p>
           )}
+          {busy && <span className="sr-only">{t('Applying...')}</span>}
         </div>
       </article>
     );
@@ -363,7 +437,9 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
 
       {catalog?.enforcementEnabled ? (
         <p className="rounded-xl border border-[var(--color-accent-strong)]/20 bg-[var(--accent-surface)] px-3 py-2 text-[11px] text-[var(--color-primary-text)]">
-          {t('Premium templates require an active paid plan.')}
+          {t(
+            'Every template can be previewed for free. Unlock a premium template with AI credits, or get every template with a paid plan.'
+          )}
         </p>
       ) : (
         catalog && (
@@ -614,25 +690,23 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
                   language={settings.resumeLanguage}
                   mode="full"
                   loadingLabel={t('Loading preview')}
-                  lockedLabel={t('This template is part of a paid plan.')}
+                  lockedLabel={t('This preview could not be loaded.')}
                   pageCountLabel={(pages) =>
                     pages === 1 ? t('1 page') : t('{count} pages').replace('{count}', String(pages))
                   }
                 />
               ) : (
-                // The server refused to hand over the layout. The refusal is
-                // the answer: a premium template that cannot be previewed is
-                // not previewed by another route.
+                // The layout never arrived. This is a broken catalogue rather
+                // than a paywall, and it says so instead of pretending the
+                // template is locked.
                 <div className="flex min-h-[420px] flex-col items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)]/60 px-6 text-center">
-                  <Lock className="h-5 w-5 text-[var(--text-muted)]" aria-hidden="true" />
                   <p className="text-xs font-semibold text-[var(--text-secondary)]">
-                    {previewError ?? t('This template is part of a paid plan.')}
+                    {previewError ?? t('This preview could not be loaded.')}
                   </p>
                   <p className="max-w-sm text-[11px] leading-relaxed text-[var(--text-muted)]">
-                    {previewError
-                      ? t('The preview of this template is not available on your plan.')
-                      : t('Upgrade to see the layout of this template.')}
-                  </p>                </div>
+                    {t('Please close this and try again.')}
+                  </p>
+                </div>
               )}
             </div>
 
@@ -645,7 +719,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
                   {t('Best for:')} {preview.bestFor}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setPreview(null)}
@@ -658,34 +732,260 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({ onOpenEdit
                     <Check className="h-3.5 w-3.5" aria-hidden="true" /> {t('Current')}
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => void apply(preview)}
-                    disabled={!preview.access.allowed || applyingId !== null}
-                    title={
-                      preview.access.allowed ? undefined : t(preview.access.reason)
-                    }
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {applyingId === preview.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                    ) : preview.access.allowed ? (
-                      <LayoutTemplate className="h-3.5 w-3.5" aria-hidden="true" />
-                    ) : (
-                      <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-                    )}
-                    {applyingId === preview.id
-                      ? t('Applying...')
-                      : preview.access.allowed
-                        ? t('Use this template')
-                        : t('Upgrade to use')}
-                  </button>
+                  actions(preview)
                 )}
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {unlockTarget && (
+        <UnlockDialog
+          template={unlockTarget}
+          language={settings.resumeLanguage}
+          balance={creditBalance?.balance ?? null}
+          onClose={() => setUnlockTarget(null)}
+          onUpgrade={onUpgrade}
+          onUnlocked={async (templateId, creditsCharged, remainingBalance) => {
+            setUnlockTarget(null);
+            setCatalog((previous) =>
+              previous
+                ? {
+                    ...previous,
+                    currentTemplateId: templateId,
+                    templates: previous.templates.map((entry) =>
+                      entry.id === templateId
+                        ? {
+                            ...entry,
+                            access: {
+                              ...entry.access,
+                              allowed: true,
+                              access: 'premium',
+                              canUnlockWithCredits: false,
+                              unlockCredits: 0,
+                              unlockMethod: 'credits',
+                              reason: 'You unlocked this template with AI credits.',
+                            },
+                          }
+                        : entry
+                    ),
+                  }
+                : previous
+            );
+            updateSettings({ cvTemplateId: templateId });
+            await refreshCredits();
+            setNotice(
+              creditsCharged > 0
+                ? t('Template unlocked. {spent} credits were spent — {remaining} left.')
+                    .replace('{spent}', String(creditsCharged))
+                    .replace(
+                      '{remaining}',
+                      remainingBalance === null ? '—' : String(remainingBalance)
+                    )
+                : t('Template applied. Your content has not changed.')
+            );
+          }}
+        />
+      )}
     </div>
   );
 };
+
+/**
+ * The offer for a premium template.
+ *
+ * The candidate sees the document they would be buying, what the unlock gives
+ * them, what it costs, and what they have. Nothing is spent until they press
+ * the button, and the button says what it will spend.
+ */
+function UnlockDialog({
+  template,
+  language,
+  balance,
+  onClose,
+  onUpgrade,
+  onUnlocked,
+}: {
+  template: CvTemplateWithAccess;
+  language: 'en' | 'ar';
+  balance: number | null;
+  onClose: () => void;
+  onUpgrade?: () => void;
+  onUnlocked: (
+    templateId: string,
+    creditsCharged: number,
+    remainingBalance: number | null
+  ) => Promise<void> | void;
+}) {
+  const { t } = useCareer();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const price = template.access.unlockCredits;
+  const affordable = balance === null ? true : balance >= price;
+
+  const unlock = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await unlockCvTemplateWithCredits(template.id);
+      await onUnlocked(result.templateId, result.creditsCharged, result.remainingBalance);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : t('The template could not be unlocked.')
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('Unlock template')}
+    >
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-base font-bold text-[var(--text-primary)]">
+                {template.name}
+              </h3>
+              <TierBadge template={template} />
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+              {t('Unlock this template for your CV.')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--border-subtle)] p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            aria-label={t('Close')}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] sm:p-5">
+          {/* The document the candidate is buying. It is drawn in full: the
+              same renderer, the same paper, the same proportions. */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-[280px] overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white shadow-sm">
+              <CvTemplatePreview
+                template={template}
+                language={language}
+                loadingLabel={t('Loading preview')}
+                lockedLabel={t('This preview could not be loaded.')}
+                pageCountLabel={(pages) =>
+                  pages === 1 ? t('1 page') : t('{count} pages').replace('{count}', String(pages))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+              {template.description}
+            </p>
+
+            <ul className="space-y-2 text-[11px] text-[var(--text-secondary)]">
+              <li className="flex items-start gap-2">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
+                {t('This layout applied to your CV, with your own content.')}
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
+                {t('Export to PDF and to an editable Word document.')}
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
+                {t('Unlocked for your account — you pay once, not on every export.')}
+              </li>
+            </ul>
+
+            {/* The price, stated plainly, before anything is spent. */}
+            <div className="rounded-xl border border-[var(--color-accent-strong)]/25 bg-[var(--accent-surface)] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary-text)]">
+                  <Coins className="h-4 w-4" aria-hidden="true" />
+                  {t('Unlock price')}
+                </span>
+                <span className="text-base font-bold tabular-nums text-[var(--color-primary-text)]">
+                  {price} {t('AI Credits')}
+                </span>
+              </div>
+              {balance !== null && (
+                <p className="mt-1.5 text-[11px] text-[var(--color-primary-text)]">
+                  {t('Your balance:')} {balance} {t('AI Credits')}
+                </p>
+              )}
+              {!affordable && (
+                <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-[var(--color-danger)]/10 px-2 py-1.5 text-[11px] text-[var(--color-danger)]">
+                  <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {t('You do not have enough credits for this template yet.')}
+                </p>
+              )}
+            </div>
+
+            <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-[var(--text-muted)]">
+              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {t(
+                'Credits are only taken when the unlock succeeds. If it fails, nothing is charged.'
+              )}
+            </p>
+
+            {error && (
+              <p
+                role="alert"
+                className="rounded-lg border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-[11px] text-[var(--color-danger)]"
+              >
+                {error}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)] p-4 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--border-subtle)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)]"
+          >
+            {t('Not now')}
+          </button>
+          {onUpgrade && (
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              {t('Upgrade Plan')}
+              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void unlock()}
+            disabled={busy || !affordable}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Coins className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            {busy
+              ? t('Unlocking...')
+              : t('Unlock with {count} Credits').replace('{count}', String(price))}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

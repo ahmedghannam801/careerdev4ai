@@ -1,8 +1,9 @@
 // The CV template API client.
 //
-// The catalogue, the apply decision and the export authorisation are all
-// server answers. The client renders the lock the server describes; it never
-// decides for itself that a premium template is unlocked.
+// The catalogue, the apply decision, the unlock and the export authorisation are
+// all server answers. The client renders what the server describes; it never
+// decides for itself that a premium template is unlocked, and it never charges
+// anything. The credits that buy a premium template are taken by the server.
 
 import { apiRequest, ApiRequestError } from './apiClient';
 import { getAccessToken } from './supabase';
@@ -20,10 +21,10 @@ import type {
 /**
  * A template as the catalogue presents it.
  *
- * The LAYOUT is absent for a template the candidate may not use: the server
- * sends the name and the description of a premium template so the library can
- * show what it is, but not the layout that makes it. The browser therefore
- * cannot draw a locked template, which is a stronger lock than a badge.
+ * The LAYOUT is included for every template, locked or not. Looking at a
+ * template is free, and the gallery has to be able to draw the real document —
+ * a placeholder tells the candidate nothing about what they would be buying.
+ * The access decision beside it says what they may DO with the template.
  */
 export interface CvTemplateWithAccess
   extends Omit<CvTemplateDefinition, 'structure'> {
@@ -46,9 +47,8 @@ export async function fetchCvTemplateCatalog(): Promise<CvTemplateCatalogRespons
 /**
  * Asks the server for a template's layout so that it can be previewed.
  *
- * The layout is the product, so a premium template's layout is not handed to
- * the browser without an entitlement: the server decides, and a refusal comes
- * back as a refusal rather than as a layout.
+ * Previewing is free. The server hands back the layout for every template,
+ * because a candidate cannot judge a template they are not allowed to look at.
  */
 export async function fetchCvTemplatePreview(
   templateId: string
@@ -60,6 +60,29 @@ export async function applyCvTemplate(
   templateId: string
 ): Promise<{ success: boolean; templateId: string; access: CvTemplateAccessResult }> {
   return apiRequest('/api/cv-templates/apply', {
+    method: 'POST',
+    body: JSON.stringify({ templateId }),
+  });
+}
+
+/**
+ * Buys a premium template with AI credits.
+ *
+ * The server decides whether this candidate may buy it, what it costs, and
+ * whether the balance covers it; it takes the credits and records the unlock
+ * in the same request. The answer reports what was actually spent so the
+ * interface can show it.
+ */
+export async function unlockCvTemplateWithCredits(
+  templateId: string
+): Promise<{
+  success: boolean;
+  templateId: string;
+  creditsCharged: number;
+  remainingBalance: number | null;
+  access: CvTemplateAccessResult;
+}> {
+  return apiRequest(`/api/cv-templates/${encodeURIComponent(templateId)}/unlock`, {
     method: 'POST',
     body: JSON.stringify({ templateId }),
   });

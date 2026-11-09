@@ -9,16 +9,20 @@
  *
  * The page is drawn at its real A4 width and scaled to fit, so the preview is
  * a true miniature of the paper rather than a second layout that could
- * disagree with it. It is scaled to fit the WHOLE document, not the first
- * sheet: a candidate choosing between a one-page and a two-page document has
- * to see both, and a preview that stops at the fold is a preview that lies.
+ * disagree with it. A card shows the first sheet at a size that can be read,
+ * and says how many sheets the whole document runs to; the dialog carries the
+ * entire document, with its sheet boundaries drawn, so nothing is hidden from
+ * the candidate who wants to read it.
  *
  * The number of pages the document would print as is shown next to it, for
  * the same reason.
+ *
+ * There is no locked state here. Looking at a template is free, so the layout
+ * is always here to draw; whether the candidate may USE the template is a
+ * different question, and the library answers it beside the document.
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Lock } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CvTemplateDefinition, CvTemplateStructure } from '../../../../shared/cvTemplates';
 import type { ResumeLanguage } from '../../../../shared/resumeLanguage';
 import { cvTemplateSample } from '../../../../shared/cvTemplateSample';
@@ -27,9 +31,10 @@ import { A4_HEIGHT, A4_WIDTH, CV_TEMPLATE_DENSITY, CvTemplateRenderer } from './
 /**
  * What the preview is asked to draw.
  *
- * The layout is optional because the server does not send it for a template
- * the candidate may not use. A preview of a locked template therefore has
- * nothing to draw, and says so.
+ * The layout is optional only so that a catalogue that failed to load still
+ * type-checks; in practice the server sends the layout for every template,
+ * because a template the candidate may not use is still a template they are
+ * allowed to look at.
  */
 export type CvTemplatePreviewTarget =
   | CvTemplateDefinition
@@ -75,29 +80,45 @@ function useNearViewport<T extends HTMLElement>(rootMargin = '400px') {
  * fit, and the document's height depends on its own content — which is only
  * known once it has been laid out. A ResizeObserver is the only way to learn
  * it without measuring twice.
+ *
+ * The element is measured through a CALLBACK ref, not an object ref. The page
+ * is not on the screen until the card nears the viewport, so an effect that
+ * ran once on mount would find nothing to measure and would never run again:
+ * the document would keep the height of nothing, and the page count would be
+ * a guess. A callback ref runs whenever the element actually appears.
  */
 function useMeasuredSize<T extends HTMLElement>() {
-  const ref = useRef<T | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const cleanupRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
+  const ref = useCallback((node: T | null) => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    if (!node) return;
 
     const update = () =>
-      setSize({ width: element.clientWidth, height: element.clientHeight });
+      setSize({ width: node.clientWidth, height: node.clientHeight });
 
     update();
 
     if (typeof ResizeObserver === 'undefined') {
       window.addEventListener('resize', update);
-      return () => window.removeEventListener('resize', update);
+      cleanupRef.current = () => window.removeEventListener('resize', update);
+      return;
     }
 
     const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
+    observer.observe(node);
+    cleanupRef.current = () => observer.disconnect();
   }, []);
+
+  useEffect(
+    () => () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    },
+    []
+  );
 
   return { ref, size };
 }
@@ -134,7 +155,13 @@ interface CvTemplatePreviewProps {
   pageCountLabel?: (pages: number) => string;
   /** Called with the number of pages once the document has been measured. */
   onPageCount?: (pages: number) => void;
-  /** The message shown when the layout was withheld. */
+  /**
+   * A label for the case where the layout is missing altogether.
+   *
+   * This is a failure state, not a paywall: the server sends the layout for
+   * every template, so a preview without a layout means the catalogue did not
+   * load.
+   */
   lockedLabel?: string;
 }
 
@@ -145,7 +172,7 @@ export const CvTemplatePreview: React.FC<CvTemplatePreviewProps> = ({
   loadingLabel = 'Loading preview',
   pageCountLabel,
   onPageCount,
-  lockedLabel = 'This template is part of a paid plan.',
+  lockedLabel = 'This preview could not be loaded.',
 }) => {
   const { ref: nearRef, near } = useNearViewport<HTMLDivElement>(
     mode === 'full' ? '0px' : '400px'
@@ -196,11 +223,15 @@ export const CvTemplatePreview: React.FC<CvTemplatePreviewProps> = ({
 /**
  * The miniature on a library card.
  *
- * The card is a sheet of A4 and the document is drawn at A4 width. The
- * document is then scaled by whichever is smaller — the width it needs or the
- * height it needs — so that the WHOLE document is inside the card. A preview
- * that cut the bottom off would be telling the candidate a two-page template
- * is a one-page one.
+ * The card is a sheet of A4 and the document is drawn at A4 width, then scaled
+ * to the width of the card. What the candidate sees is therefore the first
+ * sheet of the real paper, at the real proportions, at a size they can read —
+ * a thumbnail of a three-page document shrunk until all three pages fit would
+ * be a grey smudge, and a smudge is not a preview.
+ *
+ * The card is not lying about the rest of the document: the page count sits in
+ * the corner, and the full preview in the dialog carries the whole thing with
+ * its sheet boundaries drawn.
  */
 function ThumbnailPreview({
   template,
@@ -227,6 +258,15 @@ function ThumbnailPreview({
   const { ref: pageRef, size: pageSize } = useMeasuredSize<HTMLDivElement>();
   const structure = template.structure;
 
+  // The card box and the near-viewport watcher watch the same element.
+  const setCardNode = useCallback(
+    (node: HTMLDivElement | null) => {
+      nearRef.current = node;
+      cardRef(node);
+    },
+    [nearRef, cardRef]
+  );
+
   const pages = useMemo(
     () => (structure ? cvTemplatePageCount(template as CvTemplateDefinition, pageSize.height || A4_HEIGHT) : 0),
     [template, structure, pageSize.height]
@@ -236,21 +276,15 @@ function ThumbnailPreview({
     if (structure && pageSize.height > 0) onPageCount?.(pages);
   }, [pages, pageSize.height, structure, onPageCount]);
 
-  // The scale that puts the whole document inside the card.
+  // The scale that puts one full sheet across the card.
   const scale = useMemo(() => {
-    if (!cardSize.width || !pageSize.height) return null;
-    const cardHeight = (cardSize.width * A4_HEIGHT) / A4_WIDTH;
-    const byWidth = cardSize.width / A4_WIDTH;
-    const byHeight = cardHeight / pageSize.height;
-    return Math.min(byWidth, byHeight);
-  }, [cardSize.width, pageSize.height]);
+    if (!cardSize.width) return null;
+    return cardSize.width / A4_WIDTH;
+  }, [cardSize.width]);
 
   return (
     <div
-      ref={(node) => {
-        nearRef.current = node;
-        cardRef.current = node;
-      }}
+      ref={setCardNode}
       className="relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white"
       style={{
         aspectRatio: '210 / 297',
@@ -285,10 +319,9 @@ function ThumbnailPreview({
           />
         </div>
       ) : near ? (
-        // The layout was withheld, so there is no document to draw. The card
-        // says so rather than showing an empty sheet.
+        // The layout never arrived. This is a broken catalogue, not a paywall,
+        // and it says so plainly instead of pretending the template is locked.
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--surface-secondary)]/60 px-3 text-center">
-          <Lock className="h-4 w-4 text-[var(--text-muted)]" aria-hidden="true" />
           <span className="text-[10px] leading-snug text-[var(--text-muted)]">
             {lockedLabel}
           </span>
@@ -315,6 +348,15 @@ function ThumbnailPreview({
  * It can be zoomed, because a two-column layout that has been scaled to fit a
  * dialog cannot be read. The zoom is a scale on the real A4 page rather than
  * a re-layout, so what the candidate reads is what the printer will produce.
+ *
+ * The page is fitted to the WIDTH of the frame by default. That is the whole
+ * point of a preview that is read in a dialog: showing the page at its natural
+ * width pushes half of it out of sight, and a candidate who has to scroll
+ * sideways to read a name has not been shown a preview.
+ *
+ * When the document runs past one sheet, the sheet boundaries are drawn on it
+ * and the reader is told which sheet they are looking at, so scrolling through
+ * a long document is navigation rather than guesswork.
  */
 function FullPreview({
   template,
@@ -335,7 +377,9 @@ function FullPreview({
   onPageCount?: (pages: number) => void;
   lockedLabel?: string;
 }) {
+  const { ref: frameRef, size: frameSize } = useMeasuredSize<HTMLDivElement>();
   const { ref: pageRef, size: pageSize } = useMeasuredSize<HTMLDivElement>();
+  const [currentPage, setCurrentPage] = useState(1);
   const structure = template.structure;
 
   const pages = useMemo(
@@ -347,22 +391,34 @@ function FullPreview({
     if (structure && pageSize.height > 0) onPageCount?.(pages);
   }, [pages, pageSize.height, structure, onPageCount]);
 
-  // `null` means the page is shown at its natural width and the frame scrolls
-  // sideways. A number scales the page about its top left corner.
-  const scale = zoom ?? 1;
+  // The scale that fits the sheet across the frame.
+  const fitScale = useMemo(() => {
+    if (!frameSize.width) return 1;
+    // A little breathing room so the sheet never touches the frame.
+    return Math.min(1, (frameSize.width - 24) / A4_WIDTH);
+  }, [frameSize.width]);
+
+  const scale = zoom ?? fitScale;
   const naturalHeight = pageSize.height || A4_HEIGHT;
 
   const step = (direction: 1 | -1) => {
-    const current = zoom ?? 1;
-    const next = Math.min(2, Math.max(0.5, Math.round((current + direction * 0.1) * 10) / 10));
+    const current = zoom ?? fitScale;
+    const next = Math.min(2, Math.max(0.25, Math.round((current + direction * 0.1) * 100) / 100));
     onZoomChange(next);
   };
 
-  // There is nothing to draw when the server withheld the layout.
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    const sheet = A4_HEIGHT * scale;
+    if (sheet <= 0) return;
+    const page = Math.floor(element.scrollTop / sheet) + 1;
+    setCurrentPage(Math.min(pages, Math.max(1, page)));
+  };
+
+  // There is nothing to draw only when the catalogue itself failed.
   if (!structure) {
     return (
       <div className="flex min-h-[420px] flex-col items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-6 text-center">
-        <Lock className="h-5 w-5 text-[var(--text-muted)]" aria-hidden="true" />
         <p className="text-xs font-semibold text-[var(--text-secondary)]">
           {lockedLabel}
         </p>
@@ -370,11 +426,23 @@ function FullPreview({
     );
   }
 
+  // The sheet boundaries, drawn on the paper so the reader can see where a
+  // page ends and the next one begins.
+  const sheetBreaks = [];
+  for (let index = 1; index < pages; index += 1) {
+    sheetBreaks.push(index * A4_HEIGHT);
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] font-medium text-[var(--text-muted)]">
           {pageCountLabel ? pageCountLabel(pages) : `${pages} pages`}
+          {pages > 1 ? (
+            <span className="ms-1.5 tabular-nums">
+              · {currentPage} / {pages}
+            </span>
+          ) : null}
         </p>
 
         <div className="flex items-center gap-1" role="group" aria-label="Zoom">
@@ -412,7 +480,11 @@ function FullPreview({
         </div>
       </div>
 
-      <div className="overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+      <div
+        ref={frameRef}
+        onScroll={handleScroll}
+        className="max-h-[70vh] overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3"
+      >
         <div
           style={{
             width: A4_WIDTH * scale,
@@ -423,6 +495,7 @@ function FullPreview({
           <div
             ref={pageRef}
             style={{
+              position: 'relative',
               width: A4_WIDTH,
               transformOrigin: 'top left',
               transform: `scale(${scale})`,
@@ -435,6 +508,22 @@ function FullPreview({
               template={template as CvTemplateDefinition}
               printable={false}
             />
+
+            {/* Where one sheet ends and the next begins. */}
+            {sheetBreaks.map((offset) => (
+              <div
+                key={offset}
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: offset,
+                  left: 0,
+                  right: 0,
+                  height: 0,
+                  borderTop: '1px dashed rgba(15, 23, 42, 0.28)',
+                }}
+              />
+            ))}
           </div>
         </div>
       </div>

@@ -41,16 +41,49 @@ export const cvTemplatesAr: Record<string, string> = {
   'All templates are available on every plan today.':
     'جميع القوالب متاحة على كل الخطط اليوم.',
 
+  // The gallery: looking at a template is free, and a premium one can be
+  // bought with credits.
+  'Use Template': 'استخدام القالب',
+  'Unlock with {count} Credits': 'فتحه بـ {count} رصيد',
+  'Upgrade Plan': 'ترقية الخطة',
+  'Full preview': 'معاينة كاملة',
+  'This preview could not be loaded.': 'تعذّر تحميل هذه المعاينة.',
+  'Please close this and try again.': 'يُرجى الإغلاق والمحاولة مرة أخرى.',
+  'Unlock template': 'فتح القالب',
+  'Unlock this template for your CV.': 'افتح هذا القالب لسيرتك الذاتية.',
+  'Unlock price': 'سعر الفتح',
+  'AI Credits': 'رصيد ذكاء اصطناعي',
+  'Your balance:': 'رصيدك:',
+  'You do not have enough credits for this template yet.':
+    'رصيدك غير كافٍ لفتح هذا القالب بعد.',
+  'Credits are only taken when the unlock succeeds. If it fails, nothing is charged.':
+    'لا يُخصم الرصيد إلا إذا نجح الفتح. وإذا فشل، لا يُخصم شيء.',
+  'This layout applied to your CV, with your own content.':
+    'هذا التخطيط مطبَّق على سيرتك الذاتية بمحتواك الخاص.',
+  'Export to PDF and to an editable Word document.':
+    'تصدير إلى PDF وإلى مستند Word قابل للتعديل.',
+  'Unlocked for your account — you pay once, not on every export.':
+    'يُفتح لحسابك مرة واحدة — تدفع مرة، لا عند كل تصدير.',
+  'Not now': 'ليس الآن',
+  'Unlocking...': 'جارٍ الفتح...',
+  'The template could not be unlocked.': 'تعذّر فتح القالب.',
+  'Template unlocked. {spent} credits were spent — {remaining} left.':
+    'تم فتح القالب. خُصم {spent} رصيد — والباقي {remaining}.',
+  'Every template can be previewed for free. Unlock a premium template with AI credits, or get every template with a paid plan.':
+    'يمكن معاينة كل قالب مجانًا. افتح قالبًا مميزًا برصيد الذكاء الاصطناعي، أو احصل على كل القوالب بخطة مدفوعة.',
+
   // The server's access reasons, shown as the honest explanation of a lock.
   'This template is free for everyone.': 'هذا القالب مجاني للجميع.',
   'Premium templates are included under the current free-access policy.':
     'القوالب المميزة مشمولة في سياسة الوصول المجاني الحالية.',
   'Your active plan includes every premium template.':
     'خطتك النشطة تشمل كل القوالب المميزة.',
-  'Premium templates unlock after your payment is verified.':
-    'تُفتح القوالب المميزة بعد التحقق من دفعتك.',
-  'This template requires an active paid plan.':
-    'يتطلب هذا القالب خطة مدفوعة نشطة.',
+  'Unlock this template with AI credits, or upgrade your plan.':
+    'افتح هذا القالب برصيد الذكاء الاصطناعي، أو رقِّ خطتك.',
+  'Unlock this template with AI credits, or upgrade your plan to use it.':
+    'افتح هذا القالب برصيد الذكاء الاصطناعي، أو رقِّ خطتك لاستخدامه.',
+  'You unlocked this template with AI credits.':
+    'لقد فتحت هذا القالب برصيد الذكاء الاصطناعي.',
 
   // The deterministic recommendations, so a reason is never only English.
   'A parser-safe default that works for every application.':

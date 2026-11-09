@@ -9,13 +9,25 @@
  *
  * The paper stays paper-white in both themes: this is a print surface. It
  * carries `data-cv-print`, which is what the print stylesheet keeps.
+ *
+ * THE PAPER IS A SHEET OF A4.
+ *
+ * The sheet is drawn at its real width — 794px at 96dpi, which is A4 — and
+ * scaled down to whatever room the screen has, rather than being laid out
+ * narrower and looking like a sheet of A4. A document laid out at a different
+ * width wraps its lines in different places, so a fluid paper would not be the
+ * document the printer produces. Drawn at A4 and scaled, it is exactly the
+ * document that comes out of the printer, at a size that fits on the screen.
+ *
+ * The print stylesheet takes the scale away again, so the printed sheet is the
+ * sheet, full size.
  */
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { CVProfile } from '../../types/career';
 import type { ResumeLanguage } from '../../../shared/resumeLanguage';
 import type { CvTemplateDefinition } from '../../../shared/cvTemplates';
-import { CvTemplateRenderer } from './templates/CvTemplateRenderer';
+import { A4_HEIGHT, A4_WIDTH, CvTemplateRenderer } from './templates/CvTemplateRenderer';
 
 interface CvPreviewProps {
   cv: CVProfile;
@@ -41,12 +53,79 @@ export const CvPreview: React.FC<CvPreviewProps> = ({
   templateId,
   template,
   catalog,
-}) => (
-  <CvTemplateRenderer
-    cv={cv}
-    language={language}
-    templateId={templateId}
-    template={template}
-    catalog={catalog}
-  />
-);
+}) => {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const paperRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
+  const [paperHeight, setPaperHeight] = useState(A4_HEIGHT);
+
+  // The sheet is scaled to the room the screen has. It is never scaled UP: a
+  // sheet larger than A4 is not a sheet of A4.
+  useEffect(() => {
+    const element = frameRef.current;
+    if (!element) return;
+
+    const update = () => {
+      const available = element.clientWidth;
+      setScale(available > 0 ? Math.min(1, available / A4_WIDTH) : 1);
+    };
+
+    update();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
+    }
+
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  // The frame reserves the height the scaled sheet needs. A document longer
+  // than one sheet is longer here too, so the whole of it is shown.
+  useEffect(() => {
+    const element = paperRef.current;
+    if (!element) return;
+
+    const update = () => setPaperHeight(element.offsetHeight);
+
+    update();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
+    }
+
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={frameRef}
+      data-cv-paper-frame
+      className="mx-auto w-full overflow-hidden"
+      style={{ height: paperHeight * scale }}
+    >
+      <div
+        ref={paperRef}
+        data-cv-paper-scale
+        style={{
+          width: A4_WIDTH,
+          transformOrigin: 'top left',
+          transform: `scale(${scale})`,
+        }}
+      >
+        <CvTemplateRenderer
+          cv={cv}
+          language={language}
+          templateId={templateId}
+          template={template}
+          catalog={catalog}
+        />
+      </div>
+    </div>
+  );
+};

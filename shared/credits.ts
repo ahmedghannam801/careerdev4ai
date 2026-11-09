@@ -18,6 +18,7 @@ export const AI_CREDIT_ACTIONS = [
   'ai_assist_inline',
   'learning_recommendation',
   'project_analysis',
+  'premium_template_unlock',
 ] as const;
 export type AICreditAction = (typeof AI_CREDIT_ACTIONS)[number];
 
@@ -36,6 +37,11 @@ export const CREDIT_WEIGHTS: Record<AICreditAction, number> = {
   ai_assist_inline: 1,
   learning_recommendation: 1,
   project_analysis: 1,
+  /**
+   * Unlocking a premium CV template. The weight is the price of the template:
+   * the candidate sees it on the screen before anything is spent.
+   */
+  premium_template_unlock: 10,
 };
 
 export interface CreditPack {

@@ -414,16 +414,42 @@
  * the CV and not a page of blank space followed by the CV. An ancestor of
  * the paper has to stay — the paper needs somewhere to live — but its other
  * children do not, and each of those is removed by the same rule.
+ *
+ * THE PRINTED SHEET IS THE PREVIEWED SHEET.
+ *
+ * The sheet is A4 and its margin is the document's own padding, so the page
+ * margin here is zero and the paper keeps the padding the renderer gave it.
+ * A margin of the printer's own would narrow the text area, the lines would
+ * wrap in different places, and the PDF would no longer be the document the
+ * candidate was looking at. The paper is pinned to the A4 width and the
+ * ancestors holding it are stripped of their padding, so nothing narrows it
+ * on the way to the printer.
  */
 @media print {
   @page {
-    margin: 14mm;
+    margin: 0;
     size: A4;
   }
 
   html,
   body {
     background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* The ancestors of the paper stay in the flow — the paper needs somewhere
+     to live — but they must not narrow it: the paper is A4, exactly. */
+  body *:has([data-cv-print]) {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    max-width: none !important;
+    width: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
 
   body *:not([data-cv-print]):not([data-cv-print] *):not(:has([data-cv-print])) {
@@ -442,12 +468,30 @@
   }
 
   [data-cv-print] {
-    padding: 0 !important;
+    /* The sheet is A4 at 96dpi: 794 by 1123. */
+    width: 794px !important;
+    max-width: none !important;
     margin: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     background: #ffffff !important;
+    /* The padding is deliberately NOT reset: it is the page's margin, and it
+       is the same margin the preview showed. */
+  }
+
+  /* The sheet is scaled down on the screen to fit the room it has. The
+     printed sheet is the sheet, at its full size, so the scale is taken away
+     and the frame stops reserving the height the scaled copy needed. */
+  body [data-cv-paper-frame] {
+    width: 794px !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body [data-cv-paper-scale] {
+    width: 794px !important;
+    transform: none !important;
   }
 
   /* A heading is never left at the foot of a page, and a bullet is never

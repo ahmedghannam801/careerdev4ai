@@ -33,12 +33,12 @@ export interface CvTemplateCatalogResult {
   /**
    * Every template the candidate may see, with the access decision attached.
    *
-   * The LAYOUT of a locked template is not included. The layout is the
-   * product: a premium template's structure is handed to the browser only
-   * when the server has decided that this candidate may use it. The metadata
-   * — the name, the description, the picture of it — is always included, so
-   * the library can show what a premium template is and why it is worth
-   * having.
+   * The LAYOUT is included for every template, locked or not. Looking at a
+   * template is free: the gallery has to show the real document, because a
+   * placeholder is not a preview, and a candidate who cannot see what a
+   * template looks like cannot judge whether it is worth ten credits. The
+   * access decision travels with the layout and governs the USE of the
+   * template, not the sight of it.
    */
   templates: Array<
     Omit<CvTemplateDefinition, 'structure'> & {
@@ -105,6 +105,70 @@ export async function listCvTemplateRows(): Promise<{
 }
 
 /**
+ * The premium templates this candidate has already unlocked with credits.
+ *
+ * The table is optional at runtime, exactly like the administrator's table: a
+ * deployment that has not applied the migration simply has no unlocks, and
+ * nothing breaks.
+ */
+export async function listCvTemplateUnlockIds(profileId: string): Promise<string[]> {
+  try {
+    const { data, error } = await getSupabaseServer()
+      .from('cv_template_unlocks')
+      .select('template_id')
+      .eq('profile_id', profileId);
+    if (error) {
+      if (isMissingTable(error)) return [];
+      throw error;
+    }
+    return ((data ?? []) as Array<{ template_id: string }>).map((row) => row.template_id);
+  } catch (error) {
+    console.error('Failed to read the unlocked CV templates:', error);
+    return [];
+  }
+}
+
+/**
+ * Records that a candidate unlocked a template with credits.
+ *
+ * The write is idempotent: unlocking a template the candidate already owns is
+ * a no-op that returns the existing row, so a retried request can never make
+ * the candidate pay twice.
+ */
+export async function recordCvTemplateUnlock(params: {
+  profileId: string;
+  templateId: string;
+  creditsPaid: number;
+  ledgerIdempotencyKey?: string | null;
+}): Promise<{ recorded: boolean; alreadyUnlocked: boolean }> {
+  const { data, error } = await getSupabaseServer()
+    .from('cv_template_unlocks')
+    .insert({
+      profile_id: params.profileId,
+      template_id: params.templateId,
+      credits_paid: params.creditsPaid,
+      ledger_idempotency_key: params.ledgerIdempotencyKey ?? null,
+    })
+    .select('template_id')
+    .maybeSingle();
+
+  if (error) {
+    // A duplicate is not a failure: the candidate already unlocked it.
+    if (error.code === '23505') {
+      return { recorded: false, alreadyUnlocked: true };
+    }
+    if (isMissingTable(error)) {
+      throw new Error(
+        'The CV template unlock table is missing. Apply the latest database migration before unlocking a template with credits.'
+      );
+    }
+    throw error;
+  }
+
+  return { recorded: Boolean(data), alreadyUnlocked: false };
+}
+
+/**
  * The access context for one candidate.
  *
  * `temporary_access` is deliberately not treated as a paid plan: a payment an
@@ -121,11 +185,15 @@ export async function getCvTemplateAccessContext(
   }
 
   try {
-    const summary = await getUserSubscriptionSummary(profileId);
+    const [summary, unlockedTemplateIds] = await Promise.all([
+      getUserSubscriptionSummary(profileId),
+      listCvTemplateUnlockIds(profileId),
+    ]);
     return {
       enforcementEnabled,
       planCode: summary.planCode,
       subscriptionStatus: summary.status,
+      unlockedTemplateIds,
     };
   } catch (error) {
     console.error('Failed to resolve CV template access:', error);
@@ -158,14 +226,13 @@ export async function getCvTemplateCatalog(
   }
 
   return {
-    templates: applyCvTemplateAccess(catalog, accessContext).map((template) =>
-      // The layout of a template the candidate may not use is not sent. The
-      // browser cannot draw what it does not have, so a premium template is
-      // locked by the absence of its layout and not only by a badge.
-      template.access.allowed
-        ? { ...template, structure: template.structure }
-        : { ...template, structure: null }
-    ),
+    templates: applyCvTemplateAccess(catalog, accessContext).map((template) => ({
+      // The layout travels with every template. Looking at a template is free,
+      // so the browser can draw the real document — the gallery would otherwise
+      // show a placeholder where a CV should be. The access decision beside it
+      // says what the candidate may DO with the template.
+      ...template,
+    })),
     enforcementEnabled: accessContext.enforcementEnabled,
     currentTemplateId,
     adminTableAvailable: available,

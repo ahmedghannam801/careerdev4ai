@@ -1774,12 +1774,39 @@ export function isCvTemplatePremiumEnforcementEnabled(
 
 export type CvTemplateAccess = 'free' | 'included' | 'premium' | 'locked';
 
+/**
+ * What a candidate may offer to pay to use a premium template.
+ *
+ * `free`      the template costs nothing;
+ * `subscription` the candidate's plan already includes it;
+ * `credits`   the template can be unlocked with AI credits;
+ * `upgrade`   the template is only available on a paid plan.
+ */
+export type CvTemplateUnlockMethod = 'free' | 'subscription' | 'credits' | 'upgrade';
+
+/**
+ * What unlocking a premium template costs.
+ *
+ * The price is a property of the product, not of a candidate: every premium
+ * template costs the same number of AI credits, and the number is stated in
+ * the interface before anything is spent. The server re-reads it, so the price
+ * on the screen and the price on the ledger cannot disagree.
+ */
+export const CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS = 10;
+
 export interface CvTemplateAccessContext {
   enforcementEnabled: boolean;
   /** The candidate's effective plan code, when the server resolved one. */
   planCode?: SubscriptionPlanCode | null;
   /** `active` means a verified paid subscription; temporary access is not. */
   subscriptionStatus?: 'active' | 'temporary_access' | 'free';
+  /**
+   * The premium templates this candidate has already unlocked with credits.
+   *
+   * A template is unlocked ONCE: the candidate paid for it, and paying again
+   * for the same document would be charging twice for one thing.
+   */
+  unlockedTemplateIds?: readonly string[];
 }
 
 export interface CvTemplateAccessResult {
@@ -1788,6 +1815,12 @@ export interface CvTemplateAccessResult {
   /** What the interface should call this template for this candidate. */
   access: CvTemplateAccess;
   reason: string;
+  /** Whether the candidate may unlock this template with AI credits. */
+  canUnlockWithCredits: boolean;
+  /** What an unlock costs, in AI credits. */
+  unlockCredits: number;
+  /** How this candidate obtains the template. */
+  unlockMethod: CvTemplateUnlockMethod;
 }
 
 /**
@@ -1797,9 +1830,18 @@ export interface CvTemplateAccessResult {
  *
  *   free template                  → always allowed;
  *   premium, enforcement off       → allowed and shown as included;
- *   premium, enforcement on        → allowed only for an ACTIVE, verified paid
- *                                    plan. A temporary-access payment is not
- *                                    enough: the money has not been verified.
+ *   premium, enforcement on        → allowed for an ACTIVE, verified paid plan, or for a
+ *                                    template the candidate already unlocked with credits;
+ *                                    otherwise the candidate may unlock it with credits, or
+ *                                    has to upgrade the plan.
+ *
+ * A temporary-access payment is not a verified paid plan: the money has not
+ * been verified, so it does not include the premium templates.
+ *
+ * NOTE: this decides whether a template may be USED. It never decides whether a
+ * candidate may LOOK at it. Seeing a template is free and always is — the
+ * layout reaches the browser for every template, locked or not, so the gallery
+ * can show the real document instead of a placeholder.
  */
 export function resolveCvTemplateAccess(
   template: CvTemplateDefinition,
@@ -1814,6 +1856,9 @@ export function resolveCvTemplateAccess(
       allowed: true,
       access: 'free',
       reason: 'This template is free for everyone.',
+      canUnlockWithCredits: false,
+      unlockCredits: 0,
+      unlockMethod: 'free',
     };
   }
 
@@ -1823,6 +1868,9 @@ export function resolveCvTemplateAccess(
       allowed: true,
       access: 'included',
       reason: 'Premium templates are included under the current free-access policy.',
+      canUnlockWithCredits: false,
+      unlockCredits: 0,
+      unlockMethod: 'free',
     };
   }
 
@@ -1837,6 +1885,23 @@ export function resolveCvTemplateAccess(
       allowed: true,
       access: 'premium',
       reason: 'Your active plan includes every premium template.',
+      canUnlockWithCredits: false,
+      unlockCredits: 0,
+      unlockMethod: 'subscription',
+    };
+  }
+
+  // The candidate has already paid for this template with credits. Charging
+  // again would be charging twice for the same document.
+  if (context.unlockedTemplateIds?.includes(template.id)) {
+    return {
+      templateId: template.id,
+      allowed: true,
+      access: 'premium',
+      reason: 'You unlocked this template with AI credits.',
+      canUnlockWithCredits: false,
+      unlockCredits: 0,
+      unlockMethod: 'credits',
     };
   }
 
@@ -1846,8 +1911,11 @@ export function resolveCvTemplateAccess(
     access: 'locked',
     reason:
       context.subscriptionStatus === 'temporary_access'
-        ? 'Premium templates unlock after your payment is verified.'
-        : 'This template requires an active paid plan.',
+        ? 'Unlock this template with AI credits, or upgrade your plan.'
+        : 'Unlock this template with AI credits, or upgrade your plan to use it.',
+    canUnlockWithCredits: true,
+    unlockCredits: CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS,
+    unlockMethod: 'credits',
   };
 }
 

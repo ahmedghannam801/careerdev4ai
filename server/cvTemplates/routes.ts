@@ -3,8 +3,13 @@
  *
  * The client never decides whether a template is allowed. It may draw a lock,
  * but the apply and export routes ask this module, which asks the verified
- * subscription. The same rule is used for the catalogue the client reads, so
- * the interface and the server cannot disagree about a candidate's access.
+ * subscription and the credit ledger. The same rule is used for the catalogue
+ * the client reads, so the interface and the server cannot disagree about a
+ * candidate's access.
+ *
+ * Looking at a template is a separate question from using one, and it is
+ * always allowed: the preview route hands back the layout for every template,
+ * because a candidate cannot judge a template they are not allowed to see.
  */
 
 import type { Express, Response } from 'express';
@@ -19,6 +24,7 @@ import type { CVProfile } from '../../src/types/career.ts';
 import { isResumeLanguage } from '../../shared/resumeLanguage.ts';
 import {
   CV_TEMPLATE_CATEGORIES,
+  CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS,
   buildCvTemplateCatalog,
   isBuiltinCvTemplateId,
   isCvTemplateCategory,
@@ -32,8 +38,16 @@ import {
   getCvTemplateForUser,
   listCvTemplateAdminRows,
   listCvTemplateRows,
+  listCvTemplateUnlockIds,
+  recordCvTemplateUnlock,
   updateCvTemplateRow,
 } from './service.ts';
+import {
+  canPerformAiAction,
+  chargeAiAction,
+  getUserCreditsWithTrial,
+  refundAiAction,
+} from '../credits/service.ts';
 import { buildCvDocx } from './docx.ts';
 
 function str(value: unknown, max: number): string {
@@ -114,11 +128,28 @@ export function registerCvTemplateRoutes(app: Express): void {
         return res.status(404).json({ error: 'This template is not available.' });
       }
       if (!result.access.allowed) {
+        // The candidate cannot use the template yet, but they may be able to
+        // BUY it with credits. The answer says so, and says what it costs, so
+        // the interface can offer the real price instead of only a wall.
+        let currentBalance: number | null = null;
+        if (result.access.canUnlockWithCredits) {
+          try {
+            const affordability = await canPerformAiAction(
+              req.authUser!.id,
+              'premium_template_unlock'
+            );
+            currentBalance = affordability.balance;
+          } catch (error) {
+            console.error('Failed to read the credit balance:', error);
+          }
+        }
         return res.status(403).json({
           error: result.access.reason,
           code: 'UPGRADE_REQUIRED',
           templateId,
           access: result.access,
+          requiredCredits: result.access.unlockCredits,
+          currentBalance,
         });
       }
 
@@ -138,15 +169,16 @@ export function registerCvTemplateRoutes(app: Express): void {
   });
 
   /**
-   * Authorises a template preview and hands back the layout to draw.
+   * Hands back the layout to draw, for every template.
    *
-   * The layout is the product. A premium template's structure is not something
-   * the browser may hold without an entitlement, so the preview of a premium
-   * template goes through the server: it answers with the layout only for a
-   * candidate who may use the template, and refuses otherwise.
+   * Previewing is free and always is. The gallery's whole job is to show the
+   * real document, and a candidate cannot judge a template they are not
+   * allowed to look at — a lock over a placeholder tells them nothing about
+   * whether the template is worth anything.
    *
-   * The three free templates are answered without a subscription, which is
-   * the whole point of there being three of them.
+   * What this route does NOT do is grant the right to USE the template. The
+   * access decision travels with the layout, and the apply and export routes
+   * are the ones that enforce it.
    */
   app.get(
     '/api/cv-templates/:id/preview',
@@ -162,13 +194,6 @@ export function registerCvTemplateRoutes(app: Express): void {
         if (!result) {
           return res.status(404).json({ error: 'This template is not available.' });
         }
-        if (!result.access.allowed) {
-          return res.status(403).json({
-            error: result.access.reason,
-            code: 'UPGRADE_REQUIRED',
-            access: result.access,
-          });
-        }
         return res.json({
           success: true,
           templateId,
@@ -176,8 +201,166 @@ export function registerCvTemplateRoutes(app: Express): void {
           access: result.access,
         });
       } catch (error) {
-        console.error('Failed to authorise the CV template preview:', error);
-        return res.status(500).json({ error: 'Failed to authorise the CV template preview' });
+        console.error('Failed to load the CV template preview:', error);
+        return res.status(500).json({ error: 'Failed to load the CV template preview' });
+      }
+    }
+  );
+
+  /**
+   * Unlocks a premium template with AI credits.
+   *
+   * The price is ten credits and it is charged here, on the server, at the
+   * moment the candidate commits to the template. Nothing is charged for
+   * looking at it, for browsing the gallery, or for choosing a template the
+   * account can already use.
+   *
+   * A candidate with an active, verified subscription never reaches this
+   * route: their plan already includes every premium template, and the apply
+   * route accepts it.
+   *
+   * The purchase is idempotent twice over. The ledger row is keyed by an
+   * idempotency key derived from the candidate and the template, so a retried
+   * request does not take a second payment; and the unlock table has one row
+   * per candidate per template, so a template the candidate already owns is
+   * never charged for again.
+   */
+  app.post(
+    '/api/cv-templates/:id/unlock',
+    requireAuth,
+    async (req: AuthedRequest, res: Response) => {
+      res.setHeader('Cache-Control', 'no-store');
+      const templateId = str(req.params.id, 64);
+      if (!isCvTemplateIdShape(templateId)) {
+        return res.status(400).json({ error: 'Invalid CV template' });
+      }
+
+      const profileId = req.authUser!.id;
+      try {
+        const result = await getCvTemplateForUser(profileId, templateId);
+        if (!result) {
+          return res.status(404).json({ error: 'This template is not available.' });
+        }
+
+        // A template the candidate may already use needs no payment. This is
+        // the path a subscriber takes, and it must never cost credits.
+        if (result.access.allowed) {
+          const saved = await upsertPreferences(profileId, { cv_template_id: templateId });
+          return res.json({
+            success: true,
+            templateId,
+            creditsCharged: 0,
+            remainingBalance: null,
+            access: result.access,
+            preferences: { cvTemplateId: saved.cv_template_id ?? templateId },
+          });
+        }
+
+        if (!result.access.canUnlockWithCredits) {
+          return res.status(403).json({
+            error: result.access.reason,
+            code: 'UPGRADE_REQUIRED',
+            templateId,
+            access: result.access,
+          });
+        }
+
+        const price = CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS;
+
+        // A template the candidate has already bought is not bought again.
+        // This is checked BEFORE the charge, because the ledger replays an
+        // idempotent key with the balance from the original purchase — which
+        // would report a stale number and hide the fact that nothing was
+        // spent now.
+        const unlockedIds = await listCvTemplateUnlockIds(profileId);
+        if (unlockedIds.includes(templateId)) {
+          const saved = await upsertPreferences(profileId, { cv_template_id: templateId });
+          const balance = await getUserCreditsWithTrial(profileId);
+          return res.json({
+            success: true,
+            templateId,
+            creditsCharged: 0,
+            remainingBalance: balance.balance,
+            access: result.access,
+            preferences: { cvTemplateId: saved.cv_template_id ?? templateId },
+          });
+        }
+
+        const affordability = await canPerformAiAction(profileId, 'premium_template_unlock');
+        if (!affordability.allowed) {
+          return res.status(402).json({
+            error: `This template costs ${price} AI Credits and your balance is ${affordability.balance}.`,
+            code: 'INSUFFICIENT_CREDITS',
+            templateId,
+            requiredCredits: price,
+            currentBalance: affordability.balance,
+            access: result.access,
+          });
+        }
+
+        const idempotencyKey = `cv-template-unlock:${profileId}:${templateId}`;
+        const charge = await chargeAiAction({
+          profileId,
+          action: 'premium_template_unlock',
+          idempotencyKey,
+          metadata: { templateId, source: 'cv_template_gallery' },
+        });
+
+        if (!charge.success) {
+          return res.status(402).json({
+            error:
+              charge.error ??
+              'The credits could not be taken. Nothing was charged — please try again.',
+            code: 'INSUFFICIENT_CREDITS',
+            templateId,
+            requiredCredits: price,
+            access: result.access,
+          });
+        }
+
+        // The unlock is recorded AFTER the credits are taken. If the record
+        // fails, the candidate has paid for a template they do not hold, so
+        // the purchase is given back rather than left half-made.
+        try {
+          await recordCvTemplateUnlock({
+            profileId,
+            templateId,
+            creditsPaid: price,
+            ledgerIdempotencyKey: idempotencyKey,
+          });
+        } catch (recordError) {
+          console.error('Failed to record the CV template unlock:', recordError);
+          await refundAiAction({
+            profileId,
+            amount: price,
+            reason: 'The template unlock could not be recorded, so the purchase was reversed.',
+            idempotencyKey: `cv-template-unlock-refund:${profileId}:${templateId}`,
+          });
+          return res.status(500).json({
+            error: 'The unlock could not be completed. The credits were returned to your balance.',
+            code: 'UNLOCK_FAILED',
+            templateId,
+          });
+        }
+
+        const saved = await upsertPreferences(profileId, { cv_template_id: templateId });
+
+        // The access decision is read again, now that the unlock exists, so
+        // the answer reflects the real state of the account rather than an
+        // assumption about it.
+        const refreshed = await getCvTemplateForUser(profileId, templateId);
+
+        return res.json({
+          success: true,
+          templateId,
+          creditsCharged: price,
+          remainingBalance: charge.remainingBalance,
+          access: refreshed?.access ?? result.access,
+          preferences: { cvTemplateId: saved.cv_template_id ?? templateId },
+        });
+      } catch (error) {
+        console.error('Failed to unlock the CV template:', error);
+        return res.status(500).json({ error: 'Failed to unlock the CV template' });
       }
     }
   );

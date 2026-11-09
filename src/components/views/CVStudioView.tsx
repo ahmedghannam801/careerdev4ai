@@ -41,7 +41,9 @@ import { takeTailoredCv } from '../../lib/tailoredCvHandoff';
 import { fetchCvTemplateCatalog } from '../../lib/cvTemplatesApi';
 import type { CvTemplateDefinition } from '../../../shared/cvTemplates';
 
-export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = () => {
+export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = ({
+  onNavigate,
+}) => {
   const {
     activeCV,
     updateCV,
@@ -455,7 +457,10 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       {/* The structure of the document. Choosing a template changes the
           presentation only; the content is rebuilt from the same records. */}
       {activeTab === 'templates' && (
-        <CvTemplateLibrary onOpenEditor={() => setActiveTab('editor')} />
+        <CvTemplateLibrary
+          onOpenEditor={() => setActiveTab('editor')}
+          onUpgrade={() => onNavigate?.('pricing')}
+        />
       )}
 
       {/* The import that is also a review. The document is read first and
