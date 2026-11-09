@@ -269,7 +269,16 @@ export default {
     }
 
     try {
-      await runSubscriptionMaintenanceSweeps();
+      // The outcome is recorded in the heartbeat, not only in the log: the
+      // daily free-credit allowance is granted by this sweep, and the only
+      // way to know that it reached the accounts is to see that it ran and
+      // what it granted.
+      const maintenance = await runSubscriptionMaintenanceSweeps();
+      sweep.subscriptionsExpired = maintenance.expiredSubscriptions;
+      sweep.temporaryAccessExpired = maintenance.expiredTemporaryAccess;
+      sweep.dailyCreditsGranted = maintenance.dailyCreditsGranted;
+      sweep.dailyCreditsSkipped = maintenance.dailyCreditsSkipped;
+      sweep.dailyCreditsFailed = maintenance.dailyCreditsFailed;
     } catch (error) {
       console.error('The subscription maintenance sweep failed:', error);
     }
