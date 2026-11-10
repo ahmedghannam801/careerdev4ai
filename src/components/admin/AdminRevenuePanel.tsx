@@ -315,11 +315,11 @@ export const AdminRevenuePanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Manual Credit Grant Tool */}
+        {/* Manual Token Grant Tool */}
         <div className={`${CARD} p-5 space-y-4`}>
           <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-[var(--color-primary)]" />
-            <span>{t('Manual Credit Grant')}</span>
+            <span>{t('Manual Token Grant')}</span>
           </h3>
 
           {grantNotice && (
@@ -347,7 +347,7 @@ export const AdminRevenuePanel: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--text-muted)] mb-1">
-                  الكمية (Credits) *
+                  {t('Amount (Tokens)')} *
                 </label>
                 <input
                   type="number"
@@ -380,7 +380,7 @@ export const AdminRevenuePanel: React.FC = () => {
               className="w-full py-2 rounded-xl bg-[var(--color-primary)] text-white text-xs font-bold hover:bg-[var(--color-primary-hover)] shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{grantBusy ? 'جاري المنح...' : t('Grant Credits')}</span>
+              <span>{grantBusy ? 'جاري المنح...' : t('Grant Tokens')}</span>
             </button>
           </form>
         </div>

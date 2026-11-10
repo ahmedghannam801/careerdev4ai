@@ -27,6 +27,9 @@ async function runningBalance(profileId: string): Promise<number> {
     .select('running_balance')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false })
+    // The tie-break matches the database's own ordering, so two rows written
+    // in the same millisecond cannot be read in the wrong order.
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
@@ -168,8 +171,8 @@ test.describe('the daily credit allowance', () => {
     assert.equal(await runningBalance(user.id), 0, 'the balance stayed at zero');
   });
 
-  test('the allowance is three credits and the referral reward cannot exceed it', async () => {
-    assert.equal(DAILY_CREDIT_ALLOWANCE, 3, 'the daily allowance is three credits');
+  test('the allowance is two tokens and the referral reward cannot exceed it', async () => {
+    assert.equal(DAILY_CREDIT_ALLOWANCE, 2, 'the daily allowance is two tokens');
     assert.ok(
       REFERRAL_REWARD_CREDITS <= DAILY_CREDIT_ALLOWANCE,
       'a referral reward is never worth more than one daily allowance'
@@ -238,7 +241,7 @@ test.describe('the daily credit allowance', () => {
     assert.equal(againRow.balance, DAILY_CREDIT_ALLOWANCE, 'the balance did not grow');
   });
 
-  test('the sweep reaches every eligible account, not only the ones that read their balance', async () => {
+  test('the sweep grants nothing, because the allowance is claimed', async () => {
     // A second account that has never touched the credit system.
     const untouched = await createTestUser('daily-credits-sweep');
     try {
@@ -252,30 +255,207 @@ test.describe('the daily credit allowance', () => {
 
       const swept = await admin.rpc('grant_daily_credits_to_all');
       assert.equal(swept.error, null, swept.error?.message);
+      assert.equal(
+        (swept.data as { manual_claim?: boolean }).manual_claim,
+        true,
+        'the sweep says that the reward is claimed by the candidate'
+      );
 
       const { data: after } = await admin
         .from('daily_credit_grants')
         .select('granted_amount, remaining')
         .eq('profile_id', untouched.id);
-      assert.equal((after ?? []).length, 1, 'the sweep granted the allowance');
       assert.equal(
-        (after ?? [])[0]?.granted_amount,
-        DAILY_CREDIT_ALLOWANCE,
-        'the sweep granted the full allowance'
+        (after ?? []).length,
+        0,
+        'the sweep granted no allowance, because nobody claimed it'
       );
 
-      // The sweep is idempotent.
-      const again = await admin.rpc('grant_daily_credits_to_all');
-      assert.equal(again.error, null, again.error?.message);
-      const { data: afterAgain } = await admin
+      // The candidate claims it, and only then does it exist.
+      const claimed = await admin.rpc('claim_daily_credits', {
+        p_profile_id: untouched.id,
+        p_amount: DAILY_CREDIT_ALLOWANCE,
+      });
+      assert.equal(claimed.error, null, claimed.error?.message);
+
+      const { data: afterClaim } = await admin
         .from('daily_credit_grants')
-        .select('id')
+        .select('granted_amount, remaining')
         .eq('profile_id', untouched.id);
-      assert.equal((afterAgain ?? []).length, 1, 'a second sweep grants nothing more');
+      assert.equal((afterClaim ?? []).length, 1, 'the claim created the allowance');
+      assert.equal(
+        (afterClaim ?? [])[0]?.granted_amount,
+        DAILY_CREDIT_ALLOWANCE,
+        'the claim granted the full allowance'
+      );
     } finally {
       await clearCredits(untouched.id);
       await deleteTestUser(untouched);
     }
+  });
+
+  test('the claim endpoint pays the allowance out once, and only once', async () => {
+    await clearCredits(user.id);
+
+    // The balance before the claim. Reading it must not grant anything: the
+    // reward is claimed, not handed out.
+    //
+    // The read may grant the one-time trial allowance to an account that has
+    // never had one, so the balance it reports is a starting point rather
+    // than a fixed number, and the assertions below are about the DIFFERENCE
+    // the claim makes.
+    const beforeRead = await api('GET', '/api/credits/balance', { token: user.token });
+    assert.equal(beforeRead.status, 200, beforeRead.body?.error);
+    assert.equal(
+      (beforeRead.body?.daily as { claimedToday?: boolean } | undefined)?.claimedToday,
+      false,
+      'the balance read must not claim the reward'
+    );
+    assert.equal(
+      (beforeRead.body?.daily as { remaining?: number } | undefined)?.remaining,
+      0,
+      'the balance read must not grant the reward'
+    );
+    const beforeBalance = beforeRead.body?.balance as number;
+
+    // The claim.
+    const claimed = await api('POST', '/api/credits/daily/claim', { token: user.token });
+    assert.equal(claimed.status, 200, claimed.body?.error);
+    assert.equal(claimed.body?.success, true, 'the claim succeeded');
+    assert.equal(
+      claimed.body?.granted,
+      DAILY_CREDIT_ALLOWANCE,
+      'the claim granted the full allowance'
+    );
+    assert.equal(
+      (claimed.body?.daily as { claimedToday?: boolean } | undefined)?.claimedToday,
+      true,
+      'the account has claimed today'
+    );
+
+    // The balance went up by exactly the allowance.
+    const afterRead = await api('GET', '/api/credits/balance', { token: user.token });
+    assert.equal(afterRead.status, 200, afterRead.body?.error);
+    assert.equal(
+      afterRead.body?.balance,
+      beforeBalance + DAILY_CREDIT_ALLOWANCE,
+      'the balance grew by exactly the allowance'
+    );
+
+    // A second claim on the same day pays nothing. A double press, a retried
+    // request or two tabs open at once must not pay twice.
+    const again = await api('POST', '/api/credits/daily/claim', { token: user.token });
+    assert.equal(again.status, 200, again.body?.error);
+    assert.equal(again.body?.granted, 0, 'the second claim paid nothing');
+    assert.equal(
+      again.body?.balance,
+      afterRead.body?.balance,
+      'the balance did not change'
+    );
+
+    // And the ledger says so: one grant of the allowance, and nothing else.
+    const { data: ledger } = await admin
+      .from('ai_credit_ledger')
+      .select('amount, operation, source_type')
+      .eq('profile_id', user.id)
+      .eq('source_type', 'daily_allowance');
+    const grants = (ledger ?? []).filter((row) => row.operation === 'grant');
+    assert.equal(grants.length, 1, 'the allowance was granted exactly once');
+    assert.equal(grants[0]?.amount, DAILY_CREDIT_ALLOWANCE, 'the grant is the allowance');
+  });
+
+  test('the claim endpoint needs a session', async () => {
+    const anonymous = await api('POST', '/api/credits/daily/claim', {});
+    assert.notEqual(anonymous.status, 200, 'an anonymous claim must be refused');
+  });
+
+  test('reading the state grants nothing, and it reports the claim honestly', async () => {
+    await clearCredits(user.id);
+
+    const before = await admin.rpc('get_daily_credit_state', { p_profile_id: user.id });
+    assert.equal(before.error, null, before.error?.message);
+    const beforeRow = before.data as {
+      daily_allowance: number;
+      daily_remaining: number;
+      claimed_today: boolean;
+    };
+    assert.equal(beforeRow.daily_allowance, DAILY_CREDIT_ALLOWANCE, 'the promise is reported');
+    assert.equal(beforeRow.daily_remaining, 0, 'nothing was granted by reading');
+    assert.equal(beforeRow.claimed_today, false, 'the account has not claimed');
+
+    const { data: grants } = await admin
+      .from('daily_credit_grants')
+      .select('id')
+      .eq('profile_id', user.id);
+    assert.equal((grants ?? []).length, 0, 'reading the state created no bucket');
+
+    await admin.rpc('claim_daily_credits', {
+      p_profile_id: user.id,
+      p_amount: DAILY_CREDIT_ALLOWANCE,
+    });
+
+    // The claim is remembered even after every claimed token is spent, so
+    // the button reads "claimed today" rather than offering a second claim.
+    await admin.rpc('consume_ai_credits', {
+      p_profile_id: user.id,
+      p_operation: 'job_description_analysis',
+      p_amount: DAILY_CREDIT_ALLOWANCE,
+      p_idempotency_key: `test-spend-all-${Date.now()}`,
+      p_metadata: {},
+    });
+
+    const after = await admin.rpc('get_daily_credit_state', { p_profile_id: user.id });
+    const afterRow = after.data as { daily_remaining: number; claimed_today: boolean };
+    assert.equal(afterRow.daily_remaining, 0, 'the claimed tokens were spent');
+    assert.equal(
+      afterRow.claimed_today,
+      true,
+      'the account has claimed today, even though nothing is left of it'
+    );
+  });
+
+  test('the expiry removes a leftover from yesterday without granting anything', async () => {
+    await clearCredits(user.id);
+
+    // A bucket from an earlier day that still holds tokens. Without the
+    // expiry, those tokens would sit in the running balance forever and
+    // could be spent long after they expired.
+    const { data: day, error: dayError } = await admin.rpc('careerpilot_egypt_date', {
+      p_at: new Date().toISOString(),
+    });
+    assert.equal(dayError, null, dayError?.message);
+    const yesterday = new Date(`${day as string}T00:00:00.000Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+
+    const bucket = await admin.from('daily_credit_grants').insert({
+      profile_id: user.id,
+      grant_date: yesterdayKey,
+      granted_amount: 2,
+      remaining: 2,
+      expires_at: new Date().toISOString(),
+    });
+    assert.equal(bucket.error, null, `the stale bucket must be created: ${bucket.error?.message ?? ''}`);
+
+    const ledger = await admin.from('ai_credit_ledger').insert({
+      profile_id: user.id,
+      amount: 2,
+      running_balance: 2,
+      operation: 'grant',
+      source_type: 'daily_allowance',
+      idempotency_key: `stale-grant:${user.id}:${yesterdayKey}`,
+      description: 'A stale daily allowance',
+    });
+    assert.equal(ledger.error, null, `the stale ledger row must be created: ${ledger.error?.message ?? ''}`);
+
+    const expired = await admin.rpc('expire_daily_credits', { p_profile_id: user.id });
+    assert.equal(expired.error, null, expired.error?.message);
+    assert.equal(
+      (expired.data as { expired: number }).expired,
+      2,
+      'the leftover was expired'
+    );
+    assert.equal(await runningBalance(user.id), 0, 'the balance no longer holds it');
   });
 });
 

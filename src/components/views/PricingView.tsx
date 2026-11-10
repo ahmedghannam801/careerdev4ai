@@ -10,6 +10,7 @@ import {
   Sparkles,
   Zap,
   Shield,
+  Crown,
   ArrowRight,
   ArrowLeft,
   AlertCircle,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CheckoutModal } from '../subscription/CheckoutModal';
+import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import {
   CardNetworkMarks,
   InstaPayMark,
@@ -25,6 +27,7 @@ import {
 } from '../payment/PaymentBrandMarks';
 import { formatEgpPrice } from '../../../shared/subscriptions';
 import { CREDIT_PACKS } from '../../../shared/credits';
+import { CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS } from '../../../shared/cvTemplates';
 import {
   fetchStripeBillingStatus,
   openStripePortal,
@@ -64,7 +67,7 @@ const PLANS: PlanDefinition[] = [
       'Explore live job market & save up to 5 jobs',
       'Browse complete role skill catalogues',
       'Basic career milestone tracker',
-      '5 one-time trial AI credits',
+      '5 one-time trial tokens',
       '100% free core platform forever',
     ],
     featuresAr: [
@@ -72,7 +75,7 @@ const PLANS: PlanDefinition[] = [
       'استكشاف الوظائف وحفظ حتى ٥ وظائف',
       'تصفح كتالوج المهارات والأدوار الوظيفية',
       'تتبع خطوات المسار المهني الأساسية',
-      '٥ نقاط تجريبية مجانية لمرة واحدة',
+      '٥ توكنات تجريبية مجانية لمرة واحدة',
       'المنصة الأساسية مجانية بالكامل للأبد',
     ],
   },
@@ -92,7 +95,7 @@ const PLANS: PlanDefinition[] = [
       'AI-tailored CVs for specific vacancies',
       'AI cover letter generator',
       'Personalized learning roadmaps',
-      '25 monthly AI credits',
+      '25 monthly tokens',
     ],
     featuresAr: [
       'منشئ السيرة الذاتية وتصدير PDF احترافي',
@@ -101,7 +104,7 @@ const PLANS: PlanDefinition[] = [
       'تخصيص السيرة الذاتية لكل فرصة عمل بالذكاء الاصطناعي',
       'توليد خطابات التقديم (Cover Letter) مخصصة',
       'خرائط تعلم وتطوير مهارات مخصصة',
-      '٢٥ نقطة ذكاء اصطناعي شهرياً',
+      '٢٥ توكن شهرياً',
     ],
   },
   {
@@ -121,7 +124,7 @@ const PLANS: PlanDefinition[] = [
       '24/7 AI Career Mentor & strategic consultation',
       'Advanced portfolio & evidence showcase',
       'Detailed career progress & health reports',
-      '60 monthly AI credits',
+      '60 monthly tokens',
     ],
     featuresAr: [
       'كل مميزات خطة الطلاب',
@@ -130,7 +133,7 @@ const PLANS: PlanDefinition[] = [
       'مستشار مهني ذكي على مدار الساعة للإرشاد والتوجيه',
       'معرض متقدم للمشاريع والإثباتات المهارية',
       'تقارير تفصيلية للجاهزية والنمو المهني',
-      '٦٠ نقطة ذكاء اصطناعي شهرياً',
+      '٦٠ توكن شهرياً',
     ],
   },
   {
@@ -150,7 +153,7 @@ const PLANS: PlanDefinition[] = [
       'Deep scenario interview simulations',
       'Executive career review reports',
       'Highest priority processing',
-      '120 monthly AI credits',
+      '120 monthly tokens',
     ],
     featuresAr: [
       'كل مميزات خطة المحترف',
@@ -165,7 +168,8 @@ const PLANS: PlanDefinition[] = [
 ];
 
 export const PricingView: React.FC = () => {
-  const { t, settings, subscription, refreshSubscription, refreshCredits } = useCareer();
+  const { t, settings, subscription, creditBalance, refreshSubscription, refreshCredits } =
+    useCareer();
   const isAr = settings.language === 'ar';
   const { params } = useRoute();
 
@@ -356,6 +360,68 @@ export const PricingView: React.FC = () => {
         </div>
       </div>
 
+      {/* The Token Hub.
+          *
+          * The page is called "Pricing", but the first question a candidate
+          * arrives with is not "which plan" — it is "what can I spend right
+          * now, and what else can I get for free". So the token balance, the
+          * daily claim and the price of the one thing tokens buy — the premium
+          * CV template — come before the plans.
+          *
+          * The daily widget here is the SAME component the dashboard shows. One
+          * widget, one state, one button; it cannot disagree with itself. */}
+      <div className="max-w-3xl mx-auto w-full rounded-3xl border border-border bg-surface-raised overflow-hidden">
+        <div className="flex flex-col gap-4 p-5 sm:p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Sparkles className="h-7 w-7" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-muted">
+                {t('Tokens')}
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black text-foreground tabular-nums">
+                  {creditBalance?.balance ?? 0}
+                </span>
+                <span className="text-xs font-semibold text-muted">
+                  {t('Your balance')}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+                <span>
+                  {t('Monthly Allowance')}: {creditBalance?.monthlyAllocation ?? 0}
+                </span>
+                <span>
+                  {t('Used this cycle')}: {creditBalance?.consumedThisMonth ?? 0}
+                </span>
+                <span>
+                  {t('Plan')}: {subscription?.planCode ?? 'free'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* What tokens buy, said plainly and before anything is spent. */}
+          <div className="flex items-center gap-2 rounded-2xl border border-[var(--color-accent-strong)]/25 bg-[var(--accent-surface)] px-4 py-3">
+            <Crown className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]" aria-hidden="true" />
+            <div className="text-[11px] leading-snug">
+              <div className="font-bold text-[var(--color-primary-text)]">
+                {t('Premium CV template')}
+              </div>
+              <div className="text-[var(--color-primary-text)]/80">
+                {CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS} {t('Tokens')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* The daily claim. The same widget the dashboard shows. */}
+        <div className="border-t border-border p-5 sm:p-6">
+          <DailyTokenClaim />
+        </div>
+      </div>
+
       {/* Post-checkout banner */}
       {checkoutNotice && (
         <div
@@ -537,15 +603,15 @@ export const PricingView: React.FC = () => {
                   </div>
                   {plan.monthlyPiasters > 0 && billingCycle === 'annual' && (
                     <div className="text-[11px] text-emerald-600 font-bold mt-1">
-                      {formatEgpPrice(Math.round(plan.annualPiasters / 12))} / {t('month')} ({t('Billed annually')})
+                      {formatEgpPrice(Math.round(plan.annualPiasters / 12))} / {t('per month')} ({t('Billed annually')})
                     </div>
                   )}
 
                   <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-xs font-bold text-primary">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>
-                      {plan.monthlyAiCredits} {t('Credits')}{' '}
-                      {plan.code === 'free' ? '(مرة واحدة)' : `/ ${t('month')}`}
+                      {plan.monthlyAiCredits} {t('Tokens')}{' '}
+                      {plan.code === 'free' ? '(مرة واحدة)' : `/ ${t('per month')}`}
                     </span>
                   </div>
                 </div>
@@ -599,16 +665,16 @@ export const PricingView: React.FC = () => {
         })}
       </div>
 
-      {/* Credit Booster Packs */}
+      {/* Token Booster Packs */}
       <div className="p-8 rounded-3xl bg-surface-raised border border-border space-y-6">
         <div className="text-center max-w-xl mx-auto space-y-1">
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider">
             <Zap className="w-4 h-4" />
-            <span>{t('Top up credits')}</span>
+            <span>{t('Top up tokens')}</span>
           </div>
-          <h2 className="text-2xl font-bold text-foreground">{t('Credit Packs')}</h2>
+          <h2 className="text-2xl font-bold text-foreground">{t('Token Packs')}</h2>
           <p className="text-xs text-muted">
-            اشحن رصيد ذكاء اصطناعي إضافي دون تغيير خطتك الحالية. الرصيد الإضافي لا تنتهي صلاحيته ويبقى في محفظتك.
+            {t('Top up extra tokens without changing your current plan. Extra tokens never expire and stay in your wallet.')}
           </p>
         </div>
 
@@ -624,7 +690,7 @@ export const PricingView: React.FC = () => {
                 </div>
                 <div className="text-xs text-primary font-extrabold flex items-center gap-1 mt-0.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>{pack.credits} {t('Credits')}</span>
+                  <span>{pack.credits} {t('Tokens')}</span>
                 </div>
               </div>
               <button
@@ -634,13 +700,13 @@ export const PricingView: React.FC = () => {
                     code: pack.id,
                     nameEn: pack.nameEn,
                     nameAr: pack.nameAr,
-                    taglineEn: `${pack.credits} AI Credits`,
-                    taglineAr: `${pack.credits} نقطة ذكاء اصطناعي`,
+                    taglineEn: `${pack.credits} Tokens`,
+                    taglineAr: `${pack.credits} توكن`,
                     monthlyPiasters: pack.pricePiasters,
                     annualPiasters: pack.pricePiasters,
                     monthlyAiCredits: pack.credits,
-                    featuresEn: [`${pack.credits} AI credits`, 'Never expires'],
-                    featuresAr: [`${pack.credits} نقطة رصيد`, 'بدون تاريخ انتهاء'],
+                    featuresEn: [`${pack.credits} tokens`, 'Never expires'],
+                    featuresAr: [`${pack.credits} توكن`, 'بدون تاريخ انتهاء'],
                   });
                   setCheckoutOpen(true);
                 }}

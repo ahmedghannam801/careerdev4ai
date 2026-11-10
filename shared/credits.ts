@@ -1,6 +1,11 @@
 /**
- * Shared AI Credits Domain Models and Types
+ * Shared Tokens Domain Models and Types
  * Double-entry credit ledger, credit pack definitions, and action weightings.
+ *
+ * The ledger underneath calls a token a credit, because a credit is what the
+ * ledger records. The interface calls it a token, because that is what the
+ * candidate holds. The two names describe the same thing from two sides, and
+ * only the interface's name reaches a candidate.
  */
 
 export const CREDIT_OPERATIONS = ['grant', 'consume', 'refund', 'expire', 'bonus'] as const;
@@ -40,8 +45,13 @@ export const CREDIT_WEIGHTS: Record<AICreditAction, number> = {
   /**
    * Unlocking a premium CV template. The weight is the price of the template:
    * the candidate sees it on the screen before anything is spent.
+   *
+   * Five tokens. The price is low on purpose — a template is a presentation
+   * choice, not a product of value, and a candidate who cannot afford the
+   * layout simply cannot see what the library can do for them. The daily claim
+   * is two tokens, so a template is reachable without ever buying anything.
    */
-  premium_template_unlock: 10,
+  premium_template_unlock: 5,
 };
 
 export interface CreditPack {
@@ -102,28 +112,32 @@ export interface CreditLedgerDTO {
 }
 
 /**
- * The daily free-credit allowance.
+ * The daily free-token allowance.
  *
- * Every eligible account may spend a small allowance of AI credits each day.
- * The allowance is a separate pool from the subscription entitlement, it
- * resets at midnight in the platform's documented timezone (Africa/Cairo), and
- * it does not accumulate: yesterday's unused allowance simply expires.
+ * Every eligible account may claim a small allowance of tokens each day. The
+ * allowance is a separate pool from the subscription entitlement, it resets at
+ * midnight in the platform's documented timezone (Africa/Cairo), and it does
+ * not accumulate: yesterday's unused allowance simply expires.
  *
- * The size is three credits. That is the number the product promises, and it
- * is the number the database grants: `claim_daily_credits` reads the
- * allowance from `careerpilot_daily_credit_allowance()` rather than from this
- * constant, so the two can never disagree. This constant is the application
- * side of the same promise, and the two are asserted to be equal by the test
- * suite.
+ * The size is two tokens. That is the number the product promises, and it is
+ * the number the database grants: `claim_daily_credits` reads the allowance
+ * from `careerpilot_daily_credit_allowance()` rather than from this constant,
+ * so the two can never disagree. This constant is the application side of the
+ * same promise, and the two are asserted to be equal by the test suite.
  *
- * Three credits buy three lightweight operations (`job_description_analysis`,
+ * The allowance is CLAIMED, not granted automatically. Reading the balance
+ * never hands out tokens; the candidate presses the claim button and the
+ * tokens arrive. A day that is never claimed is a day with no free tokens,
+ * which is what makes the button worth pressing.
+ *
+ * Two tokens buy two lightweight operations (`job_description_analysis`,
  * `ai_assist_inline`, `learning_recommendation`, `project_analysis` all cost
  * 1), or one heavier one — a CV ATS analysis costs 2, a CV generation or a
  * roadmap costs 4, a mock interview costs 5. The allowance is still far below
  * the cheapest paid plan (25 credits for 99 EGP) and it never unlocks a
  * paid-only entitlement.
  */
-export const DAILY_CREDIT_ALLOWANCE = 3;
+export const DAILY_CREDIT_ALLOWANCE = 2;
 
 /**
  * The reward a referrer receives for a verified referral.
@@ -142,8 +156,16 @@ export interface DailyCreditState {
   remaining: number;
   /** When today's allowance expires (the next Africa/Cairo midnight). */
   resetAt: string;
-  /** Whether today's allowance has already been granted. */
-  grantedToday: boolean;
+  /**
+   * Whether today's reward has already been claimed.
+   *
+   * This is TRUE as soon as the candidate claims, even after every claimed
+   * token has been spent. It is the flag the claim button reads to decide
+   * between "claim 2 tokens" and "claimed today", so it must not be derived
+   * from the remaining count: a candidate who claimed and then spent the
+   * tokens has still claimed today.
+   */
+  claimedToday: boolean;
 }
 
 export interface CreditBalanceDTO {

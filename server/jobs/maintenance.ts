@@ -9,7 +9,8 @@ import { getSupabaseServer } from '../db/supabase.ts';
 export interface MaintenanceSweepOutcome {
   expiredSubscriptions: number;
   expiredTemporaryAccess: number;
-  dailyCreditsGranted: number;
+  /** How many expired daily tokens were taken out of the running balances. */
+  dailyCreditsExpired: number;
   dailyCreditsSkipped: number;
   dailyCreditsFailed: number;
 }
@@ -22,7 +23,7 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
   const supabase = getSupabaseServer();
   let expiredSubscriptions = 0;
   let expiredTemporaryAccess = 0;
-  let dailyCreditsGranted = 0;
+  let dailyCreditsExpired = 0;
   let dailyCreditsSkipped = 0;
   let dailyCreditsFailed = 0;
 
@@ -48,38 +49,38 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
     console.error('Failed to run expire_temporary_access:', err);
   }
 
-  // The daily free-credit allowance.
+  // The daily free-token allowance.
   //
-  // The balance read claims the allowance on demand, which keeps the number
-  // the candidate sees current. This sweep covers the other half of the
-  // promise: an account that has not opened the application still receives
-  // the allowance it was given.
+  // The allowance is CLAIMED by the candidate, so a sweep must not grant it:
+  // a reward that arrives on its own is not the reward the claim button
+  // promises. `grant_daily_credits_to_all` therefore grants nothing and
+  // reports that it is a manual claim.
   //
-  // It is safe to run often. The grant is idempotent per day, so a second run
-  // in the same day grants nothing, and an account whose own claim is in
-  // flight is skipped rather than waited for.
+  // What the sweep still owns is the EXPIRY: yesterday's unused tokens have
+  // to leave the running balance whether or not anybody claims today, and the
+  // balance read cannot be the only thing that does it.
   try {
-    const { data, error } = await supabase.rpc('grant_daily_credits_to_all');
+    const { data, error } = await supabase.rpc('expire_all_daily_credits');
     if (error) {
-      console.error('Error in grant_daily_credits_to_all RPC:', error);
+      console.error('Error in expire_all_daily_credits RPC:', error);
     } else if (data) {
       const outcome = data as {
-        granted?: number;
+        expired?: number;
         skipped?: number;
         failed?: number;
       };
-      dailyCreditsGranted = Number(outcome?.granted ?? 0);
+      dailyCreditsExpired = Number(outcome?.expired ?? 0);
       dailyCreditsSkipped = Number(outcome?.skipped ?? 0);
       dailyCreditsFailed = Number(outcome?.failed ?? 0);
     }
   } catch (err) {
-    console.error('Failed to run grant_daily_credits_to_all:', err);
+    console.error('Failed to run expire_all_daily_credits:', err);
   }
 
   return {
     expiredSubscriptions,
     expiredTemporaryAccess,
-    dailyCreditsGranted,
+    dailyCreditsExpired,
     dailyCreditsSkipped,
     dailyCreditsFailed,
   };

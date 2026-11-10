@@ -269,14 +269,17 @@ export default {
     }
 
     try {
-      // The outcome is recorded in the heartbeat, not only in the log: the
-      // daily free-credit allowance is granted by this sweep, and the only
-      // way to know that it reached the accounts is to see that it ran and
-      // what it granted.
+      // The outcome is recorded in the heartbeat, not only in the log.
+      //
+      // The daily free-token allowance is CLAIMED by the candidate, so this
+      // sweep does not grant it — it expires yesterday's leftovers, which is
+      // the half that has to happen whether or not anybody claims today. The
+      // heartbeat says how many tokens were expired, so the API can tell the
+      // candidate the truth.
       const maintenance = await runSubscriptionMaintenanceSweeps();
       sweep.subscriptionsExpired = maintenance.expiredSubscriptions;
       sweep.temporaryAccessExpired = maintenance.expiredTemporaryAccess;
-      sweep.dailyCreditsGranted = maintenance.dailyCreditsGranted;
+      sweep.dailyCreditsExpired = maintenance.dailyCreditsExpired;
       sweep.dailyCreditsSkipped = maintenance.dailyCreditsSkipped;
       sweep.dailyCreditsFailed = maintenance.dailyCreditsFailed;
     } catch (error) {

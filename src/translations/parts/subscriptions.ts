@@ -1,5 +1,5 @@
 /**
- * Arabic translations for Subscriptions, Pricing, Checkout, AI Credits, and Billing.
+ * Arabic translations for Subscriptions, Pricing, Checkout, Tokens, and Billing.
  * Keyed by the exact English source strings.
  */
 
@@ -26,7 +26,7 @@ export const subscriptionsAr: Record<string, string> = {
   'per year': 'سنوياً',
   'Billed monthly': 'دفع شهري',
   'Billed annually': 'دفع سنوي',
-  'AI Credits included': 'رصيد ذكاء اصطناعي مشمول',
+  'Tokens included': 'توكنات مشمولة',
   'Popular': 'الأكثر طلباً',
   'Best Value': 'أفضل قيمة',
   'All core platform features are 100% free': 'جميع مميزات المنصة الأساسية مجانية بالكامل ١٠٠٪',
@@ -67,24 +67,45 @@ export const subscriptionsAr: Record<string, string> = {
   'Copy': 'نسخ',
   'Copied!': 'تم النسخ!',
 
-  // AI Credits Badge & Modal
-  'AI Credits': 'رصيد الذكاء الاصطناعي',
-  'Credits': 'نقطة رصيد',
+  // Tokens Badge & Modal
+  //
+  // The currency is called TOKENS in the interface. The ledger underneath
+  // still calls it a credit, but a candidate never sees the ledger, and two
+  // names for one currency is one name too many.
+  'Tokens': 'توكن',
   'Your balance': 'رصيدك الحالي',
   'Monthly Allowance': 'الرصيد الشهري المخصص',
   'Used this cycle': 'المستخدم في هذه الدورة',
-  'Daily allowance': 'الرصيد اليومي المخصص',
+  'Daily tokens': 'التوكنات اليومية',
   'Remaining today': 'المتاح اليوم',
-  'Next reset': 'التجديد التالي',
-  'Daily free credit allowance': 'الرصيد المجاني اليومي',
-  'Top up credits': 'شحن رصيد إضافي',
-  'Credit Packs': 'باقات الرصيد',
-  'Starter Pack (15 Credits)': 'باقة البداية (١٥ نقطة)',
-  'Booster Pack (40 Credits)': 'باقة الدعم (٤٠ نقطة)',
-  'Power Pack (100 Credits)': 'باقة القوة (١٠٠ نقطة)',
-  'Insufficient AI Credits': 'رصيد الذكاء الاصطناعي غير كافٍ',
-  'You need more credits to run this AI model. Top up or upgrade your plan.':
-    'تحتاج إلى رصيد إضافي لتشغيل هذا النموذج الذكي. اشحن رصيدك أو قم بترقية خطتك.',
+  'Next claim in': 'الاستلام التالي بعد',
+  'Daily free tokens': 'التوكنات المجانية اليومية',
+  'Top up tokens': 'شحن توكنات إضافية',
+  'Token Packs': 'باقات التوكنات',
+  'Top up extra tokens without changing your current plan. Extra tokens never expire and stay in your wallet.':
+    'اشحن توكنات إضافية دون تغيير خطتك الحالية. التوكنات الإضافية لا تنتهي صلاحيتها وتبقى في محفظتك.',
+  'Premium CV template': 'قالب السيرة الذاتية المميز',
+  'Insufficient tokens': 'التوكنات غير كافية',
+  'You need more tokens to run this AI model. Top up or upgrade your plan.':
+    'تحتاج إلى توكنات إضافية لتشغيل هذا النموذج الذكي. اشحن رصيدك أو قم بترقية خطتك.',
+
+  // The daily claim.
+  //
+  // The reward is CLAIMED, so the wording is about an action the candidate
+  // takes — "Claim", "Claimed today" — rather than about a grant that arrives
+  // on its own.
+  'Claim': 'استلم',
+  'Claiming...': 'جارٍ الاستلام...',
+  'Claim daily tokens': 'استلم التوكنات اليومية',
+  'Claimed today': 'تم الاستلام اليوم',
+  'Already claimed today': 'تم الاستلام اليوم بالفعل',
+  'Your daily tokens are already waiting for you.': 'توجد توكناتك اليومية في انتظارك بالفعل.',
+  'Daily tokens claimed': 'تم استلام التوكنات اليومية',
+  'You received': 'لقد استلمت',
+  'tokens': 'توكن',
+  'Free tokens every day': 'توكنات مجانية كل يوم',
+  'Could not claim the daily tokens': 'تعذّر استلام التوكنات اليومية',
+  'Nothing was taken. Please try again.': 'لم يُخصم شيء. يُرجى المحاولة مرة أخرى.',
 
   // Admin Panels
   'Subscriptions': 'الاشتراكات',
@@ -104,9 +125,9 @@ export const subscriptionsAr: Record<string, string> = {
   'Fraud Risk': 'مخاطر الاحتيال',
   'Total Collected Revenue': 'إجمالي الإيرادات المحصلة',
   'Transactions': 'المعاملات',
-  'Manual Credit Grant': 'منح رصيد يدوي',
-  'Grant Credits': 'منح الرصيد',
-  'Amount (Credits)': 'الكمية (نقطة)',
+  'Manual Token Grant': 'منح توكنات يدوي',
+  'Grant Tokens': 'منح التوكنات',
+  'Amount (Tokens)': 'الكمية (توكن)',
   'Reason for Grant': 'سبب المنح',
 
   // Card payments (Stripe)

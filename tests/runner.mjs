@@ -324,6 +324,10 @@ async function main() {
     // exactly once, a birthday belongs to one day in the candidate's own
     // timezone, and a signed-in client cannot write the tables that hold money.
     join(TESTS_DIR, 'credits-referrals-birthday.test.ts'),
+    // The token economy's own contract: the daily allowance is two tokens, a
+    // premium CV template is five, and the price the interface quotes is the
+    // price the server charges. Pure: no key and no database are needed.
+    join(TESTS_DIR, 'token-economy.test.ts'),
     // The Checkout Studio parameters sent to Stripe, and the rule that picks
     // the hosted checkout's user-interface mode from the account's API
     // version. Pure: no key and no database are needed.

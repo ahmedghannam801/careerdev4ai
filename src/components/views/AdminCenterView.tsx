@@ -1006,7 +1006,7 @@ export const AdminCenterView: React.FC = () => {
       entries.push({ id: 'cv-templates', label: t('CV templates'), icon: LayoutTemplate });
     }
     if (permissions.has('credits.read')) {
-      entries.push({ id: 'credits', label: t('AI Credits & CV Activity'), icon: Coins });
+      entries.push({ id: 'credits', label: t('Tokens & CV Activity'), icon: Coins });
     }
     return entries;
   }, [permissions, t]);

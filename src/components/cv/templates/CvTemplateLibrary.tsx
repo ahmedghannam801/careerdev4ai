@@ -20,7 +20,7 @@
  * candidate who cannot see the layout cannot judge it, and a placeholder is
  * not a preview. What the lock decides is whether the candidate may USE the
  * template — and even then it is not a dead end, because a premium template
- * can be unlocked with AI credits, and the price is on the card before
+ * can be unlocked with tokens, and the price is on the card before
  * anything is spent.
  *
  * Switching a template is presentation only: the document is rebuilt from the
@@ -62,6 +62,7 @@ import {
   type CvTemplateTierFilter,
 } from '../../../../shared/cvTemplates';
 import { CvTemplatePreview } from './CvTemplatePreview';
+import { DailyTokenClaim } from '../../subscription/DailyTokenClaim';
 
 interface CvTemplateLibraryProps {
   /** Opens the editor, so the candidate can see the new layout on their CV. */
@@ -322,7 +323,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
           className={PRIMARY_BUTTON}
         >
           <Coins className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('Unlock with {count} Credits').replace('{count}', String(price))}
+          {t('Unlock with {count} Tokens').replace('{count}', String(price))}
         </button>
         {onUpgrade && (
           <button
@@ -383,6 +384,20 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
               </span>
             )}
             <TierBadge template={template} />
+
+            {/* The price, on the card. A locked template that does not say
+                what it costs is a locked template the candidate cannot
+                decide about, and the price is the one fact that lets them
+                decide: they have a balance, they know what it buys. */}
+            {template.tier === 'premium' && !template.access.allowed && template.access.unlockCredits > 0 ? (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--color-accent-strong)]/30 bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--color-primary-text)]"
+                title={t('Unlock price')}
+              >
+                <Coins className="h-2.5 w-2.5" aria-hidden="true" />
+                {template.access.unlockCredits} {t('Tokens')}
+              </span>
+            ) : null}
           </div>
 
           <div className="flex items-start justify-between gap-2">
@@ -438,7 +453,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
       {catalog?.enforcementEnabled ? (
         <p className="rounded-xl border border-[var(--color-accent-strong)]/20 bg-[var(--accent-surface)] px-3 py-2 text-[11px] text-[var(--color-primary-text)]">
           {t(
-            'Every template can be previewed for free. Unlock a premium template with AI credits, or get every template with a paid plan.'
+            'Every template can be previewed for free. Unlock a premium template with tokens, or get every template with a paid plan.'
           )}
         </p>
       ) : (
@@ -765,7 +780,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
                               canUnlockWithCredits: false,
                               unlockCredits: 0,
                               unlockMethod: 'credits',
-                              reason: 'You unlocked this template with AI credits.',
+                              reason: 'You unlocked this template with tokens.',
                             },
                           }
                         : entry
@@ -777,7 +792,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
             await refreshCredits();
             setNotice(
               creditsCharged > 0
-                ? t('Template unlocked. {spent} credits were spent — {remaining} left.')
+                ? t('Template unlocked. {spent} tokens were spent — {remaining} left.')
                     .replace('{spent}', String(creditsCharged))
                     .replace(
                       '{remaining}',
@@ -917,26 +932,51 @@ function UnlockDialog({
                   {t('Unlock price')}
                 </span>
                 <span className="text-base font-bold tabular-nums text-[var(--color-primary-text)]">
-                  {price} {t('AI Credits')}
+                  {price} {t('Tokens')}
                 </span>
               </div>
               {balance !== null && (
                 <p className="mt-1.5 text-[11px] text-[var(--color-primary-text)]">
-                  {t('Your balance:')} {balance} {t('AI Credits')}
+                  {t('Your balance:')} {balance} {t('Tokens')}
                 </p>
               )}
               {!affordable && (
-                <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-[var(--color-danger)]/10 px-2 py-1.5 text-[11px] text-[var(--color-danger)]">
-                  <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  {t('You do not have enough credits for this template yet.')}
-                </p>
+                <div className="mt-2 rounded-lg border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 px-2.5 py-2 text-[11px] text-[var(--color-danger)]">
+                  <p className="flex items-start gap-1.5">
+                    <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {t('You do not have enough tokens for this template yet.')}
+                  </p>
+                  {balance !== null && (
+                    <p className="mt-1 ps-5 font-semibold tabular-nums">
+                      {t('You need {count} more tokens').replace('{count}', String(price - balance))}
+                    </p>
+                  )}
+
+                  {/* A shortfall is not a dead end, so the way out is offered
+                      here rather than left for the candidate to find. The
+                      daily claim is the SAME widget the dashboard shows, and
+                      it only appears when there are tokens to claim today. */}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 ps-5">
+                    <DailyTokenClaim variant="compact" />
+                    {onUpgrade && (
+                      <button
+                        type="button"
+                        onClick={onUpgrade}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                      >
+                        <Coins className="h-3 w-3" aria-hidden="true" />
+                        {t('Top up tokens')}
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
             <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-[var(--text-muted)]">
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {t(
-                'Credits are only taken when the unlock succeeds. If it fails, nothing is charged.'
+                'Tokens are only taken when the unlock succeeds. If it fails, nothing is charged.'
               )}
             </p>
 
@@ -982,7 +1022,7 @@ function UnlockDialog({
             )}
             {busy
               ? t('Unlocking...')
-              : t('Unlock with {count} Credits').replace('{count}', String(price))}
+              : t('Unlock with {count} Tokens').replace('{count}', String(price))}
           </button>
         </div>
       </div>

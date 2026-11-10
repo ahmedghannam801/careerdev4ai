@@ -193,8 +193,8 @@ export const adminAr: Record<string, string> = {
   'Specific users (profile IDs)': 'مستخدمون محددون (معرّفات الملفات)',
 
   // Credit monitor
-  'AI Credits & CV Activity': 'رصيد الذكاء الاصطناعي ونشاط السيرة الذاتية',
-  'What the platform granted, what the credits were spent on, and how much CV work they paid for.':
+  'Tokens & CV Activity': 'التوكنات ونشاط السيرة الذاتية',
+  'What the platform granted, what the tokens were spent on, and how much CV work they paid for.':
     'ما منحته المنصة، وما أُنفق على الرصيد، وكم من العمل على السيرة الذاتية غطّاه.',
   'Loading the credit monitor…': 'جارٍ تحميل مراقب الرصيد…',
   'Failed to load the credit monitor.': 'تعذّر تحميل مراقب الرصيد.',

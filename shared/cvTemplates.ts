@@ -1779,7 +1779,7 @@ export type CvTemplateAccess = 'free' | 'included' | 'premium' | 'locked';
  *
  * `free`      the template costs nothing;
  * `subscription` the candidate's plan already includes it;
- * `credits`   the template can be unlocked with AI credits;
+ * `credits`   the template can be unlocked with tokens;
  * `upgrade`   the template is only available on a paid plan.
  */
 export type CvTemplateUnlockMethod = 'free' | 'subscription' | 'credits' | 'upgrade';
@@ -1788,11 +1788,15 @@ export type CvTemplateUnlockMethod = 'free' | 'subscription' | 'credits' | 'upgr
  * What unlocking a premium template costs.
  *
  * The price is a property of the product, not of a candidate: every premium
- * template costs the same number of AI credits, and the number is stated in
+ * template costs the same number of tokens, and the number is stated in
  * the interface before anything is spent. The server re-reads it, so the price
  * on the screen and the price on the ledger cannot disagree.
+ *
+ * The currency the candidate sees is called a TOKEN. The ledger underneath
+ * still calls it a credit, because the ledger is a double-entry record of
+ * what was spent and renaming it would not change what was spent.
  */
-export const CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS = 10;
+export const CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS = 5;
 
 export interface CvTemplateAccessContext {
   enforcementEnabled: boolean;
@@ -1815,9 +1819,9 @@ export interface CvTemplateAccessResult {
   /** What the interface should call this template for this candidate. */
   access: CvTemplateAccess;
   reason: string;
-  /** Whether the candidate may unlock this template with AI credits. */
+  /** Whether the candidate may unlock this template with tokens. */
   canUnlockWithCredits: boolean;
-  /** What an unlock costs, in AI credits. */
+  /** What an unlock costs, in tokens. */
   unlockCredits: number;
   /** How this candidate obtains the template. */
   unlockMethod: CvTemplateUnlockMethod;
@@ -1898,7 +1902,7 @@ export function resolveCvTemplateAccess(
       templateId: template.id,
       allowed: true,
       access: 'premium',
-      reason: 'You unlocked this template with AI credits.',
+      reason: 'You unlocked this template with tokens.',
       canUnlockWithCredits: false,
       unlockCredits: 0,
       unlockMethod: 'credits',
@@ -1911,8 +1915,8 @@ export function resolveCvTemplateAccess(
     access: 'locked',
     reason:
       context.subscriptionStatus === 'temporary_access'
-        ? 'Unlock this template with AI credits, or upgrade your plan.'
-        : 'Unlock this template with AI credits, or upgrade your plan to use it.',
+        ? 'Unlock this template with tokens, or upgrade your plan.'
+        : 'Unlock this template with tokens, or upgrade your plan to use it.',
     canUnlockWithCredits: true,
     unlockCredits: CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS,
     unlockMethod: 'credits',

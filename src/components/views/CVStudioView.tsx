@@ -315,6 +315,24 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         </div>
 
         <div className="flex items-center gap-2">
+          {/* The template gallery is reachable from every step of the studio.
+              It used to live only in the secondary navigation of the "My CV"
+              step, which meant a candidate reading their ATS score had to go
+              back a step to discover that the library — and the premium
+              layout the token balance buys — was there at all. The library is
+              a part of the studio, so its door is in the studio's own header. */}
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+              activeTab === 'templates'
+                ? 'border-[var(--accent-primary)]/40 bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
+                : 'border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <LayoutTemplate className="w-3.5 h-3.5" />
+            <span>{t('Templates')}</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('review')}
             className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors"

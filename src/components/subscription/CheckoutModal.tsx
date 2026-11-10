@@ -571,9 +571,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </span>
         </div>
         <div className="flex justify-between text-sm text-[var(--text-secondary)]">
-          <span>{t('AI Credits included')}</span>
+          <span>{t('Tokens included')}</span>
           <span className="font-bold text-[var(--accent-primary)]">
-            {aiCredits} {t('Credits')} / {t('month')}
+            {aiCredits} {t('Tokens')} / {t('per month')}
           </span>
         </div>
         {couponDiscountPiasters > 0 && (

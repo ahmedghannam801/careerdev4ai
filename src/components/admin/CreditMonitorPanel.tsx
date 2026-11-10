@@ -138,11 +138,11 @@ export const CreditMonitorPanel: React.FC = () => {
         <div>
           <h2 className="flex items-center gap-2 text-xl font-bold text-[var(--text-primary)]">
             <Coins className="h-5 w-5 text-[var(--accent-primary)]" />
-            <span>{t('AI Credits & CV Activity')}</span>
+            <span>{t('Tokens & CV Activity')}</span>
           </h2>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
             {t(
-              'What the platform granted, what the credits were spent on, and how much CV work they paid for.'
+              'What the platform granted, what the tokens were spent on, and how much CV work they paid for.'
             )}
           </p>
         </div>

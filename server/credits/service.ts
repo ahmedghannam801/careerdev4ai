@@ -9,11 +9,13 @@ import {
   deductCredits,
   refundCredits,
   listCreditHistory,
+  claimDailyCredits,
 } from '../db/credits.ts';
 import {
   type AICreditAction,
   type CreditBalanceDTO,
   type CreditLedgerDTO,
+  type DailyCreditState,
   CREDIT_WEIGHTS,
 } from '../../shared/credits.ts';
 
@@ -95,5 +97,50 @@ export async function getCreditLedgerHistory(
   limit = 50
 ): Promise<CreditLedgerDTO[]> {
   return listCreditHistory(profileId, limit);
+}
+
+/**
+ * Claims the daily free-token reward.
+ *
+ * The reward is CLAIMED, not granted: this is the only path that hands out the
+ * daily allowance, and it is called when the candidate presses the claim
+ * button. It is idempotent per Africa/Cairo calendar day, so a double press
+ * or a retried request pays out exactly once.
+ *
+ * The answer carries the new balance and the state of the allowance, so the
+ * interface can move from "claim" to "claimed today" without a second
+ * round trip.
+ */
+export async function claimDailyTokenReward(profileId: string): Promise<{
+  success: boolean;
+  granted: number;
+  balance: number;
+  daily: DailyCreditState | null;
+}> {
+  const claimed = await claimDailyCredits(profileId);
+
+  if (!claimed) {
+    // The claim could not be completed. The balance is still read, so the
+    // interface can show the truth rather than a stale number.
+    const balance = await getCreditBalance(profileId);
+    return {
+      success: false,
+      granted: 0,
+      balance: balance.balance,
+      daily: balance.daily ?? null,
+    };
+  }
+
+  return {
+    success: true,
+    granted: claimed.granted,
+    balance: claimed.balance,
+    daily: {
+      allowance: claimed.allowance,
+      remaining: claimed.remaining,
+      resetAt: claimed.resetAt,
+      claimedToday: claimed.claimedToday,
+    },
+  };
 }
 

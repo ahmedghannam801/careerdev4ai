@@ -29,6 +29,7 @@ import React from 'react';
 import {
   CV_TEMPLATES,
   CV_TEMPLATE_CATEGORIES,
+  CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS,
   FREE_CV_TEMPLATE_ID,
   FREE_CV_TEMPLATE_IDS,
   cvTemplateStructuralSignature,
@@ -383,7 +384,7 @@ describe('the template access rule', () => {
       subscriptionStatus: 'free',
     });
     assert.equal(access.canUnlockWithCredits, true);
-    assert.equal(access.unlockCredits, 10);
+    assert.equal(access.unlockCredits, CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS);
     assert.equal(access.unlockMethod, 'credits');
   });
 
@@ -468,8 +469,14 @@ let otherUser: TestUser;
 /** The plan the harness gives a subscribed candidate. */
 const PAID_PLAN = 'pro';
 
-/** What a premium template costs to unlock. */
-const UNLOCK_PRICE = 10;
+/**
+ * What a premium template costs to unlock.
+ *
+ * It is read from the product's own constant rather than written out here,
+ * because a price written in two places is a price that will eventually be
+ * wrong in one of them. The tests then describe the product as it is.
+ */
+const UNLOCK_PRICE = CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS;
 
 /**
  * The balance the candidate sees.
@@ -489,8 +496,8 @@ async function apiBalance(token: string): Promise<number> {
 /**
  * The ledger rows that record a premium template purchase.
  *
- * A purchase is a `consume` of ten credits with the action that names it, so
- * the money can be traced from the ledger to the template it bought.
+ * A purchase is a `consume` of the stated price with the action that names
+ * it, so the money can be traced from the ledger to the template it bought.
  */
 async function unlockLedgerRows(profileId: string): Promise<Array<{ amount: number }>> {
   const { data } = await admin
@@ -858,7 +865,7 @@ describe('the template API', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('unlocking a premium template with credits', () => {
-  test('a candidate with enough credits buys the template for ten credits', async () => {
+  test('a candidate with enough tokens buys the template for the stated price', async () => {
     const buyer = await createTestUser('cvtpl-buyer', { subscription: false });
     try {
       await grantCredits(buyer.id, 50, `cvtpl-unlock-${buyer.id}`);
@@ -877,7 +884,7 @@ describe('unlocking a premium template with credits', () => {
       assert.equal(await apiBalance(buyer.token), before - UNLOCK_PRICE);
       const rows = await unlockLedgerRows(buyer.id);
       assert.equal(rows.length, 1, 'one purchase, one ledger row');
-      assert.equal(rows[0].amount, -UNLOCK_PRICE, 'ten credits were taken');
+      assert.equal(rows[0].amount, -UNLOCK_PRICE, 'the stated price was taken');
     } finally {
       await deleteTestUser(buyer);
     }
@@ -948,9 +955,15 @@ describe('unlocking a premium template with credits', () => {
     }
   });
 
-  test('a candidate with too few credits is refused, and nothing is charged', async () => {
+  test('a candidate with too few tokens is refused, and nothing is charged', async () => {
     const buyer = await createTestUser('cvtpl-poor', { subscription: false });
     try {
+      // The shortfall is arranged deliberately. A brand new account receives a
+      // trial grant, and that grant may well be worth more than the template
+      // costs, so relying on the trial balance would make this test depend on
+      // the size of the trial rather than on the rule it is checking.
+      await grantCredits(buyer.id, UNLOCK_PRICE - 1, `cvtpl-poor-${buyer.id}`);
+
       const before = await apiBalance(buyer.token);
       assert.ok(
         before < UNLOCK_PRICE,

@@ -30,6 +30,7 @@ import {
 import {
   getUserCreditsWithTrial,
   getCreditLedgerHistory,
+  claimDailyTokenReward,
 } from '../credits/service.ts';
 import { validateCoupon } from '../coupons/service.ts';
 import {
@@ -240,6 +241,46 @@ export function registerSubscriptionRoutes(app: Express): void {
     } catch (error) {
       console.error('Failed to fetch credit history:', error);
       return res.status(500).json({ error: 'Failed to retrieve credit history' });
+    }
+  });
+
+  // Candidate: Claim the daily free-token reward.
+  //
+  // This is the ONLY route that hands out the daily allowance. The balance
+  // read deliberately does not: the reward is something the candidate claims,
+  // and a reward that arrives because somebody read a number is not a reward
+  // anybody can press a button for.
+  //
+  // The claim is idempotent per Africa/Cairo calendar day, so a double press,
+  // a retried request or two tabs open at once pay out exactly once. The
+  // answer says how much was actually granted, so a press that changed nothing
+  // is reported as having changed nothing.
+  app.post('/api/credits/daily/claim', requireAuth, async (req: AuthedRequest, res: Response) => {
+    try {
+      const result = await claimDailyTokenReward(req.authUser!.id);
+
+      if (!result.success) {
+        return res.status(503).json({
+          success: false,
+          code: 'CLAIM_UNAVAILABLE',
+          error:
+            'The daily tokens could not be claimed right now. Nothing was taken — please try again in a moment.',
+        });
+      }
+
+      return res.json({
+        success: true,
+        granted: result.granted,
+        balance: result.balance,
+        daily: result.daily,
+      });
+    } catch (error) {
+      console.error('Failed to claim the daily tokens:', error);
+      return res.status(500).json({
+        success: false,
+        code: 'CLAIM_FAILED',
+        error: 'The daily tokens could not be claimed. Nothing was taken — please try again.',
+      });
     }
   });
 

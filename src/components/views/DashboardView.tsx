@@ -27,6 +27,7 @@ import { CountUp } from '../motion/CountUp';
 import { EmptyState } from '../ui/EmptyState';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
+import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import { CareerImage } from '../ui/CareerImage';
 
 interface DashboardViewProps {
@@ -278,6 +279,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           </button>
         </div>
       </div>
+
+      {/* The daily token reward.
+          *
+          * It sits directly under the greeting, before the numbered journey
+          * below, because it is the one thing on this page the candidate can
+          * act on in five seconds and see something for. Everything further
+          * down is a piece of the career; this is a piece of the platform, and
+          * it is the platform's way of saying "come back tomorrow".
+          *
+          * The widget is the same one the balance badge and the pricing page
+          * use, so the dashboard and the header cannot disagree about whether
+          * today's tokens have been claimed. */}
+      <DailyTokenClaim />
 
       {/* 1. Where am I? */}
       <section

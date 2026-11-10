@@ -66,7 +66,7 @@ export async function applyCvTemplate(
 }
 
 /**
- * Buys a premium template with AI credits.
+ * Buys a premium template with tokens.
  *
  * The server decides whether this candidate may buy it, what it costs, and
  * whether the balance covers it; it takes the credits and records the unlock

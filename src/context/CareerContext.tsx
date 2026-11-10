@@ -209,6 +209,7 @@ import {
 } from '../lib/subscriptionApi';
 import {
   fetchCreditBalance,
+  claimDailyTokens as claimDailyTokensRequest,
 } from '../lib/creditsApi';
 import type { CreditBalanceDTO } from '../../shared/credits';
 import {
@@ -217,6 +218,7 @@ import {
   readStoredReferralCode,
 } from '../lib/referralApi';
 import { ProcessingProvider } from '../components/processing/ProcessingProvider';
+import { ToastProvider } from '../components/toast/ToastProvider';
 
 export interface UserProfile {
   name: string;
@@ -571,11 +573,21 @@ interface CareerContextType {
   exportDataJson: () => void;
   resetAllData: () => void;
 
-  // Subscription & AI Credits
+  // Subscription & Tokens
   subscription: CurrentSubscriptionResponse | null;
   creditBalance: CreditBalanceDTO | null;
   refreshSubscription: () => Promise<void>;
   refreshCredits: () => Promise<void>;
+  /**
+   * Claims the daily free-token reward.
+   *
+   * Resolves to the number of tokens that were actually granted — zero when
+   * the reward had already been claimed today — or `null` when the claim
+   * could not be completed at all. The balance in context is corrected
+   * straight away, so every surface that shows the balance shows the truth
+   * without waiting for the next read.
+   */
+  claimDailyTokens: () => Promise<number | null>;
 }
 
 const CareerContext = createContext<CareerContextType | undefined>(undefined);
@@ -1169,7 +1181,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [consentState, setConsentState] = useState<ConsentState | null>(null);
   const [consentError, setConsentError] = useState<string | null>(null);
 
-  // Subscriptions & AI Credits
+  // Subscriptions & Tokens
   const [subscription, setSubscription] = useState<CurrentSubscriptionResponse | null>(null);
   const [creditBalance, setCreditBalance] = useState<CreditBalanceDTO | null>(null);
 
@@ -1190,6 +1202,38 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       console.warn('Could not refresh credit balance:', err);
     }
   }, []);
+
+  // Claims the daily free-token reward.
+  //
+  // The reward is claimed, not granted: nothing else in the application hands
+  // it out, so this is the single path that creates a claim. The server
+  // treats the claim as idempotent per day, so a double press pays out once.
+  //
+  // The answer carries the new balance and the new allowance state, and both
+  // are written into the context here. That is what lets the badge, the
+  // dashboard widget and the token hub agree without asking again.
+  const claimDailyTokens = useCallback(async (): Promise<number | null> => {
+    try {
+      const result = await claimDailyTokensRequest();
+
+      setCreditBalance((previous) => {
+        if (!previous) return previous;
+        return {
+          ...previous,
+          balance: result.balance,
+          ...(result.daily ? { daily: result.daily } : {}),
+        };
+      });
+
+      return result.granted;
+    } catch (err) {
+      console.warn('Could not claim the daily tokens:', err);
+      // The balance may still have moved on the server, so it is read again
+      // rather than left showing a number that is known to be wrong.
+      void refreshCredits();
+      return null;
+    }
+  }, [refreshCredits]);
 
   // The identity the in-memory career state belongs to. When the Supabase
   // session changes to a different user (or disappears) without going through
@@ -5198,12 +5242,18 @@ Skills: ${activeCV.skillsList.join(', ')}
         creditBalance,
         refreshSubscription,
         refreshCredits,
+        claimDailyTokens,
       }}
     >
       {/* The global processing layer lives inside the career provider, so the
           surface it renders is translated with the application's own
           translator. */}
-      <ProcessingProvider>{children}</ProcessingProvider>
+      <ProcessingProvider>
+        {/* The toast layer lives inside the career provider too, so every
+            confirmation the application raises — the daily token claim above
+            all — has somewhere to go. */}
+        <ToastProvider>{children}</ToastProvider>
+      </ProcessingProvider>
     </CareerContext.Provider>
   );
 };

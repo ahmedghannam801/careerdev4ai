@@ -5,20 +5,34 @@
  */
 
 import { apiRequest } from './apiClient';
-import type { CreditBalanceDTO, CreditLedgerDTO } from '../../shared/credits';
+import type {
+  CreditBalanceDTO,
+  CreditLedgerDTO,
+  DailyCreditState,
+} from '../../shared/credits';
 
 /**
- * The state of the daily free-credit allowance.
+ * The state of the daily free-token allowance.
  *
  * The allowance is a separate pool from the subscription entitlement: it is
- * granted once a day, it resets at midnight in the platform's timezone, and it
+ * claimed once a day, it resets at midnight in the platform's timezone, and it
  * does not accumulate. The interface shows it next to the balance so a
- * candidate knows that a credit is coming back tomorrow.
+ * candidate knows that tokens are coming back tomorrow.
  *
  * The shape is the shared domain model, re-exported here so the client has
  * one name for it.
  */
 export type { DailyCreditState } from '../../shared/credits';
+
+export interface DailyTokenClaimResponse {
+  success: boolean;
+  /** How many tokens the press actually paid out. Zero when it was already claimed. */
+  granted: number;
+  /** The balance after the claim. */
+  balance: number;
+  /** The state of the allowance after the claim. */
+  daily: DailyCreditState | null;
+}
 
 export interface CouponValidationResponse {
   success: boolean;
@@ -67,6 +81,20 @@ export async function fetchCreditHistory(): Promise<CreditLedgerDTO[]> {
     '/api/credits/history'
   );
   return res.history;
+}
+
+/**
+ * Claims the daily free-token reward.
+ *
+ * The reward is claimed, not granted: this is the only call that hands out the
+ * daily allowance, and it is the one behind the "Claim 2 tokens" button. The
+ * server treats it as idempotent per day, so a double press or a retried
+ * request pays out exactly once and reports `granted: 0` the second time.
+ */
+export async function claimDailyTokens(): Promise<DailyTokenClaimResponse> {
+  return apiRequest<DailyTokenClaimResponse>('/api/credits/daily/claim', {
+    method: 'POST',
+  });
 }
 
 export async function validateCoupon(

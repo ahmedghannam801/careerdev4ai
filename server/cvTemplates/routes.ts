@@ -208,9 +208,9 @@ export function registerCvTemplateRoutes(app: Express): void {
   );
 
   /**
-   * Unlocks a premium template with AI credits.
+   * Unlocks a premium template with tokens.
    *
-   * The price is ten credits and it is charged here, on the server, at the
+   * The price is five tokens and it is charged here, on the server, at the
    * moment the candidate commits to the template. Nothing is charged for
    * looking at it, for browsing the gallery, or for choosing a template the
    * account can already use.
