@@ -50,6 +50,8 @@ import type { CVProfile } from '../../types/career';
 import { extractCvSection } from '../../lib/cvExtractionApi';
 import { useCareer } from '../../context/CareerContext';
 
+export type CvApplyMode = 'studio_and_profile' | 'studio_only';
+
 interface CvExtractionReviewProps {
   /** The review the server produced. */
   review: CvExtractionReviewDocument;
@@ -61,7 +63,11 @@ interface CvExtractionReviewProps {
    */
   sourceText: string;
   /** Called with the document the candidate accepted. */
-  onApply: (cv: CVProfile, selectedSections: Record<string, boolean>) => Promise<void>;
+  onApply: (
+    cv: CVProfile,
+    selectedSections: Record<string, boolean>,
+    mode: CvApplyMode
+  ) => Promise<void>;
   /** Called when the candidate closes the review without applying it. */
   onClose?: () => void;
 }
@@ -329,6 +335,7 @@ export const CvExtractionReview: React.FC<CvExtractionReviewProps> = ({
   const [showIssues, setShowIssues] = useState(true);
   const [showSource, setShowSource] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [applyMode, setApplyMode] = useState<CvApplyMode>('studio_and_profile');
   const [isRereading, setIsRereading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -428,7 +435,7 @@ export const CvExtractionReview: React.FC<CvExtractionReviewProps> = ({
     setIsApplying(true);
     setError(null);
     try {
-      await onApply(draft, selected);
+      await onApply(draft, selected, applyMode);
     } catch (applyError) {
       setError(
         applyError instanceof Error
@@ -653,35 +660,63 @@ export const CvExtractionReview: React.FC<CvExtractionReviewProps> = ({
       </div>
 
       {/* The decision. */}
-      <div className="sticky bottom-0 p-4 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-          {t(
-            'Applying the CV fills in the sections you kept. Anything you already have is never overwritten.'
-          )}
-        </p>
-        <div className="flex items-center gap-2">
-          {onClose && (
+      <div className="sticky bottom-0 p-4 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-lg space-y-3">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <label className="inline-flex items-center gap-2 cursor-pointer text-[var(--text-primary)] font-medium">
+            <input
+              type="radio"
+              name="cv-apply-mode"
+              checked={applyMode === 'studio_and_profile'}
+              onChange={() => setApplyMode('studio_and_profile')}
+              className="accent-[var(--accent-primary)]"
+            />
+            <span>{t('Apply to CV Studio & Sync with My Profile')}</span>
+          </label>
+          <label className="inline-flex items-center gap-2 cursor-pointer text-[var(--text-secondary)] font-medium">
+            <input
+              type="radio"
+              name="cv-apply-mode"
+              checked={applyMode === 'studio_only'}
+              onChange={() => setApplyMode('studio_only')}
+              className="accent-[var(--accent-primary)]"
+            />
+            <span>{t('Apply to CV Studio Only')}</span>
+          </label>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            {applyMode === 'studio_and_profile'
+              ? t('Applying updates your CV Studio document and merges kept sections into your profile records without duplicating existing entries.')
+              : t('Applying saves this document in CV Studio only. Your saved profile records will not be modified.')}
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                {t('Cancel')}
+              </button>
+            )}
             <button
               type="button"
-              onClick={onClose}
-              className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              onClick={handleApply}
+              disabled={isApplying}
+              className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-bold flex items-center gap-2 transition-colors disabled:opacity-60"
             >
-              {t('Cancel')}
+              {isApplying ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              {isApplying
+                ? t('Applying…')
+                : applyMode === 'studio_and_profile'
+                  ? t('Apply to CV Studio & Sync with My Profile')
+                  : t('Apply to CV Studio Only')}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleApply}
-            disabled={isApplying}
-            className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-bold flex items-center gap-2 transition-colors disabled:opacity-60"
-          >
-            {isApplying ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="w-3.5 h-3.5" />
-            )}
-            {isApplying ? t('Applying…') : t('Apply this CV')}
-          </button>
+          </div>
         </div>
       </div>
     </div>

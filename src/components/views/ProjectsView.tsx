@@ -18,6 +18,7 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerProject, ProjectCategory, ProjectStatus } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
+import { useToast } from '../toast/ToastProvider';
 import { ProjectAiPanel } from '../projects/ProjectAiPanel';
 import { uploadPortfolioAttachment } from '../../lib/coreApi';
 import { CareerImage } from '../ui/CareerImage';
@@ -40,7 +41,22 @@ const CATEGORY_LABELS: Record<ProjectCategory, string> = {
 };
 
 export const ProjectsView: React.FC = () => {
-  const { projects, addProject, updateProject, deleteProject, volunteerExperiences, t } = useCareer();
+  const {
+    projects,
+    addProject,
+    updateProject,
+    deleteProject,
+    evidenceItems,
+    addEvidence,
+    targetRole,
+    volunteerExperiences,
+    t,
+  } = useCareer();
+  const { showToast } = useToast();
+  const defaultProjectSkills = useMemo(
+    () => (targetRole?.requiredSkills ?? []).slice(0, 3).map((s) => s.name).join(', '),
+    [targetRole]
+  );
   const [statusFilter, setStatusFilter] = useRouteParam<string>('status', PROJECT_STATUS_FILTERS, 'all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   
@@ -58,7 +74,7 @@ export const ProjectsView: React.FC = () => {
   const [responsibilitiesStr, setResponsibilitiesStr] = useState('');
   const [difficulty, setDifficulty] = useState<'Beginner' | 'Intermediate' | 'Advanced'>('Intermediate');
   const [status, setStatus] = useState<ProjectStatus>('in_progress');
-  const [skillsStr, setSkillsStr] = useState('React, TypeScript, Tailwind CSS');
+  const [skillsStr, setSkillsStr] = useState(defaultProjectSkills);
   const [repoUrl, setRepoUrl] = useState('');
   const [demoUrl, setDemoUrl] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -99,7 +115,7 @@ export const ProjectsView: React.FC = () => {
     setResponsibilitiesStr('');
     setDifficulty('Intermediate');
     setStatus('in_progress');
-    setSkillsStr('React, TypeScript, Tailwind CSS');
+    setSkillsStr(defaultProjectSkills);
     setRepoUrl('');
     setDemoUrl('');
     setStartDate('');
@@ -197,6 +213,45 @@ export const ProjectsView: React.FC = () => {
     }
   };
 
+  const maybeCreateProjectEvidence = async (proj: {
+    id?: string;
+    title: string;
+    goal?: string;
+    status: ProjectStatus;
+    skills: string[];
+    repositoryUrl?: string;
+    demoUrl?: string;
+  }) => {
+    const done = proj.status === 'completed' || proj.status === 'published';
+    const artifactUrl = proj.repositoryUrl?.trim() || proj.demoUrl?.trim();
+    if (!done || !artifactUrl) return;
+    const alreadyExists = evidenceItems.some(
+      (item) =>
+        (proj.id && item.projectId === proj.id) ||
+        item.url === artifactUrl ||
+        item.title.trim().toLowerCase() === proj.title.trim().toLowerCase()
+    );
+    if (alreadyExists) return;
+    try {
+      await addEvidence({
+        title: `${proj.title} — ${t('Project Deliverable')}`,
+        type: proj.repositoryUrl?.trim() ? 'github' : 'demo',
+        description: proj.goal?.trim() || t('Completed portfolio project with public artifact link.'),
+        url: artifactUrl,
+        verified: false,
+        projectId: proj.id,
+        skillNames: proj.skills,
+      });
+      showToast({
+        variant: 'success',
+        title: t('Portfolio evidence recorded'),
+        description: t('"{title}" was linked in Evidence & Portfolio to substantiate your skills.').replace('{title}', proj.title),
+      });
+    } catch {
+      // Evidence creation is additive; do not block project update if it fails.
+    }
+  };
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProject || !title.trim() || isSubmitting) return;
@@ -208,6 +263,9 @@ export const ProjectsView: React.FC = () => {
         .split('\n')
         .map((s) => s.trim())
         .filter(Boolean);
+      const parsedSkills = skillsStr.split(',').map((s) => s.trim()).filter(Boolean);
+      const nextRepo = repoUrl.trim() || undefined;
+      const nextDemo = demoUrl.trim() || undefined;
 
       await updateProject(editingProject.id, {
         title: title.trim(),
@@ -218,14 +276,24 @@ export const ProjectsView: React.FC = () => {
         responsibilities,
         difficulty,
         status,
-        skills: skillsStr.split(',').map((s) => s.trim()).filter(Boolean),
-        repositoryUrl: repoUrl.trim() || undefined,
-        demoUrl: demoUrl.trim() || undefined,
+        skills: parsedSkills,
+        repositoryUrl: nextRepo,
+        demoUrl: nextDemo,
         startDate: startDate.trim() || undefined,
         completedAt: completedAt.trim() || undefined,
         isFeatured,
         includeInPortfolio,
         thumbnailUrl: thumbnailUrl.trim() || undefined,
+      });
+
+      await maybeCreateProjectEvidence({
+        id: editingProject.id,
+        title: title.trim(),
+        goal: goal.trim(),
+        status,
+        skills: parsedSkills,
+        repositoryUrl: nextRepo,
+        demoUrl: nextDemo,
       });
 
       setEditingProject(null);
@@ -279,7 +347,7 @@ export const ProjectsView: React.FC = () => {
       <div className="space-y-3 pb-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-semibold text-[var(--text-secondary)] me-2">{t('Status')}:</span>
-          {['all', 'in_progress', 'completed', 'planned', 'idea', 'published'].map((st) => (
+          {['all', 'planned', 'in_progress', 'completed', 'published'].map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
@@ -419,7 +487,19 @@ export const ProjectsView: React.FC = () => {
 
                       <select
                         value={project.status}
-                        onChange={(e) => updateProject(project.id, { status: e.target.value as ProjectStatus })}
+                        onChange={(e) => {
+                          const nextStatus = e.target.value as ProjectStatus;
+                          updateProject(project.id, { status: nextStatus });
+                          void maybeCreateProjectEvidence({
+                            id: project.id,
+                            title: project.title,
+                            goal: project.goal,
+                            status: nextStatus,
+                            skills: project.skills,
+                            repositoryUrl: project.repositoryUrl,
+                            demoUrl: project.demoUrl,
+                          });
+                        }}
                         className="text-xs bg-[var(--surface-secondary)] border border-[var(--border-subtle)] rounded-lg px-2 py-1 text-[var(--text-primary)] font-medium focus:outline-none"
                       >
                         <option value="idea">{t('Idea')}</option>

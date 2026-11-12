@@ -300,8 +300,8 @@ export const careerAr: Record<string, string> = {
   'Skills Linked': 'مهارة مرتبطة',
 
   // Activity feed
-  'Verified log of meaningful milestones, application events, roadmap completions, and evidence uploads.':
-    'سجل موثّق للمعالم المهمة وأحداث التقديم واكتمال خارطة الطريق ورفع الأدلة.',
+  'Chronological record of your career milestones, applications, assessments, and evidence submissions.':
+    'سجل زمني مرتّب لمعالمك المهنية وطلبات التوظيف والتقييمات وتقديم الأدلة.',
   'Logged Actions': 'إجراءات مسجّلة',
   'All Activity': 'كل النشاط',
   'Roadmap & Tasks': 'خارطة الطريق والمهام',

@@ -28,6 +28,7 @@ import type { CvAnalysisReport } from '../../../shared/cvAnalysis';
 import { CV_STUDIO_TABS, cvStudioStepForTab, type CvStudioTab } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
 import { CvDataManager } from '../cv/studio/CvDataManager';
 import { CvStudioSectionNav, type CvStudioSection } from '../cv/studio/CvStudioSectionNav';
@@ -193,7 +194,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const latestAnalysis = latestVersion?.atsAnalysis;
   const analysisRole = resolveAtsAnalysisRole(
     latestVersion?.targetRoleTitle,
-    targetRole.title
+    targetRole?.title ?? ''
   );
   const analysisRoleLabel = analysisRole.roleTitle ?? t('your saved CV');
   const retryDelay = formatRetryDelay(cvAnalysisError?.retryAfterSeconds);
@@ -309,7 +310,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           <div>
             <div className="text-xs text-[var(--text-secondary)]">{t('CV WORKSPACE & ATS OPTIMIZER')}</div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-              {t('CV Studio for')} {targetRole.title}
+              {t('CV Studio for')} {targetRole?.title ?? ''}
             </h1>
           </div>
         </div>
@@ -355,7 +356,11 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               className="px-3.5 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--color-primary-text)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <Sparkles className={`w-3.5 h-3.5 ${isOptimizingCV ? 'animate-spin' : ''}`} />
-              <span>{isOptimizingCV ? t('Analyzing ATS Keywords...') : t('Run ATS Audit')}</span>
+              <span>
+                {isOptimizingCV
+                  ? t('Analyzing ATS Keywords...')
+                  : aiButtonLabel(t('Run ATS Audit'), 'cv_tailoring', t)}
+              </span>
             </button>
           )}
 
@@ -532,7 +537,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
             <CvSectionEditor
               cv={activeCV}
               update={updateCV}
-              targetRoleTitle={targetRole.title}
+              targetRoleTitle={targetRole?.title ?? ''}
               source={editorSource}
               ratedSkills={ratedSkills}
               advice={measuredReport}
@@ -586,7 +591,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                       {t('This analysis is out of date for your target role.')}
                     </span>{' '}
                     {t('It was generated for')} {analysisRoleLabel}
-                    {t(', but your current target is')} {targetRole.title}
+                    {t(', but your current target is')} {targetRole?.title ?? ''}
                     {t('. The score below has not been applied to your current readiness.')}
                   </div>
                   <button
@@ -599,7 +604,9 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                     }
                     className="px-3 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-[11px] font-semibold whitespace-nowrap disabled:opacity-50"
                   >
-                    {isOptimizingCV ? t('Analyzing…') : `${t('Audit for')} ${targetRole.title}`}
+                    {isOptimizingCV
+                      ? t('Analyzing…')
+                      : aiButtonLabel(`${t('Audit for')} ${targetRole?.title ?? ''}`, 'cv_tailoring', t)}
                   </button>
                 </div>
               )}
@@ -612,7 +619,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                     </h2>
                     {analysisRole.isStale && (
                       <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                        {t('Current target:')} {targetRole.title}
+                        {t('Current target:')} {targetRole?.title ?? ''}
                       </p>
                     )}
                   </div>
@@ -715,7 +722,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('No ATS analysis yet')}</h2>
               <p className="text-xs text-[var(--text-secondary)] max-w-lg mx-auto leading-relaxed">
                 {t('Run an ATS audit to compare this CV against the keywords and requirements for')}{' '}
-                {targetRole.title}.
+                {targetRole?.title ?? ''}.
               </p>
               <button
                 onClick={handleRunAtsAudit}
@@ -727,7 +734,9 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                 }
                 className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-50"
               >
-                {isOptimizingCV ? t('Analyzing…') : t('Run ATS Audit')}
+                {isOptimizingCV
+                  ? t('Analyzing…')
+                  : aiButtonLabel(t('Run ATS Audit'), 'cv_tailoring', t)}
               </button>
               {!aiWritingEnabled && (
                 <p className="text-[11px] text-[var(--color-warning)]">
@@ -743,8 +752,8 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               score above. */}
           <CvMeasuredAnalysis
             cv={activeCV}
-            targetRoleTitle={targetRole.title}
-            targetRoleSkills={targetRole.requiredSkills.map(s => s.name)}
+            targetRoleTitle={targetRole?.title ?? ''}
+            targetRoleSkills={(targetRole?.requiredSkills ?? []).map(s => s.name)}
             onMeasured={setMeasuredReport}
           />
           {/* The analyzer's own run, now part of the studio.

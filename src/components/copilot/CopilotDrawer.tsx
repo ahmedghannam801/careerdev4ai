@@ -5,6 +5,7 @@ import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 import { AiResponse } from './AiResponse';
 import { EvidencePanel } from './EvidencePanel';
+import { aiButtonLabel, aiTokenCostLabel } from '../../lib/aiTokenCosts';
 
 interface CopilotDrawerProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           </div>
           <div>
             <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerDev4AI Copilot')}</div>
-            <div className="text-xs text-[var(--text-secondary)]">{t('Advisor for')} {targetRole.title}</div>
+            <div className="text-xs text-[var(--text-secondary)]">{t('Advisor for')} {targetRole?.title ?? ''}</div>
           </div>
         </div>
         <button
@@ -124,9 +125,13 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
                     <button
                       key={idx}
                       onClick={() => handleSend(sug)}
-                      className="block w-full text-start text-xs text-[var(--color-primary-text)] hover:bg-[var(--accent-surface)] p-1.5 rounded transition-colors"
+                      disabled={isCopilotTyping}
+                      className="block w-full text-start text-xs text-[var(--color-primary-text)] hover:bg-[var(--accent-surface)] p-1.5 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      → {sug}
+                      <span>→ {sug}</span>{' '}
+                      <span className="text-[var(--text-muted)]">
+                        {aiTokenCostLabel('career_consultation_chat', t)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -173,21 +178,24 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       <div className="px-4 py-2 border-t border-[var(--border-subtle)] bg-[var(--surface-main)] flex gap-2 overflow-x-auto text-xs">
         <button
           onClick={() => handleSend(t('copilotPrompt1'))}
-          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
+          disabled={isCopilotTyping}
+          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t('Today\'s Next Step')}
+          {aiButtonLabel(t('Today\'s Next Step'), 'career_consultation_chat', t)}
         </button>
         <button
           onClick={() => handleSend(t('copilotPrompt3'))}
-          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
+          disabled={isCopilotTyping}
+          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t('Recommend Project')}
+          {aiButtonLabel(t('Recommend Project'), 'career_consultation_chat', t)}
         </button>
         <button
           onClick={() => handleSend(t('copilotPrompt4'))}
-          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors"
+          disabled={isCopilotTyping}
+          className="whitespace-nowrap px-2.5 py-1 rounded bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t('CV Audit')}
+          {aiButtonLabel(t('CV Audit'), 'career_consultation_chat', t)}
         </button>
       </div>
 

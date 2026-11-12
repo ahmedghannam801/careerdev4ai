@@ -115,4 +115,21 @@ export const skillsAr: Record<string, string> = {
   'Start Assessment': 'بدء التقييم',
   'Recent Assessment Attempts': 'المحاولات السابقة',
   'Score': 'الدرجة',
+  'Verified Proficient': 'إتقان موثّق بالأدلة',
+  'Knowledge Verified': 'معرفة مُتحقَّق منها',
+  'Diagnostic knowledge checks cap at Level 4/5. Complete a practical project or add verified work in Evidence to earn 5/5 Verified Proficient.':
+    'تُحتسب اختبارات المعرفة التشخيصية بحد أقصى 4/5. أنجز مشروعًا عمليًا أو أضف عملًا موثّقًا في الأدلة للوصول إلى 5/5 إتقان موثّق.',
+  'Assessment Impact Summary': 'ملخّص أثر التقييم',
+  'Skill Recorded': 'المهارة المُسجّلة',
+  'Role Readiness': 'الجاهزية للدور',
+  'No target role': 'لا يوجد دور مستهدف',
+  'Portfolio Evidence': 'دليل معرض الأعمال',
+  'Assessment Evidence Added': 'أُضيف دليل التقييم',
+  'Pending Save': 'بانتظار الحفظ',
+  'Category headings like SOFT SKILLS or TECHNICAL SKILLS cannot be added as individual skills. Enter a specific skill name instead.':
+    'عناوين الأقسام مثل المهارات الشخصية أو التقنية لا تُضاف كمهارات فردية. أدخل اسم مهارة محددة بدلًا منها.',
+  'Invalid skill name': 'اسم مهارة غير صالح',
+  'Failed to save skill': 'تعذّر حفظ المهارة',
+  'Current Level vs General Target': 'المستوى الحالي مقابل الهدف العام',
+  'Self': 'التقييم الذاتي',
 };

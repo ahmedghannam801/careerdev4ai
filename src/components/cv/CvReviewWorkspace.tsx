@@ -35,7 +35,8 @@ import { CV_SECTION_LABELS } from '../../../shared/cvExtraction';
 import { extractCv, importReviewedCv } from '../../lib/cvExtractionApi';
 import { ApiRequestError } from '../../lib/apiClient';
 import { useCareer } from '../../context/CareerContext';
-import { CvExtractionReview } from './CvExtractionReview';
+import { useToast } from '../toast/ToastProvider';
+import { CvExtractionReview, type CvApplyMode } from './CvExtractionReview';
 
 const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.json'];
 
@@ -46,6 +47,7 @@ export interface CvReviewWorkspaceProps {
 
 export const CvReviewWorkspace: React.FC<CvReviewWorkspaceProps> = ({ onApplied }) => {
   const { t, targetRole, applyReviewedCv } = useCareer();
+  const { showToast } = useToast();
   const [review, setReview] = useState<CvExtractionReviewDocument | null>(null);
   const [sourceText, setSourceText] = useState('');
   const [isReading, setIsReading] = useState(false);
@@ -89,19 +91,82 @@ export const CvReviewWorkspace: React.FC<CvReviewWorkspaceProps> = ({ onApplied 
     }
   };
 
-  const handleApply = async (cv: CVProfile, selectedSections: Record<string, boolean>) => {
+  const handleApply = async (
+    cv: CVProfile,
+    selectedSections: Record<string, boolean>,
+    mode: CvApplyMode = 'studio_and_profile'
+  ) => {
+    const versionName = review?.source.fileName
+      ? `${review.source.fileName.replace(/\.[^/.]+$/, '')} (Reviewed)`
+      : 'Reviewed CV';
+
+    if (mode === 'studio_only') {
+      applyReviewedCv({
+        cv,
+        versionName,
+        targetRoleTitle: targetRole?.title ?? '',
+      });
+      const studioOnlyOutcome: CvReviewedImportResult = {
+        success: true,
+        imported: 0,
+        skipped: 0,
+        failed: 0,
+        sections: [],
+        errors: [],
+      };
+      setResult(studioOnlyOutcome);
+      showToast({
+        variant: 'info',
+        title: t('Applied to CV Studio Only'),
+        description: t('The reviewed CV is now loaded in CV Studio. Your saved profile records were left unchanged.'),
+      });
+      onApplied?.(studioOnlyOutcome, cv);
+      return;
+    }
+
     const outcome = await importReviewedCv(cv, selectedSections);
     setResult(outcome);
     applyReviewedCv({
       cv,
-      versionName: review?.source.fileName
-        ? `${review.source.fileName.replace(/\.[^/.]+$/, '')} (Reviewed)`
-        : 'Reviewed CV',
-      targetRoleTitle: targetRole.title,
+      versionName,
+      targetRoleTitle: targetRole?.title ?? '',
       cvId: outcome.cvId ?? undefined,
       cvVersionId: outcome.cvVersionId ?? undefined,
     });
     onApplied?.(outcome, cv);
+
+    // The candidate has just changed their own records, so the interface
+    // confirms it. The counts are the real ones from the write — including
+    // what was skipped as already present, so "3 added" is never claimed
+    // when nothing was actually added.
+    if (outcome.failed > 0) {
+      showToast({
+        variant: 'error',
+        title: t('The CV was applied with some problems.'),
+        description: t('{imported} imported, {skipped} already saved, {failed} failed.').replace(
+          '{imported}',
+          String(outcome.imported)
+        ).replace('{skipped}', String(outcome.skipped)).replace('{failed}', String(outcome.failed)),
+      });
+    } else if (outcome.imported === 0 && outcome.skipped > 0) {
+      showToast({
+        variant: 'info',
+        title: t('Everything in this CV was already saved.'),
+        description: t('{skipped} records matched your profile, so nothing was duplicated.').replace(
+          '{skipped}',
+          String(outcome.skipped)
+        ),
+      });
+    } else {
+      showToast({
+        variant: 'success',
+        title: t('CV applied to your profile.'),
+        description: t('{imported} records added, {skipped} already saved.').replace(
+          '{imported}',
+          String(outcome.imported)
+        ).replace('{skipped}', String(outcome.skipped)),
+      });
+    }
   };
 
   if (result) {

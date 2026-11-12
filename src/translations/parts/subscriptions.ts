@@ -73,6 +73,8 @@ export const subscriptionsAr: Record<string, string> = {
   // still calls it a credit, but a candidate never sees the ledger, and two
   // names for one currency is one name too many.
   'Tokens': 'توكن',
+  // The singular, for the cost a button shows: "(1 Token)".
+  'Token': 'توكن',
   'Your balance': 'رصيدك الحالي',
   'Monthly Allowance': 'الرصيد الشهري المخصص',
   'Used this cycle': 'المستخدم في هذه الدورة',
@@ -88,6 +90,31 @@ export const subscriptionsAr: Record<string, string> = {
   'Insufficient tokens': 'التوكنات غير كافية',
   'You need more tokens to run this AI model. Top up or upgrade your plan.':
     'تحتاج إلى توكنات إضافية لتشغيل هذا النموذج الذكي. اشحن رصيدك أو قم بترقية خطتك.',
+
+  // The pricing FAQ.
+  //
+  // This section used to be hard-coded Arabic inside an otherwise bilingual
+  // page, so an English speaker read Arabic in the one place on the Token Hub
+  // that should have spoken their language.
+  'Frequently asked questions about plans and payments':
+    'الأسئلة الشائعة حول الاشتراكات والمدفوعات',
+  'Everything you need to know about pricing and how a subscription is activated in Egypt.':
+    'كل ما تحتاج معرفته عن سياسة الأسعار وتفعيل الاشتراكات في مصر.',
+  'Are the core features of the platform actually free?':
+    'هل الميزات الأساسية للمنصة مجانية بالفعل؟',
+  'Yes — the core platform is completely free: job discovery, goal tracking and the basic learning maps. Paid plans exist to cover the running cost of the advanced AI models (Gemini), document processing and interview simulation.':
+    'نعم — المنصة الأساسية مجانية بالكامل: استكشاف الوظائف وتتبع الأهداف وخرائط التعلم الأساسية. باقات الاشتراك مخصصة لتغطية تكاليف نماذج الذكاء الاصطناعي المتقدمة (Gemini) ومعالجة الوثائق ومحاكاة المقابلات.',
+  'How is my account activated after I pay with Vodafone Cash or InstaPay?':
+    'كيف يتم تفعيل الحساب بعد التحويل عبر فودافون كاش أو إنستاباي؟',
+  'As soon as you enter the transfer reference and upload a screenshot of the receipt, the system gives you temporary access for 24 hours so you can carry on straight away, while an administrator makes the final confirmation during working hours.':
+    'بمجرد إدخال الرقم المرجعي للتحويل ورفع لقطة الشاشة للإيصال، يمنحك النظام وصولاً مؤقتاً لمدة ٢٤ ساعة لمتابعة مهامك على الفور، بينما يقوم المشرف بالتأكيد النهائي خلال ساعات العمل.',
+  'What happens if the AI call fails? Do I lose my tokens?':
+    'ماذا يحدث إذا فشل استدعاء الذكاء الاصطناعي؟ هل أخسر توكناتي؟',
+  'Never. The platform runs a secure double-entry ledger. If there is any network interruption or a model error, the tokens that were held are automatically refunded to your account straight away.':
+    'مستحيل. المنصة تطبّق نظام دفتر الأستاذ المزدوج الآمن. إذا حدث أي انقطاع للشبكة أو خطأ في النموذج، تُسترد التوكنات المخصومة تلقائياً إلى حسابك فوراً.',
+  'Can I pay by bank card?': 'هل يمكنني الدفع بالبطاقة البنكية؟',
+  'Yes. Choose “Bank card” when you subscribe and you will be taken to Stripe’s secure page to enter your card details. The platform never sees or stores your card number, the subscription activates as soon as Stripe confirms the payment, and you can manage the card or cancel the renewal from “Manage invoices” on this page.':
+    'نعم. اختر «بطاقة بنكية» عند الاشتراك لتنتقل إلى صفحة Stripe الآمنة لإدخال بيانات البطاقة. المنصة لا ترى رقم بطاقتك ولا تخزنه، ويتفعل الاشتراك تلقائياً بعد تأكيد الدفع، ويمكنك إدارة البطاقة أو إلغاء التجديد من زر «إدارة الفواتير» في هذه الصفحة.',
 
   // The daily claim.
   //

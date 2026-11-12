@@ -55,6 +55,12 @@ export interface AiCareerContext {
   targetRoleId: string | null;
   /** The catalogue slug of the target role's domain. */
   targetRoleDomain: string | null;
+  /**
+   * The level the user is aiming at (student, intern, junior, mid, senior,
+   * lead). It tells the model WHICH rung of the ladder to write for, which
+   * the target role alone cannot say.
+   */
+  experienceLevel: string | null;
   /** The language the assistant must answer in. */
   language: AiLanguageCode;
   /** How far the user's rated skills cover the target role's requirements. */
@@ -244,6 +250,7 @@ export async function loadAiCareerContext(
     targetRole,
     targetRoleId: targetRole?.id ?? profile?.targetRoleId ?? null,
     targetRoleDomain: targetRole?.domainId ?? profile?.targetRoleDomain ?? null,
+    experienceLevel: profile?.experienceLevel ?? null,
     language,
     skillGaps: skillGaps.slice(0, 8),
     currentSkills,
@@ -313,6 +320,9 @@ export function buildAiContextBlock(context: AiCareerContext): string {
   }
   if (context.targetRoleTitle) {
     lines.push(`- Target role: ${context.targetRoleTitle}`);
+  }
+  if (context.experienceLevel) {
+    lines.push(`- Target experience level: ${context.experienceLevel}`);
   }
   if (context.targetRoleId) {
     lines.push(`- Target role id: ${context.targetRoleId}`);

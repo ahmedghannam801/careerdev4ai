@@ -150,4 +150,38 @@ describe('skill levels (H-2)', () => {
     });
     assert.equal(res.status, 400);
   });
+
+  test('a section header cannot be stored as an individual skill', async () => {
+    const selfRes = await api('POST', '/api/user-skills', {
+      token: user.token,
+      body: { name: 'SOFT SKILLS', proficiency: 3, category: 'soft_skills' },
+    });
+    assert.equal(selfRes.status, 400);
+
+    const assessRes = await api('POST', '/api/user-skills/assessment', {
+      token: user.token,
+      body: { name: 'TECHNICAL SKILLS', level: 4, score: 85, category: 'technical' },
+    });
+    assert.equal(assessRes.status, 400);
+  });
+
+  test('a diagnostic assessment caps at 4/5 without practical evidence and creates an evidence record', async () => {
+    const res = await api('POST', '/api/user-skills/assessment', {
+      token: user.token,
+      body: { name: 'AssessmentCapSkill', level: 5, score: 100, category: 'technical' },
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.body?.skillRecord?.assessedLevel, 4, 'knowledge check caps at 4/5 without practical evidence');
+    assert.equal(res.body?.skillRecord?.assessmentScore, 100);
+    assert.ok(res.body?.evidence?.id, 'completing an assessment creates an evidence record');
+    assert.equal(res.body?.evidence?.type, 'assessment');
+
+    const evList = await api('GET', '/api/evidence', { token: user.token });
+    assert.equal(evList.status, 200);
+    const createdEvidence = (evList.body?.evidence ?? []).find(
+      (item: any) => item.id === res.body?.evidence?.id
+    );
+    assert.ok(createdEvidence, 'the created assessment evidence is readable via GET /api/evidence');
+    assert.equal(createdEvidence.type, 'assessment');
+  });
 });

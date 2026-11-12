@@ -8,7 +8,7 @@ interface CareerPlanViewProps {
 }
 
 export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) => {
-  const { roadmapPhases, targetRole, profile, t} = useCareer();
+  const { roadmapPhases, targetRole, careerIdentity, t} = useCareer();
 
   return (
     <Reveal className="space-y-8">
@@ -17,7 +17,7 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
         <div>
           <div className="text-xs text-[var(--text-secondary)]">{t('PROGRESSION STRATEGY')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            {t('Personal Career Plan for')} {targetRole.title}
+            {t('Personal Career Plan for')} {targetRole?.title ?? ''}
           </h1>
         </div>
 
@@ -37,7 +37,7 @@ export const CareerPlanView: React.FC<CareerPlanViewProps> = ({ onNavigate }) =>
           <span>{t('Strategic Trajectory Overview')}</span>
         </div>
         <h2 className="text-lg font-bold text-[var(--text-primary)]">
-          {t('From')} {t(profile.careerState.replace('_', ' '))} {t('to Mid-Level')} {targetRole.title}
+          {t('From')} {t(careerIdentity.currentStatusLabel)} {t('to Mid-Level')} {targetRole?.title ?? ''}
         </h2>
         <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-3xl">
           {t('This 5-phase dynamic career architecture addresses your assessed gaps in priority order. Advancing through each phase unlocks the next tier of proof and prepares you for competitive market applications.')}

@@ -10,6 +10,7 @@ import { getProfile, upsertProfile } from './profiles';
 import { getPreferences, upsertPreferences } from './preferences';
 import { getUserSkills, upsertUserSkill, DEFAULT_SKILL_CATEGORY } from './userSkills';
 import { resolveTargetRoleWrite } from '../targetRole.ts';
+import { normalizeExperienceLevel } from '../../shared/experienceLevel.ts';
 
 export interface StatePayload {
   profile?: any;
@@ -110,6 +111,14 @@ export async function saveState(
   if (p.phone !== undefined) profileUpdates.phone = p.phone ?? null;
   if (p.bio !== undefined) profileUpdates.bio = p.bio ?? null;
   if (p.careerGoal !== undefined) profileUpdates.career_goal = p.careerGoal ?? null;
+  // The target experience level is validated against its own vocabulary, so a
+  // bad value is reported as unmapped instead of being stored.
+  const experienceLevelOutcome = normalizeExperienceLevel(p.experienceLevel);
+  if (experienceLevelOutcome.ok && p.experienceLevel !== undefined) {
+    profileUpdates.experience_level = experienceLevelOutcome.value ?? null;
+  } else if (!experienceLevelOutcome.ok) {
+    unmappedCollections.push('experienceLevel');
+  }
   if (p.industry !== undefined) profileUpdates.target_industry = p.industry ?? null;
   if (p.onboardingCompleted !== undefined) profileUpdates.onboarding_completed = !!p.onboardingCompleted;
   // The target role is a hierarchical selection (domain + specialisation), so

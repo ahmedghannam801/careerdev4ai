@@ -8,7 +8,7 @@ export interface AvatarOption {
 }
 
 export const CAREERPILOT_AVATARS: AvatarOption[] = [
-  { id: 'avatar-01', name: 'Alex', description: 'Modern minimal crew style' },
+  { id: 'avatar-01', name: 'Nour', description: 'Modern minimal crew style' },
   { id: 'avatar-02', name: 'Maya', description: 'Classic professional waves' },
   { id: 'avatar-03', name: 'Liam', description: 'Curated architectural glasses' },
   { id: 'avatar-04', name: 'Sophia', description: 'Sleek contemporary bob' },
@@ -49,7 +49,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
   switch (normalizedId) {
     case 'avatar-01':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Alex Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Nour Avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#EBDDCF" />
           {/* Shoulders */}

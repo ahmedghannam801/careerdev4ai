@@ -18,7 +18,7 @@ import { resolveRole } from '../../shared/careerRoles.ts';
 import { normalizeAiLanguage, type AiLanguageCode } from '../../shared/aiLanguages.ts';
 import type {
   BudgetPreference,
-  ExperienceLevel,
+  LearningLevel,
   LearningContext,
   LearningCourse,
   LearningFormat,
@@ -38,11 +38,57 @@ export interface RecommendationPreferences {
   limit?: number;
 }
 
+/**
+ * How advanced a course should be for this candidate.
+ *
+ * THE CANDIDATE'S STATED TARGET WINS.
+ * The candidate tells the platform what level they are aiming at — Student,
+ * Intern, Junior, Mid, Senior, Lead — in Profile and in Settings. When they
+ * have said so, the courses are matched to that, not to a guess.
+ *
+ * Before they say so, the level is inferred from the years of experience on
+ * their record and from the career state they are in, exactly as it always
+ * was. The target role's own level is the last resort.
+ */
+function experienceLevelFor(
+  targetLevel: string | null,
+  userType: string | null,
+  yearsOfExperience: string | null,
+  roleLevel: string | null
+): LearningLevel {
+  const stated = learningLevelFromTarget(targetLevel);
+  if (stated) return stated;
+  return experienceFromProfile(userType, yearsOfExperience, roleLevel);
+}
+
+/**
+ * Maps the candidate's target experience level onto the learning engine's
+ * course-difficulty axis.
+ *
+ * Student, Intern and Junior all begin at the entry level; Mid and Senior
+ * and Lead sit at the levels their names say.
+ */
+function learningLevelFromTarget(targetLevel: string | null): LearningLevel | null {
+  switch (targetLevel) {
+    case 'student':
+    case 'intern':
+    case 'junior':
+      return 'entry';
+    case 'mid':
+      return 'mid';
+    case 'senior':
+    case 'lead':
+      return 'senior';
+    default:
+      return null;
+  }
+}
+
 function experienceFromProfile(
   userType: string | null,
   yearsOfExperience: string | null,
   roleLevel: string | null
-): ExperienceLevel {
+): LearningLevel {
   const years = Number.parseInt(yearsOfExperience ?? '', 10);
   if (Number.isFinite(years)) {
     if (years >= 5) return 'senior';
@@ -189,9 +235,10 @@ export async function buildLearningContext(
       userSkills: skillContexts,
       roadmapSkills,
       roadmapCourseIds,
-      experienceLevel: experienceFromProfile(
+      experienceLevel: experienceLevelFor(
+        profile?.experience_level ?? null,
         profile?.user_type ?? null,
-        (profile as { years_of_experience?: string | null } | null)?.years_of_experience ?? null,
+        profile?.years_of_experience ?? null,
         targetRole?.level ?? null
       ),
       language,

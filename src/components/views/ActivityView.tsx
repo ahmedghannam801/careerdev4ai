@@ -10,6 +10,14 @@ import { ACTIVITY_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { getActionIcon } from '../career/activityIcons';
+import { activityBadge, type ActivityBadgeTone } from '../../../shared/activityStatus';
+
+const BADGE_TONE_CLASS: Record<ActivityBadgeTone, string> = {
+  neutral: 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-subtle)]',
+  info: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/25',
+  measured: 'bg-[var(--color-ai-surface)]/40 text-[var(--color-ai-text)] border-[var(--color-ai-border)]/40',
+  proof: 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)] border-[var(--color-success)]/25',
+};
 
 export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { activities, t} = useCareer();
@@ -39,7 +47,7 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
             {t('Recent Career Activity')}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            {t('Verified log of meaningful milestones, application events, roadmap completions, and evidence uploads.')}
+            {t('Chronological record of your career milestones, applications, assessments, and evidence submissions.')}
           </p>
         </div>
 
@@ -92,6 +100,7 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
           <Stagger inView gap={0.06} className="space-y-3">
             {filteredActivities.map((act) => {
               const Icon = getActionIcon(act.actionType);
+              const statusBadge = activityBadge(act.actionType);
               return (
                 <StaggerItem
                   key={act.id}
@@ -103,10 +112,16 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
                     </div>
 
                     <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-xs font-bold text-[var(--text-primary)]">
                           {act.title}
                         </h3>
+                        <span
+                          title={t(statusBadge.description)}
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${BADGE_TONE_CLASS[statusBadge.tone]}`}
+                        >
+                          {t(statusBadge.label)}
+                        </span>
                         {act.relatedObject && (
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                             {act.relatedObject}

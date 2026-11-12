@@ -381,7 +381,20 @@ export async function deductCredits(params: {
   amount: number;
   idempotencyKey: string;
   metadata?: Record<string, unknown>;
-}): Promise<{ success: boolean; remainingBalance: number; error?: string }> {
+}): Promise<{
+  success: boolean;
+  remainingBalance: number;
+  error?: string;
+  /**
+   * True when the ledger already held this idempotency key.
+   *
+   * The database replays a known key instead of deducting a second time. The
+   * caller must know this, because a replayed request never took the money:
+   * refunding it would give back a credit that a DIFFERENT (earlier) request
+   * legitimately spent.
+   */
+  idempotentReplay?: boolean;
+}> {
   const { data, error } = await getSupabaseServer().rpc('consume_ai_credits', {
     p_profile_id: params.profileId,
     p_operation: params.operation,
@@ -395,12 +408,14 @@ export async function deductCredits(params: {
     success: boolean;
     error?: string;
     remaining_balance?: number;
+    idempotent_replay?: boolean;
   };
 
   return {
     success: result.success,
     remainingBalance: result.remaining_balance ?? 0,
     error: result.error,
+    idempotentReplay: result.idempotent_replay === true,
   };
 }
 

@@ -78,7 +78,7 @@ interface SectionContext {
  * Finds a value inside the document.
  *
  * The search is done on the normalised text, so a value that differs only in
- * spacing or in case still counts as found â€” the document and the parser
+ * spacing or in case still counts as found — the document and the parser
  * both collapse whitespace before anything else.
  */
 function locate(
@@ -378,7 +378,7 @@ export function buildExtractionReview(
     const entries = values.map((value, index) =>
       entry(
         value.id || `${key}-${index}`,
-        [value.role, value.organization].filter(Boolean).join(' â€” ') || `Entry ${index + 1}`,
+        [value.role, value.organization].filter(Boolean).join(' — ') || `Entry ${index + 1}`,
         {
           role: field('role', 'Role', value.role, contexts, [key]),
           organization: field('organization', 'Organisation', value.organization, contexts, [key]),
@@ -474,7 +474,7 @@ export function buildExtractionReview(
     confidence: 'needs-review',
     fields: {},
     entries: cv.education.map((value, index) =>
-      entry(value.id || `education-${index}`, [value.degree, value.institution].filter(Boolean).join(' â€” '), {
+      entry(value.id || `education-${index}`, [value.degree, value.institution].filter(Boolean).join(' — '), {
         institution: field('institution', 'Institution', value.institution, contexts, ['education']),
         degree: field('degree', 'Degree', value.degree, contexts, ['education']),
         field: field('field', 'Field of study', value.field, contexts, ['education']),

@@ -25,6 +25,7 @@ import { join } from 'node:path';
 
 import { CAREER_ROLES } from '../shared/careerRoles.ts';
 import { ANALYTICS_EVENTS } from '../shared/analyticsEvents.ts';
+import { BUSINESS_CONTACT } from '../shared/contact.ts';
 import { absoluteUrl, clampDescription, siteOrigin, siteUrl, slugify } from '../server/seo/config.ts';
 import { websiteSchema } from '../server/seo/jsonld.ts';
 import { escapeHtml, escapeJsonLd } from '../server/seo/html.ts';
@@ -143,6 +144,93 @@ describe('the public pages', () => {
   });
 });
 
+describe('the contact page', () => {
+  it('serves the contact details without a session', async () => {
+    const page = await resolvePublicPage('/contact');
+    assert.ok(page, '/contact should resolve to a page');
+    assert.equal(page.status, 200);
+    assert.match(page.contentType, /text\/html/);
+    assert.match(page.html, /<h1>Contact Us<\/h1>/);
+    assert.match(page.html, /Business contact details/);
+    assert.match(page.html, /Business address/);
+    assert.match(page.html, /Telephone/);
+    assert.match(page.html, /Email/);
+  });
+
+  it('is linked from the footer of every public page', async () => {
+    for (const path of ['/about', '/privacy', '/careers']) {
+      const page = await resolvePublicPage(path);
+      assert.ok(page, `${path} should resolve to a page`);
+      assert.match(
+        page.html,
+        /<a href="\/contact">Contact Us<\/a>/,
+        `${path} has no footer link to the contact page`
+      );
+    }
+  });
+
+  it('publishes a detail only once it has been supplied', async () => {
+    const page = await resolvePublicPage('/contact');
+    assert.ok(page);
+    const details = BUSINESS_CONTACT;
+
+    // A telephone number that has not been supplied must not become a link:
+    // a `tel:` to a made-up number is a fabricated contact detail.
+    if (!details.phone?.trim()) {
+      assert.equal(page.html.includes('tel:'), false, 'the page links to a phone that is not published');
+    }
+
+    // The same holds for the address: with no street published, the page must
+    // not describe one.
+    if (!details.address.street?.trim() && !details.address.city?.trim()) {
+      assert.equal(
+        page.html.includes('streetAddress'),
+        false,
+        'the structured data describes a street that is not published'
+      );
+      assert.match(page.html, /To be published/);
+    }
+
+    // An address that has been supplied is published in full.
+    if (details.address.street?.trim()) {
+      assert.ok(page.html.includes(details.address.street.trim()));
+    }
+  });
+
+  it('publishes the telephone number on the +20 country code', async () => {
+    const page = await resolvePublicPage('/contact');
+    assert.ok(page);
+    const phone = BUSINESS_CONTACT.phone?.trim();
+
+    if (!phone) {
+      assert.equal(page.html.includes('tel:'), false);
+      return;
+    }
+
+    // The number is read the way it is published, and the link carries the
+    // same digits without the spacing.
+    assert.ok(page.html.includes(phone), `the page does not show ${phone}`);
+    assert.ok(
+      page.html.includes(`tel:${phone.replace(/[^\d+]/g, '')}`),
+      'the telephone link does not match the published number'
+    );
+    assert.match(phone, /^\+20\b/, 'the number must carry the +20 country code');
+  });
+
+  it('describes the business in structured data', async () => {
+    const page = await resolvePublicPage('/contact');
+    assert.ok(page);
+    const blocks = [...page.html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)];
+    const contact = blocks
+      .map((block) => JSON.parse(block[1]))
+      .find((parsed) => parsed['@type'] === 'ContactPage');
+
+    assert.ok(contact, 'the page should carry a ContactPage block');
+    assert.equal(contact.mainEntity['@type'], 'Organization');
+    assert.equal(contact.mainEntity.name, BUSINESS_CONTACT.businessName);
+  });
+});
+
 describe('the public pages in production', () => {
   it('forwards every public page to the application', () => {
     // The Pages worker serves the static asset binding for every path it
@@ -213,6 +301,7 @@ describe('the sitemap', () => {
     assert.ok(paths.includes('/careers'));
     assert.ok(paths.includes('/learning'));
     assert.ok(paths.includes('/opportunities'));
+    assert.ok(paths.includes('/contact'));
   });
 
   it('lists a page for every career role', async () => {

@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, CheckCircle2, Sparkles, ArrowUpRight, Target, Route, GraduationCap, FileBadge2, Menu, X, Languages } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { TARGET_ROLES } from '../../data/rolesData';
-import { SUPPORT_EMAIL, PUBLIC_PATHS, OPERATOR_LINKEDIN_URL } from '../../../shared/contact.ts';
+import { PUBLIC_PATHS, OPERATOR_LINKEDIN_URL } from '../../../shared/contact.ts';
 import { Logo } from '../brand/Logo';
 import { CareerJourneyVisual } from '../brand/CareerJourneyVisual';
 import { HeroVisual3D } from '../landing/HeroVisual3D';
@@ -923,10 +923,10 @@ const navLinks = [
                 {t('Learning')}
               </a>
               <a
-                href={`mailto:${SUPPORT_EMAIL}`}
+                href={PUBLIC_PATHS.contact}
                 className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
               >
-                {t('Contact')}
+                {t('Contact Us')}
               </a>
               {/* The language switch is a real control, not a label. */}
               <button

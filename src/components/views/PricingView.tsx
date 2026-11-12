@@ -162,8 +162,33 @@ const PLANS: PlanDefinition[] = [
       'محاكاة متقدمة للمقابلات القيادية والتقنية العميقة',
       'تقارير تنفيذية شاملة للمسار والنمو',
       'أولوية معالجة قصوى لكافة النماذج',
-      '١٢٠ نقطة ذكاء اصطناعي شهرياً',
+      '١٢٠ توكن شهرياً',
     ],
+  },
+];
+
+/**
+ * The pricing FAQ.
+ *
+ * The questions are data, and each string is a translation key. The FAQ was
+ * once hard-coded Arabic, which left every English speaker on this page
+ * reading Arabic in the one section that should have spoken their language.
+ */
+const FAQ_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
+  {
+    question: 'Are the core features of the platform actually free?',
+    answer:
+      'Yes — the core platform is completely free: job discovery, goal tracking and the basic learning maps. Paid plans exist to cover the running cost of the advanced AI models (Gemini), document processing and interview simulation.',
+  },
+  {
+    question: 'How is my account activated after I pay with Vodafone Cash or InstaPay?',
+    answer:
+      'As soon as you enter the transfer reference and upload a screenshot of the receipt, the system gives you temporary access for 24 hours so you can carry on straight away, while an administrator makes the final confirmation during working hours.',
+  },
+  {
+    question: 'What happens if the AI call fails? Do I lose my tokens?',
+    answer:
+      'Never. The platform runs a secure double-entry ledger. If there is any network interruption or a model error, the tokens that were held are automatically refunded to your account straight away.',
   },
 ];
 
@@ -315,7 +340,7 @@ export const PricingView: React.FC = () => {
           <Sparkles className="w-4 h-4" />
           <span>{t('Subscriptions & Pricing')} — مصممة لمصر والعالم العربي</span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
           {t('Choose the plan that fits your career ambitions')}
         </h1>
         <p className="text-base sm:text-lg text-muted leading-relaxed">
@@ -585,7 +610,7 @@ export const PricingView: React.FC = () => {
               <div>
                 {/* Plan Header */}
                 <div className="space-y-1">
-                  <h3 className="font-extrabold text-xl text-foreground">
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">
                     {isAr ? plan.nameAr : plan.nameEn}
                   </h3>
                   <p className="text-xs text-muted min-h-[32px] leading-relaxed">
@@ -672,7 +697,7 @@ export const PricingView: React.FC = () => {
             <Zap className="w-4 h-4" />
             <span>{t('Top up tokens')}</span>
           </div>
-          <h2 className="text-2xl font-bold text-foreground">{t('Token Packs')}</h2>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('Token Packs')}</h2>
           <p className="text-xs text-muted">
             {t('Top up extra tokens without changing your current plan. Extra tokens never expire and stay in your wallet.')}
           </p>
@@ -724,7 +749,7 @@ export const PricingView: React.FC = () => {
         <div className="space-y-2 text-start">
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary shrink-0" />
-            <h3 className="text-lg font-bold text-foreground">
+            <h3 className="text-base font-bold text-[var(--text-primary)]">
               {stripeReady
                 ? t('Secure local payment methods — and card payment via Stripe')
                 : t('Secure local payment methods')}
@@ -759,43 +784,43 @@ export const PricingView: React.FC = () => {
         </div>
       </div>
 
-      {/* FAQ Accordion */}
+      {/* FAQ Accordion
+          *
+          * The questions are DATA, and every string goes through the
+          * translation function. The FAQ used to be hard-coded Arabic inside
+          * an otherwise bilingual page, which meant every English speaker saw
+          * Arabic here — the one place on the Token Hub that did not speak the
+          * reader's language. */}
       <div className="max-w-3xl mx-auto space-y-4">
         <div className="text-center space-y-1 mb-6">
-          <h3 className="text-xl font-bold text-foreground">الأسئلة الشائعة حول الاشتراكات والمدفوعات</h3>
-          <p className="text-xs text-muted">كل ما تحتاج معرفته عن سياسة الأسعار وتفعيل الاشتراكات في مصر</p>
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">
+            {t('Frequently asked questions about plans and payments')}
+          </h3>
+          <p className="text-xs text-muted">
+            {t('Everything you need to know about pricing and how a subscription is activated in Egypt.')}
+          </p>
         </div>
 
         <div className="space-y-3">
-          <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
-            <h4 className="font-bold text-sm text-foreground">هل الميزات الأساسية للمنصة مجانية بالفعل؟</h4>
-            <p className="text-xs text-muted leading-relaxed">
-              نعم، المنصة الأساسية مجانية بالكامل ١٠٠٪، وتشمل استكشاف الوظائف، تتبع الأهداف، وخرائط التعلم الأساسية. باقات الاشتراك مخصصة لتغطية تكاليف نماذج الذكاء الاصطناعي المتقدمة (Gemini) ومعالجة الوثائق ومحاكاة المقابلات.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
-            <h4 className="font-bold text-sm text-foreground">كيف يتم تفعيل الحساب بعد التحويل عبر فودافون كاش أو إنستاباي؟</h4>
-            <p className="text-xs text-muted leading-relaxed">
-              بمجرد إدخال الرقم المرجعي للتحويل ورفع لقطة الشاشة للإيصال، يمنحك النظام وصولاً مؤقتاً لمدة ٢٤ ساعة لمتابعة مهامك على الفور، بينما يقوم المشرف بالتأكيد النهائي خلال ساعات العمل.
-            </p>
-          </div>
+          {FAQ_ITEMS.map((item) => (
+            <div key={item.question} className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
+              <h4 className="font-bold text-sm text-foreground">{t(item.question)}</h4>
+              <p className="text-xs text-muted leading-relaxed">{t(item.answer)}</p>
+            </div>
+          ))}
 
           {stripeReady && (
             <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
-              <h4 className="font-bold text-sm text-foreground">هل يمكنني الدفع بالبطاقة البنكية؟</h4>
+              <h4 className="font-bold text-sm text-foreground">
+                {t('Can I pay by bank card?')}
+              </h4>
               <p className="text-xs text-muted leading-relaxed">
-                نعم. اختر «بطاقة بنكية» عند الاشتراك لتنتقل إلى صفحة Stripe الآمنة لإدخال بيانات البطاقة. المنصة لا ترى رقم بطاقتك ولا تخزنه، ويتفعل الاشتراك تلقائياً بعد تأكيد الدفع، ويمكنك إدارة البطاقة أو إلغاء التجديد من زر «إدارة الفواتير» في صفحة الأسعار.
+                {t(
+                  'Yes. Choose “Bank card” when you subscribe and you will be taken to Stripe’s secure page to enter your card details. The platform never sees or stores your card number, the subscription activates as soon as Stripe confirms the payment, and you can manage the card or cancel the renewal from “Manage invoices” on this page.'
+                )}
               </p>
             </div>
           )}
-
-          <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
-            <h4 className="font-bold text-sm text-foreground">ماذا يحدث إذا فشل استدعاء الذكاء الاصطناعي؟ هل أخسر رصيدي؟</h4>
-            <p className="text-xs text-muted leading-relaxed">
-              مستحيل! المنصة تطبق نظام دفتر الأستاذ المزدوج الآمن. إذا حدث أي انقطاع للشبكة أو خطأ في النموذج، يتم استرداد الرصيد المخصوم تلقائياً لحسابك فوراً.
-            </p>
-          </div>
         </div>
       </div>
 

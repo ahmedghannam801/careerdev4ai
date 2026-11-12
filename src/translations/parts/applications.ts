@@ -48,4 +48,21 @@ export const applicationsAr: Record<string, string> = {
   'Stage:': 'المرحلة:',
   'Next:': 'التالي:',
   'Delete': 'حذف',
+  'Application updated': 'تم تحديث الطلب',
+  'Saved notes and document links for {company}.': 'تم حفظ الملاحظات وروابط المستندات لشركة {company}.',
+  'Failed to save application links': 'تعذّر حفظ روابط مستندات الطلب',
+  'Please try again.': 'يُرجى المحاولة مرة أخرى.',
+  'Job Application Tracker': 'متتبّع طلبات التوظيف',
+  'Discipline-driven pipeline management with linked CV versions, tailored cover letters, and private notes.':
+    'إدارة منظّمة لمسار التقديم مع ربط نسخ السيرة الذاتية وخطابات التقديم المخصصة والملاحظات الخاصة.',
+  'No tracked job applications yet': 'لا توجد طلبات توظيف متتبّعة بعد',
+  'Track live opportunities or manual applications to keep linked CV versions, cover letters, follow-up dates, and interview stages organized.':
+    'تتبّع الفرص المتاحة أو الطلبات اليدوية لتنظيم نسخ السيرة الذاتية وخطابات التقديم ومواعيد المتابعة ومراحل المقابلات.',
+  'Linked CV Version': 'نسخة السيرة المرتبطة',
+  'None linked': 'غير مرتبط',
+  'Not audited yet': 'لم يُدقّق بعد',
+  'No saved CV snapshots yet': 'لا توجد لقطات سيرة ذاتية محفوظة بعد',
+  'Linked Cover Letter': 'خطاب التقديم المرتبط',
+  'Linked': 'مرتبط',
+  'No saved cover letters yet': 'لا توجد خطابات تقديم محفوظة بعد',
 };

@@ -19,7 +19,10 @@ interface CareerSetupViewProps {
 
 export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) => {
   const { targetRole, savedRoles, setPrimaryTargetRole, saveRole, removeSavedRole, skills, t} = useCareer();
-  const [selectedRole, setSelectedRole] = useState<TargetRole>(targetRole);
+  // The selected role starts as the candidate's current target, or as the
+  // first catalogue entry when they have not chosen one yet — this screen is
+  // where a candidate without a role picks their first one.
+  const [selectedRole, setSelectedRole] = useState<TargetRole>(targetRole ?? TARGET_ROLES[0]);
   const [compareRole, setCompareRole] = useState<TargetRole | null>(null);
 
   const isSaved = (roleId: string) => savedRoles.some(r => r.id === roleId);
@@ -128,7 +131,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                 </div>
               </div>
 
-              {targetRole.id !== selectedRole.id && (
+              {targetRole?.id !== selectedRole.id && (
                 <button
                   onClick={() => setPrimaryTargetRole(selectedRole.id)}
                   className="w-full py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-colors"
@@ -181,7 +184,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
                 </div>
               </div>
 
-              {targetRole.id !== compareRole.id && (
+              {targetRole?.id !== compareRole.id && (
                 <button
                   onClick={() => setPrimaryTargetRole(compareRole.id)}
                   className="w-full py-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold hover:bg-[var(--accent-secondary)] transition-colors"
@@ -207,7 +210,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
               selectedRoleId={selectedRole.id}
               onSelect={setSelectedRole}
               renderSpecialisation={(role) => {
-                const isCurrentTarget = targetRole.id === role.id;
+                const isCurrentTarget = targetRole?.id === role.id;
                 const isSelected = selectedRole.id === role.id;
                 return (
                   <StaggerItem
@@ -278,7 +281,7 @@ export const CareerSetupView: React.FC<CareerSetupViewProps> = ({ onNavigate }) 
               </div>
 
               <div className="flex items-center gap-2">
-                {targetRole.id !== selectedRole.id ? (
+                {targetRole?.id !== selectedRole.id ? (
                   <button
                     onClick={() => setPrimaryTargetRole(selectedRole.id)}
                     className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold transition-all shadow-xs"

@@ -24,6 +24,9 @@ import { backgroundJobsAr } from './parts/backgroundJobs.ts';
 import { applicationWorkflowAr } from './parts/applicationWorkflow.ts';
 import { commonAr } from './parts/common.ts';
 import { careerAr } from './parts/career.ts';
+import { careerIdentityAr } from './parts/careerIdentity.ts';
+import { careerTargetAr } from './parts/careerTarget.ts';
+import { careerRolesAr } from './parts/careerRoles.ts';
 import { cvAr } from './parts/cv.ts';
 import { cvTemplatesAr } from './parts/cvTemplates.ts';
 import { cvExtractionAr } from './parts/cvExtraction.ts';
@@ -34,10 +37,12 @@ import { interviewsAr } from './parts/interviews.ts';
 import { jobsAr } from './parts/jobs.ts';
 import { landingAr } from './parts/landing.ts';
 import { learningAr } from './parts/learning.ts';
+import { momentumAr } from './parts/momentum.ts';
 import { profileAr } from './parts/profile.ts';
 import { processingAr } from './parts/processing.ts';
 import { projectsAr } from './parts/projects.ts';
 import { roadmapAr } from './parts/roadmap.ts';
+import { roadmapJourneyAr } from './parts/roadmapJourney.ts';
 import { settingsAr } from './parts/settings.ts';
 import { skillsAr } from './parts/skills.ts';
 import { volunteerAr } from './parts/volunteer.ts';
@@ -60,9 +65,14 @@ export const AR_STRINGS: Record<string, string> = {
   ...backgroundJobsAr,
   ...applicationWorkflowAr,
   ...careerAr,
+  ...careerIdentityAr,
+  ...careerTargetAr,
+  ...careerRolesAr,
   ...roadmapAr,
+  ...roadmapJourneyAr,
   ...skillsAr,
   ...learningAr,
+  ...momentumAr,
   ...interviewsAr,
   ...jobsAr,
   ...projectsAr,

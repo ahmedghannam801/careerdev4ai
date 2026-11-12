@@ -73,11 +73,28 @@ export const SESSION_ROUTES = ['landing', 'onboarding'] as const;
  */
 export const LEGACY_ALIASED_ROUTES = ['cv-analyzer'] as const;
 
+/**
+ * Addresses that are not views of their own but are still linked to directly.
+ *
+ * These are different from the legacy addresses above. A legacy address is
+ * one that used to be a screen and no longer is — the platform recognises it
+ * so an old link does not dead-end. These are current links: the Portfolio
+ * pillar points at `#/profile-certifications` because that is where the
+ * candidate collects certifications, and the address resolves to the
+ * profile's certifications section.
+ *
+ * They are not views, so nothing may open one as a screen, and they are not
+ * legacy, so they are not "addresses from the past". They are simply
+ * addresses that name a section of a view.
+ */
+export const ALIASED_SECTION_ROUTES = ['profile-certifications'] as const;
+
 /** Every route the application recognises, signed in or not. */
 export const KNOWN_ROUTES: readonly string[] = [
   ...APP_ROUTES,
   ...SESSION_ROUTES,
   ...LEGACY_ALIASED_ROUTES,
+  ...ALIASED_SECTION_ROUTES,
 ];
 
 /** Whether a string names a view of the signed-in application. */
@@ -107,6 +124,10 @@ export const ROUTE_ALIASES: Readonly<
   Record<string, { route: string; params?: Record<string, string> }>
 > = {
   'cv-analyzer': { route: 'cv-studio', params: { tab: 'ats' } },
+  // The certifications live in the profile, but they are one of the things a
+  // candidate collects rather than one of the things they set about
+  // themselves. The Portfolio pillar links to them directly.
+  'profile-certifications': { route: 'profile', params: { section: 'certifications' } },
 };
 
 /** Where an aliased route now lives, or `null` when the route is not an alias. */
@@ -338,13 +359,18 @@ export const SKILL_CATEGORIES = [
   'soft_skills',
 ] as const;
 
-/** The status filter of the projects board. */
+/**
+ * The status filter of the projects board.
+ *
+ * The statuses are the shared lifecycle enum, so the board filters on the
+ * same vocabulary the database stores. 'idea' used to be a status of its own
+ * here while the platform called it 'planned' elsewhere.
+ */
 export const PROJECT_STATUS_FILTERS = [
   'all',
+  'planned',
   'in_progress',
   'completed',
-  'planned',
-  'idea',
   'published',
 ] as const;
 

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useAIProcessing } from '../../lib/useAIProcessing';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { getAccessToken } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import {
@@ -138,7 +139,7 @@ export const InterviewsView: React.FC = () => {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
-            roleTitle: targetRole.title,
+            roleTitle: targetRole?.title ?? '',
             interviewType: question.category,
             question: question.question,
             userAnswer,
@@ -163,7 +164,7 @@ export const InterviewsView: React.FC = () => {
         let saved = true;
         try {
           await saveInterviewSession({
-            roleTitle: targetRole.title,
+            roleTitle: targetRole?.title ?? '',
             type: question.category,
             question: question.question,
             userAnswer,
@@ -227,6 +228,19 @@ export const InterviewsView: React.FC = () => {
     ).toFixed(1);
   }, [answered]);
 
+  const scoredSessions = useMemo(
+    () => interviewSessions.filter((s) => typeof s.aiFeedback?.score === 'number'),
+    [interviewSessions]
+  );
+
+  const interviewReadinessPct = useMemo(() => {
+    if (scoredSessions.length === 0) return 0;
+    const avgOutOfTen =
+      scoredSessions.reduce((sum, s) => sum + (s.aiFeedback?.score ?? 0), 0) /
+      scoredSessions.length;
+    return Math.round(avgOutOfTen * 10);
+  }, [scoredSessions]);
+
   const behavioralCount = plan?.filter((question) => question.stage === 'behavioral').length ?? 8;
   const technicalCount = plan?.filter((question) => question.stage === 'technical').length ?? 7;
 
@@ -246,9 +260,15 @@ export const InterviewsView: React.FC = () => {
             )}
           </p>
         </div>
-        <div className="text-xs text-[var(--text-muted)]">
-          {t('Target Role:')}{' '}
-          <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-1.5">
+            <span className="text-[var(--text-muted)]">{t('Interview Readiness')}: </span>
+            <strong className="font-mono text-[var(--color-primary-text)]">{interviewReadinessPct}%</strong>
+          </div>
+          <div className="text-[var(--text-muted)]">
+            {t('Target Role:')}{' '}
+            <strong className="text-[var(--text-primary)]">{targetRole?.title ?? t('Not set')}</strong>
+          </div>
         </div>
       </div>
 
@@ -269,7 +289,7 @@ export const InterviewsView: React.FC = () => {
                 <div className="absolute bottom-3 start-4">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
                     <BrainCircuit className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
-                    {targetRole.title} {t('Interview Prep')}
+                    {targetRole?.title ?? ''} {t('Interview Prep')}
                   </span>
                 </div>
               </CareerImage>
@@ -304,7 +324,7 @@ export const InterviewsView: React.FC = () => {
                     {t('Technical')}
                   </div>
                   <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
-                    {technicalCount} {t('questions')} · {targetRole.title}
+                    {technicalCount} {t('questions')} · {targetRole?.title ?? ''}
                   </p>
                 </div>
               </div>
@@ -321,13 +341,18 @@ export const InterviewsView: React.FC = () => {
           </div>
 
           <div data-tour="ai-mentor-panel" className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6">
-            <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-              <History className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
-              {t('Recorded Mock Sessions')} ({interviewSessions.length})
+            <div className="flex items-center justify-between gap-2 text-sm font-bold text-[var(--text-primary)]">
+              <span className="inline-flex items-center gap-2">
+                <History className="h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
+                {t('Recorded Mock Sessions')} ({interviewSessions.length})
+              </span>
+              <span className="text-xs font-mono text-[var(--color-primary-text)]">
+                {interviewReadinessPct}%
+              </span>
             </div>
             {interviewSessions.length === 0 ? (
               <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                {t('No recorded sessions yet. Your first answer will appear here.')}
+                {t('Interview readiness is 0% until you complete your first scored mock interview session.')}
               </p>
             ) : (
               <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pe-1">
@@ -421,7 +446,7 @@ export const InterviewsView: React.FC = () => {
             {t(
               "Great. Now let's move to the Technical interview. The next questions are specific to"
             )}{' '}
-            <strong className="text-[var(--text-primary)]">{targetRole.title}</strong>.
+            <strong className="text-[var(--text-primary)]">{targetRole?.title ?? ''}</strong>.
           </p>
           <button
             type="button"
@@ -512,7 +537,9 @@ export const InterviewsView: React.FC = () => {
                   <Sparkles
                     className={`h-4 w-4 shrink-0 ${isEvaluating ? 'animate-spin' : ''}`}
                   />
-                  {t(isEvaluating ? 'Evaluating with AI...' : 'Submit Answer')}
+                  {isEvaluating
+                    ? t('Evaluating with AI...')
+                    : aiButtonLabel(t('Submit Answer'), 'interview_mock_session', t)}
                 </button>
               </div>
             )}

@@ -26,7 +26,6 @@ import {
   ListVideo,
   PlayCircle,
   Presentation,
-  Sparkles,
   Star,
   Target,
   Video,
@@ -35,6 +34,7 @@ import {
   BookMarked,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { WhyWeRecommend } from '../ui/WhyWeRecommend';
 import { learningActionUrl } from '../../../shared/learningLinks';
 import {
   RESOURCE_TYPE_LABELS,
@@ -382,14 +382,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         )}
 
         {showReason && reason && (
-          <div data-guide="learning-reason" className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              <Sparkles className="h-3 w-3 shrink-0" />
-              {t('Why this now')}
-            </div>
-            <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
-              {reason}
-            </p>
+          <div data-guide="learning-reason" className="mt-3">
+            <WhyWeRecommend reason={reason} title={t('Why this now')} />
             {recommendation?.aiSkillGap && (
               <p className="mt-1.5 text-[10px] text-[var(--text-secondary)]">
                 <span className="font-semibold text-[var(--text-primary)]">{t('Skill gap:')}</span>{' '}

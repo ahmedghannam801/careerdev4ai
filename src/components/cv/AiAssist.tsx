@@ -27,6 +27,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Check, Loader2, Sparkles, X } from 'lucide-react';
 import { assistCvField } from '../../lib/cvAssistApi';
 import { useCareer } from '../../context/CareerContext';
+import { aiButtonLabel, aiTokenCostLabel } from '../../lib/aiTokenCosts';
 import {
   CV_ASSIST_LENGTHS,
   CV_ASSIST_TONES,
@@ -261,7 +262,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
         ) : (
           <Sparkles className="h-3 w-3 shrink-0" />
         )}
-        <span>{label ?? t(FIELD_LABELS[field])}</span>
+        <span>{aiButtonLabel(label ?? t(FIELD_LABELS[field]), 'ai_assist_inline', t)}</span>
       </button>
 
       {isOpen && (
@@ -269,12 +270,18 @@ export const AiAssist: React.FC<AiAssistProps> = ({
           {/* What the candidate is asking for. */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
-              {t('AI Suggestions')}
+              {t('AI Suggestions')} {aiTokenCostLabel('ai_assist_inline', t)}
             </span>
             {actions.map((option) => (
               <button
                 key={option}
                 type="button"
+                // The chip starts a request that costs a token, so it is
+                // closed while one is in flight. A second click would
+                // otherwise replace the answer in flight with another
+                // request, and the candidate would be billed twice for one
+                // piece of work.
+                disabled={isWorking}
                 onClick={() => {
                   setAction(option);
                   // The answer changes with the action, so the old one is
@@ -286,13 +293,13 @@ export const AiAssist: React.FC<AiAssistProps> = ({
                   attemptRef.current = 0;
                   void run(0);
                 }}
-                className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors ${
+                className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   option === action
                     ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
                     : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                {t(ACTION_LABELS[option])}
+                {aiButtonLabel(t(ACTION_LABELS[option]), 'ai_assist_inline', t)}
               </button>
             ))}
           </div>
@@ -372,7 +379,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
                   className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
                 >
                   <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>{t('Try again')}</span>
+                  <span>{aiButtonLabel(t('Try again'), 'ai_assist_inline', t)}</span>
                 </button>
                 <button
                   type="button"

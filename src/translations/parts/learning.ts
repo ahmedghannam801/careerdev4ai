@@ -143,6 +143,7 @@ export const learningAr: Record<string, string> = {
   'Situation: Set the context... Task: What was expected... Action: Specific steps you took... Result: Outcome and metrics...':
     'الموقف: حدِّد السياق... المهمة: ما كان متوقَّعًا... الإجراء: الخطوات المحدّدة التي اتَّخذتها... النتيجة: الحصيلة والمؤشرات...',
   'Evaluating with AI...': 'جارٍ التقييم بالذكاء الاصطناعي...',
+  'Submit Answer': 'إرسال الإجابة',
   'Submit Response for AI Scoring': 'إرسال الإجابة للتقييم بالذكاء الاصطناعي',
   'Score:': 'الدرجة:',
   'Recorded Mock Sessions': 'الجلسات التجريبية المسجَّلة',

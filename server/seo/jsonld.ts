@@ -109,6 +109,69 @@ export function breadcrumbSchema(entries: BreadcrumbEntry[], path: string): Reco
   };
 }
 
+/**
+ * The Contact Us page.
+ *
+ * The schema describes the business behind the page, and it describes it only
+ * as far as the business has actually published itself. A property that has
+ * not been supplied is left out of the markup entirely: a `PostalAddress`
+ * without a street, or a `telephone` that is a placeholder, would be a
+ * structured-data assertion the page does not make.
+ */
+export function contactPageSchema(input: {
+  name: string;
+  description: string;
+  path: string;
+  business: {
+    name: string;
+    url?: string;
+    email?: string | null;
+    telephone?: string | null;
+    address?: {
+      streetAddress?: string | null;
+      addressLocality?: string | null;
+      addressRegion?: string | null;
+      postalCode?: string | null;
+      addressCountry?: string | null;
+    } | null;
+  };
+}): Record<string, unknown> {
+  const schema: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'ContactPage',
+    name: input.name,
+    description: input.description,
+    url: absoluteUrl(input.path),
+    inLanguage: 'en',
+  };
+
+  const business: Record<string, unknown> = {
+    '@type': 'Organization',
+    name: input.business.name,
+  };
+
+  if (input.business.url) business.url = input.business.url;
+  if (input.business.email) business.email = input.business.email;
+  if (input.business.telephone) business.telephone = input.business.telephone;
+
+  const address = input.business.address;
+  if (address) {
+    const postal: Record<string, unknown> = { '@type': 'PostalAddress' };
+    if (address.streetAddress) postal.streetAddress = address.streetAddress;
+    if (address.addressLocality) postal.addressLocality = address.addressLocality;
+    if (address.addressRegion) postal.addressRegion = address.addressRegion;
+    if (address.postalCode) postal.postalCode = address.postalCode;
+    if (address.addressCountry) postal.addressCountry = address.addressCountry;
+    // A postal address with nothing in it is not an address. It is only
+    // published once at least the street and the locality are known.
+    if (Object.keys(postal).length > 2) business.address = postal;
+  }
+
+  schema.mainEntity = business;
+
+  return schema;
+}
+
 /** A page of the site. */
 export function webPageSchema(input: {
   name: string;

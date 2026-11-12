@@ -35,6 +35,11 @@ export interface RoadmapTaskDTO {
   resourceTitle: string | null;
   evidenceId: string | null;
   estimatedHours: number | null;
+  /**
+   * The kind of work this step is: learning, practice, project or
+   * application. It is what makes the time estimate break down honestly.
+   */
+  workKind: string | null;
   sortOrder: number;
   /** How hard this step is: foundational, intermediate or advanced. */
   difficulty: string | null;
@@ -127,6 +132,8 @@ export interface CreateRoadmapTaskInput {
   resourceTitle?: string;
   evidenceId?: string;
   estimatedHours?: number;
+  /** The kind of work this step is, for the additive time breakdown. */
+  workKind?: string | null;
   difficulty?: string;
   prerequisites?: string[];
   skillNames?: string[];
@@ -202,6 +209,7 @@ interface TaskRow {
   resource_title: string | null;
   evidence_id: string | null;
   estimated_hours: number | null;
+  work_kind: string | null;
   sort_order: number;
   difficulty: string | null;
   prerequisites: string[] | null;
@@ -247,6 +255,7 @@ function toTaskDTO(row: TaskRow): RoadmapTaskDTO {
     resourceTitle: row.resource_title,
     evidenceId: row.evidence_id,
     estimatedHours: row.estimated_hours,
+    workKind: row.work_kind,
     sortOrder: row.sort_order,
     difficulty: row.difficulty,
     prerequisites: row.prerequisites ?? [],
@@ -351,7 +360,7 @@ export async function listRoadmaps(profileId: string): Promise<RoadmapDTO[]> {
     const { data: taskRows, error: taskError } = await getSupabaseServer()
       .from('roadmap_tasks')
       .select(
-        'id, milestone_id, title, description, status, skill_id, skill_name, deadline, resource_id, resource_title, evidence_id, estimated_hours, sort_order, difficulty, prerequisites, skill_names, project_titles, resources, priority, rationale'
+        'id, milestone_id, title, description, status, skill_id, skill_name, deadline, resource_id, resource_title, evidence_id, estimated_hours, work_kind, sort_order, difficulty, prerequisites, skill_names, project_titles, resources, priority, rationale'
       )
       .in('milestone_id', milestoneIds)
       .order('sort_order', { ascending: true });
@@ -686,6 +695,7 @@ async function insertRoadmapTree(
     resource_title: string | null;
     evidence_id: string | null;
     estimated_hours: number | null;
+    work_kind: string | null;
     sort_order: number;
     difficulty: string | null;
     prerequisites: string[];
@@ -723,6 +733,7 @@ async function insertRoadmapTree(
           resource_title: tInput.resourceTitle ?? null,
           evidence_id: tInput.evidenceId ?? null,
           estimated_hours: tInput.estimatedHours ?? null,
+          work_kind: tInput.workKind ?? null,
           sort_order: tIdx,
           difficulty: tInput.difficulty ?? null,
           prerequisites: tInput.prerequisites ?? [],
@@ -790,6 +801,7 @@ function roadmapDtoToTree(roadmap: RoadmapDTO): TreePhase[] {
         resourceTitle: task.resourceTitle ?? undefined,
         evidenceId: task.evidenceId ?? undefined,
         estimatedHours: task.estimatedHours ?? undefined,
+        workKind: task.workKind ?? undefined,
         difficulty: task.difficulty ?? undefined,
         prerequisites: task.prerequisites,
         skillNames: task.skillNames,
@@ -1077,10 +1089,11 @@ export async function addTask(
       resource_title: input.resourceTitle ?? null,
       evidence_id: input.evidenceId ?? null,
       estimated_hours: input.estimatedHours ?? null,
+      work_kind: input.workKind ?? null,
       sort_order: sortOrder,
     })
     .select(
-      'id, milestone_id, title, description, status, skill_id, skill_name, deadline, resource_id, resource_title, evidence_id, estimated_hours, sort_order'
+      'id, milestone_id, title, description, status, skill_id, skill_name, deadline, resource_id, resource_title, evidence_id, estimated_hours, work_kind, sort_order'
     )
     .single();
   if (error) throw error;

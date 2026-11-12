@@ -30,6 +30,7 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
+import { CareerGoalRolePanel } from '../career/CareerGoalRolePanel';
 import { SUPPORT_EMAIL } from '../../../shared/contact.ts';
 import { CONTACT_PHONE } from '../../../shared/paymentAccounts.ts';
 
@@ -309,6 +310,17 @@ export const SettingsView: React.FC = () => {
           <span>{t('Export All Career Data')}</span>
         </button>
       </div>
+
+      {/* THE CAREER TARGET — first, because it is what the rest of the
+          platform measures the candidate against. It sits above the tabs so
+          it is visible whichever tab is open, and it is the SAME component
+          the Profile page mounts, so the two can never disagree. */}
+      <CareerGoalRolePanel
+        headingId="settings-career-target"
+        description={t(
+          'Your target role, career track and experience level. Your roadmap, skill gaps, learning plan and job matches are all measured against this — change it here and the whole platform follows.'
+        )}
+      />
 
       <div data-tour="tour-help-revisit" className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

@@ -59,6 +59,7 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
     { path: '/careers', priority: 0.9, changefreq: 'weekly' },
     { path: '/learning', priority: 0.9, changefreq: 'weekly' },
     { path: '/opportunities', priority: 0.8, changefreq: 'daily' },
+    { path: '/contact', priority: 0.7, changefreq: 'monthly' },
     { path: '/privacy', priority: 0.3, changefreq: 'yearly' },
     // The Terms are listed only once they are published. An unpublished legal
     // document must never be offered to a crawler.

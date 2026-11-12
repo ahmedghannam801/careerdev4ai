@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  Compass,
   ExternalLink,
   Flag,
   FolderGit2,
@@ -22,6 +23,11 @@ import { ROADMAP_STATUS_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { isSafeExternalUrl } from '../../../shared/learningLinks';
 import {
+  ROADMAP_JOURNEY_STAGES,
+  journeyStageForPhase,
+} from '../../../shared/roadmapJourney';
+import { computeTimeBreakdown } from '../../../shared/roadmapTimeBreakdown';
+import {
   RESOURCE_TYPE_LABELS,
   isVideoResource,
   officialThumbnail,
@@ -30,6 +36,8 @@ import {
 import { RoadmapTaskStatus } from '../../types/career';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
 import { CareerImage } from '../ui/CareerImage';
+import { TimeBreakdown } from '../ui/TimeBreakdown';
+import { useToast } from '../toast/ToastProvider';
 
 interface RoadmapViewProps {
   onNavigate?: (view: string) => void;
@@ -80,28 +88,41 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
     saveLearningCourse,
     startLearningCourse,
     regeneratePersonalizedRoadmap,
+    projects,
+    addProject,
+    targetRole,
     t,
   } = useCareer();
+  const { showToast } = useToast();
+  const [startingProjectTitle, setStartingProjectTitle] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useRouteParam<string>('status', ROADMAP_STATUS_FILTERS, 'all');
   const [isUpdating, setIsUpdating] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [showAll, setShowAll] = useState<string[]>([]);
 
-  const stageLabels = [
-    t('Foundation'),
-    t('Core Skills'),
-    t('Practice'),
-    t('Job Preparation'),
-  ];
+  // The stage names come from the shared journey, so the roadmap, the
+  // dashboard and the tests all call the stages the same thing.
+  //
+  // The journey has five stages: Foundation, Core Skills, Practice, Job
+  // Preparation and Job Ready. The list used to stop at Job Preparation,
+  // which meant the stage a candidate actually reached — the one where they
+  // are applying — had no name of its own.
+  const stageLabels = ROADMAP_JOURNEY_STAGES.map((stage) => t(stage.label));
 
   const courseById = useMemo(() => {
     const map = new Map(learningCatalog.map((course) => [course.id, course]));
     return map;
   }, [learningCatalog]);
 
-  const allTasks = roadmapPhases.flatMap((phase) =>
-    phase.milestones.flatMap((milestone) => milestone.tasks)
+  // The plan's tasks, memoized so the breakdown below is not recomputed on
+  // every render.
+  const allTasks = useMemo(
+    () =>
+      roadmapPhases.flatMap((phase) =>
+        phase.milestones.flatMap((milestone) => milestone.tasks)
+      ),
+    [roadmapPhases]
   );
   const totalTasks = allTasks.length;
   const completedTasks = allTasks.filter((task) => task.status === 'completed').length;
@@ -109,10 +130,21 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   const totalHours = allTasks.reduce((sum, task) => sum + (task.estimatedHours || 0), 0);
   const jobReady = totalTasks > 0 && completedTasks === totalTasks;
 
+  // The plan's hours, split by the kind of work they are spent on. The parts
+  // always add up to the total, so "48 hours" is never a number without an
+  // explanation of where the hours go.
+  const planTimeBreakdown = useMemo(
+    () => computeTimeBreakdown(allTasks),
+    [allTasks]
+  );
+
   const stages = roadmapPhases.map((phase, index) => {
     const tasks = phase.milestones.flatMap((milestone) => milestone.tasks);
     const done = tasks.filter((task) => task.status === 'completed').length;
     const hours = tasks.reduce((sum, task) => sum + (task.estimatedHours || 0), 0);
+    // The stage's own breakdown. It is summed from the stage's tasks, so the
+    // stage total and its parts can never disagree.
+    const timeBreakdown = computeTimeBreakdown(tasks);
     const resources = new Map<string, NonNullable<(typeof tasks)[number]['resources']>[number]>();
     const projects = new Set<string>();
     for (const task of tasks) {
@@ -123,10 +155,14 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
       id: phase.id,
       phase,
       label: stageLabels[index] ?? phase.title,
+      // The journey stage this phase belongs to, with its objective and the
+      // criteria that say the stage is done.
+      journey: journeyStageForPhase(index + 1),
       tasks,
       done,
       total: tasks.length,
       hours,
+      timeBreakdown,
       resources: [...resources.values()].slice(0, 5),
       projects: [...projects].slice(0, 3),
       pct: tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0,
@@ -231,14 +267,93 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
             {t('These projects turn the skills above into evidence a hiring manager can see.')}
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {allProjectTitles.map((project) => (
-              <div
-                key={project}
-                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-3 py-2 text-xs text-[var(--text-secondary)]"
-              >
-                {project}
-              </div>
-            ))}
+            {allProjectTitles.map((projectTitle) => {
+              const existingProject = projects.find(
+                (p) => p.title.trim().toLowerCase() === projectTitle.trim().toLowerCase()
+              );
+              const linkedSkills = (targetRole?.requiredSkills ?? [])
+                .slice(0, 3)
+                .map((s) => s.name);
+              const handleStartProject = async () => {
+                if (existingProject) {
+                  onNavigate?.('projects');
+                  return;
+                }
+                setStartingProjectTitle(projectTitle);
+                try {
+                  await addProject({
+                    title: projectTitle,
+                    goal: `${t('Proof-of-work project recommended for')} ${targetRole?.title ?? t('your target role')}`,
+                    description: `${t('Build and document')} "${projectTitle}" ${t('as verifiable portfolio evidence.')}`,
+                    category: 'personal',
+                    difficulty: 'Intermediate',
+                    status: 'in_progress',
+                    skills: linkedSkills,
+                    tasks: [
+                      t('Define project scope and architecture'),
+                      t('Implement core functionality and tests'),
+                      t('Publish repository or live demo and attach evidence'),
+                    ],
+                    deliverables: [
+                      t('Working repository or live demo link'),
+                      t('README documenting trade-offs and results'),
+                    ],
+                  });
+                  showToast({
+                    variant: 'success',
+                    title: t('Project started'),
+                    description: t('Added "{title}" to My Projects (In Progress).').replace('{title}', projectTitle),
+                  });
+                } catch (err) {
+                  showToast({
+                    variant: 'error',
+                    title: t('Could not start project'),
+                    description: err instanceof Error ? err.message : t('Please try again.'),
+                  });
+                } finally {
+                  setStartingProjectTitle(null);
+                }
+              };
+              return (
+                <div
+                  key={projectTitle}
+                  className="flex flex-col justify-between gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3 text-xs text-[var(--text-secondary)]"
+                >
+                  <span className="font-semibold text-[var(--text-primary)]">{projectTitle}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    {linkedSkills.length > 0 && (
+                      <span className="text-[10px] text-[var(--text-muted)] truncate">
+                        {linkedSkills.join(' · ')}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      disabled={startingProjectTitle === projectTitle}
+                      onClick={() => void handleStartProject()}
+                      className={`ms-auto shrink-0 inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                        existingProject
+                          ? 'border border-[var(--color-success)]/30 bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
+                          : 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] disabled:opacity-60'
+                      }`}
+                    >
+                      {existingProject ? (
+                        <>
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>{t('In Portfolio')}</span>
+                        </>
+                      ) : startingProjectTitle === projectTitle ? (
+                        <span>{t('Starting…')}</span>
+                      ) : (
+                        <>
+                          <PlayCircle className="h-3 w-3" />
+                          <span>{t('Start This Project')}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           {onNavigate && (
             <button
@@ -394,6 +509,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           <div className="text-[11px] text-[var(--text-muted)]">
             {t('Across')} {totalTasks} {t('steps')}
           </div>
+          <TimeBreakdown breakdown={planTimeBreakdown} className="mt-2.5" />
         </div>
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
           <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -671,6 +787,25 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                         <span>{stage.phase.goal}</span>
                       </p>
                     )}
+
+                    {/* What this stage is FOR, and what has to be true for it
+                        to be finished.
+                        Without them a stage is a list of tasks with a title, and
+                        the candidate cannot tell what the stage is aiming at
+                        or when they are done with it. */}
+                    <p className="flex items-start gap-1.5 text-xs text-[var(--text-secondary)]">
+                      <Compass className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-primary-text)]" />
+                      <span>{t(stage.journey.objective)}</span>
+                    </p>
+                    {stage.journey.completionCriteria.length > 0 && (
+                      <ul className="ps-6 text-[11px] text-[var(--text-muted)]">
+                        {stage.journey.completionCriteria.map((criterion) => (
+                          <li key={criterion} className="list-disc">
+                            {t(criterion)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -682,6 +817,13 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                       </span>
                       <span>{stage.pct}%</span>
                     </div>
+                    {/* Where this stage's hours go. The parts add up to the
+                        stage total above, so the two can never disagree. */}
+                    <TimeBreakdown
+                      breakdown={stage.timeBreakdown}
+                      showLabels={false}
+                      className="mt-2"
+                    />
                   </div>
 
                   <div className="flex w-full shrink-0 items-center gap-3 sm:w-44">
@@ -701,6 +843,15 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
 
                 {isOpen && (
                   <div className="space-y-4 border-t border-[var(--border-subtle)] p-5">
+                    {/* Where this stage's hours go. Every part is a real kind
+                        of work, and they add up to the stage's own total. */}
+                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 p-3">
+                      <div className={SECTION_LABEL_CLASS}>
+                        {t('WHERE THESE HOURS GO')}
+                      </div>
+                      <TimeBreakdown breakdown={stage.timeBreakdown} className="mt-2" />
+                    </div>
+
                     {/* Up to five actions: enough to act on, not a wall. */}
                     {limited.length === 0 ? (
                       <p className="rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-xs text-[var(--text-secondary)]">
@@ -955,12 +1106,23 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                     id={`status-${task.id}`}
                                     data-tour={taskIndex === 0 && index === 0 ? "roadmap-task-checkbox" : undefined}
                                     value={task.status}
-                                    onChange={(event) =>
-                                      updateTaskStatus(
-                                        task.id,
-                                        event.target.value as RoadmapTaskStatus
-                                      )
-                                    }
+                                    onChange={(event) => {
+                                      const nextStatus = event.target.value as RoadmapTaskStatus;
+                                      updateTaskStatus(task.id, nextStatus);
+                                      // Confirm the change. A status the
+                                      // candidate set has to be visibly
+                                      // accepted, and the step title is what
+                                      // makes the confirmation specific
+                                      // rather than a generic "saved".
+                                      showToast({
+                                        variant: nextStatus === 'completed' ? 'success' : 'info',
+                                        title:
+                                          nextStatus === 'completed'
+                                            ? t('Step completed.')
+                                            : t('Step updated.'),
+                                        description: task.title,
+                                      });
+                                    }}
                                     className={`rounded-lg border px-2 py-1 text-[11px] font-medium capitalize ${
                                       task.status === 'completed'
                                         ? 'border-[var(--color-success-strong)]/30 bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'

@@ -94,7 +94,10 @@ export async function buildPersonalizedPlan(
   const ratedSkills = skills
     .map((row) => ({
       name: row.skill?.name ?? '',
-      level: row.proficiency ?? 1,
+      // A diagnostic check is a measurement, not a second opinion: the level
+      // the product uses is the stronger of the self-reported proficiency and
+      // the assessed level, so finishing a check closes a gap immediately.
+      level: Math.max(row.proficiency ?? 0, row.assessed_level ?? 0),
     }))
     .filter((skill) => Boolean(skill.name));
 
@@ -156,6 +159,7 @@ export async function generateAndPersistRoadmap(
         status: task.status,
         skillName: task.primarySkillName ?? undefined,
         estimatedHours: task.estimatedHours,
+        workKind: task.workKind,
         difficulty: task.difficulty,
         prerequisites: task.prerequisites,
         skillNames: task.skillNames,
@@ -188,6 +192,7 @@ export async function generateAndPersistRoadmap(
       planSummary: {
         totalTasks: plan.summary.totalTasks,
         estimatedHours: plan.summary.estimatedHours,
+        timeBreakdown: plan.summary.timeBreakdown,
         openGaps: plan.summary.openGaps,
         coveredSkills: plan.summary.coveredSkills,
         tasksByPriority: plan.summary.tasksByPriority,
@@ -292,7 +297,10 @@ export async function getSkillGapSummary(profileId: string): Promise<{
 
   const skills = await getUserSkills(profileId);
   const ratedSkills = skills
-    .map((row) => ({ name: row.skill?.name ?? '', level: row.proficiency ?? 1 }))
+    .map((row) => ({
+      name: row.skill?.name ?? '',
+      level: Math.max(row.proficiency ?? 0, row.assessed_level ?? 0),
+    }))
     .filter((skill) => Boolean(skill.name));
 
   // The evidence the candidate's own records hold. A project they built, a

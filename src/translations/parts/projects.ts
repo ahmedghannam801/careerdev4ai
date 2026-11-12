@@ -165,4 +165,9 @@ export const projectsAr: Record<string, string> = {
   'Try another type, or add evidence of this kind.':
     'جرّب نوعًا آخر، أو أضف دليلًا من هذا النوع.',
   'Add your first evidence': 'أضف أول دليل لك',
+  'Project Deliverable': 'مخرَج المشروع',
+  'Completed portfolio project with public artifact link.': 'مشروع مكتمل في معرض الأعمال مع رابط دليل منشور.',
+  'Portfolio evidence recorded': 'تم توثيق دليل معرض الأعمال',
+  '"{title}" was linked in Evidence & Portfolio to substantiate your skills.':
+    'تم ربط "{title}" في الأدلة ومعرض الأعمال لتوثيق مهاراتك.',
 };

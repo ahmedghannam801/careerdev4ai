@@ -6,8 +6,16 @@
 // Ownership: profile_id = auth.users.id; the id is always the verified
 // Supabase user id, never a client-supplied value.
 import { getSupabaseServer } from './supabase';
+import type { ProjectLifecycleStatus } from '../../shared/projectLifecycle.ts';
 
-export type ProjectStatus = 'idea' | 'planned' | 'in_progress' | 'completed' | 'published';
+/**
+ * The status of a project.
+ *
+ * It is the shared lifecycle enum, so the server and the interface cannot
+ * drift apart. The older vocabulary is still accepted on the way in and is
+ * normalised before it is written.
+ */
+export type ProjectStatus = ProjectLifecycleStatus;
 export type ProjectDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 export type ProjectCategory = 'academic' | 'personal' | 'professional' | 'volunteer' | 'team';
 

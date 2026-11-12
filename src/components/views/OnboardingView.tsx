@@ -81,10 +81,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   } = useCareer();
 
   const [step, setStep] = useState<number>(() => Math.min(profile.onboardingStep ?? 0, STEPS.length - 1));
-  const [selectedPersona, setSelectedPersona] = useState<CareerState>(profile.careerState || 'working_professional');
+  const [selectedPersona, setSelectedPersona] = useState<CareerState | null>(profile.careerState ?? null);
   const [currentTitle, setCurrentTitle] = useState(profile.currentTitle || '');
   const [location, setLocation] = useState(profile.location || '');
-  const [selectedGoal, setSelectedGoal] = useState<CareerGoal>(profile.careerGoal || 'get_promoted');
+  const [selectedGoal, setSelectedGoal] = useState<CareerGoal | null>(profile.careerGoal ?? null);
   const [customGoal, setCustomGoal] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(targetRole?.id ?? null);
   const [isSaving, setIsSaving] = useState(false);
@@ -184,10 +184,18 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     setIsSaving(true);
     try {
       if (step === 1) {
+        if (!selectedPersona) {
+          setSaveError(t('Select where you are right now before continuing.'));
+          return;
+        }
         await setCareerState(selectedPersona);
         await updateProfile({ currentTitle, location });
         setStep(2);
       } else if (step === 2) {
+        if (!selectedGoal) {
+          setSaveError(t('Select what you are working towards before continuing.'));
+          return;
+        }
         await setCareerGoal(
           selectedGoal,
           selectedGoal === 'custom' ? customGoal.trim() : ''
@@ -228,7 +236,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   const handleSkip = async () => {
     if (isSaving) return;
     const confirmed = window.confirm(
-      t('Skip the getting-started tour? You can restart it later from Settings.')
+      t(
+        'Skip the getting-started tour? You can restart it later from Settings, and you can set your target role at any time from Profile or Settings.'
+      )
     );
     if (!confirmed) return;
     setIsSaving(true);
@@ -637,7 +647,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 <div className="text-xs text-[var(--text-secondary)]">
                   You have {projects.length} project{projects.length === 1 ? '' : 's'} recorded.
                   {targetRole
-                    ? ` The Projects screen suggests the ones that match ${targetRole.title}.`
+                    ? ` The Projects screen suggests the ones that match ${targetRole?.title ?? ''}.`
                     : ''}
                 </div>
               </div>

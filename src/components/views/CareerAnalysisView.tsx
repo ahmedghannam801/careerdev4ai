@@ -12,6 +12,7 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { Reveal } from '../motion/Motion';
 import { useAIProcessing } from '../../lib/useAIProcessing';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 
 interface CareerAnalysisViewProps {
   onNavigate: (view: string) => void;
@@ -22,6 +23,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
     analysis,
     targetRole,
     profile,
+    careerIdentity,
     skills,
     refreshAiAnalysis,
     isAnalyzing,
@@ -70,7 +72,11 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
             className="px-3.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-primary)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
-            <span>{t(isAnalyzing ? 'Re-evaluating with AI...' : 'Run Deep AI Gap Analysis')}</span>
+            <span>
+              {isAnalyzing
+                ? t('Re-evaluating with AI...')
+                : aiButtonLabel(t('Run Deep AI Gap Analysis'), 'cv_ats_analysis', t)}
+            </span>
           </button>
           <button
             onClick={() => onNavigate('plan')}
@@ -90,7 +96,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
             <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t('Current State')}</div>
             <div className="text-xl font-bold text-[var(--text-primary)]">{profile.name}</div>
             <div className="text-xs text-[var(--text-secondary)]">
-              {profile.currentTitle} · {t(profile.careerState.replace('_', ' '))}
+              {profile.currentTitle} · {t(careerIdentity.currentStatusLabel)}
             </div>
             <div className="text-xs text-[var(--text-muted)] pt-1">
               {skills.length} {t('tracked skills')} · {skills.filter(s => s.evidenceIds.length > 0).length} {t('verified with evidence')}
@@ -109,12 +115,12 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
           {/* Target State Column */}
           <div className="md:col-span-5 space-y-2 md:text-end">
             <div className="text-xs font-semibold uppercase tracking-wider text-[var(--color-primary-text)]">{t('Target State')}</div>
-            <div className="text-xl font-bold text-[var(--text-primary)]">{targetRole.title}</div>
+            <div className="text-xl font-bold text-[var(--text-primary)]">{targetRole?.title ?? ''}</div>
             <div className="text-xs text-[var(--text-secondary)]">
-              {targetRole.category} · {targetRole.level} {t('Level')}
+              {targetRole?.category ?? ''} {targetRole?.level ? `· ${targetRole.level} ${t('Level')}` : ''}
             </div>
             <div className="text-xs text-[var(--text-muted)] pt-1">
-              {t('Salary Expectation:')} <span className="font-mono text-[var(--color-success-strong)]">{targetRole.salaryRange.split(' ')[0]}</span>
+              {t('Salary Expectation:')} <span className="font-mono text-[var(--color-success-strong)]">{targetRole?.salaryRange?.split(' ')[0] ?? '—'}</span>
             </div>
           </div>
         </div>

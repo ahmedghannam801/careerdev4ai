@@ -23,6 +23,12 @@ import type {
   CVVolunteering,
 } from '../../src/types/career.ts';
 import type { ParsedCv } from './parseStructuredCv.ts';
+import {
+  dedupeEducation,
+  dedupeExperience,
+  dedupeSkills,
+  isSkillSectionHeader,
+} from '../../shared/cvDedupe.ts';
 
 /** A stable id for an entry that the document has no id for yet. */
 function entryId(seed: string, index: number): string {
@@ -152,28 +158,40 @@ export function parsedCvToProfile(parsed: ParsedCv): CVProfile {
     linkedin: parsed.linkedin || undefined,
     github: parsed.github || undefined,
     website: parsed.website || undefined,
-    experiences: parsed.experiences.map((entry, index) => ({
-      id: entry.id || entryId(`${entry.role}-${entry.company}`, index),
-      company: entry.company,
-      role: entry.role,
-      period: entry.period,
-      location: entry.location,
-      bullets: entry.bullets,
-      startDate: entry.startDate,
-      endDate: entry.endDate,
-      isCurrent: entry.isCurrent,
-    })),
-    education: parsed.education.map((entry, index) => ({
-      id: entry.id || entryId(`${entry.institution}-${entry.degree}`, index),
-      institution: entry.institution,
-      degree: entry.degree,
-      field: entry.field,
-      period: entry.period,
-      gpa: entry.gpa || undefined,
-      startDate: entry.startDate,
-      endDate: entry.endDate,
-      current: entry.current,
-    })),
+    // The duplicates are removed HERE, before the document reaches the
+    // studio.
+    //
+    // A CV often lists the same placement twice — once under "Experience"
+    // and once under "Internships" — and the import used to carry both into
+    // the profile, so the candidate saw the same job twice and pressing
+    // "Fill from my records" again added a third copy.
+    experiences: dedupeExperience(
+      parsed.experiences.map((entry, index) => ({
+        id: entry.id || entryId(`${entry.role}-${entry.company}`, index),
+        company: entry.company,
+        role: entry.role,
+        period: entry.period,
+        location: entry.location,
+        bullets: entry.bullets,
+        startDate: entry.startDate,
+        endDate: entry.endDate,
+        isCurrent: entry.isCurrent,
+        employmentType: entry.employmentType,
+      }))
+    ),
+    education: dedupeEducation(
+      parsed.education.map((entry, index) => ({
+        id: entry.id || entryId(`${entry.institution}-${entry.degree}`, index),
+        institution: entry.institution,
+        degree: entry.degree,
+        field: entry.field,
+        period: entry.period,
+        gpa: entry.gpa,
+        startDate: entry.startDate,
+        endDate: entry.endDate,
+        current: entry.current,
+      }))
+    ),
     projects: parsed.projects.map((entry, index) => ({
       id: entry.id || entryId(entry.title, index),
       title: entry.title,
@@ -182,7 +200,12 @@ export function parsedCvToProfile(parsed: ParsedCv): CVProfile {
       technologies: entry.technologies,
       bullets: entry.bullets,
     })),
-    skillsList: parsed.skillsList,
+    // The skill list is normalised and de-duplicated, and a section heading
+    // is never kept as a skill. "TECHNICAL SKILLS" is a heading; "Python" is
+    // a skill.
+    skillsList: dedupeSkills(parsed.skillsList).filter(
+      (skill) => !isSkillSectionHeader(skill)
+    ),
     certifications: parsed.certifications,
     certificationDetails,
     links: [],

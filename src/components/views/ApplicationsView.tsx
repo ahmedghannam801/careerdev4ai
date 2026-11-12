@@ -1,31 +1,46 @@
-import React, { useState } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  X, 
+import React, { useEffect, useState } from 'react';
+import {
+  Briefcase,
+  Plus,
+  Trash2,
+  X,
   FileText,
-  FolderClosed
+  FolderClosed,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { APPLICATION_VIEW_MODES } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { todayIsoDate } from '../../../shared/dateRange';
+import {
+  listApplicationPackages,
+  saveApplicationPackage,
+  updateApplicationPackage,
+  type ApplicationPackageDTO,
+} from '../../lib/applicationPackagesApi';
 import { ApplicationStage, JobApplication } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { EmptyState } from '../ui/EmptyState';
+import { useToast } from '../toast/ToastProvider';
 
 export const ApplicationsView: React.FC = () => {
-  const { 
-    applications, 
-    updateApplicationStage, 
-    updateApplicationNotes, 
-    deleteApplication, 
+  const {
+    applications,
+    updateApplicationStage,
+    updateApplicationNotes,
+    deleteApplication,
     addApplication,
     cvVersions,
-    logActivity, t} = useCareer();
+    coverLetters,
+    saveCoverLetter,
+    logActivity,
+    t,
+  } = useCareer();
+  const { showToast } = useToast();
 
   const [viewMode, setViewMode] = useRouteParam<'kanban' | 'list'>('view', APPLICATION_VIEW_MODES, 'kanban');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedApp, setSelectedApp] = useState<JobApplication | null>(null);
+  const [packages, setPackages] = useState<ApplicationPackageDTO[]>([]);
 
   // Form state for new application
   const [company, setCompany] = useState('');
@@ -35,18 +50,37 @@ export const ApplicationsView: React.FC = () => {
   const [stage, setStage] = useState<ApplicationStage>('applied');
   const [nextAction, setNextAction] = useState('Awaiting recruiter response');
   const [nextActionDate, setNextActionDate] = useState('');
-  // When the application was made. An application is often added after the
-  // fact, so the date is editable rather than fixed to today.
   const [appliedDate, setAppliedDate] = useState(todayIsoDate());
-  // The salary is written in the private notes, which is where the form
-  // says it belongs. Nothing is invented here: an application that has no
-  // salary yet carries no salary.
   const [notes, setNotes] = useState('');
 
   // Edit details form inside modal
   const [editNotes, setEditNotes] = useState('');
   const [editNextAction, setEditNextAction] = useState('');
   const [editNextActionDate, setEditNextActionDate] = useState('');
+  const [selectedCvVersionId, setSelectedCvVersionId] = useState('');
+  const [selectedCoverLetterId, setSelectedCoverLetterId] = useState('');
+  const [savingDetails, setSavingDetails] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    listApplicationPackages()
+      .then((list) => {
+        if (active) setPackages(list);
+      })
+      .catch(() => {
+        // Packages are optional metadata for document linking.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const findMatchingPackage = (app: JobApplication): ApplicationPackageDTO | undefined =>
+    packages.find(
+      (pkg) =>
+        (pkg.company ?? '').trim().toLowerCase() === app.company.trim().toLowerCase() &&
+        (pkg.jobTitle ?? '').trim().toLowerCase() === app.role.trim().toLowerCase()
+    );
 
   const stages: ApplicationStage[] = [
     'saved',
@@ -94,12 +128,79 @@ export const ApplicationsView: React.FC = () => {
     setEditNotes(app.notes || '');
     setEditNextAction(app.nextAction || '');
     setEditNextActionDate(app.nextActionDate || '');
+    const pkg = findMatchingPackage(app);
+    const linkedLetter =
+      coverLetters.find((letter) => letter.applicationId === app.id) ??
+      (pkg?.coverLetterId ? coverLetters.find((letter) => letter.id === pkg.coverLetterId) : undefined);
+    setSelectedCvVersionId(pkg?.tailoredCvVersionId ?? '');
+    setSelectedCoverLetterId(linkedLetter?.id ?? '');
   };
 
-  const handleSaveAppDetails = () => {
-    if (!selectedApp) return;
-    updateApplicationNotes(selectedApp.id, editNotes, editNextAction, editNextActionDate);
-    setSelectedApp(null);
+  const handleSaveAppDetails = async () => {
+    if (!selectedApp || savingDetails) return;
+    setSavingDetails(true);
+    try {
+      updateApplicationNotes(selectedApp.id, editNotes, editNextAction, editNextActionDate);
+
+      // Link selected cover letter in PostgreSQL via cover_letters.application_id.
+      if (selectedCoverLetterId) {
+        const pickedLetter = coverLetters.find((l) => l.id === selectedCoverLetterId);
+        if (pickedLetter && pickedLetter.applicationId !== selectedApp.id) {
+          await saveCoverLetter({
+            id: pickedLetter.id,
+            title: pickedLetter.title,
+            company: pickedLetter.company,
+            role: pickedLetter.role,
+            jobDescription: pickedLetter.jobDescription,
+            content: pickedLetter.content,
+            keyHighlights: pickedLetter.keyHighlights,
+            targetJobId: pickedLetter.targetJobId,
+            applicationId: selectedApp.id,
+          });
+        }
+      }
+
+      // Link selected CV version / cover letter in application_packages when selected or updating.
+      const existingPkg = findMatchingPackage(selectedApp);
+      const pickedVersion = cvVersions.find((v) => v.id === selectedCvVersionId) ?? null;
+      if (existingPkg) {
+        const updated = await updateApplicationPackage(existingPkg.id, {
+          tailoredCvVersionId: selectedCvVersionId || null,
+          coverLetterId: selectedCoverLetterId || null,
+          matchScore: pickedVersion?.atsAnalysis?.overallScore ?? existingPkg.matchScore,
+        });
+        setPackages((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      } else if (selectedCvVersionId || selectedCoverLetterId) {
+        const created = await saveApplicationPackage({
+          jobTitle: selectedApp.role,
+          company: selectedApp.company,
+          jobDescription: `Application package for ${selectedApp.role} at ${selectedApp.company}.`,
+          analysis: {},
+          matchAnalysis: {},
+          matchScore: pickedVersion?.atsAnalysis?.overallScore ?? 0,
+          language: null,
+          sourceCvId: pickedVersion?.cvId ?? null,
+          tailoredCvVersionId: selectedCvVersionId || null,
+          coverLetterId: selectedCoverLetterId || null,
+        });
+        setPackages((prev) => [created, ...prev]);
+      }
+
+      showToast({
+        variant: 'success',
+        title: t('Application updated'),
+        description: t('Saved notes and document links for {company}.').replace('{company}', selectedApp.company),
+      });
+      setSelectedApp(null);
+    } catch (error) {
+      showToast({
+        variant: 'error',
+        title: t('Failed to save application links'),
+        description: error instanceof Error ? error.message : t('Please try again.'),
+      });
+    } finally {
+      setSavingDetails(false);
+    }
   };
 
   return (
@@ -111,10 +212,10 @@ export const ApplicationsView: React.FC = () => {
             {t('OPPORTUNITY PIPELINE')}
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            Job Application Tracker ({applications.length})
+            {t('Job Application Tracker')} ({applications.length})
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Discipline-driven pipeline management with linked CV versions, tailored cover letters, and private notes.
+            {t('Discipline-driven pipeline management with linked CV versions, tailored cover letters, and private notes.')}
           </p>
         </div>
 
@@ -225,6 +326,14 @@ export const ApplicationsView: React.FC = () => {
             );
           })}
         </Stagger>
+      ) : applications.length === 0 ? (
+        <EmptyState
+          icon={Briefcase}
+          title={t('No tracked job applications yet')}
+          description={t('Track live opportunities or manual applications to keep linked CV versions, cover letters, follow-up dates, and interview stages organized.')}
+          actionLabel={t('Track New Application')}
+          onAction={() => setShowAddModal(true)}
+        />
       ) : (
         /* LIST VIEW */
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs">
@@ -308,7 +417,7 @@ export const ApplicationsView: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] block">{t('Applied Date')}</span>
-                  <span className="font-mono text-[var(--text-primary)]">{selectedApp.appliedDate || 'Oct 15, 2026'}</span>
+                  <span className="font-mono text-[var(--text-primary)]">{selectedApp.appliedDate || t('Not set')}</span>
                 </div>
               </div>
 
@@ -351,24 +460,66 @@ export const ApplicationsView: React.FC = () => {
               </div>
 
               {/* Linked Documents Showcase */}
-              <div className="p-3 rounded-xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)] space-y-2">
+              <div className="p-3 rounded-xl bg-[var(--surface-secondary)]/40 border border-[var(--border-subtle)] space-y-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
                   {t('Linked Application Documents')}
                 </span>
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-xs p-1.5 bg-[var(--surface-main)] rounded border border-[var(--border-subtle)]">
-                    <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
-                      <FileText className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
-                      <span>{cvVersions[0]?.name || 'Frontend Engineer CV'}</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-[var(--color-success-strong)]">84% ATS Match</span>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[var(--text-secondary)]">
+                      <span className="inline-flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
+                        {t('Linked CV Version')}
+                      </span>
+                      {(() => {
+                        const cvVer = cvVersions.find((v) => v.id === selectedCvVersionId);
+                        if (!cvVer) return <span className="text-[10px] text-[var(--text-muted)]">{t('None linked')}</span>;
+                        return cvVer.atsAnalysis ? (
+                          <span className="text-[10px] font-mono text-[var(--color-success-strong)]">
+                            {t('ATS')}: {cvVer.atsAnalysis.overallScore}%
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-[var(--text-muted)]">{t('Not audited yet')}</span>
+                        );
+                      })()}
+                    </label>
+                    <select
+                      value={selectedCvVersionId}
+                      onChange={(e) => setSelectedCvVersionId(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
+                    >
+                      <option value="">{cvVersions.length === 0 ? t('No saved CV snapshots yet') : t('None linked')}</option>
+                      {cvVersions.map((version) => (
+                        <option key={version.id} value={version.id}>
+                          {version.name}
+                          {version.atsAnalysis ? ` (ATS ${version.atsAnalysis.overallScore}%)` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="flex items-center justify-between text-xs p-1.5 bg-[var(--surface-main)] rounded border border-[var(--border-subtle)]">
-                    <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
-                      <FolderClosed className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />
-                      <span>{selectedApp.company} - Tailored Cover Letter.pdf</span>
-                    </span>
-                    <span className="text-[10px] font-mono text-[var(--text-muted)]">{t('Verified')}</span>
+
+                  <div className="space-y-1">
+                    <label className="flex items-center justify-between text-[11px] font-semibold text-[var(--text-secondary)]">
+                      <span className="inline-flex items-center gap-1.5">
+                        <FolderClosed className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />
+                        {t('Linked Cover Letter')}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)]">
+                        {selectedCoverLetterId ? t('Linked') : t('None linked')}
+                      </span>
+                    </label>
+                    <select
+                      value={selectedCoverLetterId}
+                      onChange={(e) => setSelectedCoverLetterId(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)]"
+                    >
+                      <option value="">{coverLetters.length === 0 ? t('No saved cover letters yet') : t('None linked')}</option>
+                      {coverLetters.map((letter) => (
+                        <option key={letter.id} value={letter.id}>
+                          {letter.title} ({letter.company})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -382,10 +533,11 @@ export const ApplicationsView: React.FC = () => {
                 {t('Close')}
               </button>
               <button
-                onClick={handleSaveAppDetails}
-                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold"
+                onClick={() => void handleSaveAppDetails()}
+                disabled={savingDetails}
+                className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold disabled:opacity-60"
               >
-                {t('Save Notes & Reminder')}
+                {savingDetails ? t('Saving…') : t('Save Notes & Reminder')}
               </button>
             </div>
           </div>

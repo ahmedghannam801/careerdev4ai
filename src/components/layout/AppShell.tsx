@@ -121,54 +121,66 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Navigation is grouped into five destinations rather than two long
-  // lists. Every existing route is still reachable; the grouping only says
-  // what kind of thing it is.
+  // The navigation is grouped into the five pillars the product is built
+  // around:
+  //
+  //   My Career      — where you are and what is still open
+  //   Learn & Practise — how you close the gaps
+  //   Get Hired      — the CV, the openings, the applications
+  //   Portfolio      — the proof of what you can do
+  //   Account        — who you are and how the platform behaves
+  //
+  // Every route is still reachable; the grouping only says what kind of
+  // thing it is. A route appears in exactly one pillar: a destination listed
+  // twice makes the navigation longer without making it clearer.
   const navGroups = [
     {
-      id: 'home',
-      label: t('Home'),
-      items: [{ id: 'dashboard', label: t('navHome'), icon: Home }],
-    },
-    {
-      id: 'career',
-      label: t('Career'),
+      id: 'my-career',
+      label: t('My Career'),
       items: [
-        { id: 'my-career', label: t('navMyCareer'), icon: Compass },
-        { id: 'roadmap', label: t('navRoadmap'), icon: Layers },
+        { id: 'my-career', label: t('Overview'), icon: Compass },
         { id: 'skills', label: t('navSkills'), icon: Award },
+        { id: 'roadmap', label: t('navRoadmap'), icon: Layers },
         { id: 'progress', label: t('navProgress'), icon: TrendingUp },
       ],
     },
     {
       id: 'learn',
-      label: t('Learn'),
+      label: t('Learn & Practise'),
       items: [
-        { id: 'learning', label: t('navLearn'), icon: BookOpen },
+        { id: 'learning', label: t('Learning Hub'), icon: BookOpen },
         { id: 'assessment', label: t('Assessments'), icon: ShieldCheck },
         { id: 'projects', label: t('navProjects'), icon: FolderGit2 },
         { id: 'volunteer', label: t('navOpportunities'), icon: HeartHandshake },
       ],
     },
     {
-      id: 'tools',
-      label: t('Career Tools'),
+      id: 'get-hired',
+      label: t('Get Hired'),
       items: [
         { id: 'cv-studio', label: t('navCV'), icon: FileText },
         { id: 'jobs', label: t('navJobs'), icon: Briefcase },
         { id: 'applications', label: t('navApplications'), icon: Calendar },
         { id: 'interviews', label: t('navInterviews'), icon: Target },
-        { id: 'documents', label: t('My Documents'), icon: FolderClosed },
       ],
     },
     {
-      id: 'profile',
-      label: t('Profile'),
+      id: 'portfolio',
+      label: t('Portfolio'),
+      items: [
+        { id: 'documents', label: t('My Documents'), icon: FolderClosed },
+        { id: 'evidence', label: t('Evidence'), icon: Activity },
+        { id: 'profile-certifications', label: t('Certifications'), icon: Sparkles },
+      ],
+    },
+    {
+      id: 'account',
+      label: t('Account'),
       items: [
         { id: 'profile', label: t('My Profile'), icon: User },
-        { id: 'activity', label: t('Recent Activity'), icon: Activity },
-        { id: 'referrals', label: t('Referrals'), icon: Users },
         { id: 'settings', label: t('navSettings'), icon: Settings },
+        { id: 'referrals', label: t('Referrals'), icon: Users },
+        { id: 'activity', label: t('Recent Activity'), icon: Activity },
       ],
     },
   ];
@@ -248,7 +260,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 {t('CareerDev4AI')}
               </div>
               <div className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[140px]">
-                {targetRole.title}
+                {targetRole?.title ?? ''}
               </div>
             </div>
           </button>

@@ -428,4 +428,36 @@ export const cvAr: Record<string, string> = {
   'Listing the target-role skills the CV does not show.': 'حصر مهارات الوظيفة المستهدفة التي لا تظهر في السيرة.',
   'Turning the findings into a prioritised action plan.': 'تحويل النتائج إلى خطة عمل مرتبة.',
   'Combining the measured dimensions into one score.': 'دمج الأبعاد المقاسة في درجة واحدة.',
+
+  // ---- The toast that confirms a reviewed import --------------------------
+  'The CV was applied with some problems.': 'طُبّقت السيرة الذاتية مع بعض المشاكل.',
+  '{imported} imported, {skipped} already saved, {failed} failed.':
+    'تم استيراد {imported}، و{skipped} محفوظ مسبقًا، و{failed} فشل.',
+  'Everything in this CV was already saved.':
+    'كل ما في هذه السيرة الذاتية كان محفوظًا مسبقًا.',
+  '{skipped} records matched your profile, so nothing was duplicated.':
+    'تطابقت {skipped} سجلات مع ملفك، فلم يتم تكرار أي شيء.',
+  'CV applied to your profile.': 'طُبّقت السيرة الذاتية على ملفك.',
+  '{imported} records added, {skipped} already saved.':
+    'تمت إضافة {imported} سجلات، و{skipped} محفوظ مسبقًا.',
+  'Apply to CV Studio & Sync with My Profile': 'تطبيق على استوديو السيرة والمزامنة مع ملفي',
+  'Apply to CV Studio Only': 'تطبيق على استوديو السيرة فقط',
+  'Applying updates your CV Studio document and merges kept sections into your profile records without duplicating existing entries.':
+    'يُحدّث التطبيق مستندك في استوديو السيرة ويدمج الأقسام المختارة في ملفك دون تكرار السجلات الحالية.',
+  'Applying saves this document in CV Studio only. Your saved profile records will not be modified.':
+    'يحفظ التطبيق هذا المستند في استوديو السيرة فقط ولن يغيّر سجلات ملفك المحفوظة.',
+  'Applied to CV Studio Only': 'تم التطبيق على استوديو السيرة فقط',
+  'The reviewed CV is now loaded in CV Studio. Your saved profile records were left unchanged.':
+    'تم تحميل السيرة المُراجعة في استوديو السيرة، وبقيت سجلات ملفك المحفوظة دون تغيير.',
+  'All Documents': 'كل المستندات',
+  'CV Versions': 'نسخ السيرة الذاتية',
+  'Cover Letter Studio': 'استوديو خطابات التقديم',
+  'No documents in this view yet': 'لا توجد مستندات في هذا العرض بعد',
+  'Create a CV snapshot in CV Studio, generate a cover letter, or add a certificate or portfolio project to collect your career assets here.':
+    'أنشئ لقطة سيرة ذاتية في الاستوديو، أو ولّد خطاب تقديم، أو أضف شهادة أو مشروعًا لجمع مستنداتك المهنية هنا.',
+  'Maintain distinct, tailored versions for specific roles without overwriting your master profile.':
+    'احتفظ بنسخ مخصصة ومستقلة للأدوار الوظيفية المختلفة دون استبدال ملفك الأساسي.',
+  'No CV versions saved yet': 'لا توجد نسخ محفوظة للسيرة الذاتية بعد',
+  'Save snapshots in CV Studio to maintain role-specific versions and track ATS alignment over time.':
+    'احفظ لقطات في استوديو السيرة للاحتفاظ بنسخ مخصصة لكل وظيفة ومتابعة توافق ATS بمرور الوقت.',
 };

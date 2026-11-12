@@ -150,4 +150,19 @@ export const profileAr: Record<string, string> = {
   'Could not load this profile': 'تعذّر تحميل هذا الملف',
   'The server could not be reached. Please try again.':
     'تعذّر الوصول إلى الخادم. يُرجى المحاولة مرة أخرى.',
+  'Select where you are right now before continuing.': 'اختر مرحلتك الحالية قبل المتابعة.',
+  'Select what you are working towards before continuing.': 'اختر هدفك المهني قبل المتابعة.',
+  'Job title and company name are required.': 'المسمى الوظيفي واسم الشركة مطلوبان.',
+  'End date cannot be earlier than start date.': 'لا يمكن أن يسبق تاريخ الانتهاء تاريخ البدء.',
+  'Institution and degree are required.': 'اسم المؤسسة التعليمية والدرجة العلمية مطلوبان.',
+  'Graduation date cannot be earlier than start date.': 'لا يمكن أن يسبق تاريخ التخرج تاريخ البدء.',
+  'No work experience recorded yet': 'لم تُسجَّل خبرات عمل بعد',
+  'Add internships, part-time roles, freelance work, or full-time positions to substantiate your trajectory.':
+    'أضف التدريب العملي أو العمل الجزئي أو الحر أو الدوام الكامل لتوثيق مسارك المهني.',
+  'No education entries yet': 'لا توجد سجلات تعليمية بعد',
+  'Add your university, degree program, or expected graduation year so your CV and career stage stay accurate.':
+    'أضف جامعتك وتخصصك أو سنة التخرج المتوقعة لتبقى سيرتك ومرحلتك المهنية دقيقة.',
+  'Add Education': 'إضافة تعليم',
+  'Graduation Date (or Expected)': 'تاريخ التخرج (أو المتوقع)',
+  'I am currently studying here (not yet graduated)': 'ما زلت أدرس هنا حاليًا (لم أتخرج بعد)',
 };

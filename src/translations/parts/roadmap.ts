@@ -138,4 +138,18 @@ export const roadmapAr: Record<string, string> = {
   'Proof of work': 'إثبات العمل',
   'These projects turn the skills above into evidence a hiring manager can see.':
     'هذه المشاريع تحوّل المهارات أعلاه إلى أدلة يراها مسؤول التوظيف.',
+  'Proof-of-work project recommended for': 'مشروع إثبات عمل مُوصى به لدور',
+  'Build and document': 'أنشئ ووثّق',
+  'as verifiable portfolio evidence.': 'كدليل عملي موثّق في معرض الأعمال.',
+  'Define project scope and architecture': 'حدّد نطاق المشروع وبنيته',
+  'Implement core functionality and tests': 'نفّذ الوظائف الأساسية والاختبارات',
+  'Publish repository or live demo and attach evidence': 'انشر المستودع أو العرض الحي وأرفق الدليل',
+  'Working repository or live demo link': 'رابط مستودع فعّال أو عرض حي',
+  'README documenting trade-offs and results': 'ملف README يوثّق القرارات والنتائج',
+  'Project started': 'بدأ المشروع',
+  'Added "{title}" to My Projects (In Progress).': 'أُضيف "{title}" إلى مشاريعي (قيد التنفيذ).',
+  'Could not start project': 'تعذّر بدء المشروع',
+  'In Portfolio': 'في معرض الأعمال',
+  'Starting…': 'جارٍ البدء…',
+  'Start This Project': 'ابدأ هذا المشروع',
 };

@@ -46,12 +46,40 @@ import {
 } from '../types/career';
 import { TARGET_ROLES, resolveRole } from '../data/rolesData';
 import { validateTargetRoleSelection } from '../../shared/targetRoleSelection';
+import {
+  buildSkillRecord,
+  effectiveSkillLevel,
+  type SkillRecord as SkillEvidenceRecord,
+} from '../../shared/skillEvidence';
+import {
+  computeSkillGaps,
+  summarizeSkillGaps,
+  toRoleSkillRequirements,
+  describeGap,
+} from '../../shared/skillGap';
+import {
+  deriveCareerIdentity,
+  type CareerIdentity,
+  type EducationStatus,
+} from '../../shared/careerIdentity';
+import { computeProfileCompleteness } from '../../shared/profileCompleteness';
+import {
+  isActiveProjectStatus,
+  isShippedStatus,
+  normalizeProjectStatus,
+} from '../../shared/projectLifecycle';
+import {
+  impliedExperienceLevel,
+  normalizeExperienceLevel,
+  type ExperienceLevel,
+} from '../../shared/experienceLevel';
 import { translations } from '../translations';
 import { translate } from '../translations/sourceStrings';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
 import { trackEvent } from '../lib/analytics';
 import { apiUrl } from '../lib/native';
 import { mergeCanonicalCvDocument } from '../../shared/cvProjection';
+import { isSkillSectionHeader, normalizeSkillKey } from '../../shared/cvDedupe';
 import {
   DEFAULT_RESUME_LANGUAGE,
   normalizeResumeLanguage,
@@ -164,10 +192,14 @@ import {
   deleteEducation as deleteEducationApi,
   fetchUserSkills,
   postUserSkill,
+  postSkillAssessment,
+  fetchSkillGaps,
+  recalculateSkillDependents as requestSkillRecalculation,
   deleteUserSkill as deleteUserSkillApi,
   type ExperienceDTO,
   type EducationDTO,
   type UserSkillDTO,
+  type SkillRecalculationDTO,
 } from '../lib/careerHistoryApi';
 import {
   fetchNotifications,
@@ -241,9 +273,29 @@ export interface UserProfile {
   professionalSummary?: string;
   username?: string;
   isPublic?: boolean;
-  careerState: CareerState;
-  careerGoal: CareerGoal;
+  /**
+   * The career state the candidate is in right now.
+   *
+   * It is NULLABLE on purpose: "not set" is a real state, and the platform
+   * must report it rather than defaulting to "working professional" for a
+   * candidate who skipped onboarding.
+   */
+  careerState: CareerState | null;
+  /**
+   * The goal the candidate is aiming at. Nullable for the same reason: the
+   * goal is chosen, never assumed.
+   */
+  careerGoal: CareerGoal | null;
   customGoalText?: string;
+  /**
+   * Whether the candidate is currently studying or has graduated.
+   *
+   * The platform never guesses this: a stated graduation year in the future
+   * always means "currently studying", whatever this column says.
+   */
+  educationStatus?: EducationStatus | null;
+  /** The year the candidate expects to graduate, when they stated one. */
+  expectedGraduationYear?: number | null;
   onboardingCompleted: boolean;
   onboardingStatus: 'not_started' | 'started' | 'completed' | 'skipped';
   onboardingStep: number;
@@ -277,8 +329,17 @@ const emptyProfile: UserProfile = {
   currentTitle: '',
   location: '',
   bio: '',
-  careerState: 'working_professional',
-  careerGoal: 'get_promoted',
+  // The career state and the goal are NOT given a default.
+  //
+  // They used to default to "working_professional" and "get_promoted", which
+  // meant a candidate who skipped onboarding was presented as a working
+  // professional chasing a promotion. The identity is derived from what the
+  // candidate actually stated, and an absent value is reported as absent so
+  // the interface can ask rather than invent.
+  careerState: null,
+  careerGoal: null,
+  educationStatus: null,
+  expectedGraduationYear: null,
   onboardingCompleted: false,
   onboardingStatus: 'not_started',
   onboardingStep: 0,
@@ -365,6 +426,29 @@ interface CareerContextType {
   reorderCvCollection: (collection: OrderedCollection, ids: string[]) => Promise<void>;
   setCareerState: (state: CareerState) => Promise<void>;
   setCareerGoal: (goal: CareerGoal, customText?: string) => Promise<void>;
+  /**
+   * The candidate's career identity, derived once and read everywhere.
+   *
+   * It carries the distinct axes — who they are now, what they do now, the
+   * role they are aiming at, their goal, whether they are still studying and
+   * the level they are aiming at — so no screen has to infer any of them.
+   */
+  careerIdentity: CareerIdentity;
+  /**
+   * Saves the career identity in ONE write.
+   *
+   * My Profile and Settings both call this, so a change made in either place
+   * is immediately true in the other and in every screen that reads the
+   * identity. The patch uses the identity's own vocabulary.
+   */
+  saveCareerIdentity: (patch: {
+    currentStatus?: CareerState | null;
+    currentRole?: string | null;
+    careerGoal?: CareerGoal | null;
+    experienceLevel?: ExperienceLevel | null;
+    educationStatus?: EducationStatus | null;
+    expectedGraduationYear?: number | null;
+  }) => Promise<boolean>;
   completeOnboarding: () => Promise<void>;
   suggestAiSummary: (signal?: AbortSignal) => Promise<string>;
   validateUsername: (username: string) => Promise<{ available: boolean; message: string }>;
@@ -379,9 +463,48 @@ interface CareerContextType {
   setCopilotOpen: (open: boolean) => void;
 
   // Target Roles & Comparison
-  targetRole: TargetRole;
+  /**
+   * The candidate's target role, or `null` when they have not chosen one.
+   *
+   * It is nullable ON PURPOSE. It used to be initialised to the first role in
+   * the catalogue — "Frontend Engineer" — which meant a candidate who skipped
+   * onboarding was permanently, invisibly a Frontend Engineer: the database
+   * had no role for them, so the hydration never replaced the default, and
+   * every screen spoke about a role they never chose.
+   *
+   * `null` is the honest state, and it is a state the interface can show.
+   */
+  targetRole: TargetRole | null;
+  /** The target role's title, or an empty string when no role is chosen. */
+  targetRoleTitle: string;
+  /** True once the candidate has chosen a target role. */
+  hasTargetRole: boolean;
+  /**
+   * The level the candidate is aiming at (student, intern, junior, mid,
+   * senior, lead). It is a different axis from the career state.
+   */
+  experienceLevel: ExperienceLevel | null;
+  /** Saves the experience level on its own. */
+  setExperienceLevel: (level: ExperienceLevel | null) => Promise<void>;
   savedRoles: TargetRole[];
   setPrimaryTargetRole: (roleId: string) => Promise<boolean>;
+  /**
+   * Saves the whole career target in ONE write.
+   *
+   * This is the single writer that the Profile page and the Settings page
+   * both use, which is what keeps them in step: there is only one path from a
+   * change in the interface to the database, so the two screens cannot drift.
+   */
+  saveCareerTarget: (input: {
+    /** The catalogue id of the new role. Omit to leave the role alone. */
+    roleId?: string | null;
+    /** The new experience level. Omit to leave the level alone. */
+    experienceLevel?: ExperienceLevel | null;
+    /** The new career goal. Omit to leave the goal alone. */
+    careerGoal?: CareerGoal | null;
+    /** The free-text goal. Omit to leave it alone. */
+    customGoalText?: string | null;
+  }) => Promise<boolean>;
   saveRole: (role: TargetRole) => void;
   removeSavedRole: (roleId: string) => void;
 
@@ -422,6 +545,43 @@ interface CareerContextType {
   updateSkillLevel: (skillId: string, currentLevel: number) => void;
   addCustomSkill: (skill: Omit<UserSkill, 'id' | 'gap' | 'lastUpdated'>) => void;
   removeSkill: (skillId: string) => void;
+
+  /**
+   * The structured evidence for each skill, keyed by the lowercased name.
+   *
+   * A skill is a claim plus what the platform can prove. This map keeps the
+   * three apart: the self-report, the level a diagnostic check measured, and
+   * the evidence records that back it.
+   */
+  skillEvidence: Record<string, SkillEvidenceRecord>;
+  /**
+   * What the last recalculation found.
+   *
+   * The ranked priorities are the SAME list the roadmap's first recommended
+   * step comes from, so "My Career" and the roadmap never disagree. The
+   * readiness figure is the same number the server computed.
+   */
+  skillRecalculation: SkillRecalculationDTO | null;
+  /**
+   * Stores the result of a diagnostic knowledge check.
+   *
+   * The measurement is kept beside the candidate's self-report, not on top of
+   * it, and the recalculation that follows removes a satisfied skill from the
+   * blockers and from the roadmap's opening steps automatically.
+   */
+  recordSkillAssessment: (input: {
+    name: string;
+    level: number;
+    score: number;
+    category?: string;
+  }) => Promise<boolean>;
+  /**
+   * The explicit re-sync control.
+   *
+   * Every skill write already recalculates; this is the secondary fallback
+   * for a user who wants to be certain the roadmap matches their skills.
+   */
+  resyncSkillDependents: () => Promise<SkillRecalculationDTO | null>;
 
   // Analysis, Plan, Health, Blockers
   analysis: CareerAnalysis;
@@ -857,6 +1017,7 @@ function toRoadmapPhases(dto: RoadmapDTO | null): RoadmapPhase[] {
         resourceTitle: task.resourceTitle ?? undefined,
         evidenceId: task.evidenceId ?? undefined,
         estimatedHours: task.estimatedHours ?? 0,
+    workKind: (task.workKind as RoadmapTask['workKind']) ?? undefined,
         difficulty: task.difficulty ?? null,
         prerequisites: task.prerequisites ?? [],
         skillNames: task.skillNames ?? [],
@@ -881,7 +1042,7 @@ function toCareerProject(dto: ProjectDTO): CareerProject {
     skills: dto.skills,
     tasks: dto.tasks,
     deliverables: dto.deliverables,
-    status: (dto.status as CareerProject['status']) ?? 'idea',
+    status: normalizeProjectStatus(dto.status),
     repositoryUrl: dto.repositoryUrl ?? undefined,
     demoUrl: dto.demoUrl ?? undefined,
     documentation: dto.documentation ?? undefined,
@@ -1443,6 +1604,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           learningItemList,
           learningRecommendationResult,
           profileLinkList,
+          skillGapList,
         ] = await Promise.all([
           fetchRoadmap(),
           fetchProfile(),
@@ -1477,6 +1639,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           // A missing link list must not block the hydration: the CV shows the
           // links it has, and the studio can still add more.
           fetchProfileLinks().catch(() => []),
+          // The ranked skill gaps. A candidate with no target role has none,
+          // which is a normal state rather than a failure.
+          fetchSkillGaps().catch(() => null),
         ]);
         if (cancelled) return;
         // The roadmap tables and the profile tables are the source of truth for
@@ -1505,14 +1670,23 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             // The address belongs to the auth identity, not to the profile
             // row, so it comes from the session rather than from the DTO.
             email: currentUser?.email ?? prev.email,
-            careerGoal: (profileRecord.careerGoal as UserProfile['careerGoal']) ?? prev.careerGoal,
+            // The goal is what the candidate chose, or absent. It is never
+            // defaulted, because a default goal is how a student ended up
+            // chasing a promotion.
+            careerGoal: (profileRecord.careerGoal as UserProfile['careerGoal']) ?? null,
             customGoalText: profileRecord.customGoalText ?? prev.customGoalText,
             industry: profileRecord.targetIndustry ?? prev.industry,
             username: profileRecord.username ?? prev.username,
             // The column is `user_type`; the domain field is `careerState`.
             // Writing it to `userType` left the persona at its default, so
             // every user saw "Working Professional" whatever they chose.
-            careerState: (profileRecord.userType as UserProfile['careerState']) ?? prev.careerState,
+            careerState: (profileRecord.userType as UserProfile['careerState']) ?? null,
+            // The education axis: whether the candidate is still studying
+            // and when they expect to graduate. The level they are aiming at
+            // is read separately, into its own state.
+            educationStatus:
+              (profileRecord.educationStatus as UserProfile['educationStatus']) ?? null,
+            expectedGraduationYear: profileRecord.expectedGraduationYear ?? null,
             yearsOfExperience: profileRecord.yearsOfExperience ?? prev.yearsOfExperience,
             onboardingCompleted: profileRecord.onboardingCompleted,
             onboardingStatus: profileRecord.onboardingStatus ?? (profileRecord.onboardingCompleted ? 'completed' : 'not_started'),
@@ -1588,12 +1762,34 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // rated stays at level 1 (B.4 finding C-5).
         setUserSkillRows(userSkillList);
         const levels: Record<string, number> = {};
+        // The evidence for each skill, kept beside the level. The self-report
+        // and the measurement are separate values, so a skill that was only
+        // MEASURED (never self-rated) still shows up — with its assessment
+        // badge and no self-reported claim.
+        const evidence: Record<string, SkillEvidenceRecord> = {};
         for (const row of userSkillList) {
-          const name = (row.skill?.name ?? '').toLowerCase();
-          if (!name || row.proficiency === null) continue;
-          levels[name] = row.proficiency;
+          const rawName = row.skill?.name ?? '';
+          const name = rawName.toLowerCase();
+          if (!name) continue;
+          const record = buildSkillRecord({
+            name: rawName,
+            category: row.skill?.category,
+            selfReportedLevel: row.proficiency,
+            assessedLevel: row.assessed_level ?? null,
+            assessmentScore: row.assessment_score ?? null,
+            assessmentAt: row.assessment_at ?? null,
+            evidenceSources: row.evidence_sources ?? [],
+          });
+          evidence[name] = record;
+          if (row.proficiency !== null) levels[name] = row.proficiency;
         }
+        setSkillEvidence(evidence);
         setSkillLevels(levels);
+
+        // The ranked gaps come from the server, so the blockers, the readiness
+        // figure and the roadmap's first recommended step all read the same
+        // numbers.
+        if (skillGapList) setSkillRecalculation(skillGapList);
 
         // The professional links are their own records. The CV shows them, so
         // they have to be in the projection.
@@ -1637,10 +1833,23 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         // The target role is persisted as its canonical title; the catalogue entry
         // supplies the skill requirements and the roadmap the UI derives.
+        //
+        // A candidate with no persisted role has NO role — the state is null,
+        // not the first entry of the catalogue. That is what stops a skipped
+        // onboarding from leaving someone permanently "Frontend Engineer".
         const persistedRole = profileRecord?.targetRole
           ? resolveRole(profileRecord.targetRole)
           : undefined;
-        if (persistedRole) setTargetRole(persistedRole);
+        setTargetRole(persistedRole ?? null);
+
+        // The experience level is its own column. When the profile has none,
+        // the career state gives a sensible starting value.
+        const persistedLevel = normalizeExperienceLevel(profileRecord?.experienceLevel);
+        setExperienceLevelState(
+          persistedLevel.ok
+            ? persistedLevel.value ?? impliedExperienceLevel(profileRecord?.userType ?? null)
+            : impliedExperienceLevel(profileRecord?.userType ?? null)
+        );
 
         // Hydration is complete: only now may the localStorage cache be
         // written, and only then does the app trust the server's view.
@@ -1704,10 +1913,73 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Target Roles & Comparison
   //
   // B.4 finding M-5: the target role was initialised from localStorage. The
-  // cache must never seed the state, so it now starts from the first
-  // catalogue role and is replaced by the server's `targetRole` column once
-  // the session hydrates.
-  const [targetRole, setTargetRole] = useState<TargetRole>(TARGET_ROLES[0]);
+  // cache must never seed the state, so it now starts EMPTY and is replaced by
+  // the server's `targetRole` column once the session hydrates.
+  //
+  // It is deliberately NOT initialised to the first catalogue role either.
+  // That role is "Frontend Engineer", and a candidate who skipped onboarding
+  // has no role at all — so the honest starting state is `null`, and the
+  // interface asks them to choose rather than inventing an answer for them.
+  const [targetRole, setTargetRole] = useState<TargetRole | null>(null);
+
+  // The level the candidate is aiming at. Hydrated from the profile, and
+  // seeded from the career state when the profile has no level of its own.
+  const [experienceLevel, setExperienceLevelState] = useState<ExperienceLevel | null>(null);
+
+  // ---- The Career Identity ----
+  //
+  // ONE definition of who the candidate is, used by every screen: My
+  // Profile, Settings, My Career, the Dashboard, the Roadmap and CV Studio.
+  //
+  // It is DERIVED, never stored twice. The facts live in the profile row and
+  // the education records; this reads them and produces one answer. That is
+  // what stops the profile from saying "Student" while the roadmap plans
+  // for a working professional, and what stops a target role from appearing
+  // on a CV that belongs to someone who never chose one.
+  //
+  // The derivation is pure and lives in `shared/careerIdentity.ts`, so the
+  // server, the browser and the tests all agree.
+  const careerIdentity: CareerIdentity = useMemo(
+    () =>
+      deriveCareerIdentity({
+        currentStatus: profile.careerState,
+        currentRole: profile.currentTitle,
+        targetRoleTitle: targetRole?.title ?? null,
+        targetRoleId: targetRole?.id ?? null,
+        careerGoal: profile.careerGoal,
+        experienceLevel: experienceLevel ?? null,
+        educationStatusOverride: profile.educationStatus ?? null,
+        expectedGraduationYear: profile.expectedGraduationYear ?? null,
+        education: profile.education.map((entry) => ({
+          institution: entry.institution,
+          degree: entry.degree,
+          startDate: entry.startDate,
+          endDate: entry.endDate,
+          current: entry.current,
+        })),
+        // The current year is injected rather than read from the clock, so
+        // the rule "a graduation year in the future means still studying" is
+        // testable and never depends on when the code runs.
+        currentYear: new Date().getFullYear(),
+      }),
+    [
+      profile.careerState,
+      profile.currentTitle,
+      profile.careerGoal,
+      experienceLevel,
+      profile.educationStatus,
+      profile.expectedGraduationYear,
+      profile.education,
+      targetRole,
+    ],
+  );
+
+
+  /** The target role's title, or an empty string when none is chosen. */
+  const targetRoleTitle = targetRole?.title ?? '';
+
+  /** True once the candidate has chosen a target role. */
+  const hasTargetRole = targetRole !== null;
 
   // Saved roles — PostgreSQL is the source of truth (B.3.7).
   const [savedRoles, setSavedRoles] = useState<TargetRole[]>([]);
@@ -1725,27 +1997,45 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // The raw /api/user-skills rows, kept so a skill's catalogue id (skill_id)
   // can be resolved when it is removed.
   const [userSkillRows, setUserSkillRows] = useState<UserSkillDTO[]>([]);
+  // The structured evidence for each skill, keyed by the skill name.
+  //
+  // A skill is a claim plus whatever the platform can prove: the candidate's
+  // self-report, the level a diagnostic knowledge check measured, and the
+  // records (projects, courses, certificates) that back it. Keeping the three
+  // apart is what lets the interface say WHICH of them it is showing instead
+  // of presenting one unexplained number.
+  const [skillEvidence, setSkillEvidence] = useState<Record<string, SkillEvidenceRecord>>({});
+  // What the last recalculation found. The roadmap, the blockers and the
+  // readiness figure all follow from this, and it is what the "why is this
+  // out of date?" indicator reads.
+  const [skillRecalculation, setSkillRecalculation] = useState<SkillRecalculationDTO | null>(null);
 
   // The user's skill list, derived from two sources:
   //   * the CATALOGUE — the required and preferred skills of the target role
   //     plus any skill the user added themselves;
-  //   * the user's LEVELS — the proficiency values persisted in
-  //     public.user_skills, keyed by skill name.
+  //   * the user's EVIDENCE — the self-report, the measurement and the proof
+  //     held in public.user_skills, keyed by skill name.
   //
-  // A skill the user has never rated is shown at level 1 with a gap to the
-  // role's target. The levels are never invented (B.4 finding C-5 / H-5).
+  // The level the platform compares against the role is the EFFECTIVE level:
+  // the strongest of the self-report, the assessment and the evidence. A
+  // skill nobody rated and nothing proves is level 0 — the old default of 1
+  // hid the largest possible gap behind an optimistic number.
   const skills: UserSkill[] = useMemo(() => {
     const role = targetRole;
     const catalogue: Array<{ name: string; category: SkillCategory; targetLevel: number }> = [];
 
-    for (const req of role.requiredSkills ?? []) {
+    // No role means no role catalogue. The candidate's own skills still show,
+    // but the platform must not ask them to rate the requirements of a role
+    // they never chose — that is how "Frontend Engineer" used to leak into
+    // every account that skipped onboarding.
+    for (const req of role?.requiredSkills ?? []) {
       catalogue.push({
         name: req.name,
         category: (req.category as SkillCategory) ?? 'technical',
         targetLevel: req.minLevel,
       });
     }
-    for (const pref of role.preferredSkills ?? []) {
+    for (const pref of role?.preferredSkills ?? []) {
       if (catalogue.some((entry) => entry.name.toLowerCase() === pref.name.toLowerCase())) continue;
       catalogue.push({
         name: pref.name,
@@ -1755,17 +2045,31 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
 
     const merged: UserSkill[] = catalogue.map((entry) => {
-      const level = skillLevels[entry.name.toLowerCase()] ?? 1;
+      const key = entry.name.toLowerCase();
+      const record = skillEvidence[key];
+      const level = record ? effectiveSkillLevel(record) : 0;
+      const selfReported = record?.selfReportedLevel ?? null;
+      const assessed = record?.assessedLevel ?? null;
       return {
-        id: `skill-${entry.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        id: `skill-${key.replace(/[^a-z0-9]+/g, '-')}`,
         name: entry.name,
         category: entry.category,
         currentLevel: level,
         targetLevel: entry.targetLevel,
         gap: Math.max(0, entry.targetLevel - level),
-        source: skillLevels[entry.name.toLowerCase()] !== undefined ? 'self_reported' : 'ai_estimated',
+        source:
+          selfReported !== null
+            ? 'self_reported'
+            : assessed !== null
+              ? 'assessment'
+              : 'ai_estimated',
         evidenceIds: [],
         lastUpdated: new Date().toISOString().split('T')[0],
+        selfReportedLevel: selfReported,
+        assessedLevel: assessed,
+        assessmentScore: record?.assessmentScore ?? null,
+        assessmentAt: record?.assessmentAt ?? null,
+        evidenceSources: record?.evidenceSources ?? [],
       };
     });
 
@@ -1776,7 +2080,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
 
     return merged;
-  }, [targetRole, skillLevels, customSkills]);
+  }, [targetRole, skillEvidence, customSkills]);
 
   // The skills the candidate actually owns.
   //
@@ -2230,7 +2534,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       },
       body: JSON.stringify({
         name: profile.name,
-        targetRoleTitle: targetRole.title,
+        targetRoleTitle: targetRole?.title ?? '',
         careerState: profile.careerState,
         yearsExperience: profile.yearsOfExperience,
         skills: skills.map(s => s.name),
@@ -2422,100 +2726,83 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [notifications, notificationPreferences]);
 
   // Real Calculated Profile Completeness
+  // The profile completeness.
+  //
+  // It is computed from what the candidate has actually FILLED IN, and it is
+  // the shared engine's job so the number is the same everywhere. The old
+  // local version checked eight things that had nothing to do with the
+  // sections a CV needs, so a candidate with no projects and no
+  // certifications could still be told they were 90% complete.
   const profileCompleteness = useMemo<ProfileCompletenessBreakdown>(() => {
-    const missingItems: ProfileCompletenessBreakdown['missingItems'] = [];
-    let score = 0;
-
-    // Full name (10%)
-    if (profile.name?.trim().length > 3) {
-      score += 10;
-    } else {
-      missingItems.push({ id: 'name', label: 'Add full name', impactWeight: 10, targetView: 'profile' });
-    }
-
-    // Headline (10%)
-    if (profile.headline && profile.headline.trim().length > 5) {
-      score += 10;
-    } else {
-      missingItems.push({ id: 'headline', label: 'Add professional headline', impactWeight: 10, targetView: 'profile' });
-    }
-
-    // Location (5%)
-    if (profile.location && profile.location.trim().length > 2) {
-      score += 5;
-    } else {
-      missingItems.push({ id: 'location', label: 'Specify your location', impactWeight: 5, targetView: 'profile' });
-    }
-
-    // Professional Summary (15%)
-    if (profile.professionalSummary && profile.professionalSummary.trim().length > 30) {
-      score += 15;
-    } else {
-      missingItems.push({ id: 'summary', label: 'Add professional summary', impactWeight: 15, targetView: 'profile' });
-    }
-
-    // Education entries (15%)
-    if (profile.education && profile.education.length > 0) {
-      score += 15;
-    } else {
-      missingItems.push({ id: 'education', label: 'Add education credentials', impactWeight: 15, targetView: 'profile' });
-    }
-
-    // Experience entries (15%)
-    if (profile.experiences && profile.experiences.length > 0) {
-      score += 15;
-    } else {
-      missingItems.push({ id: 'experience', label: 'Add at least 1 work experience', impactWeight: 15, targetView: 'profile' });
-    }
-
-    // Skills (10%)
-    if (skills && skills.length >= 3) {
-      score += 10;
-    } else {
-      missingItems.push({ id: 'skills', label: 'Assess at least 3 skills in Skills Center', impactWeight: 10, targetView: 'skills' });
-    }
-
-    // Project / Evidence (10%)
-    if (evidenceItems && evidenceItems.length > 0) {
-      score += 10;
-    } else {
-      missingItems.push({ id: 'evidence', label: 'Attach proof-of-skill or project repository', impactWeight: 10, targetView: 'evidence' });
-    }
-
-    // Professional Links (5%)
-    if (profile.links?.linkedin || profile.links?.github) {
-      score += 5;
-    } else {
-      missingItems.push({ id: 'links', label: 'Connect LinkedIn or GitHub profile', impactWeight: 5, targetView: 'profile' });
-    }
-
-    // CV uploaded or tailored (5%)
-    if (cvVersions && cvVersions.length > 0) {
-      score += 5;
-    } else {
-      missingItems.push({ id: 'cv', label: 'Generate or upload your CV', impactWeight: 5, targetView: 'cv-studio' });
-    }
+    const result = computeProfileCompleteness({
+      fullName: profile.name,
+      headline: profile.headline,
+      location: profile.location,
+      professionalSummary: profile.professionalSummary,
+      avatarUrl: profile.avatarUrl,
+      targetRoleTitle: targetRole?.title ?? null,
+      educationCount: profile.education?.length ?? 0,
+      experienceCount: profile.experiences?.length ?? 0,
+      // The skills the candidate has really rated, not the role catalogue.
+      ratedSkillCount: Object.keys(skillEvidence).length,
+      evidencedSkillCount: Object.values(skillEvidence).filter(
+        (record) => record.evidenceSources.length > 0 || record.assessedLevel !== null
+      ).length,
+      activeProjectCount: projects.filter(
+        (project) => isActiveProjectStatus(project.status)
+      ).length,
+      shippedProjectCount: projects.filter((project) => isShippedStatus(project.status))
+        .length,
+      certificationCount: profile.certifications?.length ?? 0,
+      hasProfessionalLink: Boolean(profile.links?.linkedin || profile.links?.github),
+      cvVersionCount: cvVersions?.length ?? 0,
+    });
 
     return {
-      overallPercent: Math.min(100, score),
-      missingItems
+      overallPercent: result.overallPercent,
+      missingItems: result.missingItems.map((item) => ({
+        id: item.id,
+        label: item.label,
+        impactWeight: item.impactWeight,
+        targetView: item.targetView,
+      })),
     };
-  }, [profile, skills, evidenceItems, cvVersions]);
+  }, [profile, targetRole, skillEvidence, projects, cvVersions]);
 
   // Real Calculated Career Blockers
   const careerBlockers = useMemo<CareerBlocker[]>(() => {
     const blockers: CareerBlocker[] = [];
 
-    // Check critical gaps
-    const testingGap = skills.find(s => s.name.toLowerCase().includes('testing') && s.gap > 0);
-    if (testingGap) {
+    // A candidate with no target role has no role-specific blockers. Asking
+    // someone to close the gaps of a role they never chose is exactly the
+    // advice the old "Frontend Engineer" default produced.
+    const role = targetRole;
+
+    // The skill blockers come from the SAME ranked list the roadmap's first
+    // recommended step is drawn from, so "My Career" and the roadmap can never
+    // disagree about which skill to close next.
+    //
+    // The list is derived from the current levels rather than stored, so a
+    // skill that now meets the role requirement leaves the blockers the
+    // moment it is satisfied — with no "sync" step in between.
+    for (const priority of (skillRecalculation?.priorities ?? []).slice(0, 4)) {
       blockers.push({
-        id: 'blk-testing',
-        title: 'Missing Evidence for Automated Testing',
-        description: `Target role ${targetRole.title} requires level ${testingGap.targetLevel} in automated testing, but you are currently at level ${testingGap.currentLevel} without verified repository proof.`,
-        severity: 'high',
-        ctaText: 'View Testing Roadmap Task',
-        ctaView: 'roadmap'
+        id: `blk-skill-${priority.id}`,
+        title: `${priority.skillName} is below the ${role?.title ?? 'target role'} requirement`,
+        description: priority.why,
+        severity:
+          priority.priority === 'critical'
+            ? 'high'
+            : priority.priority === 'high'
+              ? 'medium'
+              : 'low',
+        ctaText:
+          priority.action === 'assessment'
+            ? 'Take the Diagnostic Check'
+            : priority.action === 'project'
+              ? 'Build the Project'
+              : 'Start Learning',
+        ctaView: priority.view === 'assessment' ? 'skills' : priority.view,
       });
     }
 
@@ -2524,22 +2811,22 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // would overstate readiness after a target-role change.
     const latestCv = cvVersions[0];
     const latestAts = latestCv?.atsAnalysis ?? null;
-    if (latestAts && !isAtsAnalysisForRole(latestCv?.targetRoleTitle, targetRole.title)) {
+    if (role && latestAts && !isAtsAnalysisForRole(latestCv?.targetRoleTitle, role.title)) {
       blockers.push({
         id: 'blk-cv-stale',
         title: 'CV ATS Analysis Needs a Refresh',
         description: `Your saved ATS score of ${latestAts.overallScore}% was generated for ${
           latestCv?.targetRoleTitle || 'an unrecorded target role'
-        }, not ${targetRole.title}. Run a new audit in CV Studio so the score matches your current target.`,
+        }, not ${role.title}. Run a new audit in CV Studio so the score matches your current target.`,
         severity: 'medium',
         ctaText: 'Refresh ATS Analysis',
         ctaView: 'cv-studio'
       });
-    } else if (latestAts && latestAts.overallScore < 85) {
+    } else if (role && latestAts && latestAts.overallScore < 85) {
       blockers.push({
         id: 'blk-cv',
         title: 'CV Optimization Needed for Target Role',
-        description: `Your active CV ATS match score for ${targetRole.title} is ${latestAts.overallScore}%. Missing key keywords like ${latestAts.missingKeywords.slice(0, 2).join(', ')}.`,
+        description: `Your active CV ATS match score for ${role.title} is ${latestAts.overallScore}%. Missing key keywords like ${latestAts.missingKeywords.slice(0, 2).join(', ')}.`,
         severity: 'medium',
         ctaText: 'Optimize in CV Studio',
         ctaView: 'cv-studio'
@@ -2572,7 +2859,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
 
     return blockers;
-  }, [skills, targetRole, cvVersions, bookmarkedJobIds, applications]);
+  }, [skillRecalculation, targetRole, cvVersions, bookmarkedJobIds, applications]);
   const [settings, setSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem('careerpilot_settings');
     // The defaults are spread UNDER the saved value so a setting added in a
@@ -2770,6 +3057,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Never cache a pre-hydration value: it would be the demo seed.
     if (!isHydrated) return;
     localStorage.setItem('careerpilot_profile', JSON.stringify(profile));
+    // The cached role mirrors the database. When the candidate has no role it
+    // caches `null` rather than a default, so a stale "Frontend Engineer" can
+    // never be resurrected from the cache.
     localStorage.setItem('careerpilot_target_role', JSON.stringify(targetRole));
     localStorage.setItem('careerpilot_skills', JSON.stringify(skills));
     localStorage.setItem('careerpilot_settings', JSON.stringify(settings));
@@ -2778,71 +3068,121 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Compute Career Analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const computeLocalAnalysis = (): CareerAnalysis => {
-    const reqSkills = targetRole.requiredSkills || [];
+    const reqSkills = targetRole?.requiredSkills || [];
     let matchScore = 0;
     const strengths: { skill: string; note: string }[] = [];
     const criticalGaps: { skill: string; current: number; target: number; reason: string }[] = [];
 
+    // The gaps are the SAME ones the server computed and the roadmap's first
+    // recommended step is drawn from. When the server has answered, its
+    // numbers are used verbatim, so the readiness figure on the dashboard, the
+    // blockers on "My Career" and the roadmap's opening step can never
+    // disagree.
+    const priorities = skillRecalculation?.priorities ?? [];
+
     if (reqSkills.length === 0) {
       matchScore = 80;
+    } else if (skillRecalculation?.readinessPct !== null && skillRecalculation?.readinessPct !== undefined) {
+      matchScore = skillRecalculation.readinessPct;
     } else {
-      let earnedPoints = 0;
-      let totalPoints = 0;
+      // Before the server has answered, the same shared engine is used
+      // locally, so the fallback is the same measurement rather than a
+      // different one.
+      const gaps = computeSkillGaps(
+        toRoleSkillRequirements(targetRole ?? { requiredSkills: reqSkills }),
+        skills.map((skill) => ({ name: skill.name, level: skill.currentLevel })),
+      );
+      const summary = summarizeSkillGaps(
+        gaps,
+        toRoleSkillRequirements(targetRole ?? { requiredSkills: reqSkills }),
+      );
+      matchScore = summary.readinessPct;
 
-      reqSkills.forEach(req => {
-        // Match on the normalised name so the analysis and the roadmap
-        // generator always agree about the same skill.
-        const normalized = normalizeSkillName(req.name);
-        const found = skills.find(s => normalizeSkillName(s.name) === normalized);
-        const current = found ? found.currentLevel : 1;
-        totalPoints += req.minLevel;
-        earnedPoints += Math.min(current, req.minLevel);
-
-        if (current >= req.minLevel) {
+      for (const gap of gaps) {
+        if (gap.gap <= 0) {
           strengths.push({
-            skill: req.name,
-            note: `Exceeds or meets baseline ${req.minLevel}/5 expectation for ${targetRole.title}.`
+            skill: gap.name,
+            note: `Meets the level ${gap.requiredLevel}/5 expectation for ${targetRole?.title ?? 'your target role'}.`,
           });
         } else {
           criticalGaps.push({
-            skill: req.name,
-            current,
-            target: req.minLevel,
-            reason: `Role requires level ${req.minLevel}/5 for independent delivery; currently assessed at ${current}/5.`
+            skill: gap.name,
+            current: gap.currentLevel,
+            target: gap.requiredLevel,
+            reason: describeGap(gap),
           });
         }
-      });
-
-      matchScore = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 75;
+      }
     }
+
+    // With no target role there is nothing to analyse against. The analysis is
+    // empty rather than descriptive of a role the candidate never chose — the
+    // platform asks for a role instead of inventing one.
+    if (!targetRole) {
+      return {
+        matchPercentage: 0,
+        strengths: [],
+        criticalGaps: [],
+        missingExperience: [],
+        careerRisks: [],
+        recommendedProjects: [],
+        recommendedLearning: [],
+        nextBestAction: {
+          title: 'Choose your target role',
+          description: 'Pick the role you are aiming at and your plan, roadmap and skill gaps will be built around it.',
+          reason: 'Everything on this screen is measured against a target role.',
+          actionType: 'task',
+        },
+      };
+    }
+
+    // The ranked list is the authority for "what is missing" and "what next".
+    if (priorities.length > 0) {
+      criticalGaps.length = 0;
+      for (const priority of priorities) {
+        criticalGaps.push({
+          skill: priority.skillName,
+          current: priority.currentLevel,
+          target: priority.requiredLevel,
+          reason: priority.why,
+        });
+      }
+    }
+
+    const topPriority = priorities[0] ?? null;
 
     return {
       matchPercentage: matchScore,
       strengths: strengths.slice(0, 4),
       criticalGaps: criticalGaps.slice(0, 5),
       missingExperience: [
-        `Demonstrable ${targetRole.title} delivery against ${targetRole.experienceExpectation || 'the role expectation'}`,
+        `Demonstrable ${targetRole?.title ?? ''} delivery against ${targetRole.experienceExpectation || 'the role expectation'}`,
         `Evidence in your portfolio that shows the skills below at working level`,
       ],
       careerRisks: [
-        `Candidates with verified ${targetRole.title} experience are competing for the same openings`,
+        `Candidates with verified ${targetRole?.title ?? ''} experience are competing for the same openings`,
         `Skills in this role are expected to keep developing, so continuous practice matters`,
       ],
       recommendedProjects: (targetRole.typicalProjects?.length
         ? targetRole.typicalProjects
-        : [`A ${targetRole.title} showcase project`]
+        : [`A ${targetRole?.title ?? ''} showcase project`]
       ).slice(0, 2),
       recommendedLearning: (targetRole.learningTopics?.length
         ? targetRole.learningTopics.map(
-            (topic) => `Focused study on ${topic} for ${targetRole.title}`,
+            (topic) => `Focused study on ${topic} for ${targetRole?.title ?? ''}`,
           )
-        : [`Targeted study on ${criticalGaps[0]?.skill || targetRole.title} fundamentals`]
+        : [`Targeted study on ${criticalGaps[0]?.skill || (targetRole?.title ?? '')} fundamentals`]
       ).slice(0, 2),
-      nextBestAction: criticalGaps.length > 0 ? {
-        title: `Close ${criticalGaps[0].skill} gap`,
-        description: `Advance from level ${criticalGaps[0].current} to ${criticalGaps[0].target} with hands-on practice.`,
-        reason: `${criticalGaps[0].skill} is your highest-impact remaining skill gap for ${targetRole.title}.`,
-        actionType: 'task'
+      nextBestAction: topPriority ? {
+        title: `Close the ${topPriority.skillName} gap`,
+        description: `Advance from level ${topPriority.currentLevel} to level ${topPriority.requiredLevel} for ${targetRole.title}. About ${topPriority.estimatedHours} hours of focused work.`,
+        reason: topPriority.why,
+        actionType:
+          topPriority.action === 'assessment'
+            ? 'task'
+            : topPriority.action === 'project'
+              ? 'project'
+              : 'course',
       } : {
         title: 'Prepare for Upcoming Interviews',
         description: 'Simulate behavioural and role-specific STAR questions to solidify your interview presence.',
@@ -2856,7 +3196,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   useEffect(() => {
     setAnalysis(computeLocalAnalysis());
-  }, [targetRole, skills]);
+    // The recalculation is part of the input: when the server's ranked gaps
+    // arrive, the readiness figure and the "next best action" follow them.
+  }, [targetRole, skills, skillRecalculation]);
 
   // Daily Career Actions
   //
@@ -2885,7 +3227,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         priority: 'high',
         completed: false,
         actionView: 'roadmap',
-        reason: `Your next roadmap task for ${targetRole.title}.`,
+        reason: `Your next roadmap task for ${targetRole?.title ?? ''}.`,
       });
     }
 
@@ -2955,7 +3297,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         : 0,
       cvAlignment: isAtsAnalysisForRole(
         cvVersions[0]?.targetRoleTitle,
-        targetRole.title
+        targetRole?.title ?? ''
       )
         ? cvVersions[0]?.atsAnalysis?.overallScore ?? 0
         : 0,
@@ -2975,7 +3317,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     );
 
     return dimensions;
-  }, [skills, evidenceItems, roadmapPhases, cvVersions, targetRole.title, applications]);
+  }, [skills, evidenceItems, roadmapPhases, cvVersions, targetRole?.title ?? '', applications]);
 
   // Weekly Career Review — derived from the user's own persisted data.
   const weeklyReview: WeeklyCareerReview = useMemo(() => {
@@ -3162,7 +3504,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // applications and notifications until hydration finished.
   function resetAuthenticatedState() {
     setProfile({ ...emptyProfile });
-    setTargetRole(TARGET_ROLES[0]);
+    // The target role resets to NOTHING, not to the first catalogue role. A
+    // signed-out tab must not leave "Frontend Engineer" behind for the next
+    // person who signs in on it.
+    setTargetRole(null);
+    setExperienceLevelState(null);
     setSavedRoles([]);
     setSkillLevels({});
     setCustomSkills([]);
@@ -3308,6 +3654,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         career_domain: role.domainId,
         level: role.level,
       });
+      // Everything that was computed for the old role is now stale.
+      void invalidateRoleDependents();
       return true;
     } catch (error) {
       console.error('Failed to persist target role:', error);
@@ -3315,10 +3663,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // failed. Put the previous target back so the UI, the server and the
       // roadmap all describe the same role.
       try {
-        await patchProfile({
-          targetRoleId: previousRole.id,
-          targetRoleDomain: previousRole.domainId,
-        });
+        await patchProfile(
+          previousRole
+            ? { targetRoleId: previousRole.id, targetRoleDomain: previousRole.domainId }
+            : { targetRole: null, targetIndustry: null }
+        );
       } catch (rollbackError) {
         console.error('Failed to roll back target role after roadmap failure:', rollbackError);
       }
@@ -3336,6 +3685,28 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     } catch (error) {
       console.error('Failed to regenerate roadmap:', error);
+    }
+    return false;
+  };
+
+  /**
+   * Reads the roadmap back from the server.
+   *
+   * The server rebuilds the roadmap whenever a skill level changes, so this
+   * is how the interface picks up the new tree: a skill that now meets the
+   * role requirement has already left the opening steps by the time this
+   * resolves.
+   */
+  const refreshRoadmap = async (): Promise<boolean> => {
+    try {
+      const roadmap = await fetchRoadmap();
+      if (roadmap) {
+        setRoadmapPhases(toRoadmapPhases(roadmap));
+        setIsEnrolledInRoadmap(roadmap.isEnrolled);
+        return true;
+      }
+    } catch (error) {
+      console.error('Failed to refresh the roadmap:', error);
     }
     return false;
   };
@@ -3807,6 +4178,159 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
+  /**
+   * Saves the experience level on its own.
+   *
+   * The level is a column of its own, so it does not need the roadmap to be
+   * regenerated — but it is written through the same profile endpoint as
+   * everything else, so there is still only one path to the database.
+   */
+  const setExperienceLevel = async (level: ExperienceLevel | null): Promise<void> => {
+    const normalized = normalizeExperienceLevel(level);
+    if (!normalized.ok) return;
+    await patchProfile({ experienceLevel: normalized.value });
+    setExperienceLevelState(normalized.value);
+  };
+
+  /**
+   * Saves the career target — role, experience level and goal — in one write.
+   *
+   * THE SINGLE WRITER
+   * The Profile page and the Settings page both edit the career target. When
+   * they each had their own write path, they could disagree: one screen
+   * showed a role the other had already replaced, and the platform's own
+   * idea of the target lagged behind. Now both screens call this, so there
+   * is exactly one path from a change in the interface to the database, and
+   * a change made in either place is immediately true in both.
+   *
+   * A ROLE CHANGE ALSO REFRESHES THE ROADMAP AND THE LEARNING RANKING,
+   * because both are derived from the target role. A level or goal change on
+   * its own does not move the roadmap, so it does not regenerate one.
+   */
+  const saveCareerTarget = async (input: {
+    roleId?: string | null;
+    experienceLevel?: ExperienceLevel | null;
+    careerGoal?: CareerGoal | null;
+    customGoalText?: string | null;
+  }): Promise<boolean> => {
+    const roleChanged =
+      input.roleId !== undefined && input.roleId !== null && input.roleId !== targetRole?.id;
+    const levelChanged =
+      input.experienceLevel !== undefined && input.experienceLevel !== experienceLevel;
+    const goalChanged =
+      (input.careerGoal !== undefined && input.careerGoal !== profile.careerGoal) ||
+      (input.customGoalText !== undefined &&
+        input.customGoalText !== (profile.customGoalText ?? ''));
+
+    if (!roleChanged && !levelChanged && !goalChanged) return true;
+
+    // The goal is a plain profile field, written through the profile endpoint.
+    if (goalChanged) {
+      await setCareerGoal(
+        (input.careerGoal ?? profile.careerGoal) as CareerGoal,
+        input.customGoalText ?? profile.customGoalText ?? ''
+      );
+    }
+
+    if (levelChanged) {
+      const normalized = normalizeExperienceLevel(input.experienceLevel);
+      if (!normalized.ok) return false;
+      await patchProfile({ experienceLevel: normalized.value });
+      setExperienceLevelState(normalized.value);
+    }
+
+    if (roleChanged && input.roleId) {
+      // The role change owns the roadmap: it is generated on the server from
+      // the new role and the candidate's own skill ratings.
+      const persisted = await setPrimaryTargetRole(input.roleId);
+      if (!persisted) return false;
+    }
+
+    return true;
+  };
+
+  /**
+   * Saves the career identity as one write.
+   *
+   * THE SINGLE WRITER
+   * My Profile and Settings both edit the identity. When they each had their
+   * own write path they could disagree, and the change made in one screen was
+   * invisible in the other until a reload. Both screens call this, so a
+   * change made in either place is immediately true everywhere — the
+   * dashboard, the roadmap, My Career and CV Studio all read the derived
+   * identity from the same state.
+   *
+   * The patch uses the identity's own vocabulary; the mapping onto the
+   * profile columns lives in one place (`identityPatchToProfilePatch`), so no
+   * screen has to remember which column `currentStatus` lives in.
+   */
+  const saveCareerIdentity = async (patch: {
+    currentStatus?: CareerState | null;
+    currentRole?: string | null;
+    careerGoal?: CareerGoal | null;
+    experienceLevel?: ExperienceLevel | null;
+    educationStatus?: EducationStatus | null;
+    expectedGraduationYear?: number | null;
+  }): Promise<boolean> => {
+    try {
+      const updates: Record<string, unknown> = {};
+
+      if (patch.currentStatus !== undefined) {
+        updates.userType = patch.currentStatus;
+      }
+      if (patch.currentRole !== undefined) {
+        updates.currentTitle = patch.currentRole ?? '';
+      }
+      if (patch.careerGoal !== undefined) {
+        updates.careerGoal = patch.careerGoal;
+      }
+      if (patch.experienceLevel !== undefined) {
+        const normalized = normalizeExperienceLevel(patch.experienceLevel);
+        if (!normalized.ok) return false;
+        updates.experienceLevel = normalized.value;
+      }
+      if (patch.educationStatus !== undefined) {
+        updates.educationStatus = patch.educationStatus;
+      }
+      if (patch.expectedGraduationYear !== undefined) {
+        updates.expectedGraduationYear = patch.expectedGraduationYear;
+      }
+
+      if (Object.keys(updates).length === 0) return true;
+
+      await patchProfile(updates as Partial<ProfileDTO>);
+
+      // The local state is only updated AFTER the server accepts the write,
+      // so the identity shown is the identity stored.
+      setProfile((prev) => ({
+        ...prev,
+        careerState:
+          patch.currentStatus !== undefined ? patch.currentStatus : prev.careerState,
+        currentTitle:
+          patch.currentRole !== undefined
+            ? (patch.currentRole ?? '')
+            : prev.currentTitle,
+        careerGoal: patch.careerGoal !== undefined ? patch.careerGoal : prev.careerGoal,
+        educationStatus:
+          patch.educationStatus !== undefined ? patch.educationStatus : prev.educationStatus,
+        expectedGraduationYear:
+          patch.expectedGraduationYear !== undefined
+            ? patch.expectedGraduationYear
+            : prev.expectedGraduationYear,
+      }));
+
+      if (patch.experienceLevel !== undefined) {
+        const normalized = normalizeExperienceLevel(patch.experienceLevel);
+        if (normalized.ok) setExperienceLevelState(normalized.value ?? null);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to persist the career identity:', error);
+      throw error;
+    }
+  };
+
   const completeOnboarding = async () => {
     try {
       // The status is the authoritative field; the legacy boolean is kept in
@@ -3829,29 +4353,162 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // /api/user-skills. The local state is only updated AFTER the server
   // confirms the write, so the level the UI shows is the level that is stored
   // (B.3.9, finding H-2).
+  //
+  // Every write is followed by a RECALCULATION. The server rebuilds the
+  // roadmap and recomputes the gap summary as part of answering, so a skill
+  // that now meets the role requirement leaves the blockers and the roadmap's
+  // opening steps on its own — there is no "Sync With Profile" step the user
+  // has to remember. The manual control is kept as a secondary fallback.
   const updateSkillLevel = async (skillId: string, currentLevel: number) => {
     const skill = skills.find(s => s.id === skillId);
     if (!skill) return;
     try {
-      await postUserSkill({ name: skill.name, proficiency: currentLevel });
-      setSkillLevels(prev => ({
-        ...prev,
-        [skill.name.toLowerCase()]: currentLevel,
-      }));
+      const { skill: stored, recalculation } = await postUserSkill({
+        name: skill.name,
+        proficiency: currentLevel,
+        category: skill.category,
+      });
+      applyStoredSkill(stored);
+      applyRecalculation(recalculation);
     } catch (error) {
       console.error('Failed to persist skill level:', error);
     }
   };
 
+  /**
+   * Stores the result of a diagnostic knowledge check.
+   *
+   * The measurement is kept BESIDE the candidate's self-report rather than on
+   * top of it: the effective level becomes the stronger of the two, so a
+   * finished check closes a gap immediately without erasing what the
+   * candidate said about themselves.
+   *
+   * Returns true when the result was stored, so the interface can report
+   * exactly what changed across the platform.
+   */
+  const recordSkillAssessment = async (input: {
+    name: string;
+    level: number;
+    score: number;
+    category?: string;
+  }): Promise<boolean> => {
+    try {
+      const { skill: stored, recalculation, evidence } = await postSkillAssessment({
+        name: input.name,
+        level: input.level,
+        score: input.score,
+        category: input.category,
+      });
+      applyStoredSkill(stored);
+      applyRecalculation(recalculation);
+      if (evidence) {
+        const mapped = toEvidenceItem(evidence);
+        setEvidenceItems((prev) => [
+          mapped,
+          ...prev.filter((item) => item.id !== mapped.id),
+        ]);
+      }
+      void logActivity({
+        actionType: 'acquired_skill',
+        title: 'Completed Skill Assessment',
+        subtitle: `${input.name} (${input.score}%)`,
+        linkView: 'assessment',
+      });
+      return true;
+    } catch (error) {
+      console.error('Failed to record the skill assessment:', error);
+      return false;
+    }
+  };
+
+  /**
+   * Asks the server to rebuild the roadmap and the gap summary.
+   *
+   * This is the secondary, explicit re-sync control. The automatic path runs
+   * on every write; this one exists so a user can be certain the projection
+   * matches the source, and so the fallback button has something to do.
+   */
+  const resyncSkillDependents = async (): Promise<SkillRecalculationDTO | null> => {
+    try {
+      const recalculation = await requestSkillRecalculation();
+      applyRecalculation(recalculation);
+      return recalculation;
+    } catch (error) {
+      console.error('Failed to re-sync the skill dependents:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Folds one stored skill back into the local evidence map.
+   *
+   * The server is the authority on what was written, so the local state
+   * takes the server's answer rather than assuming what it sent.
+   */
+  const applyStoredSkill = (stored: {
+    name: string;
+    category: string;
+    selfReportedLevel: number | null;
+    assessedLevel: number | null;
+    assessmentScore: number | null;
+    assessmentAt: string | null;
+    evidenceSources: string[];
+  }) => {
+    if (!stored?.name) return;
+    const key = stored.name.toLowerCase();
+    setSkillEvidence(prev => ({
+      ...prev,
+      [key]: buildSkillRecord({
+        name: stored.name,
+        category: stored.category,
+        selfReportedLevel: stored.selfReportedLevel,
+        assessedLevel: stored.assessedLevel,
+        assessmentScore: stored.assessmentScore,
+        assessmentAt: stored.assessmentAt,
+        evidenceSources: stored.evidenceSources,
+      }),
+    }));
+    if (stored.selfReportedLevel !== null) {
+      const selfReported = stored.selfReportedLevel;
+      setSkillLevels(prev => ({ ...prev, [key]: selfReported }));
+    }
+  };
+
+  /**
+   * Folds the recalculation into the local state.
+   *
+   * The roadmap is refetched so a satisfied skill leaves its opening steps
+   * immediately; the summary is stored so the readiness figure, the blockers
+   * and the "is this out of date?" indicator all read the same numbers.
+   */
+  const applyRecalculation = (recalculation: SkillRecalculationDTO | null) => {
+    if (!recalculation) return;
+    setSkillRecalculation(recalculation);
+    if (recalculation.roadmapRegenerated) {
+      void refreshRoadmap();
+    }
+  };
+
   const addCustomSkill = async (skill: Omit<UserSkill, 'id' | 'gap' | 'lastUpdated'>) => {
+    const cleanedName = skill.name.trim();
+    if (!cleanedName || isSkillSectionHeader(cleanedName)) {
+      throw new Error('Please enter an individual skill rather than a category header.');
+    }
     const newSkill: UserSkill = {
       ...skill,
+      name: cleanedName,
       id: `sk-custom-${Date.now()}`,
       gap: Math.max(0, skill.targetLevel - skill.currentLevel),
       lastUpdated: new Date().toISOString().split('T')[0]
     };
     try {
-      await postUserSkill({ name: newSkill.name, proficiency: newSkill.currentLevel });
+      const { skill: stored, recalculation } = await postUserSkill({
+        name: newSkill.name,
+        proficiency: newSkill.currentLevel,
+        category: newSkill.category,
+      });
+      applyStoredSkill(stored);
+      applyRecalculation(recalculation);
     } catch (error) {
       // B.4 finding L-4: the skill was added to the local list even when the
       // server refused the write, so the UI showed a skill that was not
@@ -3860,7 +4517,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       console.error('Failed to persist skill:', error);
       throw error;
     }
-    setCustomSkills(prev => [...prev, newSkill]);
+    const normalizedNew = normalizeSkillKey(newSkill.name);
+    setCustomSkills(prev => {
+      const filtered = prev.filter((item) => normalizeSkillKey(item.name) !== normalizedNew);
+      return [...filtered, newSkill];
+    });
     setSkillLevels(prev => ({
       ...prev,
       [newSkill.name.toLowerCase()]: newSkill.currentLevel,
@@ -4031,8 +4692,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // The funnel records that a roadmap was started. The domain is a
       // catalogue value, not a personal one, so it is safe to report.
       trackEvent('roadmap_enroll', {
-        career_domain: targetRole.domainId,
-        level: targetRole.level,
+        career_domain: targetRole?.domainId,
+        level: targetRole?.level,
       });
     } catch (error) {
       console.error('Failed to enroll in roadmap:', error);
@@ -4101,6 +4762,39 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const getLearningItem = (courseId: string) =>
     learningItems.find((item) => item.courseId === courseId);
+
+  /**
+   * Refreshes everything that was computed for the PREVIOUS target role.
+   *
+   * Most of the platform derives itself from `targetRole`, so a role change
+   * reaches those screens for free. Two things do not: the Learning Hub's
+   * ranking, which was built for the old role's skill gaps, and the cached
+   * role title the recommendation panel shows. Both are refreshed here, with
+   * AI OFF — the deterministic ranking is what the panel needs, and asking
+   * the model for an explanation of a role the candidate just changed would
+   * spend a token for nothing.
+   *
+   * It lives below `refreshLearningRecommendations` because it calls it, and
+   * a `const` arrow function is not hoisted.
+   */
+  const invalidateRoleDependents = async (): Promise<void> => {
+    setLearningRecommendations([]);
+    setLearningRecommendationMeta((prev) => ({
+      ...prev,
+      aiUsed: false,
+      aiFallbackReason: null,
+      generatedAt: null,
+      targetRoleTitle: null,
+      skillGapCount: 0,
+      roadmapSkillCount: 0,
+    }));
+    try {
+      await refreshLearningRecommendations({ ai: false });
+    } catch {
+      // The refresh is best-effort: a failure here must not undo the role
+      // change the candidate just made and confirmed.
+    }
+  };
 
   /**
    * Re-reads the candidate's profile links.
@@ -4225,7 +4919,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // The funnel records that a project was started. The project's title and
       // its links are never reported — only the domain it belongs to.
       trackEvent('project_start', {
-        career_domain: targetRole.domainId,
+        career_domain: targetRole?.domainId,
         level: project.difficulty ?? undefined,
       });
       void logActivity({
@@ -4471,14 +5165,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // used. Posting against an empty cvId was rejected with 400.
       let cvId = activeCvId;
       if (!cvId) {
-        const created = await postCv({ name, targetRoleTitle: targetRole.title });
+        const created = await postCv({ name, targetRoleTitle: targetRole?.title ?? '' });
         cvId = created.id;
         setActiveCvId(created.id);
       }
       const dto = await postCvVersion({
         cvId,
         name,
-        targetRoleTitle: targetRole.title,
+        targetRoleTitle: targetRole?.title ?? '',
         profileJson: profileSnapshot ?? activeCV,
         atsAnalysis: cvVersions[0]?.atsAnalysis,
       });
@@ -4514,7 +5208,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       id: cvVersionId ?? `cv-v-${Date.now()}`,
       cvId,
       name: versionName ?? 'Reviewed CV',
-      targetRoleTitle: targetRoleTitle ?? targetRole.title,
+      targetRoleTitle: targetRoleTitle ?? targetRole?.title ?? '',
       createdAt: new Date().toISOString().split('T')[0],
       profile: cv,
     };
@@ -4548,8 +5242,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         },
         body: JSON.stringify({
           cvText,
-          targetRoleTitle: targetRole.title,
-          targetRoleSkills: targetRole.requiredSkills.map(s => s.name),
+          targetRoleTitle: targetRole?.title ?? '',
+          targetRoleSkills: (targetRole?.requiredSkills ?? []).map(s => s.name),
           language: aiPreferences.preferredLanguage
         }),
         signal: options?.signal,
@@ -4582,7 +5276,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         if (latest && isPersistedId(latest.id)) {
           const dto = await patchCvVersion(latest.id, {
             atsAnalysis: result,
-            targetRoleTitle: targetRole.title,
+            targetRoleTitle: targetRole?.title ?? '',
           });
           persisted = toCVVersion(dto);
         } else {
@@ -4590,7 +5284,7 @@ Skills: ${activeCV.skillsList.join(', ')}
           if (!isPersistedId(cvId)) {
             const created = await postCv({
               name: latest?.name || 'Current CV',
-              targetRoleTitle: targetRole.title,
+              targetRoleTitle: targetRole?.title ?? '',
             });
             cvId = created.id;
             setActiveCvId(created.id);
@@ -4598,7 +5292,7 @@ Skills: ${activeCV.skillsList.join(', ')}
           const dto = await postCvVersion({
             cvId,
             name: latest?.name || 'Current CV',
-            targetRoleTitle: targetRole.title,
+            targetRoleTitle: targetRole?.title ?? '',
             profileJson: latest?.profile ?? activeCV,
             atsAnalysis: result,
           });
@@ -4626,13 +5320,13 @@ Skills: ${activeCV.skillsList.join(', ')}
           updated[0] = {
             ...updated[0],
             atsAnalysis: result,
-            targetRoleTitle: targetRole.title,
+            targetRoleTitle: targetRole?.title ?? '',
           };
         } else {
           updated.unshift({
             id: `cv-v-${Date.now()}`,
             name: 'Current CV',
-            targetRoleTitle: targetRole.title,
+            targetRoleTitle: targetRole?.title ?? '',
             createdAt: new Date().toISOString().split('T')[0],
             profile: activeCV,
             atsAnalysis: result,
@@ -4693,10 +5387,31 @@ Skills: ${activeCV.skillsList.join(', ')}
     }
   };
 
+  /**
+   * Moves an application to a new stage.
+   *
+   * The change is not only written to the application: it is recorded in the
+   * activity feed and reported to the candidate, so "My Career", "Progress"
+   * and "Recent Activity" all tell the same story about where the
+   * application stands.
+   */
   const updateApplicationStage = async (id: string, stage: ApplicationStage) => {
+    const application = applications.find((entry) => entry.id === id);
+    const previousStage = application?.stage;
     try {
       const dto = await patchJobApplication(id, { stage });
       setApplications(prev => prev.map(a => (a.id === id ? toJobApplication(dto) : a)));
+
+      // A move that changes nothing is not an event worth reporting.
+      if (!application || previousStage === stage) return;
+
+      void logActivity({
+        actionType: 'applied_job',
+        title: `Application moved to ${stage}`,
+        subtitle: `${application.role} at ${application.company}`,
+        relatedObject: application.company,
+        linkView: 'applications',
+      });
     } catch (error) {
       console.error('Failed to update application stage:', error);
     }
@@ -5120,6 +5835,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         reorderCvCollection,
         setCareerState,
         setCareerGoal,
+        careerIdentity,
+        saveCareerIdentity,
         completeOnboarding,
         suggestAiSummary,
         validateUsername,
@@ -5129,8 +5846,13 @@ Skills: ${activeCV.skillsList.join(', ')}
         copilotOpen,
         setCopilotOpen,
         targetRole,
+        targetRoleTitle,
+        hasTargetRole,
+        experienceLevel,
+        setExperienceLevel,
         savedRoles,
         setPrimaryTargetRole,
+        saveCareerTarget,
         saveRole,
         removeSavedRole,
         secondaryGoals,
@@ -5151,7 +5873,11 @@ Skills: ${activeCV.skillsList.join(', ')}
         skills,
         ownedSkills,
         updateSkillLevel,
-        addCustomSkill,
+  addCustomSkill,
+  skillEvidence,
+  skillRecalculation,
+  recordSkillAssessment,
+  resyncSkillDependents,
         removeSkill,
         analysis,
         careerHealth,

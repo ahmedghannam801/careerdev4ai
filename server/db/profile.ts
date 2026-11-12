@@ -56,6 +56,18 @@ export interface ProfileDTO {
    */
   targetRoleDomain: string | null;
   userType: string | null;
+  /**
+   * The candidate's TARGET experience level.
+   *
+   * This is the level they are aiming at (student, intern, junior, mid,
+   * senior, lead) and it is deliberately separate from `userType`, which
+   * records the career state they are in right now.
+   */
+  experienceLevel: string | null;
+  /** currently_studying | graduated | not_set, as stated by the candidate. */
+  educationStatus: string | null;
+  /** The year the candidate expects to graduate, when they stated one. */
+  expectedGraduationYear: number | null;
   onboardingCompleted: boolean;
   /**
    * The authoritative first-time onboarding state.
@@ -98,6 +110,14 @@ export interface UpdateProfileInput {
   targetRole?: string;
   targetIndustry?: string;
   userType?: string;
+  /**
+   * The target experience level. `undefined` leaves it alone; `null` clears
+   * it. It is a vocabulary of its own, validated by the caller.
+   */
+  experienceLevel?: string | null;
+  /** currently_studying | graduated | not_set. */
+  educationStatus?: string | null;
+  expectedGraduationYear?: number | null;
   onboardingCompleted?: boolean;
   onboardingStatus?: OnboardingStatus;
   onboardingStep?: number;
@@ -129,6 +149,9 @@ interface ProfileRow {
   target_role: string | null;
   target_industry: string | null;
   user_type: string | null;
+  experience_level: string | null;
+  education_status: string | null;
+  expected_graduation_year: number | null;
   onboarding_completed: boolean;
   onboarding_status: OnboardingStatus | null;
   onboarding_step: number | null;
@@ -139,7 +162,7 @@ interface ProfileRow {
 }
 
 const SELECT_COLUMNS =
-  'id, full_name, preferred_name, username, avatar_url, phone, location, city, country, timezone, current_title, current_position, current_company, years_of_experience, headline, bio, professional_summary, career_goal, custom_goal_text, target_role, target_industry, user_type, onboarding_completed, onboarding_status, onboarding_step, onboarding_updated_at, is_public, created_at, updated_at';
+  'id, full_name, preferred_name, username, avatar_url, phone, location, city, country, timezone, current_title, current_position, current_company, years_of_experience, headline, bio, professional_summary, career_goal, custom_goal_text, target_role, target_industry, user_type, experience_level, education_status, expected_graduation_year, onboarding_completed, onboarding_status, onboarding_step, onboarding_updated_at, is_public, created_at, updated_at';
 
 /** The profile row + its extension rows, as one typed DTO. */
 export async function getProfileDto(profileId: string): Promise<ProfileDTO | null> {
@@ -189,6 +212,9 @@ export async function getProfileDto(profileId: string): Promise<ProfileDTO | nul
     targetRoleId: targetRole?.id ?? null,
     targetRoleDomain: targetRole?.domainId ?? null,
     userType: row.user_type,
+    experienceLevel: row.experience_level,
+    educationStatus: row.education_status,
+    expectedGraduationYear: row.expected_graduation_year,
     onboardingCompleted: row.onboarding_completed,
     onboardingStatus: row.onboarding_status ?? (row.onboarding_completed ? 'completed' : 'not_started'),
     onboardingStep: row.onboarding_step ?? 0,
@@ -231,6 +257,9 @@ export async function updateProfileDto(
     ['targetRole', 'target_role'],
     ['targetIndustry', 'target_industry'],
     ['userType', 'user_type'],
+    ['experienceLevel', 'experience_level'],
+    ['educationStatus', 'education_status'],
+    ['expectedGraduationYear', 'expected_graduation_year'],
   ];
   for (const [key, column] of map) {
     if (input[key] !== undefined) patch[column] = input[key] ?? null;

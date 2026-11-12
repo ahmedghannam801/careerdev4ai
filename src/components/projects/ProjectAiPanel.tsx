@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useAIProcessing } from '../../lib/useAIProcessing';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import {
   fetchProjectHealth,
   fetchProjectRecommendations,
@@ -222,7 +223,11 @@ export const ProjectAiPanel: React.FC = () => {
             ) : (
               <Lightbulb className="w-3.5 h-3.5" />
             )}
-            <span>{isRecommending ? t('Finding projects…') : t('Recommend projects for me')}</span>
+            <span>
+              {isRecommending
+                ? t('Finding projects…')
+                : aiButtonLabel(t('Recommend projects for me'), 'project_analysis', t)}
+            </span>
           </button>
 
           <button
@@ -238,7 +243,7 @@ export const ProjectAiPanel: React.FC = () => {
             <span>
               {isAnalyzing
                 ? t('Checking your projects…')
-                : t('Check my existing projects')}
+                : aiButtonLabel(t('Check my existing projects'), 'project_analysis', t)}
             </span>
           </button>
 
@@ -321,7 +326,7 @@ export const ProjectAiPanel: React.FC = () => {
                     {t('Track')}
                   </div>
                   <div className="max-w-[12rem] truncate text-xs font-bold text-[var(--text-primary)]">
-                    {targetRole.title || t('Your target role')}
+                    {targetRole?.title || t('Your target role')}
                   </div>
                   <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
                     <Clock className="h-3 w-3" />~

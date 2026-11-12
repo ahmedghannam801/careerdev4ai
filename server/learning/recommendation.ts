@@ -61,7 +61,24 @@ export type LearningStatus = 'saved' | 'in_progress' | 'completed' | 'dismissed'
 
 export type BudgetPreference = 'free_only' | 'low' | 'any';
 
-export type ExperienceLevel = 'entry' | 'mid' | 'senior';
+/**
+ * The candidate's level, as the LEARNING ENGINE sees it.
+ *
+ * This is the course-difficulty axis: how advanced a course should be for
+ * this candidate. It is NOT the candidate's target experience level.
+ *
+ * The target level — the one the candidate states in Profile and Settings —
+ * is a different axis with a different vocabulary
+ * (`student | intern | junior | mid | senior | lead`, in
+ * `shared/experienceLevel.ts`). The two are mapped onto each other in
+ * `server/learning/context.ts`, and the candidate's stated target wins when
+ * they have stated one.
+ *
+ * The type was renamed from `ExperienceLevel` so that the two could not be
+ * confused for one another: the names overlapped on 'mid' and 'senior', and
+ * the two mean different things.
+ */
+export type LearningLevel = 'entry' | 'mid' | 'senior';
 
 export interface CourseSkill {
   name: string;
@@ -154,7 +171,7 @@ export interface LearningContext {
   userSkills: UserSkillContext[];
   roadmapSkills: string[];
   roadmapCourseIds: string[];
-  experienceLevel: ExperienceLevel;
+  experienceLevel: LearningLevel;
   language: 'en' | 'ar';
   /** The language the AI explanations are written in. */
   aiLanguage: AiLanguageCode;
@@ -307,8 +324,8 @@ export function buildGapMap(context: LearningContext): Map<string, UserSkillCont
   return gaps;
 }
 
-function levelFit(courseLevel: LearningCourse['level'], experience: ExperienceLevel): number {
-  const matrix: Record<ExperienceLevel, Record<LearningCourse['level'], number>> = {
+function levelFit(courseLevel: LearningCourse['level'], experience: LearningLevel): number {
+  const matrix: Record<LearningLevel, Record<LearningCourse['level'], number>> = {
     entry: { Beginner: 1, Intermediate: 0.62, Advanced: 0.22 },
     mid: { Beginner: 0.58, Intermediate: 1, Advanced: 0.64 },
     senior: { Beginner: 0.32, Intermediate: 0.72, Advanced: 1 },

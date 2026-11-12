@@ -34,6 +34,11 @@ export interface RoadmapTaskDTO {
   resourceTitle: string | null;
   evidenceId: string | null;
   estimatedHours: number | null;
+  /**
+   * The kind of work this step is: learning, practice, project or
+   * application. It is what makes the time estimate break down honestly.
+   */
+  workKind: string | null;
   sortOrder: number;
   /** How hard this step is. */
   difficulty: string | null;
@@ -167,6 +172,20 @@ export interface ProfileDTO {
    */
   targetRoleDomain: string | null;
   userType: string | null;
+  /**
+   * The candidate's target experience level. It is the level they are aiming
+   * at, and it is separate from the career state.
+   */
+  experienceLevel: string | null;
+  /**
+   * currently_studying | graduated | not_set, as stated by the candidate.
+   *
+   * A future expected graduation year always means "currently studying",
+   * whatever this column says.
+   */
+  educationStatus: string | null;
+  /** The year the candidate expects to graduate, when they stated one. */
+  expectedGraduationYear: number | null;
   onboardingCompleted: boolean;
   onboardingStatus: OnboardingStatus;
   onboardingStep: number;

@@ -8,7 +8,7 @@
  * development, the test suite and the deployed runtime always execute identical
  * route code.
  */
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 // The *web* build of the SDK is imported deliberately. It is the build the
 // browser already receives, it uses `fetch` rather than `google-auth-library`
@@ -60,7 +60,11 @@ import { registerCreditMonitorRoutes } from './server/admin/creditMonitor.ts';
 import { registerReferralRoutes } from './server/referrals/routes.ts';
 import { registerStripeRoutes } from './server/stripe/routes.ts';
 import { requireEntitlement } from './server/subscriptions/entitlements.ts';
-import { requireCredits, refundAiCreditReservation } from './server/credits/middleware.ts';
+import {
+  requireCredits,
+  refundAiCreditReservation,
+  markAiCreditCompleted,
+} from './server/credits/middleware.ts';
 import { boundedList } from './server/ai/boundedList.ts';
 import { generateCoverLetter } from './server/cv/coverLetter.ts';
 import { universalAi, isAnyAiConfigured, getDefaultProvider } from './server/ai/provider.ts';
@@ -117,10 +121,17 @@ import {
 } from './server/db/educations.ts';
 import {
   getUserSkills,
-  resolveSkillId,
-  setUserSkillLevel,
   deleteUserSkill,
 } from './server/db/userSkills.ts';
+import {
+  InvalidSkillNameError,
+  listStoredSkills,
+  recordAssessmentForSkill,
+  recordSelfReportedLevel,
+  recalculateSkillDependents,
+} from './server/skills/service.ts';
+import { rankSkillPriorities } from './shared/skillEvidence.ts';
+import { normalizeProjectStatus } from './shared/projectLifecycle.ts';
 import {
   listNotifications,
   createNotification,
@@ -134,6 +145,7 @@ import {
 } from './server/db/notifications.ts';
 import { getProfileDto, updateProfileDto } from './server/db/profile.ts';
 import { isOnboardingStatus } from './shared/onboarding.ts';
+import { normalizeExperienceLevel } from './shared/experienceLevel.ts';
 import { recordConsent, resolveConsentState } from './server/db/consents.ts';
 import {
   createApplicationPackage,
@@ -1231,22 +1243,133 @@ app.post('/api/user-skills', requireAuth, async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'Proficiency must be between 1 and 5' });
     }
 
-    const skillId = await resolveSkillId(name, str(body.category, 60) ?? undefined);
-    if (!skillId) return res.status(400).json({ error: 'Could not resolve skill' });
-
     const yearsExperience =
       typeof body.yearsExperience === 'number' && Number.isFinite(body.yearsExperience)
         ? body.yearsExperience
         : undefined;
 
-    const skill = await setUserSkillLevel(req.authUser!.id, skillId, {
-      proficiency,
-      years_experience: yearsExperience,
+    // A self-report is written to the self-report column and nothing else.
+    // The assessed level and the evidence stay as they were, and the
+    // recalculation that follows refreshes readiness, the blockers and the
+    // roadmap without the user pressing anything.
+    const result = await recordSelfReportedLevel(req.authUser!.id, {
+      name,
+      category: str(body.category, 60) ?? undefined,
+      level: proficiency,
+      yearsExperience,
     });
-    return res.status(201).json({ success: true, skill });
+
+    return res.status(201).json({
+      success: true,
+      // The persisted row, in the same shape `GET /api/user-skills` returns.
+      skill: result.row,
+      // What the row means: the self-report, the measurement and the evidence
+      // side by side, and the level the product compares against the role.
+      skillRecord: result.skill,
+      recalculation: result.recalculation,
+    });
   } catch (error) {
+    if (error instanceof InvalidSkillNameError) {
+      return res.status(400).json({ error: error.message });
+    }
     console.error('Failed to save user skill:', error);
     return res.status(500).json({ error: 'Failed to save skill' });
+  }
+});
+
+/**
+ * Stores the result of a diagnostic knowledge check.
+ *
+ * This is the route that makes an assessment mean something. Before it, a
+ * finished check lived in the browser until the user pressed "Sync to My
+ * Skill Profile", and the score it produced overwrote the candidate's own
+ * self-reported level instead of being kept beside it.
+ *
+ * Now the result is stored as EVIDENCE: `assessed_level`, the score, the time
+ * it was taken and the `diagnostic_assessment` badge. The self-report is left
+ * alone, and the effective level the product compares against the role is the
+ * stronger of the two.
+ *
+ * The recalculation that follows is what removes a satisfied skill from the
+ * blockers and from the roadmap's opening steps — automatically, with no
+ * button to press.
+ *
+ * No tokens are deducted here: storing a measurement is not an AI action.
+ */
+app.post('/api/user-skills/assessment', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const name = str(body.name, 200);
+    if (!name) return res.status(400).json({ error: 'Skill name is required' });
+
+    const rawLevel = body.level ?? body.proficiency;
+    if (typeof rawLevel !== 'number' || !Number.isFinite(rawLevel)) {
+      return res.status(400).json({ error: 'Level must be a number' });
+    }
+    const level = Math.max(1, Math.min(5, Math.round(rawLevel)));
+
+    const rawScore = body.score ?? body.percentage ?? 0;
+    if (typeof rawScore !== 'number' || !Number.isFinite(rawScore)) {
+      return res.status(400).json({ error: 'Score must be a number' });
+    }
+    const score = Math.max(0, Math.min(100, Math.round(rawScore)));
+
+    const result = await recordAssessmentForSkill(req.authUser!.id, {
+      name,
+      category: str(body.category, 60) ?? undefined,
+      level,
+      score,
+    });
+
+    return res.status(201).json({
+      success: true,
+      // The persisted row, in the same shape `GET /api/user-skills` returns.
+      skill: result.row,
+      // What the row means once the measurement and the evidence are read.
+      skillRecord: result.skill,
+      recalculation: result.recalculation,
+      evidence: result.evidence ?? null,
+    });
+  } catch (error) {
+    if (error instanceof InvalidSkillNameError) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Failed to record a skill assessment:', error);
+    return res.status(500).json({ error: 'Failed to record the assessment' });
+  }
+});
+
+/**
+ * The candidate's skills in their structured form.
+ *
+ * Each skill carries the self-report, the measurement and the evidence
+ * separately, so the interface can show which of the three it is looking at
+ * instead of presenting one unexplained number.
+ */
+app.get('/api/user-skills/evidence', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const skills = await listStoredSkills(req.authUser!.id);
+    return res.json({ success: true, skills });
+  } catch (error) {
+    console.error('Failed to load the skill evidence:', error);
+    return res.status(500).json({ error: 'Failed to load skills' });
+  }
+});
+
+/**
+ * Recalculates the roadmap, the blockers and the readiness figure.
+ *
+ * The write paths already do this automatically. This endpoint exists for the
+ * secondary, explicit re-sync control in the interface — and for the case
+ * where the user wants to be certain the projection matches the source.
+ */
+app.post('/api/user-skills/recalculate', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const recalculation = await recalculateSkillDependents(req.authUser!.id);
+    return res.json({ success: true, recalculation });
+  } catch (error) {
+    console.error('Failed to recalculate the skill dependents:', error);
+    return res.status(500).json({ error: 'Failed to recalculate' });
   }
 });
 
@@ -2035,6 +2158,9 @@ Answering rules:
         });
       }
 
+      // A real answer was produced, so the credit is earned.
+      markAiCreditCompleted(req as AuthedRequest);
+
       // Intelligent proposed action if user asks to add or change something.
       // The match uses word boundaries: a plain substring check matched
       // "add" inside "already" and "test" inside "contest".
@@ -2156,6 +2282,7 @@ Return valid JSON schema:
             'Career analysis returned an invalid response. No analysis was accepted; please try again shortly.',
         });
       }
+      markAiCreditCompleted(req as AuthedRequest);
       return res.json(payload);
     } catch (e) {
       // Never fabricate a career analysis. A made-up match percentage and
@@ -2215,6 +2342,7 @@ Return JSON schema:
             'CV analysis returned an invalid response. No ATS analysis was accepted; please try again shortly.',
         });
       }
+      markAiCreditCompleted(req as AuthedRequest);
 
       // The model may only suggest rewrites of what the candidate already
       // has. Any suggestion that introduces a company, a metric or a link
@@ -2307,6 +2435,7 @@ Return JSON schema:
             'Interview evaluation returned an invalid response. No feedback was accepted; please try again shortly.',
         });
       }
+      markAiCreditCompleted(req as AuthedRequest);
       return res.json(payload);
     } catch (e) {
       // A fabricated score and a fabricated "model answer" would teach the
@@ -2382,6 +2511,7 @@ ${groundingRules()}
             'Summary generation returned an invalid response. No summary was accepted; please try again shortly.',
         });
       }
+      markAiCreditCompleted(req as AuthedRequest);
 
       // A summary is the one part of a CV a hiring manager reads first, so a
       // fabricated employer or metric here is the most damaging kind of
@@ -2465,6 +2595,8 @@ app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, requireEntitlem
           req.authUser!.id
         );
       }
+
+      markAiCreditCompleted(req as AuthedRequest);
 
       return res.json({
         coverLetter: result.coverLetter,
@@ -2735,6 +2867,11 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, requireEntitlement('cv.b
         ai,
         getGeminiModel()
       );
+      // The headline options can be produced locally, with no model involved.
+      // Only a result the model actually wrote earns the credit.
+      if (outcome.aiUsed) {
+        markAiCreditCompleted(req as AuthedRequest);
+      }
       return res.json({ success: true, ...outcome });
     }
 
@@ -2784,6 +2921,8 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, requireEntitlement('cv.b
             'The AI assistant returned an invalid response. Nothing was written; please try again shortly.',
         });
       }
+
+      markAiCreditCompleted(req as AuthedRequest);
 
       return res.json({
         success: true,
@@ -2895,6 +3034,12 @@ app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, requireEnt
       refundDailyAiBudget(req.authUser!.id);
     }
 
+    // The deterministic reader can answer on its own. Only a result the model
+    // actually produced earns the credit.
+    if (aiUsed) {
+      markAiCreditCompleted(req as AuthedRequest);
+    }
+
     const match = await buildJobDescriptionMatch(req.authUser!.id, analysis, { language });
 
     return res.json({
@@ -2966,6 +3111,8 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireEn
         });
       }
 
+      markAiCreditCompleted(req as AuthedRequest);
+
       return res.json({
         success: true,
         analysis,
@@ -3029,6 +3176,12 @@ app.post('/api/projects/recommendations', requireAuth, aiRateLimit, requireCredi
       limit,
     });
 
+    // The deterministic plans are always produced. Only the plans the model
+    // actually wrote earn the credit.
+    if (result.aiUsed) {
+      markAiCreditCompleted(req as AuthedRequest);
+    }
+
     return res.json({
       success: true,
       plans: result.plans,
@@ -3074,6 +3227,12 @@ app.post('/api/projects/analyze', requireAuth, aiRateLimit, requireCredits('proj
       model: getGeminiModel(),
       language,
     });
+
+    // The factual reports are always produced. Only the wording the model
+    // actually wrote earns the credit.
+    if (result.aiUsed) {
+      markAiCreditCompleted(req as AuthedRequest);
+    }
 
     return res.json({
       success: true,
@@ -4263,13 +4422,11 @@ app.post('/api/projects', requireAuth, async (req: Request, res: Response) => {
       goal: str(body.goal, 4000) ?? undefined,
       description: str(body.description, 20000) ?? undefined,
       difficulty: (difficulty ?? undefined) as 'Beginner' | 'Intermediate' | 'Advanced' | undefined,
-      status: status as
-        | 'idea'
-        | 'planned'
-        | 'in_progress'
-        | 'completed'
-        | 'published'
-        | undefined,
+      // The status is normalised into the shared lifecycle enum, so the
+      // database never receives a second vocabulary.
+      status: status
+        ? normalizeProjectStatus(status)
+        : undefined,
       repositoryUrl: repositoryUrl.value,
       demoUrl: demoUrl.value,
       documentation: str(body.documentation, 500) ?? undefined,
@@ -5382,7 +5539,11 @@ app.get('/api/skill-gaps', requireAuth, async (req: Request, res: Response) => {
         code: 'no_target_role',
       });
     }
-    return res.json({ success: true, ...result });
+    // The priorities are ranked by the SAME algorithm the roadmap uses for its
+    // first recommended step, so "My Career" and the roadmap can never
+    // disagree about which skill to close next.
+    const priorities = rankSkillPriorities(result.gaps);
+    return res.json({ success: true, ...result, priorities });
   } catch (error) {
     console.error('Failed to compute skill gaps:', error);
     return res.status(500).json({ error: 'Failed to compute skill gaps' });
@@ -5577,6 +5738,55 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid userType' });
     }
 
+    // The target experience level is the level the candidate is AIMING at
+    // (student, intern, junior, mid, senior, lead). It is a different axis
+    // from the career state above, and it has its own vocabulary, so it is
+    // validated against that vocabulary rather than accepted verbatim.
+    //
+    // An absent value means "not set" and is a legitimate state: a candidate
+    // who has not chosen a level yet has none.
+    const experienceLevelWrite = normalizeExperienceLevel(body.experienceLevel);
+    if (!experienceLevelWrite.ok) {
+      return res.status(400).json({ error: experienceLevelWrite.error, code: 'invalid_experience_level' });
+    }
+
+    // The education state is its own axis. A future graduation year is a fact
+    // the platform must be able to record, because "studying, graduating 2028"
+    // and "graduated" are not the same person. An absent value leaves the
+    // column alone; an explicit null clears it.
+    const EDUCATION_STATUS_VALUES = ['currently_studying', 'graduated', 'not_set'] as const;
+    let educationStatus: string | null | undefined;
+    if (body.educationStatus === undefined) {
+      educationStatus = undefined;
+    } else if (body.educationStatus === null) {
+      educationStatus = null;
+    } else if (
+      typeof body.educationStatus === 'string' &&
+      (EDUCATION_STATUS_VALUES as readonly string[]).includes(body.educationStatus)
+    ) {
+      educationStatus = body.educationStatus;
+    } else {
+      return res
+        .status(400)
+        .json({ error: 'educationStatus must be currently_studying, graduated or not_set' });
+    }
+
+    let expectedGraduationYear: number | null | undefined;
+    if (body.expectedGraduationYear === undefined) {
+      expectedGraduationYear = undefined;
+    } else if (body.expectedGraduationYear === null) {
+      expectedGraduationYear = null;
+    } else if (
+      typeof body.expectedGraduationYear === 'number' &&
+      Number.isInteger(body.expectedGraduationYear) &&
+      body.expectedGraduationYear >= 1900 &&
+      body.expectedGraduationYear <= 2200
+    ) {
+      expectedGraduationYear = body.expectedGraduationYear;
+    } else {
+      return res.status(400).json({ error: 'expectedGraduationYear must be a four-digit year' });
+    }
+
     const isAvatarId =
       typeof body.avatarUrl === 'string' && /^avatar-[0-9]{2}$/.test(body.avatarUrl.trim());
     const avatarUrl =
@@ -5683,6 +5893,14 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
       targetRole: targetRoleTitle === undefined ? undefined : targetRoleTitle,
       targetIndustry,
       userType: (userType ?? undefined) as string | undefined,
+      // The experience level is written only when the caller supplied one.
+      // `undefined` means "leave it alone"; `null` means "clear it".
+      experienceLevel:
+        body.experienceLevel === undefined
+          ? undefined
+          : experienceLevelWrite.value ?? null,
+      educationStatus,
+      expectedGraduationYear,
       onboardingCompleted:
         typeof body.onboardingCompleted === 'boolean' ? body.onboardingCompleted : undefined,
       // The status is validated against the shared vocabulary rather than
@@ -6223,7 +6441,21 @@ app.delete('/api/learning/items/:courseId', requireAuth, async (req: Request, re
  * the authenticated user's persisted profile, skills, roadmap and learning
  * state, and the AI only sees the already-ranked candidates.
  */
-app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredits('learning_recommendation'), async (req: Request, res: Response) => {
+app.post('/api/learning/recommendations', requireAuth, aiRateLimit, (req: Request, res: Response, next: NextFunction) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  // A request that explicitly asks for the deterministic recommendations ONLY
+  // never runs a model, so it must not cost a token.
+  //
+  // This matters because the Learning Hub refreshes the deterministic ranking
+  // on its own: when the career graph is hydrated, when a course is saved,
+  // started, dismissed or completed, and when the page is opened. Those are
+  // ordinary product actions, not AI actions, and charging a token for them
+  // was the single largest source of unexpected token loss.
+  if (body.ai === false) {
+    return next();
+  }
+  return requireCredits('learning_recommendation')(req as AuthedRequest, res, next);
+}, async (req: Request, res: Response) => {
   /**
    * Refuses the request, giving the credit back first.
    *
@@ -6328,18 +6560,36 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, requireCredi
     // validation — the candidate got the deterministic ranking instead, and
     // the reservation is given back. The refund is idempotent, so it cannot
     // return the same credit twice.
-    let creditBalance = req.aiCreditReservation?.remainingBalance ?? 0;
+    //
+    // When the request asked for the deterministic ranking only, there is no
+    // reservation at all and no balance to report: the candidate was never
+    // charged, so the badge must not be told that it is now zero.
+    const reservation = req.aiCreditReservation;
+    let creditBalance = reservation?.remainingBalance;
     if (aiAttempted && !result.aiUsed) {
       const refund = await refundAiCreditReservation(
         req as AuthedRequest,
         `The Learning Hub AI answer was rejected: ${result.aiFallbackReason ?? 'unknown reason'}`
       );
       creditBalance = refund.newBalance;
+    } else if (aiAttempted && result.aiUsed) {
+      // A real AI explanation was produced, so the credit is earned.
+      markAiCreditCompleted(req as AuthedRequest);
+    } else if (reservation) {
+      // A reservation was taken but no model was ever asked — the server had
+      // no provider, or the daily allowance was spent. The reservation is
+      // given back BEFORE the answer is sent, so the balance the candidate
+      // reads is the balance the ledger holds.
+      const refund = await refundAiCreditReservation(
+        req as AuthedRequest,
+        'The Learning Hub request did not reach a model, so no token was spent.'
+      );
+      creditBalance = refund.newBalance;
     }
 
     return res.json({
       ...result,
-      creditBalance,
+      ...(typeof creditBalance === 'number' ? { creditBalance } : {}),
       context: {
         careerGoal: built.context.careerGoal,
         targetRoleSlug: built.context.targetRole?.slug ?? null,
@@ -7241,6 +7491,7 @@ const publicPageHandler = async (req: Request, res: Response) => {
 app.get('/about', publicPageHandler);
 app.get('/terms', publicPageHandler);
 app.get('/privacy', publicPageHandler);
+app.get('/contact', publicPageHandler);
 app.get('/careers', publicPageHandler);
 app.get('/careers/:slug', publicPageHandler);
 app.get('/learning', publicPageHandler);

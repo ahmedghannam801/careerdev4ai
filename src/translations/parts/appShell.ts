@@ -7,6 +7,10 @@
  */
 
 export const appShellAr: Record<string, string> = {
+  // The five pillars of the navigation.
+  'My Career': 'مسارتي المهنية',
+  'Learn & Practise': 'تعلّم وتدريب',
+  'Get Hired': 'احصل على وظيفة',
   'CareerDev4AI sign in': 'تسجيل الدخول إلى CareerDev4AI',
   'Close modal': 'إغلاق النافذة',
   'Secure career state sync': 'مزامنة آمنة لحالة المسار المهني',

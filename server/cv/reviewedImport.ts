@@ -46,6 +46,7 @@ import {
   createVolunteerExperience,
 } from '../db/volunteer.ts';
 import { getUserSkills, setUserSkillLevel, resolveSkillId } from '../db/userSkills.ts';
+import { isSkillSectionHeader, normalizeSkillKey } from '../../shared/cvDedupe.ts';
 
 /** The key a record is matched on. */
 function key(...parts: Array<string | null | undefined>): string {
@@ -53,6 +54,65 @@ function key(...parts: Array<string | null | undefined>): string {
     .map((part) => (part ?? '').trim().toLowerCase().replace(/\s+/g, ' '))
     .filter(Boolean)
     .join('|');
+}
+
+/**
+ * The key an experience is matched on: the title, the organisation and the
+ * dates.
+ *
+ * The dates are part of the key because the same title at the same
+ * organisation held twice is TWO placements — a summer internship and a
+ * graduate scheme at the same company are not the same job, and matching
+ * them on the title alone silently threw one of them away.
+ *
+ * When one of the two records has no dates at all, the match falls back to
+ * the title and the organisation: an entry the candidate has not dated yet is
+ * the same entry, not a second one.
+ */
+function experienceMatchKey(entry: {
+  role?: string | null;
+  company?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  period?: string | null;
+}): string {
+  const title = key(entry.role);
+  const organisation = key(entry.company);
+  const dates = key(entry.startDate, entry.endDate) || key(entry.period);
+  return dates ? `${title}|${organisation}|${dates}` : `${title}|${organisation}`;
+}
+
+/**
+ * Whether an incoming experience is the record that is already there.
+ *
+ * The dated key is tried first. When it does not match, a record with no
+ * dates of its own is accepted as the same entry.
+ */
+function matchesExistingExperience(
+  existing: Array<{
+    role?: string | null;
+    company?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    period?: string | null;
+  }>,
+  incoming: {
+    role?: string | null;
+    company?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    period?: string | null;
+  }
+): boolean {
+  const target = experienceMatchKey(incoming);
+  if (existing.some((entry) => experienceMatchKey(entry) === target)) return true;
+
+  // A dated entry against an undated one: the same job, recorded with and
+  // without its dates.
+  const undated = existing.filter(
+    (entry) => !key(entry.startDate, entry.endDate, entry.period)
+  );
+  return undated.some((entry) => experienceMatchKey(entry) === target);
 }
 
 function hasText(value: unknown): value is string {
@@ -122,15 +182,25 @@ async function importExperience(
 ): Promise<CvReviewedSectionResult> {
   const result = emptySection('experience');
   const existing = await listExperiences(userId);
-  const seen = new Set(existing.map((entry) => key(entry.role, entry.company)));
+  // The entries written during THIS run, so two copies of the same entry
+  // inside one CV are imported once.
+  const written: Array<{
+    role?: string | null;
+    company?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    period?: string | null;
+  }> = [];
 
   for (const entry of cv.experiences ?? []) {
     if (!hasText(entry.role) && !hasText(entry.company)) {
       result.skipped += 1;
       continue;
     }
-    const entryKey = key(entry.role, entry.company);
-    if (seen.has(entryKey)) {
+    // The match is on the title, the organisation AND the dates, so a second
+    // placement at the same organisation is imported as a second placement
+    // instead of being mistaken for a repeat.
+    if (matchesExistingExperience(existing, entry) || matchesExistingExperience(written, entry)) {
       result.skipped += 1;
       continue;
     }
@@ -144,7 +214,13 @@ async function importExperience(
         isCurrent: entry.isCurrent,
         achievements: entry.bullets,
       });
-      seen.add(entryKey);
+      written.push({
+        role: entry.role ?? null,
+        company: entry.company ?? null,
+        startDate: entry.startDate ?? null,
+        endDate: entry.endDate ?? null,
+        period: entry.period ?? null,
+      });
       result.imported += 1;
     } catch (error) {
       result.failed += 1;
@@ -387,15 +463,30 @@ async function importSkills(
 ): Promise<CvReviewedSectionResult> {
   const result = emptySection('skills');
   const existing = await getUserSkills(userId);
-  const seen = new Set(existing.map((entry) => key(entry.skill?.name)));
+  // The skill names are matched on their NORMALISED form, so "Python",
+  // "python " and "(Python)" are one skill rather than three. Matching on the
+  // raw string was how a candidate ended up with the same skill listed twice
+  // after importing two CVs.
+  const seen = new Set(
+    existing
+      .map((entry) => entry.skill?.name)
+      .filter((name): name is string => Boolean(name))
+      .map((name) => normalizeSkillKey(name))
+  );
 
   for (const name of cv.skillsList ?? []) {
     if (!hasText(name)) {
       result.skipped += 1;
       continue;
     }
-    const entryKey = key(name);
-    if (seen.has(entryKey)) {
+    // A section heading is not a skill. "TECHNICAL SKILLS" must never become
+    // a skill on the candidate's profile.
+    if (isSkillSectionHeader(name)) {
+      result.skipped += 1;
+      continue;
+    }
+    const entryKey = normalizeSkillKey(name);
+    if (!entryKey || seen.has(entryKey)) {
       result.skipped += 1;
       continue;
     }

@@ -42,6 +42,7 @@ import {
   formatCvPeriod,
   type CvSourceData,
 } from './cvDocument.ts';
+import { isSkillSectionHeader, normalizeSkillKey } from './cvDedupe.ts';
 /**
  * Whether an id belongs to a record the platform stores.
  *
@@ -332,16 +333,18 @@ export function mergeCanonicalCvDocument(
   const hiddenSkills = new Set(previous.hiddenSkills ?? []);
   const documentSkillNames = previous.skillsList ?? [];
   const skillsList: string[] = [];
-  for (const name of documentSkillNames) {
-    if (hiddenSkills.has(name)) continue;
-    if (skillsList.includes(name)) continue;
-    skillsList.push(name);
-  }
-  for (const name of ownedNames) {
-    if (skillsList.includes(name)) continue;
-    if (hiddenSkills.has(name)) continue;
-    skillsList.push(name);
-  }
+  const seenSkillKeys = new Set<string>();
+  const appendSkill = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed || isSkillSectionHeader(trimmed)) return;
+    if (hiddenSkills.has(trimmed)) return;
+    const normalized = normalizeSkillKey(trimmed);
+    if (!normalized || seenSkillKeys.has(normalized)) return;
+    seenSkillKeys.add(normalized);
+    skillsList.push(trimmed);
+  };
+  for (const name of documentSkillNames) appendSkill(name);
+  for (const name of ownedNames) appendSkill(name);
 
   /* -- links ------------------------------------------------------------- */
   // The order and the enabled flag belong to this CV; the URL and the label

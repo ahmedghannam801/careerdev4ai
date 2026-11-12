@@ -7,8 +7,10 @@
  * module.
  */
 export type { SkillCategory, TargetRole, RoleSkill } from '../../shared/careerTypes.ts';
+export type { ProjectLifecycleStatus } from '../../shared/projectLifecycle.ts';
 
 import type { SkillCategory, TargetRole } from '../../shared/careerTypes.ts';
+import type { ProjectLifecycleStatus } from '../../shared/projectLifecycle.ts';
 import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
 import type { ResumeLanguage } from '../../shared/resumeLanguage.ts';
 
@@ -39,16 +41,46 @@ export type SkillSource =
   | 'experience'
   | 'certificate';
 
+/**
+ * The evidence that backs a skill.
+ *
+ * A skill is a claim plus whatever the platform can actually prove. The
+ * vocabulary is shared with the server (`shared/skillEvidence.ts`) so a badge
+ * shown in the browser means the same thing as the value in the database.
+ */
+export type SkillEvidenceSource =
+  | 'self_reported'
+  | 'diagnostic_assessment'
+  | 'course_completed'
+  | 'verified_project'
+  | 'certificate'
+  | 'work_experience';
+
 export interface UserSkill {
   id: string;
   name: string;
   category: SkillCategory;
-  currentLevel: number; // 1-5
+  /**
+   * The level the product compares against the role: the strongest of the
+   * self-report, the assessment and the evidence. Never a silent default —
+   * a skill nobody rated and nothing proves is level 0.
+   */
+  currentLevel: number; // 0-5
   targetLevel: number;  // 1-5
   gap: number;          // targetLevel - currentLevel (min 0)
   source: SkillSource;
   evidenceIds: string[];
   lastUpdated: string;
+  /** What the candidate says they can do (1-5). Null when never rated. */
+  selfReportedLevel?: number | null;
+  /** What a diagnostic knowledge check measured (1-5). Null when never taken. */
+  assessedLevel?: number | null;
+  /** The raw percentage the assessment scored (0-100). */
+  assessmentScore?: number | null;
+  /** When the assessment was taken. */
+  assessmentAt?: string | null;
+  /** The evidence backing this skill. */
+  evidenceSources?: SkillEvidenceSource[];
 }
 
 export interface CareerAnalysis {
@@ -91,6 +123,11 @@ export interface RoadmapTask {
   resourceTitle?: string;
   evidenceId?: string;
   estimatedHours: number;
+  /**
+   * The kind of work this step is: learning, practice, project or
+   * application. It is what makes the time estimate break down honestly.
+   */
+  workKind?: 'learning' | 'practice' | 'project' | 'application';
   /** How hard this step is: foundational, intermediate or advanced. */
   difficulty?: string | null;
   /** Titles of the steps that must be finished before this one. */
@@ -126,7 +163,15 @@ export interface RoadmapPhase {
   isUnlocked: boolean;
 }
 
-export type ProjectStatus = 'idea' | 'planned' | 'in_progress' | 'completed' | 'published';
+/**
+ * The status of a project.
+ *
+ * It is the shared lifecycle enum, so the interface, the server and the
+ * database all speak the same vocabulary. The older words ('idea',
+ * 'submitted', 'verified') are read as aliases rather than as statuses of
+ * their own.
+ */
+export type ProjectStatus = ProjectLifecycleStatus;
 
 export type ProjectCategory = 'academic' | 'personal' | 'professional' | 'volunteer' | 'team';
 
@@ -822,8 +867,21 @@ export interface ProfileCompletenessBreakdown {
 
 export interface CareerContextSummary {
   profile: any;
-  careerGoal?: string;
-  targetRole: TargetRole;
+  /**
+   * The candidate's goal, or null when they have not chosen one.
+   *
+   * It is nullable because the platform never assumes a goal: a student
+   * chasing a promotion is a default the candidate did not ask for.
+   */
+  careerGoal?: string | null;
+  /**
+   * The candidate's target role, or null when they have not chosen one.
+   *
+   * It is nullable because the platform must never stand in a role the
+   * candidate did not pick. Consumers read `targetRole?.title` and fall back
+   * to a prompt.
+   */
+  targetRole: TargetRole | null;
   skills: UserSkill[];
   skillGaps: string[];
   experience: UserExperienceEntry[];

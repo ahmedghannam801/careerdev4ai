@@ -220,7 +220,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
       {
         careerState: profile.careerState,
         careerGoal: profile.careerGoal,
-        targetRoleTitle: targetRole.title,
+        targetRoleTitle: targetRole?.title ?? '',
       },
       templates
     )
@@ -229,7 +229,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
         (entry): entry is { template: CvTemplateWithAccess; reason: string } =>
           entry.template !== undefined
       );
-  }, [templates, showHighlights, profile.careerState, profile.careerGoal, targetRole.title]);
+  }, [templates, showHighlights, profile.careerState, profile.careerGoal, targetRole?.title ?? '']);
 
   const featured = useMemo(() => {
     if (!showHighlights) return [];

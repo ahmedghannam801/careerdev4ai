@@ -3,6 +3,7 @@ import { ArrowRight, Clock } from 'lucide-react';
 
 import { useCareer } from '../../context/CareerContext';
 import { getActionIcon } from './activityIcons';
+import { activityBadge } from '../../../shared/activityStatus';
 
 /**
  * The dashboard's Recent Activity panel.
@@ -68,6 +69,7 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
         <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
           {recent.map((item) => {
             const Icon = getActionIcon(item.actionType);
+            const badge = activityBadge(item.actionType);
             const body = (
               <>
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]">
@@ -76,6 +78,12 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold text-[var(--text-primary)]">{item.title}</span>
+                    <span
+                      title={t(badge.description)}
+                      className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)]"
+                    >
+                      {t(badge.label)}
+                    </span>
                     {item.relatedObject && (
                       <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]">
                         {item.relatedObject}

@@ -16,7 +16,9 @@ import { useCareer } from '../../context/CareerContext';
 import { DOCUMENT_TABS, DOCUMENT_TYPE_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { EmptyState } from '../ui/EmptyState';
 
 export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { 
@@ -167,7 +169,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           }`}
         >
           <FileText className="w-4 h-4" />
-          <span>All Documents ({documents.length})</span>
+          <span>{t('All Documents')} ({documents.length})</span>
         </button>
 
         <button
@@ -179,7 +181,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           }`}
         >
           <Layers className="w-4 h-4" />
-          <span>CV Versions ({cvVersions.length})</span>
+          <span>{t('CV Versions')} ({cvVersions.length})</span>
         </button>
 
         <button
@@ -191,7 +193,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
           }`}
         >
           <Sparkles className="w-4 h-4 text-[var(--color-primary-text)]" />
-          <span>Cover Letter Studio ({coverLetters.length})</span>
+          <span>{t('Cover Letter Studio')} ({coverLetters.length})</span>
         </button>
       </div>
 
@@ -219,12 +221,20 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             </div>
 
             <span className="text-[11px] text-[var(--text-muted)] font-mono">
-              Showing {filteredDocs.length} of {documents.length}
+              {t('Showing')} {filteredDocs.length} {t('of')} {documents.length}
             </span>
           </div>
 
-          {/* Documents Grid */}
-          <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredDocs.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title={t('No documents in this view yet')}
+              description={t('Create a CV snapshot in CV Studio, generate a cover letter, or add a certificate or portfolio project to collect your career assets here.')}
+              actionLabel={t('Open CV Studio')}
+              onAction={() => onNavigate('cv-studio')}
+            />
+          ) : (
+            <Stagger inView gap={0.06} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredDocs.map((doc) => (
               <StaggerItem
                 key={doc.id}
@@ -293,6 +303,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
               </StaggerItem>
             ))}
           </Stagger>
+          )}
         </div>
       )}
 
@@ -305,7 +316,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                 {t('Target Role CV Versions')}
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
-                Maintain distinct, tailored versions for specific roles without overwriting your master profile.
+                {t('Maintain distinct, tailored versions for specific roles without overwriting your master profile.')}
               </p>
             </div>
             <button
@@ -317,6 +328,15 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             </button>
           </div>
 
+          {cvVersions.length === 0 ? (
+            <EmptyState
+              icon={Layers}
+              title={t('No CV versions saved yet')}
+              description={t('Save snapshots in CV Studio to maintain role-specific versions and track ATS alignment over time.')}
+              actionLabel={t('Open CV Studio')}
+              onAction={() => onNavigate('cv-studio')}
+            />
+          ) : (
           <Stagger inView gap={0.06} className="space-y-3">
             {cvVersions.map((version) => (
               <StaggerItem
@@ -377,6 +397,7 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
               </StaggerItem>
             ))}
           </Stagger>
+          )}
         </div>
       )}
 
@@ -473,7 +494,11 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
                 className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-xs"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{isGeneratingCl ? 'Synthesizing with Gemini...' : 'Generate Tailored Cover Letter'}</span>
+                <span>
+                  {isGeneratingCl
+                    ? 'Synthesizing with Gemini...'
+                    : aiButtonLabel('Generate Tailored Cover Letter', 'cover_letter_generation', t)}
+                </span>
               </button>
               {!aiWritingEnabled && (
                 <p className="text-[11px] text-[var(--color-warning)]">

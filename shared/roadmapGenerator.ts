@@ -82,6 +82,13 @@ export interface RoadmapTaskPlan {
   /** Titles of tasks that must be finished first. */
   prerequisites: string[];
   estimatedHours: number;
+  /**
+   * The KIND of work this task is.
+   *
+   * It is what makes the time estimate break down honestly: a plan that says
+   * "12 hours" is not a plan unless it says how those hours are spent.
+   */
+  workKind: RoadmapStageWorkKind;
   difficulty: TaskDifficulty;
   status: RoadmapTaskStatus;
   resources: RoadmapResourceRef[];
@@ -113,6 +120,13 @@ export interface RoadmapPhasePlan {
 export interface RoadmapPlanSummary {
   totalTasks: number;
   estimatedHours: number;
+  /**
+   * How the total is spent.
+   *
+   * The parts add up to `estimatedHours` exactly, so "12h total" is never a
+   * number without a breakdown.
+   */
+  timeBreakdown: RoadmapTimeBreakdown;
   readinessPct: number;
   /** Open gaps on the role's CORE requirements. */
   openGaps: number;
@@ -121,6 +135,28 @@ export interface RoadmapPlanSummary {
   coveredSkills: string[];
   tasksByPriority: Record<SkillGapPriority, number>;
 }
+
+export type {
+  RoadmapTimeBreakdown,
+  RoadmapStageWorkKind,
+} from './roadmapTimeBreakdown.ts';
+
+export {
+  TIME_BREAKDOWN_LABELS,
+  TIME_BREAKDOWN_ORDER,
+  emptyTimeBreakdown,
+  normalizeWorkKind,
+  timeBreakdownParts,
+  breakdownTotal,
+  addTimeBreakdowns,
+  computeTimeBreakdown,
+} from './roadmapTimeBreakdown.ts';
+
+import {
+  computeTimeBreakdown,
+  type RoadmapStageWorkKind,
+  type RoadmapTimeBreakdown,
+} from './roadmapTimeBreakdown.ts';
 
 export interface RoadmapPlan {
   title: string;
@@ -274,15 +310,21 @@ export function generateRoadmapPlan(input: RoadmapGenerationInput): RoadmapPlan 
   };
   let totalTasks = 0;
   let estimatedHours = 0;
+  // The hours are counted by the KIND of work they are spent on, so the
+  // total can always be broken down. The parts add up to the total exactly:
+  // nothing is rounded away and nothing is hidden in a remainder.
+  const planTasks: Array<{ estimatedHours: number; workKind: RoadmapStageWorkKind }> = [];
   for (const phase of phases) {
     for (const milestone of phase.milestones) {
       for (const task of milestone.tasks) {
         totalTasks += 1;
         estimatedHours += task.estimatedHours;
+        planTasks.push({ estimatedHours: task.estimatedHours, workKind: task.workKind });
         tasksByPriority[task.priority] += 1;
       }
     }
   }
+  const timeBreakdown: RoadmapTimeBreakdown = computeTimeBreakdown(planTasks);
 
   const coveredSkills = gaps
     .filter((gap) => gap.gap === 0)
@@ -298,6 +340,7 @@ export function generateRoadmapPlan(input: RoadmapGenerationInput): RoadmapPlan 
     summary: {
       totalTasks,
       estimatedHours,
+      timeBreakdown,
       readinessPct: summaryStats.readinessPct,
       openGaps: openRequiredGaps.length,
       openPreferredGaps: openPreferredGaps.length,
@@ -402,6 +445,7 @@ function buildGapTask(
     primarySkillName: gap.name,
     prerequisites: [],
     estimatedHours: estimateHours(stage, gap),
+    workKind: stage === 0 ? 'learning' : stage === 1 ? 'learning' : 'practice',
     difficulty: difficultyForLevel(gap.requiredLevel),
     status: 'not_started',
     resources: matchedResources.map(stripResourceSkillNames),
@@ -458,6 +502,7 @@ function buildFallbackMilestone(
         primarySkillName: null,
         prerequisites: [],
         estimatedHours: STAGE_BASE_HOURS[stage] * 2,
+        workKind: 'practice',
         difficulty: difficultyForLevel(stage + 2),
         status: 'not_started',
         resources: matchResourcesByTopic(role, resources).slice(0, 2).map(stripResourceSkillNames),
@@ -509,6 +554,7 @@ function buildMarketReadinessPhase(
       primarySkillName: null,
       prerequisites: [],
       estimatedHours: 20,
+      workKind: 'learning',
       difficulty: 'intermediate',
       status: 'not_started',
       resources: [],
@@ -529,6 +575,7 @@ function buildMarketReadinessPhase(
       primarySkillName: null,
       prerequisites: [],
       estimatedHours: 12,
+      workKind: 'project',
       difficulty: 'intermediate',
       status: 'not_started',
       resources: [],
@@ -549,6 +596,7 @@ function buildMarketReadinessPhase(
       primarySkillName: null,
       prerequisites: [],
       estimatedHours: 6,
+      workKind: 'application',
       difficulty: 'intermediate',
       status: 'not_started',
       resources: [],

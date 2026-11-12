@@ -20,6 +20,7 @@
 import type { DocumentBlock, DocumentExtraction } from './documentExtraction.ts';
 import { CATALOG_SKILL_NAMES } from '../../shared/careerRoles.ts';
 import { normalizeProfileUrl } from '../../shared/urls.ts';
+import { isSkillSectionHeader } from '../../shared/cvDedupe.ts';
 
 export interface ParsedCvExperience {
   id: string;
@@ -31,6 +32,15 @@ export interface ParsedCvExperience {
   startDate?: string;
   endDate?: string;
   isCurrent?: boolean;
+  /**
+   * The kind of engagement: Internship, Full-time, Contract and so on.
+   *
+   * It belongs to the record it was written in, not to a record of its own.
+   * A CV that lists "Data Analyst Trainee", the training organisation, then
+   * "Internship" is describing ONE placement, and the parser used to read
+   * that third line as a section heading and throw it away.
+   */
+  employmentType?: string;
 }
 
 export interface ParsedCvEducation {
@@ -794,6 +804,107 @@ function isExperienceHeaderLine(value: string): boolean {
 }
 
 /**
+ * The kinds of engagement a CV names.
+ *
+ * The canonical spelling is the one stored on the record; the list holds the
+ * spellings candidates actually write.
+ *
+ * The patterns are ANCHORED on purpose. An unanchored "trainee" would match
+ * inside "Data Analyst Trainee", and the line that names the role would be
+ * read as the employment type and the role would be lost.
+ */
+const EMPLOYMENT_TYPE_CANONICAL: Array<{ canonical: string; pattern: RegExp }> = [
+  { canonical: 'Full-time', pattern: /^(?:full[\s-]?time|fulltime)$/i },
+  { canonical: 'Part-time', pattern: /^(?:part[\s-]?time|parttime)$/i },
+  { canonical: 'Contract', pattern: /^(?:contract|contractor|freelance[\s-]?contract)$/i },
+  { canonical: 'Freelance', pattern: /^(?:freelance|self[\s-]?employed)$/i },
+  {
+    canonical: 'Internship',
+    pattern: /^(?:intern|internship|trainee|apprentice|training(?:[\s-]?programme|[\s-]?program)?)$/i,
+  },
+  { canonical: 'Volunteer', pattern: /^(?:volunteer|voluntary|community[\s-]?service)$/i },
+  { canonical: 'Temporary', pattern: /^(?:temporary|temp|seasonal)$/i },
+  { canonical: 'Remote', pattern: /^(?:remote|work[\s-]?from[\s-]?home|wfh)$/i },
+];
+
+/** The Arabic names of the same. */
+const ARABIC_EMPLOYMENT_TYPES: Array<{ canonical: string; pattern: RegExp }> = [
+  { canonical: 'Full-time', pattern: /^(?:دوام\s*كامل|عمل\s*جزئي\s*كامل)$/u },
+  { canonical: 'Part-time', pattern: /^(?:دوام\s*جزئي)$/u },
+  { canonical: 'Contract', pattern: /^(?:عقد|عقد\s*مؤقت)$/u },
+  { canonical: 'Freelance', pattern: /^(?:عمل\s*حر|مستقل)$/u },
+  { canonical: 'Internship', pattern: /^(?:تدريب|تدريب\s*عملي|متدرب)$/u },
+  { canonical: 'Volunteer', pattern: /^(?:تطوع|متطوع|عمل\s*تطوعي)$/u },
+];
+
+/**
+ * Reads the employment type out of a line, if the line names one.
+ *
+ * Two shapes are recognised:
+ *
+ *   * the whole line is the type — "Internship", "Full-time";
+ *   * the type is in brackets on a line that also names the role —
+ *     "Data Analyst Trainee (Internship)".
+ *
+ * The second shape returns the remaining text as well, so the caller can
+ * keep the role and drop the bracket.
+ */
+export function parseEmploymentType(text: string): { type: string | null; rest: string } {
+  const raw = stripBullet(text).trim();
+  if (!raw) return { type: null, rest: '' };
+
+  // A bracketed type: "Data Analyst Trainee (Internship)".
+  const bracketed = raw.match(/^(.*?)\s*[([]([^)\]]{2,30})[)\]]\s*$/);
+  if (bracketed) {
+    const inner = bracketed[2].trim();
+    const found = findEmploymentType(inner);
+    if (found) {
+      const rest = bracketed[1].trim();
+      // The remainder must still be meaningful on its own; "(Internship)"
+      // alone leaves nothing, which is the whole-line case.
+      return { type: found, rest };
+    }
+  }
+
+  // The whole line is the type.
+  if (raw.length <= 40) {
+    const found = findEmploymentType(raw);
+    if (found) return { type: found, rest: '' };
+  }
+
+  return { type: null, rest: raw };
+}
+
+/**
+ * Matches a single line against the employment-type vocabulary.
+ */
+function findEmploymentType(text: string): string | null {
+  const value = text.trim();
+  if (!value) return null;
+  for (const entry of EMPLOYMENT_TYPE_CANONICAL) {
+    if (entry.pattern.test(value)) return entry.canonical;
+  }
+  for (const entry of ARABIC_EMPLOYMENT_TYPES) {
+    if (entry.pattern.test(value)) return entry.canonical;
+  }
+  return null;
+}
+
+/**
+ * Whether a line is nothing but an employment type.
+ *
+ * This is what separates "Internship" written as part of an entry from the
+ * "INTERNSHIPS" heading that introduces a whole section. The heading is
+ * longer, shouty, or both; the type is a single ordinary word.
+ */
+function isEmploymentTypeLine(text: string): boolean {
+  const raw = stripBullet(text).trim();
+  if (!raw || raw.length > 40) return false;
+  if (raw === raw.toUpperCase() && raw.length > 6) return false;
+  return findEmploymentType(raw) !== null;
+}
+
+/**
  * The column labels a CV table uses, and what each one means.
  *
  * A CV table says what each column holds by labelling it, so the labels
@@ -963,6 +1074,54 @@ export function parseExperience(blocks: DocumentBlock[]): ParsedCvExperience[] {
   for (const block of blocks) {
     const raw = block.text.trim();
     if (!raw) continue;
+
+    // The employment type belongs to the entry it is written in.
+    //
+    // It is read BEFORE the section-heading check, because "Internship" is
+    // both a legitimate section heading and a legitimate line inside an
+    // entry. The difference is whether an entry is open: a heading is
+    // followed by another heading, a type is followed by the rest of the
+    // entry.
+    //
+    // Only a line that is NOTHING BUT a type is handled here. A type in
+    // brackets on a line that also names the role ("Data Analyst Trainee
+    // (Internship)") is handled with the rest of that line, further down.
+    const employmentType = isEmploymentTypeLine(raw) ? findEmploymentType(raw) : null;
+    if (employmentType) {
+      if (current && !current.employmentType) {
+        // Attach it to the open entry.
+        current.employmentType = employmentType;
+        continue;
+      }
+      if (!current) {
+        // No entry is open, so this line starts one: the type is known and
+        // the role and the organisation come after it.
+        current = {
+          id: '',
+          role: '',
+          company: '',
+          period: '',
+          location: '',
+          bullets: [],
+          employmentType,
+        };
+        continue;
+      }
+      // An entry is already open and already has a type. This is a new
+      // placement that starts with its type.
+      finish();
+      current = {
+        id: '',
+        role: '',
+        company: '',
+        period: '',
+        location: '',
+        bullets: [],
+        employmentType,
+      };
+      continue;
+    }
+
     if (matchSectionHeading(raw)) continue;
 
     const range = parseDateRange(raw);
@@ -1055,20 +1214,72 @@ export function parseExperience(blocks: DocumentBlock[]): ParsedCvExperience[] {
     }
 
     if (isExperienceHeaderLine(raw)) {
-      const split = splitRoleCompany(raw);
-      // "Senior Data Analyst" followed by "Nile Retail Group" is one entry
-      // split across two lines. Merge the company into the open entry.
-      if (
-        current &&
-        !current.period &&
-        current.bullets.length === 0 &&
-        current.role &&
-        !current.company &&
-        split.company &&
-        !split.role
-      ) {
-        current.company = split.company;
-        continue;
+      // A line that names the role may also name the engagement:
+      // "Data Analyst Trainee (Internship)". The type belongs to the entry,
+      // not to a record of its own.
+      const headerEmployment = parseEmploymentType(raw);
+      const headerText = headerEmployment.rest || raw;
+
+      const split = splitRoleCompany(headerText);
+
+      // The open entry is still open: it has no dates and no bullets yet, so
+      // the lines are still describing it rather than a new one.
+      const openEntry =
+        current && !current.period && current.bullets.length === 0 ? current : null;
+
+      if (openEntry) {
+        // The organisation comes first and the role second — "University Data
+        // Analytics Training" then "Data Analyst Trainee".
+        //
+        // Read on its own the organisation looks like a complete entry with no
+        // role, so the parser used to close it and start a second one. The
+        // fix is to hold an entry that has an organisation but no role open,
+        // and fill the role in when it arrives.
+        if (!openEntry.role && !openEntry.company && split.company && !split.role) {
+          openEntry.company = split.company;
+          continue;
+        }
+
+        // The role comes first and the organisation second — "Senior Data
+        // Analyst" then "Nile Retail Group".
+        if (openEntry.role && !openEntry.company && split.company && !split.role) {
+          openEntry.company = split.company;
+          continue;
+        }
+
+        // The organisation came first and the role arrives now.
+        if (!openEntry.role && openEntry.company && split.role && !split.company) {
+          openEntry.role = split.role;
+          if (headerEmployment.type && !openEntry.employmentType) {
+            openEntry.employmentType = headerEmployment.type;
+          }
+          continue;
+        }
+
+        // The entry was opened by its employment type ("Internship") and the
+        // role and organisation follow it.
+        if (!openEntry.role && !openEntry.company && split.role) {
+          openEntry.role = split.role;
+          if (split.company) openEntry.company = split.company;
+          if (headerEmployment.type && !openEntry.employmentType) {
+            openEntry.employmentType = headerEmployment.type;
+          }
+          continue;
+        }
+
+        // The entry was opened by its employment type and only the
+        // organisation follows it.
+        if (!openEntry.role && !openEntry.company && split.company) {
+          openEntry.company = split.company;
+          continue;
+        }
+
+        // The entry already has a role and an organisation. The only thing
+        // this line can still add is the engagement type.
+        if (headerEmployment.type && !openEntry.employmentType) {
+          openEntry.employmentType = headerEmployment.type;
+          continue;
+        }
       }
 
       finish();
@@ -1079,9 +1290,10 @@ export function parseExperience(blocks: DocumentBlock[]): ParsedCvExperience[] {
         period: '',
         location: '',
         bullets: [],
+        employmentType: headerEmployment.type ?? undefined,
       };
       if (!current.role && !current.company) {
-        current.role = raw;
+        current.role = headerText;
       }
       if (pendingRange) {
         current.period = pendingRange.period;
@@ -1411,6 +1623,11 @@ function parseSkills(blocks: DocumentBlock[]): string[] {
     if (value.split(/\s+/).length > 6) return;
     if (/[.!?]$/.test(value)) return;
     if (/^(skills?|tools?|technologies|technical|core|competencies|expertise|languages?)$/i.test(value)) return;
+    // "SOFT SKILLS" and "TECHNICAL SKILLS" are headings, not skills. The
+    // single-word check above catches "Skills" but not the two-word ones,
+    // so the shared heading vocabulary decides here. Without it a candidate's
+    // CV imports a skill called "TECHNICAL SKILLS".
+    if (isSkillSectionHeader(value)) return;
     const key = value.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);

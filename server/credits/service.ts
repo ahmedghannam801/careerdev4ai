@@ -61,7 +61,17 @@ export async function chargeAiAction(params: {
   action: AICreditAction;
   idempotencyKey: string;
   metadata?: Record<string, unknown>;
-}): Promise<{ success: boolean; remainingBalance: number; error?: string }> {
+}): Promise<{
+  success: boolean;
+  remainingBalance: number;
+  error?: string;
+  /**
+   * True when the ledger already held this idempotency key, so no credit was
+   * taken this time. A replayed request must never be refunded: the credit it
+   * would give back belongs to the original request.
+   */
+  idempotentReplay?: boolean;
+}> {
   const required = CREDIT_WEIGHTS[params.action] ?? 1;
   return deductCredits({
     profileId: params.profileId,

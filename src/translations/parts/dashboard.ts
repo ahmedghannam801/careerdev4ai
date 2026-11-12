@@ -147,4 +147,8 @@ export const dashboardAr: Record<string, string> = {
   'Interview stages and roadmap deadlines appear here as they come up.':
     'تظهر مراحل المقابلات ومواعيد خارطة الطريق هنا فور ورودها.',
   'Interview practice': 'التدريب على المقابلات',
+
+  // ---- The metrics the hero card does not already show -------------------
+  'Evidence artifacts': 'أدلة الإنجاز',
+  'Mock interviews': 'مقابلات تجريبية',
 };

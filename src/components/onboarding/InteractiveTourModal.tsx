@@ -366,7 +366,7 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
 
   // Intelligent Contextual Hint (grounded in user's profile state)
   const contextualHint = (() => {
-    if (currentChapter.id === 'career-planning' && !targetRole.title) {
+    if (currentChapter.id === 'career-planning' && !targetRole?.title) {
       return t('You have not selected a target role yet. Use the catalog to choose your goal!');
     }
     if (currentChapter.id === 'skills' && skills.length === 0) {

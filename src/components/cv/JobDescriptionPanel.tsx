@@ -36,6 +36,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { AIProcessingModal, type AIProcessingStatus } from '../ai/AIProcessingModal';
 import { saveApplicationPackage, updateApplicationPackage, listApplicationPackages, type ApplicationPackageDTO } from '../../lib/applicationPackagesApi';
 import {
@@ -682,7 +683,11 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
             )}
-            <span>{isAnalyzing ? t('Analysing the job description…') : t('Analyse this job description')}</span>
+            <span>
+              {isAnalyzing
+                ? t('Analysing the job description…')
+                : aiButtonLabel(t('Analyse this job description'), 'job_description_analysis', t)}
+            </span>
           </button>
 
           <button
@@ -695,7 +700,11 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
             ) : (
               <Wand2 className="w-3.5 h-3.5" />
             )}
-            <span>{isGenerating ? t('Writing your CV…') : t('Write my CV for this job')}</span>
+            <span>
+              {isGenerating
+                ? t('Writing your CV…')
+                : aiButtonLabel(t('Write my CV for this job'), 'cv_tailoring', t)}
+            </span>
           </button>
 
           {!canAnalyze && (
@@ -1024,7 +1033,9 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
               className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] disabled:opacity-50"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              {coverLetterDraft ? t('Regenerate cover letter') : t('Generate cover letter')}
+              {coverLetterDraft
+                ? aiButtonLabel(t('Regenerate cover letter'), 'cover_letter_generation', t)
+                : aiButtonLabel(t('Generate cover letter'), 'cover_letter_generation', t)}
             </button>
             <button
               type="button"

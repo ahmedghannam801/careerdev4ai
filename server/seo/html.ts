@@ -168,6 +168,56 @@ ul.clean li:last-child { border-bottom: 0; }
   .site-nav { gap: 14px; font-size: 0.85rem; }
   main { padding: 32px 0 56px; }
 }
+
+/* The contact page.
+   The contact details are the one part of the public site that has to stay
+   correct for a third party — a reviewer reads them and acts on them. They
+   are laid out as cards that hold their shape on a phone, and a detail that
+   has not been supplied yet is marked as outstanding rather than left blank,
+   so a reader can tell the difference between "not published" and "missed". */
+.contact-card { display: flex; flex-direction: column; gap: 10px; }
+.contact-icon {
+  width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2);
+  display: inline-flex; align-items: center; justify-content: center; color: var(--accent);
+}
+.contact-icon svg { width: 18px; height: 18px; }
+.contact-label {
+  font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent); font-weight: 700;
+}
+.contact-value { font-size: 1rem; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.contact-value a { text-decoration: none; }
+.contact-value a:hover { text-decoration: underline; }
+.contact-note { font-size: 0.85rem; color: var(--text-2); margin: 0; }
+.address-block { font-style: normal; }
+.address-block span { display: block; }
+.pending {
+  border: 1px dashed var(--border-strong); background: var(--surface-2);
+  border-radius: 10px; padding: 10px 12px;
+}
+.pending .contact-value { color: var(--text-2); font-weight: 600; }
+.chip-pending {
+  display: inline-block; font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--accent); background: var(--surface); border: 1px dashed var(--border-strong);
+  border-radius: 999px; padding: 2px 10px; font-weight: 700;
+}
+.notice {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--primary); border-radius: 10px; padding: 16px 18px;
+}
+.notice p { margin: 0; }
+.notice p + p { margin-top: 10px; }
+.detail-list { list-style: none; padding: 0; margin: 14px 0 0; }
+.detail-list li { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.detail-list li:last-child { border-bottom: 0; }
+.detail-list strong { font-weight: 600; color: var(--text); }
+.detail-list span { color: var(--text-2); }
+@media (max-width: 640px) {
+  .contact-value { font-size: 0.97rem; }
+  /* On a phone the label and its explanation read better one above the other
+     than side by side, where the label wraps into three short lines. */
+  .detail-list li { flex-direction: column; gap: 2px; }
+}
 `;
 
 /** The links shown in the header of every public page. */
@@ -176,6 +226,21 @@ const HEADER_LINKS: PublicLink[] = [
   { href: '/careers', label: 'Careers' },
   { href: '/learning', label: 'Learning' },
   { href: '/opportunities', label: 'Opportunities' },
+];
+
+/**
+ * The links shown in the footer of every public page.
+ *
+ * The footer carries the whole set of public destinations rather than a
+ * selection of them: the footer is where a reader looks for the way to reach
+ * the business, so the Contact Us page is one of its links.
+ */
+const FOOTER_LINKS: PublicLink[] = [
+  { href: '/about', label: 'About' },
+  { href: '/careers', label: 'Careers' },
+  { href: '/learning', label: 'Learning' },
+  { href: '/opportunities', label: 'Opportunities' },
+  { href: '/contact', label: 'Contact Us' },
 ];
 
 /**
@@ -252,7 +317,7 @@ function renderBreadcrumb(page: PublicPage): string {
  * all receive the same content.
  */
 export function renderPublicPage(page: PublicPage): string {
-  const links = (page.footerLinks ?? HEADER_LINKS)
+  const links = (page.footerLinks ?? FOOTER_LINKS)
     .map((link) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`)
     .join('');
 

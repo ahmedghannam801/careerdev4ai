@@ -211,7 +211,14 @@ export interface InterviewPlanQuestion extends QuestionItem {
 }
 
 export interface InterviewPlanInput {
-  role: TargetRole;
+  /**
+   * The candidate's target role.
+   *
+   * It is nullable: a candidate who has not chosen a role still gets a plan,
+   * built from the universal questions and their own CV. The plan never
+   * assumes a role it was not given.
+   */
+  role: TargetRole | null;
   experiences?: Array<{
     role: string;
     company: string;
@@ -253,6 +260,12 @@ function firstNonEmpty(...values: Array<string | undefined | null>): string | nu
  */
 export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQuestion[] {
   const role = input.role;
+  // With no target role the plan is still built — from the candidate's own CV
+  // and from the universal questions — and it speaks about "your target role"
+  // rather than inventing one. The role-specific technical block is simply
+  // empty until the candidate picks a role.
+  const roleId = role?.id ?? 'general';
+  const roleTitle = role?.title ?? 'your target role';
   const experiences = input.experiences ?? [];
   const projects = input.projects ?? [];
   const volunteering = input.volunteering ?? [];
@@ -287,8 +300,8 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
   behavioural.push({
     id: 'plan-beh-01',
     category: 'behavioral',
-    roleTarget: role.id,
-    question: `Walk me through your background and explain how it leads you to ${role.title}.`,
+    roleTarget: roleId,
+    question: `Walk me through your background and explain how it leads you to ${roleTitle}.`,
     context: experienceLabel
       ? `Personalised from your experience as ${experienceLabel}.`
       : 'A personal opening question that every candidate can answer.',
@@ -299,7 +312,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
         ? `Use ${experienceLabel} as the anchor, not a list of every job`
         : 'Anchor the answer in your education, training or a project',
       'Name the two or three capabilities that transfer directly',
-      `Connect them explicitly to ${role.title}`,
+      `Connect them explicitly to ${roleTitle}`,
       'Close with what you want to build next',
     ],
     personalization: experienceLabel ?? trainingLabel ?? projectLabel ?? undefined,
@@ -309,7 +322,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     behavioural.push({
       id: 'plan-beh-02',
       category: 'behavioral',
-      roleTarget: role.id,
+      roleTarget: roleId,
       question: `In your volunteer work as ${volunteeringLabel}, tell me about a specific problem you solved and the outcome you produced.`,
       context: `Personalised from your volunteering record${
         volunteerProject ? `: ${volunteerProject}` : ''
@@ -332,7 +345,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     behavioural.push({
       id: 'plan-beh-03',
       category: 'behavioral',
-      roleTarget: role.id,
+      roleTarget: roleId,
       question: `Tell me about ${projectLabel}. What problem did it solve, what did you build, and what was the hardest decision you made?`,
       context: `Personalised from your project “${projectLabel}”.`,
       recommendedFramework:
@@ -349,7 +362,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     behavioural.push({
       id: 'plan-beh-03',
       category: 'behavioral',
-      roleTarget: role.id,
+      roleTarget: roleId,
       question: `At ${primaryExperience.company}, what is the piece of work you are proudest of, and why?`,
       context: `Personalised from your experience as ${experienceLabel}.`,
       recommendedFramework:
@@ -366,7 +379,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     behavioural.push({
       id: 'plan-beh-03',
       category: 'behavioral',
-      roleTarget: role.id,
+      roleTarget: roleId,
       question: 'Tell me about a piece of work or study you are proudest of, and what it proves about how you work.',
       context: 'A personal evidence question for a candidate still building formal experience.',
       recommendedFramework:
@@ -384,7 +397,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     behavioural.push({
       id: 'plan-beh-04',
       category: 'behavioral',
-      roleTarget: role.id,
+      roleTarget: roleId,
       question: `You completed ${trainingLabel}. How did you apply what you learned to a real task, and what changed in your work?`,
       context: `Personalised from your completed training: ${trainingLabel}.`,
       recommendedFramework:
@@ -401,7 +414,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     behavioural.push({
       id: 'plan-beh-04',
       category: 'behavioral',
-      roleTarget: role.id,
+      roleTarget: roleId,
       question: 'Tell me about something you taught yourself because the work required it. How did you learn it and prove it worked?',
       context: 'Assesses learning velocity and evidence of self-directed growth.',
       recommendedFramework:
@@ -418,7 +431,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
   behavioural.push({
     id: 'plan-beh-05',
     category: 'behavioral',
-    roleTarget: role.id,
+    roleTarget: roleId,
     question:
       'Tell me about a time you disagreed with a colleague or manager about how work should be done. How did you handle it?',
     context: 'Tests cross-functional empathy, evidence-based persuasion and commit-and-deliver.',
@@ -435,7 +448,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
   behavioural.push({
     id: 'plan-beh-06',
     category: 'behavioral',
-    roleTarget: role.id,
+    roleTarget: roleId,
     question: 'Tell me about a time something you owned went wrong. What did you do, and what did you change afterwards?',
     context: 'Assesses accountability, root-cause thinking and learning from failure.',
     recommendedFramework:
@@ -451,7 +464,7 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
   behavioural.push({
     id: 'plan-beh-07',
     category: 'behavioral',
-    roleTarget: role.id,
+    roleTarget: roleId,
     question: 'When several priorities are urgent at once, how do you decide what to do first? Give me a real example.',
     context: 'Tests prioritisation, stakeholder management and delivery judgement.',
     recommendedFramework:
@@ -467,13 +480,13 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
   behavioural.push({
     id: 'plan-beh-08',
     category: 'behavioral',
-    roleTarget: role.id,
-    question: `Why are you targeting ${role.title} now, and what is your plan for the first 12 months?`,
+    roleTarget: roleId,
+    question: `Why are you targeting ${roleTitle} now, and what is your plan for the first 12 months?`,
     context: 'Assesses career intentionality, self-awareness and growth planning.',
     recommendedFramework:
       'Past trajectory → catalyst → role alignment → a concrete 12-month learning and delivery plan.',
     sampleKeyPoints: [
-      `Connect your evidence directly to ${role.title}`,
+      `Connect your evidence directly to ${roleTitle}`,
       'Explain the genuine motivation for this problem domain',
       'Name specific skills, projects or certifications you will build',
       'Say how you will know you are succeeding',
@@ -482,14 +495,14 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
 
   const technical: Array<Omit<InterviewPlanQuestion, 'index' | 'stage'>> = [];
 
-  for (const question of buildRoleQuestions(role)) {
+  for (const question of (role ? buildRoleQuestions(role) : [])) {
     if (technical.length >= 5) break;
     technical.push(question);
   }
 
   const roleSkills = [
     ...new Set(
-      [...role.requiredSkills, ...role.preferredSkills]
+      [...(role?.requiredSkills ?? []), ...(role?.preferredSkills ?? [])]
         .map((skill) => skill.name)
         .filter(Boolean)
     ),
@@ -505,13 +518,13 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     technical.push({
       id: `plan-tech-skill-${technical.length + 1}`,
       category: 'technical',
-      roleTarget: role.id,
-      question: `How would you apply ${skill} in a real ${role.title} task? Walk me through your approach and the trade-offs.`,
-      context: `A technical question drawn from the ${role.title} competency profile.`,
+      roleTarget: roleId,
+      question: `How would you apply ${skill} in a real ${roleTitle} task? Walk me through your approach and the trade-offs.`,
+      context: `A technical question drawn from the ${roleTitle} competency profile.`,
       recommendedFramework:
         'Principle → Application → Trade-off → Evidence: state the principle, show how you would apply it, name the risk, then give a concrete example.',
       sampleKeyPoints: [
-        `Show that you understand what ${skill} means in ${role.title} work`,
+        `Show that you understand what ${skill} means in ${roleTitle} work`,
         'Ground the answer in something you have actually done or studied',
         'Name the trade-off or risk you would watch for',
         'Close with the outcome you would be accountable for',
@@ -523,8 +536,8 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     {
       id: 'plan-tech-90',
       category: 'technical',
-      roleTarget: role.id,
-      question: `How would you measure success in your first 90 days as a ${role.title}?`,
+      roleTarget: roleId,
+      question: `How would you measure success in your first 90 days as a ${roleTitle}?`,
       context: 'Tests outcome thinking, role understanding and prioritisation.',
       recommendedFramework:
         'Learn → Contribute → Own: what you would learn first, what you would deliver, and the metric you would be accountable for.',
@@ -538,8 +551,8 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     {
       id: 'plan-tech-91',
       category: 'technical',
-      roleTarget: role.id,
-      question: `Describe a difficult trade-off you would expect in ${role.title} work and how you would decide.`,
+      roleTarget: roleId,
+      question: `Describe a difficult trade-off you would expect in ${roleTitle} work and how you would decide.`,
       context: 'Tests professional judgement and the ability to reason under constraints.',
       recommendedFramework:
         'Frame the trade-off, name the constraints, state the decision criteria, then give a recommendation and the risk you accept.',
@@ -553,8 +566,8 @@ export function buildInterviewPlan(input: InterviewPlanInput): InterviewPlanQues
     {
       id: 'plan-tech-92',
       category: 'technical',
-      roleTarget: role.id,
-      question: `How do you keep your ${role.title} knowledge current, and how do you decide what is worth learning?`,
+      roleTarget: roleId,
+      question: `How do you keep your ${roleTitle} knowledge current, and how do you decide what is worth learning?`,
       context: 'Tests learning strategy, judgement about sources and professional growth.',
       recommendedFramework:
         'Sources → Filter → Practice → Evidence: where you learn, how you judge quality, how you practise, and how you prove it.',

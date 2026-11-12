@@ -289,6 +289,20 @@ async function main() {
     // The accuracy of the extraction engine against documents whose contents
     // are known, with the metrics printed so they can be watched. Pure.
     join(TESTS_DIR, 'cv-extraction-quality.test.ts'),
+    // How the work-experience section is grouped: one block of lines is one
+    // placement, whatever order the lines are in, and the employment type is
+    // captured rather than discarded. Pure.
+    join(TESTS_DIR, 'cv-experience-grouping.test.ts'),
+    // The six scenarios from the QA report, written against the shared
+    // domain layer: a new student, a changed role, a finished knowledge
+    // check, an imported CV, a hand-rated skill and the Arabic interface.
+    // Pure.
+    join(TESTS_DIR, 'qa-scenarios.test.ts'),
+    // The shared measurement layer for the roadmap time breakdown and the
+    // progress momentum: the breakdown has to be additive, and the streak has
+    // to be computed from the user's own activity rather than estimated.
+    // Pure.
+    join(TESTS_DIR, 'progress-measurement.test.ts'),
     join(TESTS_DIR, 'target-role.test.ts'),
     join(TESTS_DIR, 'volunteer.test.ts'),
     // Live job vacancies: what the provider record becomes, what the fit
@@ -328,6 +342,19 @@ async function main() {
     // premium CV template is five, and the price the interface quotes is the
     // price the server charges. Pure: no key and no database are needed.
     join(TESTS_DIR, 'token-economy.test.ts'),
+    // The token deduction contract: a token is spent only on a real AI result
+    // the candidate asked for. The route table is scanned so that no passive
+    // action can be priced like an AI action, no route can spend a token
+    // outside the credit service, the ledger key is derived from the content
+    // of the request so a duplicate is charged once, and every AI route
+    // confirms its result so a request that produced nothing is refunded.
+    // Pure: no key and no database are needed.
+    join(TESTS_DIR, 'token-deduction-contract.test.ts'),
+    // The career target's contract: the role is never seeded from a default,
+    // the Profile page and the Settings page share one component and one
+    // writer, skipping the onboarding writes no role, and the catalogue is
+    // translated in both languages. Pure: no key and no database are needed.
+    join(TESTS_DIR, 'career-target.test.ts'),
     // The Checkout Studio parameters sent to Stripe, and the rule that picks
     // the hosted checkout's user-interface mode from the account's API
     // version. Pure: no key and no database are needed.

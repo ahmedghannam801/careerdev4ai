@@ -40,7 +40,10 @@ import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { PROFILE_SECTIONS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar, AvatarSelector } from '../ui/CareerPilotAvatars';
+import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
 import { useAIProcessing } from '../../lib/useAIProcessing';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
+import { CareerGoalRolePanel } from '../career/CareerGoalRolePanel';
 
 export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const {
@@ -58,6 +61,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     addVolunteerExperience,
     updateVolunteerExperience,
     deleteVolunteerExperience,
+    careerIdentity,
     t
   } = useCareer();
 
@@ -330,7 +334,40 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     setExpModalOpen(true);
   };
 
+  const hasInvertedDateRange = (startRaw: string, endRaw: string, isOngoing: boolean): boolean => {
+    if (isOngoing) return false;
+    const parseSortable = (raw: string): number | null => {
+      const s = raw.trim();
+      if (!s) return null;
+      if (/^\d{4}$/.test(s)) return Number(`${s}0101`);
+      const ym = s.match(/^(\d{4})-(\d{2})$/);
+      if (ym) return Number(`${ym[1]}${ym[2]}01`);
+      const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (ymd) return Number(`${ymd[1]}${ymd[2]}${ymd[3]}`);
+      const parsed = Date.parse(s);
+      if (!Number.isNaN(parsed)) return parsed;
+      return null;
+    };
+    const startVal = parseSortable(startRaw);
+    const endVal = parseSortable(endRaw);
+    if (startVal !== null && endVal !== null && startVal > 99999999 && endVal <= 99999999) {
+      return Date.parse(startRaw) > Date.parse(endRaw);
+    }
+    if (startVal !== null && endVal !== null) {
+      return endVal < startVal;
+    }
+    return false;
+  };
+
   const handleSaveExp = async () => {
+    if (!expForm.role.trim() || !expForm.company.trim()) {
+      setSaveError(t('Job title and company name are required.'));
+      return;
+    }
+    if (hasInvertedDateRange(expForm.startDate, expForm.endDate, expForm.isCurrent)) {
+      setSaveError(t('End date cannot be earlier than start date.'));
+      return;
+    }
     const achList = expForm.achievements.split('\n').map(s => s.trim()).filter(Boolean);
     const skillList = expForm.skillsUsed.split(',').map(s => s.trim()).filter(Boolean);
 
@@ -340,14 +377,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       if (editingExp) {
         const updated = profile.experiences.map(e => e.id === editingExp.id ? {
           ...e,
-          role: expForm.role,
-          company: expForm.company,
+          role: expForm.role.trim(),
+          company: expForm.company.trim(),
           employmentType: expForm.employmentType,
-          location: expForm.location,
-          startDate: expForm.startDate,
-          endDate: expForm.isCurrent ? 'Present' : expForm.endDate,
+          location: expForm.location.trim(),
+          startDate: expForm.startDate.trim(),
+          endDate: expForm.isCurrent ? 'Present' : expForm.endDate.trim(),
           isCurrent: expForm.isCurrent,
-          description: expForm.description,
+          description: expForm.description.trim(),
           achievements: achList,
           skillsUsed: skillList
         } : e);
@@ -355,14 +392,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       } else {
         const newExp: UserExperienceEntry = {
           id: `exp-${Date.now()}`,
-          role: expForm.role,
-          company: expForm.company,
+          role: expForm.role.trim(),
+          company: expForm.company.trim(),
           employmentType: expForm.employmentType,
-          location: expForm.location,
-          startDate: expForm.startDate,
-          endDate: expForm.isCurrent ? 'Present' : expForm.endDate,
+          location: expForm.location.trim(),
+          startDate: expForm.startDate.trim(),
+          endDate: expForm.isCurrent ? 'Present' : expForm.endDate.trim(),
           isCurrent: expForm.isCurrent,
-          description: expForm.description,
+          description: expForm.description.trim(),
           achievements: achList,
           skillsUsed: skillList
         };
@@ -417,6 +454,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   };
 
   const handleSaveEdu = async () => {
+    if (!eduForm.institution.trim() || !eduForm.degree.trim()) {
+      setSaveError(t('Institution and degree are required.'));
+      return;
+    }
+    if (hasInvertedDateRange(eduForm.startDate, eduForm.endDate, eduForm.current)) {
+      setSaveError(t('Graduation date cannot be earlier than start date.'));
+      return;
+    }
     const courseList = eduForm.coursework.split(',').map(s => s.trim()).filter(Boolean);
     setSaveError(null);
     setSaving(true);
@@ -424,26 +469,26 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
       if (editingEdu) {
         const updated = profile.education.map(e => e.id === editingEdu.id ? {
           ...e,
-          institution: eduForm.institution,
-          degree: eduForm.degree,
-          field: eduForm.field,
-          startDate: eduForm.startDate,
-          endDate: eduForm.current ? 'Present' : eduForm.endDate,
+          institution: eduForm.institution.trim(),
+          degree: eduForm.degree.trim(),
+          field: eduForm.field.trim(),
+          startDate: eduForm.startDate.trim(),
+          endDate: eduForm.current && !eduForm.endDate.trim() ? 'Present' : eduForm.endDate.trim(),
           current: eduForm.current,
-          gpa: eduForm.gpa,
+          gpa: eduForm.gpa.trim(),
           coursework: courseList
         } : e);
         await updateProfile({ education: updated });
       } else {
         const newEdu: UserEducationEntry = {
           id: `edu-${Date.now()}`,
-          institution: eduForm.institution,
-          degree: eduForm.degree,
-          field: eduForm.field,
-          startDate: eduForm.startDate,
-          endDate: eduForm.current ? 'Present' : eduForm.endDate,
+          institution: eduForm.institution.trim(),
+          degree: eduForm.degree.trim(),
+          field: eduForm.field.trim(),
+          startDate: eduForm.startDate.trim(),
+          endDate: eduForm.current && !eduForm.endDate.trim() ? 'Present' : eduForm.endDate.trim(),
           current: eduForm.current,
-          gpa: eduForm.gpa,
+          gpa: eduForm.gpa.trim(),
           coursework: courseList
         };
         await updateProfile({ education: [...profile.education, newEdu] });
@@ -778,6 +823,9 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <span className="text-sm font-bold text-[var(--text-primary)]">
                 {profileCompleteness.overallPercent}%
               </span>
+              {/* The score explains itself: what it measures, how it is
+                  calculated, and what it deliberately leaves out. */}
+              <ScoreInfoTooltip score="profileCompleteness" value={profileCompleteness.overallPercent} />
             </div>
             <span className="text-xs text-[var(--text-secondary)]">
               {profileCompleteness.overallPercent === 100 
@@ -822,6 +870,16 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         </div>
       </div>
 
+      {/* THE CAREER TARGET — the same component the Settings page mounts.
+          It sits directly under the profile card because it is the answer to
+          "where am I going?", and everything below it is measured against it. */}
+      <CareerGoalRolePanel
+        headingId="profile-career-target"
+        description={t(
+          'Your target role, career track and experience level. Your roadmap, skill gaps, learning plan and job matches are all measured against this — change it here and the whole platform follows.'
+        )}
+      />
+
       {/* Career Identity Command Center Card */}
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
@@ -853,7 +911,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               {t('Who You Are')}
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
-              {profile.careerIdentity?.whoYouAre || profile.careerState.replace('_', ' ')}
+              {profile.careerIdentity?.whoYouAre || careerIdentity.currentStatusLabel}
             </p>
           </div>
 
@@ -871,7 +929,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               {t('Why (Career Goal)')}
             </span>
             <p className="font-semibold text-[var(--text-primary)]">
-              {profile.careerIdentity?.why || profile.careerGoal.replace('_', ' ')}
+              {profile.careerIdentity?.why || careerIdentity.careerGoalLabel}
             </p>
           </div>
 
@@ -939,7 +997,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-[var(--color-primary-text)]" />
             <h2 className="text-base font-bold text-[var(--text-primary)]">
-              Work Experience ({profile.experiences.length})
+              {t('Work Experience')} ({profile.experiences.length})
             </h2>
           </div>
           <button
@@ -952,8 +1010,23 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         </div>
 
         {profile.experiences.length === 0 ? (
-          <div className="text-center py-8 text-xs text-[var(--text-muted)]">
-            No work experience logged yet. Add your past or current positions to substantiate your career trajectory.
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-4 py-6 text-center">
+            <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]">
+              <Briefcase className="h-4 w-4" />
+            </span>
+            <p className="text-xs font-semibold text-[var(--text-primary)]">
+              {t('No work experience recorded yet')}
+            </p>
+            <p className="mt-1 max-w-sm text-[11px] leading-relaxed text-[var(--text-secondary)]">
+              {t('Add internships, part-time roles, freelance work, or full-time positions to substantiate your trajectory.')}
+            </p>
+            <button
+              type="button"
+              onClick={handleOpenAddExp}
+              className="mt-3 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)]"
+            >
+              {t('Add Experience')}
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1042,7 +1115,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="flex items-center gap-2">
               <GraduationCap className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Education ({profile.education.length})
+                {t('Education')} ({profile.education.length})
               </h2>
             </div>
             <button
@@ -1055,7 +1128,27 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
 
           <div className="space-y-3">
-            {profile.education.map((edu) => (
+            {profile.education.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-4 py-6 text-center">
+                <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]">
+                  <GraduationCap className="h-4 w-4" />
+                </span>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">
+                  {t('No education entries yet')}
+                </p>
+                <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                  {t('Add your university, degree program, or expected graduation year so your CV and career stage stay accurate.')}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenAddEdu}
+                  className="mt-3 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)]"
+                >
+                  {t('Add Education')}
+                </button>
+              </div>
+            ) : (
+            profile.education.map((edu) => (
               <div 
                 key={edu.id}
                 className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] space-y-1.5"
@@ -1063,7 +1156,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-xs font-bold text-[var(--text-primary)]">
-                      {edu.degree} in {edu.field}
+                      {[edu.degree, edu.field].filter(Boolean).join(' in ') || edu.institution}
                     </h3>
                     <p className="text-xs text-[var(--color-primary-text)] font-medium">
                       {edu.institution}
@@ -1087,7 +1180,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   </p>
                 )}
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
 
@@ -1312,7 +1406,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="flex items-center gap-2">
               <Award className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Certifications ({profile.certifications.length})
+                {t('Certifications')} ({profile.certifications.length})
               </h2>
             </div>
             <button
@@ -1452,6 +1546,46 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 )}
               </div>
             ))}
+
+            {/* An empty section says what goes here and offers the one action
+                that fills it. "0" on its own is a dead end. */}
+            {profile.certifications.length === 0 && (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-4 py-6 text-center">
+                <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]">
+                  <Award className="h-4 w-4" />
+                </span>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">
+                  {t('No certifications yet')}
+                </p>
+                <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                  {t(
+                    'A certificate is proof a hiring manager can check. Add one you already hold, and it appears on your CV and in your portfolio.',
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCert(null);
+                    setCertForm({
+                      name: '',
+                      provider: '',
+                      issueDate: '',
+                      expiryDate: '',
+                      credentialId: '',
+                      credentialUrl: '',
+                      description: '',
+                      skills: '',
+                      attachmentUrl: '',
+                      doesNotExpire: false,
+                    });
+                    setCertModalOpen(true);
+                  }}
+                  className="mt-3 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] transition-[background-color,transform] hover:bg-[var(--accent-secondary)] active:scale-[0.98]"
+                >
+                  {t('Add your first certification')}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1464,7 +1598,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="flex items-center gap-2">
               <Languages className="w-4 h-4 text-[var(--color-primary-text)]" />
               <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Languages ({profile.languages.length})
+                {t('Languages')} ({profile.languages.length})
               </h2>
             </div>
             <button
@@ -1845,7 +1979,11 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   className="px-2.5 py-1 rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)] text-xs font-semibold hover:bg-[var(--accent-primary)] hover:text-[var(--color-on-primary)] transition-colors flex items-center gap-1 disabled:opacity-50"
                 >
                   <Sparkles className="w-3 h-3" />
-                  <span>{aiSummaryLoading ? 'Generating...' : 'Generate New Draft'}</span>
+                  <span>
+                    {aiSummaryLoading
+                      ? 'Generating...'
+                      : aiButtonLabel('Generate New Draft', 'ai_assist_inline', t)}
+                  </span>
                 </button>
               </div>
 
@@ -2192,15 +2330,25 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   />
                 </div>
                 <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Graduation Date')}</label>
+                  <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('Graduation Date (or Expected)')}</label>
                   <input
                     type="text"
                     value={eduForm.endDate}
                     onChange={(e) => setEduForm(prev => ({ ...prev, endDate: e.target.value }))}
+                    placeholder="e.g. 2028"
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
                   />
                 </div>
               </div>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-primary)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={eduForm.current}
+                  onChange={(e) => setEduForm(prev => ({ ...prev, current: e.target.checked }))}
+                  className="rounded accent-[var(--accent-primary)] cursor-pointer"
+                />
+                <span>{t('I am currently studying here (not yet graduated)')}</span>
+              </label>
               <div>
                 <label className="font-semibold text-[var(--text-primary)] block mb-1">{t('GPA (optional)')}</label>
                 <input

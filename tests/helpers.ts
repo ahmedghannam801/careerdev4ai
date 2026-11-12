@@ -102,21 +102,66 @@ export async function readConsentRows(userId: string): Promise<any[]> {
  * defect in the product, so the harness waits and tries again instead of
  * failing the run. A genuine failure (a wrong password, a rejected row) is
  * reported straight away.
+ *
+ * A dropped connection counts as transient. Node's fetch reports every
+ * network-level problem — a reset connection, a timed-out socket, a refused
+ * port — as the single message "fetch failed", and the real cause is on the
+ * error's `cause`. Without looking there, the one failure mode this harness
+ * is most likely to meet mid-run is the one it cannot recognise, and a
+ * momentary blip cancels whole suites instead of waiting them out.
  */
 async function withTransientRetry<T>(label: string, operation: () => Promise<T>): Promise<T> {
-  const transient = ['429', 'rate limit', 'timeout', 'timed out', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', '500', '502', '503', '504'];
+  const transient = [
+    '429',
+    'rate limit',
+    'timeout',
+    'timed out',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'EAI_AGAIN',
+    'ECONNREFUSED',
+    'ENOTFOUND',
+    'EPIPE',
+    'fetch failed',
+    'socket hang up',
+    '500',
+    '502',
+    '503',
+    '504',
+  ];
+
+  /** Everything the error says about itself: its message and its cause. */
+  function describe(error: unknown): string {
+    const parts: string[] = [];
+    let current: unknown = error;
+    // The cause chain is at most a few links deep, and it is walked with a
+    // bound so a self-referencing cause cannot loop for ever.
+    for (let depth = 0; depth < 5 && current; depth += 1) {
+      if (current instanceof Error) {
+        parts.push(current.message);
+        parts.push(current.name);
+        const code = (current as { code?: unknown }).code;
+        if (typeof code === 'string') parts.push(code);
+        current = (current as { cause?: unknown }).cause;
+      } else {
+        parts.push(String(current));
+        break;
+      }
+    }
+    return parts.join(' | ');
+  }
+
   let lastError: unknown;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
-      const message = error instanceof Error ? error.message : String(error);
-      if (!transient.some((marker) => message.includes(marker))) throw error;
+      if (!transient.some((marker) => describe(error).includes(marker))) throw error;
       await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
     }
   }
-  throw new Error(`${label} failed after retries: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+  throw new Error(`${label} failed after retries: ${describe(lastError)}`);
 }
 
 export async function createTestUser(
@@ -128,14 +173,23 @@ export async function createTestUser(
   const email = `${runEmailPrefix()}${label}-${randomBytes(6).toString('hex')}@example.invalid`;
   const password = `Tst-${randomBytes(12).toString('hex')}Aa1!`;
 
-  const { data, error } = await withTransientRetry('createTestUser', () =>
-    admin.auth.admin.createUser({
+  const { data } = await withTransientRetry('createTestUser', async () => {
+    const result = await admin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-    })
-  );
-  if (error || !data?.user) throw new Error(`createTestUser failed: ${error?.message}`);
+    });
+    // A throttled Auth service answers with an error rather than throwing, so
+    // it is raised here — otherwise the retry wrapper never sees it and the
+    // suite is cancelled by a limit it could simply have waited out.
+    if (result.error) {
+      throw new Error(
+        `createUser refused: ${result.error.message} (status ${result.error.status ?? 'unknown'})`
+      );
+    }
+    return result;
+  });
+  if (!data?.user) throw new Error('createTestUser failed: the platform returned no user');
 
   // The profile row is created by a database trigger on auth signup; create it
   // defensively in case the trigger is absent.
@@ -189,11 +243,17 @@ export async function createTestUser(
   const client = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data: session, error: signInError } = await withTransientRetry('signIn', () =>
-    client.auth.signInWithPassword({ email, password })
-  );
-  if (signInError || !session?.session) {
-    throw new Error(`signIn failed: ${signInError?.message}`);
+  const { data: session } = await withTransientRetry('signIn', async () => {
+    const result = await client.auth.signInWithPassword({ email, password });
+    if (result.error) {
+      throw new Error(
+        `signIn refused: ${result.error.message} (status ${result.error.status ?? 'unknown'})`
+      );
+    }
+    return result;
+  });
+  if (!session?.session) {
+    throw new Error('signIn failed: the platform returned no session');
   }
 
   return {

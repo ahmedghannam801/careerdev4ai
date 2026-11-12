@@ -607,10 +607,10 @@ const TargetRoleTracks: React.FC = () => {
   const [pendingId, setPendingId] = useState('');
   const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
 
-  const additional = savedRoles.filter((role) => role.id !== targetRole.id);
+  const additional = savedRoles.filter((role) => role.id !== targetRole?.id);
   const available = TARGET_ROLES.filter(
     (role) =>
-      role.id !== targetRole.id && !additional.some((entry) => entry.id === role.id)
+      role.id !== targetRole?.id && !additional.some((entry) => entry.id === role.id)
   );
 
   const handleAdd = () => {
@@ -628,7 +628,7 @@ const TargetRoleTracks: React.FC = () => {
       const changed = await setPrimaryTargetRole(role.id);
       // Keep the old primary as an additional track so promoting a role never
       // silently drops a target the candidate had added.
-      if (changed && previousPrimary.id !== role.id) {
+      if (changed && previousPrimary && previousPrimary.id !== role.id) {
         saveRole(previousPrimary);
       }
     } finally {
@@ -653,7 +653,7 @@ const TargetRoleTracks: React.FC = () => {
       <div className="flex flex-wrap gap-1.5">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--text-primary)]">
           <Star className="h-3 w-3 shrink-0 text-[var(--accent-primary)]" />
-          {targetRole.title}
+          {targetRole?.title ?? ''}
           <span className="rounded-full bg-[var(--accent-primary)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-on-primary)]">
             {t('Primary')}
           </span>

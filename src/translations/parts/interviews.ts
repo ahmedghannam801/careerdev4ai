@@ -35,4 +35,6 @@ export const interviewsAr: Record<string, string> = {
   'Your answer': 'إجابتك',
   'Finish Interview': 'أنهِ المقابلة',
   'Next Question': 'السؤال التالي',
+  'Interview readiness is 0% until you complete your first scored mock interview session.':
+    'تبقى الجاهزية للمقابلات 0% حتى تكمل أول جلسة محاكاة مقابلة مُقيّمة.',
 };

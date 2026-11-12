@@ -17,7 +17,9 @@ import {
   History,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { useToast } from '../toast/ToastProvider';
 import { CareerImage } from '../ui/CareerImage';
+import { hasPracticalEvidence } from '../../../shared/skillEvidence';
 
 export interface AssessmentQuestion {
   id: string;
@@ -61,53 +63,73 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     questions: [
       {
         id: 'sql-1',
-        prompt: 'Which SQL clause is executed FIRST in the standard logical query processing order?',
-        options: ['SELECT', 'FROM', 'WHERE', 'HAVING'],
+        prompt:
+          'You run:\n\nSELECT dept, COUNT(*) AS n\nFROM employees\nWHERE n > 5\nGROUP BY dept;\n\nWhy does the database reject WHERE n > 5?',
+        options: [
+          'GROUP BY cannot be combined with COUNT(*).',
+          'WHERE executes before GROUP BY and aliases in SELECT are not yet evaluated — aggregate filters belong in HAVING COUNT(*) > 5.',
+          'COUNT(*) does not work without ORDER BY.',
+          'You must wrap WHERE in parentheses.',
+        ],
         correctIndex: 1,
-        explanation: 'In logical query processing, FROM (and JOINs) executes first to assemble the working data set, followed by WHERE, GROUP BY, HAVING, SELECT, and ORDER BY.',
+        explanation:
+          'In SQL logical query processing, FROM and JOIN run first, followed by WHERE, GROUP BY, HAVING, SELECT, and ORDER BY. Filtering aggregated counts requires HAVING.',
       },
       {
         id: 'sql-2',
-        prompt: 'What is the primary difference between RANK() and DENSE_RANK() in window functions?',
+        prompt:
+          'An orders table has ties in revenue: 900, 800, 800, 700.\nWhat ranks does DENSE_RANK() OVER (ORDER BY revenue DESC) return vs RANK()?',
         options: [
-          'RANK() skips ranks after ties; DENSE_RANK() does not skip any ranks.',
-          'DENSE_RANK() requires an ORDER BY clause while RANK() does not.',
-          'RANK() only works with integer partitions.',
-          'DENSE_RANK() always returns floating point percentiles.',
+          'RANK() skips ranks after ties (1, 2, 2, 4); DENSE_RANK() keeps consecutive ranks (1, 2, 2, 3).',
+          'DENSE_RANK() requires a LIMIT clause while RANK() does not.',
+          'RANK() only works on primary keys.',
+          'DENSE_RANK() returns decimals when ties occur.',
         ],
         correctIndex: 0,
-        explanation: 'RANK() assigns duplicate ranks for ties and skips subsequent ranks (e.g., 1, 2, 2, 4), whereas DENSE_RANK() leaves no gaps (e.g., 1, 2, 2, 3).',
+        explanation:
+          'RANK() leaves gaps after duplicate values (1, 2, 2, 4), whereas DENSE_RANK() assigns consecutive integers with no gaps (1, 2, 2, 3).',
       },
       {
         id: 'sql-3',
-        prompt: 'To retain all records from table A and only matching records from table B, which join should you use?',
-        options: ['INNER JOIN', 'FULL OUTER JOIN', 'LEFT OUTER JOIN', 'CROSS JOIN'],
+        prompt:
+          'You want EVERY customer row from customers (left) and only matching orders from orders (right), keeping customers with 0 orders. Which query works without accidentally turning the join into an INNER JOIN?',
+        options: [
+          'INNER JOIN orders o ON o.customer_id = c.id',
+          'FULL OUTER JOIN orders o ON o.customer_id = c.id',
+          'LEFT JOIN orders o ON o.customer_id = c.id AND o.status = \'paid\'',
+          'CROSS JOIN orders o',
+        ],
         correctIndex: 2,
-        explanation: 'A LEFT OUTER JOIN preserves all rows from the left table (A) regardless of whether a matching row exists in the right table (B).',
+        explanation:
+          'A LEFT JOIN retains all rows from customers, and placing o.status = \'paid\' inside the ON clause preserves unmatched customers rather than filtering them out in WHERE.',
       },
       {
         id: 'sql-4',
-        prompt: 'How does a correlated subquery differ from a standard subquery?',
+        prompt:
+          'When analyzing slow SQL queries, how does a correlated subquery differ from a standard CTE/subquery?',
         options: [
-          'It executes once for the entire query.',
-          'It references columns from the outer query and re-evaluates for each outer row.',
-          'It cannot contain WHERE clauses.',
-          'It is stored as a permanent database view.',
+          'It runs once before the outer query starts.',
+          'It references columns from the outer query and may re-evaluate per outer candidate row unless rewritten as a join or window.',
+          'It cannot contain a WHERE clause.',
+          'It caches results permanently across sessions.',
         ],
         correctIndex: 1,
-        explanation: 'A correlated subquery depends on values from the outer query row and executes iteratively for each candidate row processed by the outer query.',
+        explanation:
+          'A correlated subquery depends on values from each outer row, often causing row-by-row re-evaluation on large analytics tables.',
       },
       {
         id: 'sql-5',
-        prompt: 'Why should you generally avoid using SELECT * in production analytics queries?',
+        prompt:
+          'A dashboard pipeline starts failing after a table column is reordered and slow network I/O spikes. Why did SELECT * trigger both issues?',
         options: [
-          'It prevents database transactions from committing.',
-          'It increases network I/O, prevents index-only scans, and causes schema drift breakages.',
-          'It is unsupported in SQL:1999 standard.',
-          'It converts all columns to text format.',
+          'SELECT * blocks transactions from committing.',
+          'It transfers unnecessary wide columns, prevents covering index scans, and breaks fragile positional consumers when schema shifts.',
+          'SELECT * converts integers to text.',
+          'It is unsupported in PostgreSQL.',
         ],
         correctIndex: 1,
-        explanation: 'Explicit column selection reduces memory and network overhead, allows query planners to utilize covering indexes, and safeguards client applications from schema changes.',
+        explanation:
+          'Explicit column projection reduces I/O, unlocks index-only scans, and insulates downstream pipelines from schema evolution.',
       },
     ],
   },
@@ -122,53 +144,73 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     questions: [
       {
         id: 'py-1',
-        prompt: 'What is the key difference between a Python list and a tuple?',
+        prompt:
+          'A sales dataset has a "revenue" column with the string "N/A" in 12 rows. Which expression converts the column to numeric and leaves the missing rows as NaN?',
         options: [
-          'Lists can only store numbers, while tuples store any type.',
-          'Lists are mutable; tuples are immutable.',
-          'Tuples have O(1) membership search; lists have O(log n).',
-          'Lists cannot be nested inside dictionaries.',
+          'df["revenue"].astype(int)',
+          'pd.to_numeric(df["revenue"], errors="coerce")',
+          'df["revenue"].replace("N/A", 0)',
+          'df.dropna(axis=0, subset=["revenue"])',
         ],
         correctIndex: 1,
-        explanation: 'Python lists can be modified after creation (mutable), whereas tuples cannot be altered (immutable), making tuples hashable as dictionary keys.',
+        explanation:
+          'pd.to_numeric with errors="coerce" converts what it can and turns the unparseable "N/A" values into NaN, so the column stays usable and the missing rows stay identifiable. astype(int) raises a ValueError on "N/A"; replacing with 0 invents a revenue of zero; dropna deletes twelve rows of real data.',
       },
       {
         id: 'py-2',
-        prompt: 'What does the "yield" keyword do in a Python function?',
+        prompt:
+          'You need revenue per region, but each order appears on its own row. Which approach produces the total per region correctly?',
         options: [
-          'Terminates program execution immediately.',
-          'Turns the function into a generator that produces values lazily without exhausting memory.',
-          'Imports modules asynchronously.',
-          'Enforces static type checking at runtime.',
+          'df.groupby("region")["revenue"].sum()',
+          'df["revenue"].groupby("region").max()',
+          'df.groupby("region").apply(lambda g: g["revenue"].iloc[0])',
+          'df.sort_values("region").revenue',
         ],
-        correctIndex: 1,
-        explanation: 'Functions containing yield return a generator object, maintaining their state between successive iterations to produce elements on demand with minimal memory overhead.',
+        correctIndex: 0,
+        explanation:
+          'groupby("region")["revenue"].sum() groups the rows by region and adds the revenue within each group, which is exactly the total per region. max() returns the largest single order, apply with iloc[0] returns the first order only, and sorting changes nothing.',
       },
       {
         id: 'py-3',
-        prompt: 'In pandas, what is the best way to handle missing values (NaN) before training a regression model?',
+        prompt:
+          'The same customer appears three times because of a repeat import. What is the safest first step before analysing the data?',
         options: [
-          'Replace all NaNs with empty strings.',
-          'Evaluate data missingness mechanisms and apply mean/median/mode imputation, model imputation, or drop rows if MCAR.',
-          'Always drop the target column.',
-          'Convert the entire dataframe to boolean values.',
+          'Delete every customer with more than one row.',
+          'Find and remove exact duplicate rows, then check whether the remaining rows genuinely differ.',
+          'Leave them and average all values.',
+          'Rename the customer column so the duplicates become unique.',
         ],
         correctIndex: 1,
-        explanation: 'Principled data imputation depends on whether missingness is completely at random (MCAR) or depends on observed values, using median or domain-specific strategies.',
+        explanation:
+          'The safe step is to remove true duplicates and then verify whether the remaining rows for that customer are real separate records. A customer with several orders is not a data error, so deleting every repeated customer destroys real information.',
       },
       {
         id: 'py-4',
-        prompt: 'What is the time complexity of looking up a key in a Python dictionary on average?',
-        options: ['O(n)', 'O(log n)', 'O(1)', 'O(n²)'],
-        correctIndex: 2,
-        explanation: 'Python dictionaries are implemented using hash tables, giving average-case key lookups O(1) constant time.',
+        prompt:
+          'What does this code do?\n\nresult = df.merge(lookup, on="customer_id", how="left")',
+        options: [
+          'Keeps only the rows present in both dataframes.',
+          'Keeps every row of df and adds the matching lookup columns where a match exists, leaving unmatched rows with nulls.',
+          'Keeps every row of lookup and drops df.',
+          'Counts the rows of df that have no match.',
+        ],
+        correctIndex: 1,
+        explanation:
+          'A left join keeps all rows from the left frame (df) and fills the lookup columns where a match is found, leaving NaN where there is none. inner (the default) would drop the unmatched df rows, which silently loses records.',
       },
       {
         id: 'py-5',
-        prompt: 'Which library is the industry standard for fast vectorized numerical arrays in Python?',
-        options: ['NumPy', 'Requests', 'Flask', 'BeautifulSoup'],
+        prompt:
+          'Which filter keeps only orders placed in 2024 AND worth more than 500, for either region?',
+        options: [
+          'df[(df["year"] == 2024) & (df["amount"] > 500)]',
+          'df[(df["year"] == 2024) or (df["amount"] > 500)]',
+          'df[df["year"] == 2024 & df["amount"] > 500]',
+          'df[(df["year"] == 2024) + (df["amount"] > 500)]',
+        ],
         correctIndex: 0,
-        explanation: 'NumPy provides homogeneous multi-dimensional arrays with C-optimized vectorized operations, forming the foundation of the scientific Python ecosystem.',
+        explanation:
+          'Each condition needs its own parentheses and the two are combined with & for "and". Without the inner parentheses, & binds to the comparison operators and raises an error; "or" would keep far too many rows; + adds booleans numerically rather than combining them logically.',
       },
     ],
   },
@@ -183,31 +225,36 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     questions: [
       {
         id: 'xl-1',
-        prompt: 'Why is XLOOKUP generally preferred over traditional VLOOKUP in modern Excel?',
+        prompt:
+          'You insert a new column inside a financial lookup table and your old =VLOOKUP(A2, $B$2:$E$50, 3, FALSE) suddenly returns the wrong field. Why does XLOOKUP prevent this bug?',
         options: [
-          'It only works with numbers.',
-          'It can search in any direction, defaults to exact match, and does not break when columns are inserted.',
-          'It is limited to 100 rows.',
-          'It requires VBA macros.',
+          'XLOOKUP only searches numeric cells.',
+          'XLOOKUP selects lookup and return ranges explicitly, searches left or right, defaults to exact match, and adapts when columns are inserted.',
+          'XLOOKUP rounds all numbers automatically.',
+          'XLOOKUP relies on VBA macros.',
         ],
         correctIndex: 1,
-        explanation: 'XLOOKUP does not require specifying a column index number, searches left or right, defaults to exact match, and resists column insertion disruptions.',
+        explanation:
+          'Because XLOOKUP separates the lookup_array and return_array instead of hardcoding a column offset integer, inserting columns inside the table no longer breaks results.',
       },
       {
         id: 'xl-2',
-        prompt: 'What is the purpose of an Excel PivotTable?',
+        prompt:
+          'A finance manager asks for monthly totals per governorate from 18,000 raw order rows in under two minutes without altering source formulas. Which tool is best?',
         options: [
-          'Encrypting workbook files.',
-          'Rapidly summarizing, sorting, grouping, and aggregating large tabular data without writing formulas.',
-          'Exporting data directly to binary assembly.',
-          'Translating text between languages.',
+          'Manual cell coloring and copy-pasting.',
+          'An Excel PivotTable grouped by Date (Months) and Governorate with Sum of Revenue.',
+          'Nested 10-level IF statements on every row.',
+          'Converting the workbook to plain text.',
         ],
         correctIndex: 1,
-        explanation: 'PivotTables allow interactive multidimensional aggregation, cross-tabulation, and filtering of raw transactional tables in seconds.',
+        explanation:
+          'PivotTables aggregate, group, and cross-tabulate thousands of transactional rows interactively without mutating raw source records.',
       },
       {
         id: 'xl-3',
-        prompt: 'Which formula correctly sums values in range C2:C100 where column B equals "Cairo"?',
+        prompt:
+          'Which formula accurately sums order totals in C2:C100 ONLY where column B equals "Cairo"?',
         options: [
           '=SUMIF(B2:B100, "Cairo", C2:C100)',
           '=COUNTIF("Cairo", B2:B100)',
@@ -215,31 +262,33 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
           '=VLOOKUP("Cairo", B2:C100, 2, FALSE)',
         ],
         correctIndex: 0,
-        explanation: '=SUMIF(range, criteria, [sum_range]) checks the condition in B2:B100 and sums the corresponding values in C2:C100.',
+        explanation: '=SUMIF(range, criteria, [sum_range]) checks the condition in B2:B100 and sums matching rows in C2:C100.',
       },
       {
         id: 'xl-4',
-        prompt: 'What does the "$" symbol denote in a cell reference such as $A$1?',
+        prompt:
+          'You copy =B2*E1 down 50 rows to calculate VAT from a single tax rate stored in cell E1, and rows 2–50 calculate 0. How should the reference be written?',
         options: [
-          'Currency formatting.',
-          'Absolute referencing, preventing the row and column coordinates from shifting when copied.',
-          'A calculation error.',
-          'An external web link.',
+          'Format E1 as Currency.',
+          '=B2*$E$1 (absolute reference anchoring column E and row 1 so the tax cell does not shift downward).',
+          '=B2*E1!',
+          'Wrap E1 in quotes.',
         ],
         correctIndex: 1,
-        explanation: 'A dollar sign anchors the coordinate so that relative formula propagation does not alter the referenced row or column.',
+        explanation: 'Adding $ anchors the row and column coordinates ($E$1) so dragging the formula down keeps pointing at the tax-rate cell.',
       },
       {
         id: 'xl-5',
-        prompt: 'What is the primary function of the IFERROR function?',
+        prompt:
+          'A SKU lookup returns #N/A for discontinued products, causing downstream KPI sums to fail. Which wrapper keeps the KPI report clean and transparent?',
         options: [
-          'Generates a deliberate crash.',
-          'Catches formula errors (e.g., #N/A, #DIV/0!) and returns a designated fallback value.',
-          'Validates spell check.',
-          'Formats numbers as percentages.',
+          '=FORCE(A2)',
+          '=IFERROR(XLOOKUP(A2, SKUList, PriceList), 0) or a clear "Discontinued" fallback.',
+          '=SPELLCHECK(A2)',
+          '=ROUND(A2, 0)',
         ],
         correctIndex: 1,
-        explanation: 'IFERROR(value, value_if_error) traps runtime evaluation exceptions and cleanly supplies an alternate outcome such as 0 or "Not Found".',
+        explanation: 'IFERROR(value, fallback) traps #N/A or #DIV/0! safely without letting broken formula cells cascade through summary aggregations.',
       },
     ],
   },
@@ -392,7 +441,17 @@ interface SkillAssessmentViewProps {
 }
 
 export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavigate }) => {
-  const { t, skills, updateSkillLevel, addCustomSkill } = useCareer();
+  const {
+    t,
+    skills,
+    skillEvidence,
+    analysis,
+    targetRole,
+    updateSkillLevel,
+    addCustomSkill,
+    recordSkillAssessment,
+  } = useCareer();
+  const { showToast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<AssessmentCategory | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
@@ -400,7 +459,16 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [pastAttempts, setPastAttempts] = useState<PastAttempt[]>([]);
-  const [profileUpdated, setProfileUpdated] = useState(false);
+  const [readinessBefore, setReadinessBefore] = useState<number | null>(null);
+  /**
+   * The state of the automatic save.
+   *
+   * The result is stored the moment the check is finished. This flag only
+   * reports whether that write succeeded, so the interface can say plainly
+   * whether the profile was updated or whether the candidate has to press the
+   * re-sync button.
+   */
+  const [syncState, setSyncState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
   // Load past attempts from localStorage
   useEffect(() => {
@@ -435,9 +503,71 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
     setCurrentQuestionIndex(0);
     setSelectedAnswers({});
     setIsFinished(false);
-    setProfileUpdated(false);
+    setSyncState('idle');
+    setReadinessBefore(analysis.matchPercentage);
     setTimeLeft(category.timeMinutes * 60);
     setIsTimerActive(true);
+  };
+
+  /**
+   * Turns a score into a level (1-5).
+   *
+   * Diagnostic checks measure conceptual & scenario knowledge and are capped at
+   * 4/5 unless the candidate already holds verified practical evidence
+   * (a project, certificate, or completed course) that unlocks 5/5.
+   */
+  const isSkillPracticallyBacked = (skillName: string): boolean => {
+    const rec = skillEvidence[skillName.toLowerCase()];
+    if (!rec) return false;
+    return hasPracticalEvidence(rec);
+  };
+
+  const levelForScore = (percentage: number, practicalBacked = false): number => {
+    if (practicalBacked && percentage >= 90) return 5;
+    if (percentage >= 80) return 4;
+    if (percentage >= 60) return 3;
+    if (percentage >= 40) return 2;
+    return 1;
+  };
+
+  /**
+   * Stores the result the moment the check is finished.
+   *
+   * Before this, the result lived in the browser until the candidate pressed
+   * "Sync to My Skill Profile", so the profile, the readiness figure and the
+   * roadmap could all disagree with a score the candidate had already earned.
+   * Now the write happens automatically, the skill record gains its
+   * "Diagnostic Assessment" badge, and the roadmap and the blockers are
+   * recalculated by the server as part of the same request.
+   */
+  const persistResult = async (level: number, score: number): Promise<boolean> => {
+    if (!selectedCategory) return false;
+    setSyncState('saving');
+    const saved = await recordSkillAssessment({
+      name: selectedCategory.skillName,
+      level,
+      score,
+      category: 'technical',
+    });
+    setSyncState(saved ? 'saved' : 'failed');
+    if (saved) {
+      showToast({
+        title: t('Assessment saved to your skill profile'),
+        description: t(
+          '{skill} is now measured at level {level}/5. Your role readiness, career blockers and roadmap were recalculated.',
+        )
+          .replace('{skill}', selectedCategory.skillName)
+          .replace('{level}', String(level)),
+        variant: 'success',
+      });
+    } else {
+      showToast({
+        title: t('The assessment could not be saved'),
+        description: t('Your score is safe. Use "Re-sync skill profile" to try again.'),
+        variant: 'error',
+      });
+    }
+    return saved;
   };
 
   const handleSelectOption = (optionIndex: number) => {
@@ -472,14 +602,8 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
 
     const total = selectedCategory.questions.length;
     const percentage = Math.round((correct / total) * 100);
-
-    // Map percentage to 1-5 proficiency level
-    let proficiencyLevel = 1;
-    if (percentage >= 90) proficiencyLevel = 5;
-    else if (percentage >= 75) proficiencyLevel = 4;
-    else if (percentage >= 55) proficiencyLevel = 3;
-    else if (percentage >= 35) proficiencyLevel = 2;
-    else proficiencyLevel = 1;
+    const practicalBacked = isSkillPracticallyBacked(selectedCategory.skillName);
+    const proficiencyLevel = levelForScore(percentage, practicalBacked);
 
     const newAttempt: PastAttempt = {
       id: `${selectedCategory.id}-${Date.now()}`,
@@ -499,9 +623,20 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
     } catch {
       // Storage full or unavailable
     }
+
+    // The result is stored immediately. Nothing has to be pressed for the
+    // profile, the readiness figure and the roadmap to reflect it.
+    void persistResult(proficiencyLevel, percentage);
   };
 
-  const handleApplyToSkillProfile = () => {
+  /**
+   * The secondary, explicit control.
+   *
+   * The save already happened automatically; this re-runs it for a candidate
+   * whose write failed, or who simply wants to be certain the profile
+   * matches the score they just earned.
+   */
+  const handleApplyToSkillProfile = async () => {
     if (!selectedCategory || !isFinished) return;
 
     let correct = 0;
@@ -509,30 +644,36 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
       if (selectedAnswers[idx] === q.correctIndex) correct++;
     });
     const percentage = Math.round((correct / selectedCategory.questions.length) * 100);
-    let level = 1;
-    if (percentage >= 90) level = 5;
-    else if (percentage >= 75) level = 4;
-    else if (percentage >= 55) level = 3;
-    else if (percentage >= 35) level = 2;
+    const practicalBacked = isSkillPracticallyBacked(selectedCategory.skillName);
+    const level = levelForScore(percentage, practicalBacked);
 
-    const existingSkill = skills.find(
-      (s) => s.name.toLowerCase() === selectedCategory.skillName.toLowerCase()
-    );
-
-    if (existingSkill) {
-      updateSkillLevel(existingSkill.id, level);
-    } else {
-      addCustomSkill({
-        name: selectedCategory.skillName,
-        category: 'technical',
-        currentLevel: level,
-        targetLevel: Math.min(5, level + 1),
-        source: 'assessment',
-        evidenceIds: [],
+    const saved = await persistResult(level, percentage);
+    if (!saved) {
+      // The automatic write failed. Fall back to the self-report so the
+      // candidate's own rating is never lost.
+      const existingSkill = skills.find(
+        (s) => s.name.toLowerCase() === selectedCategory.skillName.toLowerCase()
+      );
+      if (existingSkill) {
+        await updateSkillLevel(existingSkill.id, level);
+      } else {
+        await addCustomSkill({
+          name: selectedCategory.skillName,
+          category: 'technical',
+          currentLevel: level,
+          targetLevel: Math.min(5, level + 1),
+          source: 'assessment',
+          evidenceIds: [],
+        });
+      }
+      showToast({
+        title: t('Skill profile updated'),
+        description: t('{skill} was saved as a self-reported level of {level}/5.')
+          .replace('{skill}', selectedCategory.skillName)
+          .replace('{level}', String(level)),
+        variant: 'success',
       });
     }
-
-    setProfileUpdated(true);
   };
 
   const formatTimer = (seconds: number) => {
@@ -562,7 +703,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
               onClick={() => setSelectedCategory(null)}
               className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
             >
-              ← {t('All Assessments')}
+              <span className="rtl:inline-block rtl:rotate-180" aria-hidden="true">←</span> {t('All Assessments')}
             </button>
             <span className="text-[var(--color-border)]">|</span>
             <span className="text-sm font-bold text-[var(--text-primary)]">
@@ -588,7 +729,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
           <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--color-ai-text)]" />
           <span>
             {t(
-              'Diagnostic Self-Assessment: Calibrated for practical skill readiness and roadmap tailoring. Not an accredited third-party certification.'
+              'Diagnostic Knowledge Check: five practical questions that place your current level on the 1-5 scale. Calibrated for roadmap and readiness tailoring. Not an accredited third-party certification.',
             )}
           </span>
         </div>
@@ -673,39 +814,112 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                 <h3 className="mt-4 text-xl font-bold text-[var(--text-primary)]">
                   {t('Assessment Complete')}
                 </h3>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  {selectedCategory.title} · {new Date().toLocaleDateString()}
-                </p>
+                {(() => {
+                  const practicalBacked = isSkillPracticallyBacked(selectedCategory.skillName);
+                  const computedLevel = levelForScore(scorePct, practicalBacked);
+                  const beforePct = readinessBefore ?? analysis.matchPercentage;
+                  const afterPct = analysis.matchPercentage;
+                  const deltaPct = afterPct - beforePct;
+                  return (
+                    <>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        {selectedCategory.title} · {new Date().toLocaleDateString()}
+                      </p>
 
-                <div className="my-6 flex items-baseline gap-2">
-                  <span className="font-mono text-4xl font-extrabold text-[var(--color-primary-text)]">
-                    {scorePct}%
-                  </span>
-                  <span className="text-sm font-semibold text-[var(--text-muted)]">
-                    ({score} / {totalQ} {t('correct')})
-                  </span>
-                </div>
+                      <div className="my-6 flex items-baseline gap-2">
+                        <span className="font-mono text-4xl font-extrabold text-[var(--color-primary-text)]">
+                          {scorePct}%
+                        </span>
+                        <span className="text-sm font-semibold text-[var(--text-muted)]">
+                          ({score} / {totalQ} {t('correct')})
+                        </span>
+                      </div>
 
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-bold text-[var(--text-primary)]">
-                    {t('Assessed Level')}: {Math.min(5, Math.max(1, Math.round((scorePct / 100) * 5)))} / 5
-                  </span>
-                  <span className="rounded-full bg-[var(--color-success-surface)] px-3 py-1 text-xs font-bold text-[var(--color-success-strong)]">
-                    {scorePct >= 70 ? t('Proficient') : scorePct >= 50 ? t('Intermediate') : t('Foundational')}
-                  </span>
-                </div>
+                      <div className="flex flex-wrap items-center justify-center gap-3">
+                        <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-bold text-[var(--text-primary)]">
+                          {t('Assessed Level')}: {computedLevel} / 5
+                        </span>
+                        <span className="rounded-full bg-[var(--color-success-surface)] px-3 py-1 text-xs font-bold text-[var(--color-success-strong)]">
+                          {computedLevel >= 5
+                            ? t('Verified Proficient')
+                            : scorePct >= 60
+                              ? t('Knowledge Verified')
+                              : t('Foundational')}
+                        </span>
+                        {/* The status of the automatic save. */}
+                        {syncState === 'saving' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+                            {t('Saving to your skill profile…')}
+                          </span>
+                        )}
+                        {syncState === 'saved' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-success-surface)] px-3 py-1 text-xs font-semibold text-[var(--color-success-strong)]">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {t('Saved to your skill profile')}
+                          </span>
+                        )}
+                        {syncState === 'failed' && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-warning-surface)] px-3 py-1 text-xs font-semibold text-[var(--color-warning-strong)]">
+                            <XCircle className="h-3.5 w-3.5" />
+                            {t('Not saved yet — use Re-sync below')}
+                          </span>
+                        )}
+                      </div>
+
+                      {!practicalBacked && scorePct >= 80 && (
+                        <p className="mt-3 max-w-lg text-[11px] leading-relaxed text-[var(--text-muted)]">
+                          {t('Diagnostic knowledge checks cap at Level 4/5. Complete a practical project or add verified work in Evidence to earn 5/5 Verified Proficient.')}
+                        </p>
+                      )}
+
+                      {/* Impact Summary Card */}
+                      <div className="mt-5 w-full max-w-xl rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 p-4 text-start space-y-2.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                          {t('Assessment Impact Summary')}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                          <div className="rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] p-2.5">
+                            <div className="text-[10px] text-[var(--text-muted)]">{t('Skill Recorded')}</div>
+                            <div className="font-bold text-[var(--text-primary)] mt-0.5">
+                              {selectedCategory.skillName} ({computedLevel}/5)
+                            </div>
+                          </div>
+                          <div className="rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] p-2.5">
+                            <div className="text-[10px] text-[var(--text-muted)]">{t('Role Readiness')}</div>
+                            <div className="font-bold font-mono text-[var(--text-primary)] mt-0.5">
+                              {targetRole
+                                ? `${beforePct}% → ${afterPct}%${deltaPct > 0 ? ` (+${deltaPct}%)` : ''}`
+                                : t('No target role')}
+                            </div>
+                          </div>
+                          <div className="rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] p-2.5">
+                            <div className="text-[10px] text-[var(--text-muted)]">{t('Portfolio Evidence')}</div>
+                            <div className="font-bold text-[var(--color-success-strong)] mt-0.5">
+                              {syncState === 'saved' ? t('Assessment Evidence Added') : t('Pending Save')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Actions */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                  {/* The secondary control. The save already happened; this
+                      re-runs it when the first write failed or when the
+                      candidate wants to be certain. */}
                   <button
                     type="button"
-                    disabled={profileUpdated}
+                    disabled={syncState === 'saving'}
                     onClick={handleApplyToSkillProfile}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-sm transition-transform hover:bg-[var(--color-primary-hover)] active:scale-95 disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-2.5 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--color-border-strong)] hover:text-[var(--text-primary)] disabled:opacity-60"
                   >
-                    <CheckCircle2 className="h-4 w-4" />
+                    <RotateCcw className="h-4 w-4" />
                     <span>
-                      {profileUpdated ? t('Skill Profile Updated!') : t('Sync to My Skill Profile')}
+                      {syncState === 'failed'
+                        ? t('Re-sync skill profile')
+                        : t('Re-sync skill profile')}
                     </span>
                   </button>
 
@@ -729,6 +943,16 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                     </button>
                   )}
                 </div>
+
+                {/* What the save changed, so the candidate knows the check was
+                    not just a score. */}
+                {syncState === 'saved' && (
+                  <p className="mt-4 text-xs text-[var(--text-muted)]">
+                    {t(
+                      'Your role readiness, the career blockers and your roadmap were recalculated from this result.',
+                    )}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -794,11 +1018,11 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
           {t('Skill Validation')}
         </div>
         <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-          {t('Skill Assessment Center')}
+          {t('Diagnostic Knowledge Checks')}
         </h2>
         <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[var(--text-secondary)] sm:text-sm">
           {t(
-            'Calibrate your actual proficiency through realistic multiple-choice technical benchmarks. Results update your skill profile and refine your personalized roadmap.'
+            'Calibrate your actual proficiency through practical, scenario-based questions. Your result is saved to your skill profile the moment you finish, and your readiness, blockers and roadmap are recalculated automatically.'
           )}
         </p>
       </div>
@@ -809,7 +1033,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
         <div className="text-xs leading-relaxed text-[var(--text-secondary)]">
           <strong className="text-[var(--text-primary)]">{t('Self-Assessment Standard')}:</strong>{' '}
           {t(
-            'These assessments serve as objective diagnostic tools for personal growth. They are not accredited academic degrees or licensed corporate certifications.'
+            'These are five-question diagnostic knowledge checks, not professional certifications. They place you on the 1-5 scale so your roadmap and readiness figures are measured against real evidence.'
           )}
         </div>
       </div>

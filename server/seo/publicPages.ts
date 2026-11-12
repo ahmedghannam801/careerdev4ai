@@ -23,14 +23,23 @@
  */
 
 import { CAREER_DOMAINS, getCareerDomain } from '../../shared/careerDomains.ts';
+import {
+  BUSINESS_CONTACT,
+  businessAddressLines,
+  businessPhoneHref,
+  isBusinessContactComplete,
+  OPERATOR_LINKEDIN_URL,
+  OPERATOR_NAME,
+} from '../../shared/contact.ts';
 import { hasApprovedTerms, TERMS_DOCUMENT } from '../../shared/legal.ts';
 import { CAREER_ROLES } from '../../shared/careerRoles.ts';
 import type { TargetRole } from '../../shared/careerTypes.ts';
 import { getSupabaseServer } from '../db/supabase.ts';
-import { SITE_NAME, clampDescription, slugify } from './config.ts';
+import { SITE_NAME, absoluteUrl, clampDescription, slugify } from './config.ts';
 import { escapeHtml, renderPublicPage, type PublicPage } from './html.ts';
 import {
   breadcrumbSchema,
+  contactPageSchema,
   courseSchema,
   itemListSchema,
   organizationSchema,
@@ -264,6 +273,18 @@ function appLink(href: string, label: string, secondary = false): string {
   )}</a>`;
 }
 
+/**
+ * Capitalises the first letter of a sentence.
+ *
+ * The notice that lists the outstanding details starts with a phrase that was
+ * written mid-sentence, so it needs the first letter raised to read as a
+ * sentence of its own.
+ */
+function capitalise(value: string): string {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 /* -------------------------------------------------------------------------- */
 /* The pages                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -400,6 +421,199 @@ function buildPrivacyPage(): PublicPage {
     breadcrumb: [
       { name: 'Home', path: '/' },
       { name: 'Privacy', path: path },
+    ],
+  };
+}
+
+/**
+ * The Contact Us page.
+ *
+ * This page carries the business details a third party acts on: a postal
+ * address, a telephone number and an email address. It is published as a
+ * server-rendered document at its own address, with no session and no
+ * account, so a reviewer can open it and read it.
+ *
+ * The details come from `shared/contact.ts` and nothing here invents one. A
+ * detail that has not been supplied is shown as a marked placeholder and is
+ * left out of the structured data, so the page never asserts an address or a
+ * number that the business has not published.
+ */
+function buildContactPage(): PublicPage {
+  const path = '/contact';
+  const details = BUSINESS_CONTACT;
+
+  const addressLines = businessAddressLines(details);
+  // A postal address is only published once it has a street and a city: a
+  // governorate on its own is not an address a post could be sent to.
+  const addressPublished = Boolean(
+    details.address.street?.trim() && details.address.city?.trim()
+  );
+  const phoneHref = businessPhoneHref(details);
+  const email = details.email?.trim() || null;
+
+  const description =
+    'Contact CareerDev4AI: the business address in Egypt, the telephone number on the +20 country code, and the email address the team answers on. Support, feedback and merchant onboarding enquiries.';
+
+  /* The details that are still outstanding, named so the notice can be exact
+     rather than vague. */
+  const missing: string[] = [];
+  if (!addressPublished) missing.push('the registered business address in Egypt');
+  if (!details.phone?.trim()) missing.push('the telephone number');
+  if (!email) missing.push('the business email address');
+  const complete = isBusinessContactComplete(details);
+
+  /* The icons are inline SVG: the page runs no JavaScript, but inline markup
+     is part of the document. */
+  const pinIcon =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+  const phoneIcon =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg>';
+  const mailIcon =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>';
+
+  const addressValue = addressPublished
+    ? `<address class="contact-value address-block">${addressLines
+        .map((line) => `<span>${escapeHtml(line)}</span>`)
+        .join('')}</address>`
+    : `<div class="pending">
+         <p class="contact-value">${escapeHtml(details.address.country)} — address to be published</p>
+       </div>
+       <p><span class="chip-pending">To be published</span></p>`;
+
+  const phoneValue = details.phone?.trim()
+    ? `<p class="contact-value"><a href="${escapeHtml(phoneHref ?? '')}">${escapeHtml(
+        details.phone.trim()
+      )}</a></p>`
+    : `<div class="pending">
+         <p class="contact-value">+20 XX XXX XXXX</p>
+       </div>
+       <p><span class="chip-pending">To be published</span></p>`;
+
+  const emailValue = email
+    ? `<p class="contact-value"><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></p>`
+    : `<div class="pending">
+         <p class="contact-value">Email address to be published</p>
+       </div>
+       <p><span class="chip-pending">To be published</span></p>`;
+
+  const pendingNotice =
+    complete || missing.length === 0
+      ? ''
+      : `      <div class="notice" role="note">
+        <p><strong>${missing.length === 1 ? 'One detail is' : `${missing.length} details are`} still to be published.</strong> ${escapeHtml(
+          capitalise(
+            missing.join(', ').replace(/, ([^,]*)$/, ' and $1')
+          )
+        )}. Nothing is shown in its place: a placeholder address or a placeholder number would be worse than an acknowledged gap, so each one is marked as outstanding until it is confirmed.</p>
+      </div>`;
+
+  const body = `      <section class="hero">
+        <h1>Contact Us</h1>
+        <p class="lede">${escapeHtml(description)}</p>
+      </section>
+
+      <section>
+        <h2>Business contact details</h2>
+        <p>These are the details for the business behind ${escapeHtml(
+          details.businessName
+        )}. They are published here so that a customer, a partner or a compliance reviewer can reach the business directly, without an account and without a form.</p>
+        <div class="grid">
+          <div class="card contact-card">
+            <span class="contact-icon">${pinIcon}</span>
+            <span class="contact-label">Business address</span>
+            ${addressValue}
+            <p class="contact-note">The registered address of the business in ${escapeHtml(
+              details.address.country
+            )}.</p>
+          </div>
+          <div class="card contact-card">
+            <span class="contact-icon">${phoneIcon}</span>
+            <span class="contact-label">Telephone</span>
+            ${phoneValue}
+            <p class="contact-note">Egyptian numbers are reached on the +20 country code.</p>
+          </div>
+          <div class="card contact-card">
+            <span class="contact-icon">${mailIcon}</span>
+            <span class="contact-label">Email</span>
+            ${emailValue}
+            <p class="contact-note">Support, feedback and merchant onboarding enquiries are answered on this address.</p>
+          </div>
+        </div>
+${pendingNotice}
+        <div class="cta">
+          ${email ? appLink(`mailto:${email}`, 'Send us an email') : ''}
+          ${appLink('/about', 'About the platform', true)}
+        </div>
+      </section>
+
+      <section>
+        <h2>What to include in a message</h2>
+        <p>It helps to have these to hand before writing, because they are what a reply usually turns on:</p>
+        <ul class="detail-list">
+          <li><strong>The name of the business</strong> <span>the registered or trading name, as it appears on the commercial record.</span></li>
+          <li><strong>Your reference</strong> <span>the merchant, application or account number the enquiry is about, if you have one.</span></li>
+          <li><strong>What you need</strong> <span>a short description of the request, and any date it relates to.</span></li>
+          <li><strong>How to reply</strong> <span>the address or number the reply should go to.</span></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Who you are writing to</h2>
+        <p>${escapeHtml(
+          details.businessName
+        )} is built and published by ${escapeHtml(OPERATOR_NAME)}, who is the contact for the published legal documents as well as for this page.</p>
+        <div class="cta">
+          <a class="button secondary" href="${escapeHtml(
+            OPERATOR_LINKEDIN_URL
+          )}" target="_blank" rel="noopener noreferrer">LinkedIn profile</a>
+        </div>
+      </section>
+
+      <section>
+        <h2>Legal documents</h2>
+        <p>The Terms and the Privacy Policy are published in full, at their own addresses, and are versioned. They name the same business and the same contact channels as this page.</p>
+        <div class="cta">
+          ${appLink('/terms', 'Terms & Conditions', true)}
+          ${appLink('/privacy', 'Privacy and analytics', true)}
+        </div>
+      </section>`;
+
+  return {
+    path,
+    title: `Contact Us — Business Address, Phone & Email | ${SITE_NAME}`,
+    description,
+    body,
+    jsonLd: [
+      contactPageSchema({
+        name: `Contact ${details.businessName}`,
+        description,
+        path,
+        business: {
+          name: details.businessName,
+          url: absoluteUrl('/'),
+          email,
+          telephone: details.phone?.trim() || null,
+          address: {
+            streetAddress: details.address.street,
+            addressLocality: details.address.city,
+            addressRegion: details.address.governorate,
+            postalCode: details.address.postalCode,
+            addressCountry: details.address.country,
+          },
+        },
+      }),
+      webPageSchema({ name: 'Contact Us', description, path, hasBreadcrumb: true }),
+      breadcrumbSchema(
+        [
+          { name: 'Home', path: '/' },
+          { name: 'Contact', path },
+        ],
+        path
+      ),
+    ],
+    breadcrumb: [
+      { name: 'Home', path: '/' },
+      { name: 'Contact', path: path },
     ],
   };
 }
@@ -1065,6 +1279,8 @@ export async function resolvePublicPage(pathname: string): Promise<PublicPageRes
     page = buildTermsPage();
   } else if (path === '/privacy') {
     page = buildPrivacyPage();
+  } else if (path === '/contact') {
+    page = buildContactPage();
   } else if (path === '/careers') {
     page = buildCareersIndexPage();
   } else if (path.startsWith('/careers/')) {

@@ -25,6 +25,8 @@ import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
 import { CountUp } from '../motion/CountUp';
 import { EmptyState } from '../ui/EmptyState';
+import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
+import { WhyWeRecommend } from '../ui/WhyWeRecommend';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
@@ -85,6 +87,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     careerHealth,
     cvVersions,
     learningRecommendations,
+    evidenceItems,
+    interviewSessions,
     visibleNotifications,
     markNotificationRead,
     recordNotificationClick,
@@ -123,13 +127,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   const readinessLabel =
     readiness >= 80 ? t('Ready to apply') : readiness >= 55 ? t('Almost there') : t('Building foundations');
 
+  // The certifications the user actually has on file. It is a count of real
+  // records — never a default.
+  const certificationCount = profile?.certifications?.length ?? 0;
+
   const nextStep = nextTask
     ? {
         title: nextTask.title,
         description: nextTask.description,
         reason:
           nextTask.rationale ??
-          `${t('This is the first unfinished step in your roadmap for')} ${targetRole.title}.`,
+          `${t('This is the first unfinished step in your roadmap for')} ${targetRole?.title ?? ''}.`,
         hours: nextTask.estimatedHours,
         skill: nextTask.skillName ?? null,
       }
@@ -258,16 +266,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             {t('Welcome back')}, {profile.name}
           </div>
           <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-            {t('Your next move for')} {targetRole.title}
+            {targetRole
+              ? `${t('Your next move for')} ${targetRole.title}`
+              : t('Choose your target role to get your plan')}
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => onNavigate('my-career')}
+            onClick={() => onNavigate('profile')}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
           >
-            {t('Switch Target Role')}
+            {targetRole ? t('Switch Target Role') : t('Set my target role')}
           </button>
           <button
             type="button"
@@ -302,7 +312,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-4 min-w-0">
             <CareerImage
-              category={targetRole.title}
+              category={targetRole?.title ?? ''}
               size="sm"
               aspectRatio="square"
               rounded="rounded-2xl"
@@ -313,23 +323,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 <Target className="h-3 w-3" />
                 {t('Where you are')}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 id="dashboard-where" className="text-lg font-bold text-[var(--text-primary)]">
-                  {targetRole.title}
-                </h2>
-                <span className="rounded-full bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]">
-                  {readinessLabel}
-                </span>
-              </div>
-              <p className="max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
-                {t('Readiness is measured against the real requirements of this role, not against a generic template.')}
-              </p>
+              {targetRole ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 id="dashboard-where" className="text-lg font-bold text-[var(--text-primary)]">
+                      {targetRole.title}
+                    </h2>
+                    <span className="rounded-full bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]">
+                      {readinessLabel}
+                    </span>
+                  </div>
+                  <p className="max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
+                    {t('Readiness is measured against the real requirements of this role, not against a generic template.')}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 id="dashboard-where" className="text-lg font-bold text-[var(--text-primary)]">
+                    {t('No target role yet')}
+                  </h2>
+                  <p className="max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
+                    {t(
+                      'Pick the role you are aiming at and everything below — your roadmap, your skill gaps, your learning plan and your job matches — is built around it.'
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('profile')}
+                    className="mt-1 inline-flex items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
+                  >
+                    <Target className="h-3.5 w-3.5" />
+                    {t('Set my target role')}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
           <div className="w-full shrink-0 lg:w-72" data-guide="readiness">
             <div className="flex items-end justify-between">
-              <span className="text-[11px] text-[var(--text-secondary)]">{t('Role readiness')}</span>
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+                {t('Role readiness')}
+                <ScoreInfoTooltip score="roleReadiness" value={readiness} />
+              </span>
               <span className="font-mono text-2xl font-bold tabular-nums text-[var(--text-primary)]">
                 <CountUp value={readiness} format={(value) => `${Math.round(value)}%`} />
               </span>
@@ -515,8 +551,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                   <span>{topLearning.course.provider}</span>
                 </div>
                 <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                  {topLearning.aiExplanation ?? topLearning.reason}
+                  {topLearning.course.description}
                 </p>
+                <WhyWeRecommend
+                  reason={topLearning.aiExplanation ?? topLearning.reason}
+                  compact
+                  className="mt-2"
+                />
                 <div className="mt-auto flex items-center gap-2 pt-3">
                   <a
                     href={topLearning.course.url}
@@ -710,13 +751,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               </div>
             </div>
 
-            {/* Metrics */}
+            {/* Metrics.
+                These used to repeat the hero card exactly — readiness,
+                skills mastered, roadmap steps and applications — so the same
+                four numbers appeared twice on one screen. The hero owns those
+                four. What is left here are the numbers the hero does NOT
+                show: the evidence behind the claims, the projects that
+                prove the skills, the certifications on file and the interviews
+                practised. */}
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
               {[
-                { label: t('Role readiness match'), value: `${readiness}%` },
-                { label: t('Skills mastered'), value: `${masteredSkillsCount}/${skills.length}` },
-                { label: t('Roadmap completion'), value: `${completedTasks}/${totalTasks}` },
-                { label: t('Active applications'), value: `${activeApplications.length}` },
+                { label: t('Evidence artifacts'), value: `${evidenceItems.length}` },
+                { label: t('Projects'), value: `${projects.length}` },
+                { label: t('Certifications'), value: `${certificationCount}` },
+                { label: t('Mock interviews'), value: `${interviewSessions.length}` },
               ].map((metric) => (
                 <div
                   key={metric.label}
@@ -856,7 +904,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 <FileText className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
                 {t('CV Studio')}
                 <span className="text-[10px] text-[var(--text-muted)]">
-                  {isAtsAnalysisForRole(cvVersions[0]?.targetRoleTitle, targetRole.title)
+                  {isAtsAnalysisForRole(cvVersions[0]?.targetRoleTitle, targetRole?.title ?? '')
                     ? `${cvVersions[0]?.atsAnalysis?.overallScore ?? '—'}`
                     : '—'}
                 </span>

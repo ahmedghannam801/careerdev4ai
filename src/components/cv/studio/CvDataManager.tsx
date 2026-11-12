@@ -1082,7 +1082,7 @@ const ProjectForm: React.FC<{
               setDraft((p) => ({ ...p, status: event.target.value as CareerProject['status'] }))
             }
           >
-            {['idea', 'planned', 'in_progress', 'completed', 'published'].map((option) => (
+            {['planned', 'in_progress', 'completed', 'published'].map((option) => (
               <option key={option} value={option}>
                 {option.replace('_', ' ')}
               </option>

@@ -17,6 +17,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { suggestCvHeadlines } from '../../lib/cvAssistApi';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import {
   generateHeadlineSuggestions,
   type HeadlineSuggestionInput,
@@ -59,13 +60,13 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
 
   const input = useMemo<HeadlineSuggestionInput>(() => {
     const roleSkills = [
-      ...(targetRole.requiredSkills ?? []).map((skill) => skill.name),
-      ...(targetRole.preferredSkills ?? []).map((skill) => skill.name),
+      ...(targetRole?.requiredSkills ?? []).map((skill) => skill.name),
+      ...(targetRole?.preferredSkills ?? []).map((skill) => skill.name),
     ];
 
     // Additional tracks are real choices the candidate saved. The headline
     // generator only combines them when the roles genuinely overlap.
-    const primaryKey = (targetRoleTitle || targetRole.title || '').trim().toLowerCase();
+    const primaryKey = (targetRoleTitle || targetRole?.title || '').trim().toLowerCase();
     const additionalTargetRoles = savedRoles
       .map((role) => role.title)
       .filter((title) => title.trim().toLowerCase() !== primaryKey);
@@ -77,7 +78,7 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
       .filter(Boolean);
 
     return {
-      targetRoleTitle: targetRoleTitle || targetRole.title || profile.currentTitle || '',
+      targetRoleTitle: targetRoleTitle || targetRole?.title || profile.currentTitle || '',
       additionalTargetRoles,
       currentTitle: value,
       skills: ownedSkills.map((skill) => skill.name),
@@ -190,7 +191,7 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
         ) : (
           <Sparkles className="h-3 w-3 shrink-0" />
         )}
-        <span>{t('Suggest headlines')}</span>
+        <span>{aiButtonLabel(t('Suggest headlines'), 'ai_assist_inline', t)}</span>
       </button>
 
       {isOpen && (
@@ -206,7 +207,7 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
               className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-[10px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40"
             >
               <RefreshCw className={`h-3 w-3 shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>{t('Refresh suggestions')}</span>
+              <span>{aiButtonLabel(t('Refresh suggestions'), 'ai_assist_inline', t)}</span>
             </button>
           </div>
 

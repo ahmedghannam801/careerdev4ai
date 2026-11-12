@@ -13,6 +13,8 @@ export interface ProfileRow {
   location: string | null;
   bio: string | null;
   user_type: string | null;
+  experience_level: string | null;
+  years_of_experience: string | null;
   career_goal: string | null;
   target_role: string | null;
   target_industry: string | null;
@@ -31,6 +33,7 @@ export type ProfileUpdate = Partial<
     | 'phone'
     | 'bio'
     | 'user_type'
+    | 'experience_level'
     | 'career_goal'
     | 'target_role'
     | 'target_industry'

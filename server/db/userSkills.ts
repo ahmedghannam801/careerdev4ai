@@ -19,6 +19,14 @@ export interface UserSkillRow {
   skill_id: string;
   proficiency: number | null;
   years_experience: number | null;
+  /** The level a diagnostic knowledge check measured (1-5). */
+  assessed_level?: number | null;
+  /** The raw percentage the assessment scored (0-100). */
+  assessment_score?: number | null;
+  /** When the assessment was taken. */
+  assessment_at?: string | null;
+  /** Evidence backing the skill, as a JSON array of source names. */
+  evidence_sources?: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,7 +51,14 @@ export async function getUserSkills(userId: string): Promise<(UserSkillRow & { s
 export async function upsertUserSkill(
   userId: string,
   skillId: string,
-  values: { proficiency?: number; years_experience?: number }
+  values: {
+    proficiency?: number;
+    years_experience?: number;
+    assessed_level?: number | null;
+    assessment_score?: number | null;
+    assessment_at?: string | null;
+    evidence_sources?: string[] | null;
+  }
 ): Promise<UserSkillRow> {
   // The unique key is (user_id, skill_id) — the upsert must target it,
   // otherwise a repeated save violates user_skills_user_id_skill_id_key.
@@ -57,6 +72,71 @@ export async function upsertUserSkill(
     .single();
   if (error) throw error;
   return data as UserSkillRow;
+}
+
+/**
+ * Persists a diagnostic knowledge check result.
+ *
+ * The self-reported proficiency is left alone: a measurement does not erase
+ * what the candidate said about themselves, it is stored beside it. The
+ * effective level the rest of the product uses is the stronger of the two, so
+ * completing a check updates readiness, blockers and the roadmap immediately
+ * without a second "sync" action.
+ */
+export async function recordSkillAssessment(
+  userId: string,
+  skillId: string,
+  result: { level: number; score: number; at?: string }
+): Promise<UserSkillRow> {
+  const level = Math.max(1, Math.min(5, Math.round(result.level)));
+  const score = Math.max(0, Math.min(100, Math.round(result.score)));
+  const at = result.at ?? new Date().toISOString();
+
+  const existing = await getSupabaseServer()
+    .from('user_skills')
+    .select('evidence_sources')
+    .eq('user_id', userId)
+    .eq('skill_id', skillId)
+    .maybeSingle();
+
+  const currentSources: string[] = Array.isArray(existing.data?.evidence_sources)
+    ? (existing.data!.evidence_sources as string[])
+    : [];
+  const evidenceSources = [...new Set([...currentSources, 'diagnostic_assessment'])];
+
+  return upsertUserSkill(userId, skillId, {
+    assessed_level: level,
+    assessment_score: score,
+    assessment_at: at,
+    evidence_sources: evidenceSources,
+  });
+}
+
+/**
+ * Adds an evidence source to a skill without changing its levels.
+ *
+ * Used when a project, course or certificate starts covering a skill the
+ * candidate already has. The source list is a set, so recording the same
+ * source twice is harmless.
+ */
+export async function addSkillEvidenceSource(
+  userId: string,
+  skillId: string,
+  source: string
+): Promise<void> {
+  const { data } = await getSupabaseServer()
+    .from('user_skills')
+    .select('evidence_sources')
+    .eq('user_id', userId)
+    .eq('skill_id', skillId)
+    .maybeSingle();
+  const current: string[] = Array.isArray(data?.evidence_sources)
+    ? (data!.evidence_sources as string[])
+    : [];
+  if (current.includes(source)) return;
+  await upsertUserSkill(userId, skillId, {
+    evidence_sources: [...current, source],
+  });
 }
 
 /**
@@ -128,7 +208,14 @@ export async function resolveSkillId(name: string, category?: string): Promise<s
 export async function setUserSkillLevel(
   userId: string,
   skillId: string,
-  values: { proficiency?: number; years_experience?: number }
+  values: {
+    proficiency?: number;
+    years_experience?: number;
+    assessed_level?: number | null;
+    assessment_score?: number | null;
+    assessment_at?: string | null;
+    evidence_sources?: string[] | null;
+  }
 ): Promise<UserSkillRow> {
   return upsertUserSkill(userId, skillId, values);
 }

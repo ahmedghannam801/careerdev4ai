@@ -17,6 +17,7 @@ import {
   Star
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { MilestoneCategory, CareerGoal } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
@@ -78,7 +79,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     milestones,
     addMilestone,
     careerBlockers,
-    learningItems, t,} = useCareer();
+    learningItems, careerIdentity, t,} = useCareer();
 
   const [addGoalModalOpen, setAddGoalModalOpen] = useState(false);
   const [goalForm, setGoalForm] = useState({
@@ -155,7 +156,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   const latestCvVersion = cvVersions[0];
   const latestCvAtsIsCurrent = isAtsAnalysisForRole(
     latestCvVersion?.targetRoleTitle,
-    targetRole.title
+    targetRole?.title ?? ''
   );
   const latestCvAtsScore = latestCvAtsIsCurrent
     ? latestCvVersion?.atsAnalysis?.overallScore ?? null
@@ -192,9 +193,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
       name: t('Target CV Alignment'),
       status: latestCvAtsScore !== null ? 'Complete' : 'Needs Improvement',
       desc: latestCvAtsScore !== null
-        ? `${t('ATS Match Score:')} ${latestCvAtsScore}% ${t('tailored for')} ${targetRole.title}`
+        ? `${t('ATS Match Score:')} ${latestCvAtsScore}% ${t('tailored for')} ${targetRole?.title ?? ''}`
         : latestCvAtsNeedsRefresh
-          ? `${t('Saved ATS score was generated for')} ${latestCvVersion?.targetRoleTitle || t('another role')} — ${t('run a new audit for')} ${targetRole.title}`
+          ? `${t('Saved ATS score was generated for')} ${latestCvVersion?.targetRoleTitle || t('another role')} — ${t('run a new audit for')} ${targetRole?.title ?? ''}`
           : t('No ATS score yet — run an ATS audit in CV Studio'),
       view: 'cv-studio'
     },
@@ -207,7 +208,14 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     {
       name: t('Interview Readiness'),
       status: interviewSessions.length >= 1 ? 'Complete' : 'Missing',
-      desc: `${interviewSessions.length} ${t('STAR mock simulations passed')}`,
+      desc: (() => {
+        const scored = interviewSessions.filter((s) => typeof s.aiFeedback?.score === 'number');
+        const readinessPct =
+          scored.length > 0
+            ? Math.round((scored.reduce((acc, s) => acc + (s.aiFeedback?.score ?? 0), 0) / scored.length) * 10)
+            : 0;
+        return `${readinessPct}% · ${interviewSessions.length} ${t('mock sessions recorded')}`;
+      })(),
       view: 'interviews'
     }
   ];
@@ -221,12 +229,15 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
 
   // The primary goal is described entirely from the user's own state: the
   // role they selected, the goal they picked, and the work still open.
-  const goalLabel = CAREER_GOAL_LABELS[profile.careerGoal] ?? t('Advance your career');
+  const goalLabel =
+    (profile.careerGoal ? CAREER_GOAL_LABELS[profile.careerGoal] : undefined) ??
+    careerIdentity.careerGoalLabel ??
+    t('Advance your career');
   const customGoal = profile.customGoalText?.trim() || '';
-  const primaryGoalTitle = customGoal || `${t('Become a')} ${targetRole.title}`;
+  const primaryGoalTitle = customGoal || `${t('Become a')} ${targetRole?.title ?? ''}`;
   const primaryGoalDescription = customGoal
-    ? `${t('Your stated goal:')} "${customGoal}" — ${t('working toward a')} ${targetRole.title} ${t('role')}.`
-    : `${t(goalLabel)} — ${t('working toward a')} ${targetRole.title} ${t('role')}.`;
+    ? `${t('Your stated goal:')} "${customGoal}" — ${t('working toward a')} ${targetRole?.title ?? ''} ${t('role')}.`
+    : `${t(goalLabel)} — ${t('working toward a')} ${targetRole?.title ?? ''} ${t('role')}.`;
 
   // The next action is the first roadmap task the user has not finished.
   const openRoadmapTasks = roadmapPhases
@@ -249,7 +260,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
 
   // Derive real dynamic journey stages:
   // 1. Direction: completed if user selected target role and career goal
-  const isDirectionDone = Boolean(targetRole.title && profile.careerGoal);
+  const isDirectionDone = Boolean((targetRole?.title ?? '') && profile.careerGoal);
   
   // 2. Skill Gaps: completed if Direction done AND skills recorded or gap analysis performed
   const isSkillsDone = isDirectionDone && (skills.length > 0 || analysis.criticalGaps.length > 0 || analysis.strengths.length > 0);
@@ -288,7 +299,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   else activeStageKey = 'opportunity';
 
   const journeySteps = [
-    { key: 'direction', label: t('Direction'), desc: targetRole.title || t('Target role & goals'), active: activeStageKey === 'direction', done: isDirectionDone },
+    { key: 'direction', label: t('Direction'), desc: targetRole?.title || t('Target role & goals'), active: activeStageKey === 'direction', done: isDirectionDone },
     { key: 'skills', label: t('Skill Gaps'), desc: `${analysis.criticalGaps.length} ${t('critical gaps')}`, active: activeStageKey === 'skills', done: isSkillsDone },
     { key: 'roadmap', label: t('Roadmap'), desc: roadmapPhases.length > 0 ? `${roadmapPhases.length} ${t('Phases Active')}` : t('Generate roadmap'), active: activeStageKey === 'roadmap', done: isRoadmapDone },
     { key: 'learning', label: t('Learning'), desc: learningItems.length > 0 ? `${learningItems.length} ${t('Courses Active')}` : completedRoadmapTasksCount > 0 ? `${completedRoadmapTasksCount} ${t('Tasks Done')}` : t('Course recommendations'), active: activeStageKey === 'learning', done: isLearningDone },
@@ -339,7 +350,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
               {t('Where Am I in My Career Journey?')}
             </h1>
             <p className="text-xs sm:text-sm text-[var(--text-secondary)] max-w-2xl">
-              {t('You are currently transitioning from')} <strong className="text-[var(--text-primary)] capitalize">{t(profile.careerState.replace('_', ' '))}</strong> {t('to a verified')} <strong className="text-[var(--color-primary-text)]">{targetRole.title}</strong>. {t('Your current market match is at')} <strong className="text-[var(--color-success-strong)]">{analysis.matchPercentage}%</strong> {t('with')} {interviewCount} {t('active interview')} {t(interviewCount === 1 ? 'pipeline' : 'pipelines')}.
+              {t('You are currently transitioning from')} <strong className="text-[var(--text-primary)] capitalize">{t(careerIdentity.currentStatusLabel)}</strong> {t('to a verified')} <strong className="text-[var(--color-primary-text)]">{targetRole?.title ?? ''}</strong>. {t('Your current market match is at')} <strong className="text-[var(--color-success-strong)]">{analysis.matchPercentage}%</strong> {t('with')} {interviewCount} {t('active interview')} {t(interviewCount === 1 ? 'pipeline' : 'pipelines')}.
             </p>
           </div>
 
@@ -495,8 +506,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 {primaryGoalDescription}
               </p>
             </div>
-            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--color-success-surface)] text-[var(--color-success-strong)] font-mono">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--color-success-surface)] text-[var(--color-success-strong)] font-mono">
               {t('Role Match')} ({analysis.matchPercentage}%)
+              <ScoreInfoTooltip score="roleReadiness" value={analysis.matchPercentage} />
             </span>
           </div>
 

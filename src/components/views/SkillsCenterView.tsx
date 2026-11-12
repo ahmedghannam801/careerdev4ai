@@ -3,14 +3,19 @@ import { Plus, CheckCircle2, X, Target } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { SKILL_CATEGORIES } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
-import { SkillCategory, SkillSource } from '../../types/career';
+import { SkillCategory, SkillSource, SkillEvidenceSource } from '../../types/career';
 import { Reveal } from '../motion/Motion';
 import {
   computeSkillGaps,
+  explainGap,
   normalizeSkillName,
   summarizeSkillGaps,
   toRoleSkillRequirements,
 } from '../../../shared/skillGap';
+import { explainGapTranslated } from '../../lib/gapExplanation';
+import { WhyWeRecommend } from '../ui/WhyWeRecommend';
+import { useToast } from '../toast/ToastProvider';
+import { isSkillSectionHeader } from '../../../shared/cvDedupe';
 
 /** The colour used for each gap priority. */
 const PRIORITY_CLASS: Record<string, string> = {
@@ -21,8 +26,26 @@ const PRIORITY_CLASS: Record<string, string> = {
   sufficient: 'bg-[var(--surface-secondary)] text-[var(--text-muted)]',
 };
 
+/**
+ * The badge shown beside a skill for each kind of evidence behind it.
+ *
+ * The labels name WHERE the level came from, because "Python: 4/5" says
+ * nothing about whether the candidate rated themselves, was measured, or
+ * built something that proves it.
+ */
+const EVIDENCE_BADGE_LABELS: Record<SkillEvidenceSource, string> = {
+  self_reported: 'Self-reported',
+  diagnostic_assessment: 'Diagnostic Assessment',
+  course_completed: 'Course Completed',
+  verified_project: 'Verified Project',
+  certificate: 'Certificate',
+  work_experience: 'Work Experience',
+};
+
 export const SkillsCenterView: React.FC = () => {
-  const { skills, updateSkillLevel, addCustomSkill, removeSkill, targetRole, t} = useCareer();
+  const { skills, skillEvidence, updateSkillLevel, addCustomSkill, removeSkill, targetRole, t} = useCareer();
+  const { showToast } = useToast();
+  const [skillError, setSkillError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useRouteParam<string>('category', SKILL_CATEGORIES, 'all');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -63,21 +86,33 @@ export const SkillsCenterView: React.FC = () => {
     return { byName, summary: summarizeSkillGaps(gaps, requirements) };
   }, [targetRole, skills]);
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSkillName.trim()) return;
+    const cleaned = newSkillName.trim();
+    if (!cleaned) return;
+    if (isSkillSectionHeader(cleaned)) {
+      const msg = t('Category headings like SOFT SKILLS or TECHNICAL SKILLS cannot be added as individual skills. Enter a specific skill name instead.');
+      setSkillError(msg);
+      showToast({ variant: 'error', title: t('Invalid skill name'), description: msg });
+      return;
+    }
 
-    addCustomSkill({
-      name: newSkillName.trim(),
-      category: newSkillCategory,
-      currentLevel: newSkillLevel,
-      targetLevel: newSkillTarget,
-      source: newSkillSource,
-      evidenceIds: []
-    });
-
-    setNewSkillName('');
-    setShowAddModal(false);
+    setSkillError(null);
+    try {
+      await addCustomSkill({
+        name: cleaned,
+        category: newSkillCategory,
+        currentLevel: newSkillLevel,
+        targetLevel: newSkillTarget,
+        source: newSkillSource,
+        evidenceIds: []
+      });
+      setNewSkillName('');
+      setShowAddModal(false);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : t('Failed to save skill');
+      setSkillError(msg);
+    }
   };
 
   return (
@@ -175,14 +210,20 @@ export const SkillsCenterView: React.FC = () => {
       <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4 shadow-xs">
         <div className="flex items-center justify-between text-xs text-[var(--text-muted)] border-b border-[var(--border-subtle)] pb-3">
           <div className="w-1/3">{t('Skill & Source')}</div>
-          <div className="w-1/3 text-center">{t('Current Level vs Target for')} {targetRole.title}</div>
+          <div className="w-1/3 text-center">
+            {targetRole
+              ? `${t('Current Level vs Target for')} ${targetRole.title}`
+              : t('Current Level vs General Target')}
+          </div>
           <div className="w-1/3 text-end">{t('Remaining Gap')}</div>
         </div>
 
         <div className="space-y-4">
           {filteredSkills.map((skill) => {
             const hasGap = skill.gap > 0;
-            const priority = gapAnalysis?.byName.get(normalizeSkillName(skill.name))?.priority;
+            const gapEntry = gapAnalysis?.byName.get(normalizeSkillName(skill.name));
+            const priority = gapEntry?.priority;
+            const evidenceRec = skillEvidence[skill.name.toLowerCase()];
 
             return (
               <div 
@@ -211,26 +252,107 @@ export const SkillsCenterView: React.FC = () => {
                     <span aria-hidden="true">·</span>
                     <span className="capitalize">{t(skill.source.replace('_', ' '))}</span>
                   </div>
+                  {/* WHY THIS SKILL IS ON THE LIST.
+                      The reason comes from the same gap engine that ranked it,
+                      so the explanation and the priority can never disagree. */}
+                  <WhyWeRecommend
+                    reason={gapEntry ? explainGapTranslated(explainGap(gapEntry), t) : null}
+                    title={t('Why this skill is prioritised')}
+                    compact
+                    className="mt-1.5"
+                  />
                 </div>
 
                 {/* Interactive Level Slider */}
                 <div data-tour="skill-rate-widget" className="md:w-1/3 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-mono">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
                     <span className="text-[var(--text-primary)] font-semibold">
                       {t('Current:')} {skill.currentLevel} / 5
                     </span>
+                    {evidenceRec && (
+                      <span className="text-[10px] text-[var(--text-muted)] font-sans">
+                        {evidenceRec.selfReportedLevel !== null && (
+                          <>{t('Self')}: L{evidenceRec.selfReportedLevel}</>
+                        )}
+                        {evidenceRec.selfReportedLevel !== null && evidenceRec.assessedLevel !== null && ' · '}
+                        {evidenceRec.assessedLevel !== null && (
+                          <>{t('Assessed')}: L{evidenceRec.assessedLevel}</>
+                        )}
+                      </span>
+                    )}
                     <span className="text-[var(--text-muted)]">
                       {t('Target:')} {skill.targetLevel} / 5
                     </span>
                   </div>
+
+                  {/* The bar, with the target marked on it.
+                      A slider alone says "you are here"; the bar says how far
+                      that is from what the role asks for. */}
+                  <div
+                    className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--color-progress-track)]"
+                    role="img"
+                    aria-label={t(
+                      'Current level {current} of 5. Target level {target} of 5.',
+                    )
+                      .replace('{current}', String(skill.currentLevel))
+                      .replace('{target}', String(skill.targetLevel))}
+                  >
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        skill.gap > 0
+                          ? 'bg-[var(--color-primary)]'
+                          : 'bg-[var(--color-success-strong)]'
+                      }`}
+                      style={{ width: `${(skill.currentLevel / 5) * 100}%` }}
+                    />
+                    {/* The target marker. */}
+                    <div
+                      className="absolute top-0 h-full w-0.5 bg-[var(--text-primary)]"
+                      style={{ left: `${(skill.targetLevel / 5) * 100}%` }}
+                      aria-hidden="true"
+                    />
+                  </div>
+
                   <input
                     type="range"
                     min="1"
                     max="5"
                     value={skill.currentLevel}
-                    onChange={(e) => updateSkillLevel(skill.id, parseInt(e.target.value, 10))}
+                    onChange={(e) => {
+                      const level = parseInt(e.target.value, 10);
+                      updateSkillLevel(skill.id, level);
+                      // The rating is saved on the server and the roadmap is
+                      // rebuilt from it, so the candidate is told what
+                      // happened rather than left watching a slider move.
+                      showToast({
+                        variant: 'success',
+                        title: t('Skill level saved.'),
+                        description: t('{skill} is now rated {level}/5. Your roadmap was rebuilt from it.').replace(
+                          '{skill}',
+                          skill.name
+                        ).replace('{level}', String(level)),
+                      });
+                    }}
                     className="w-full accent-[var(--accent-primary)] cursor-pointer"
                   />
+
+                  {/* The evidence behind the level.
+                      A number on its own says nothing about how the candidate
+                      knows it, so the badges say which of the three levels is
+                      carrying the weight: what they claim, what a check
+                      measured, and what the records prove. */}
+                  {skill.evidenceSources && skill.evidenceSources.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      {skill.evidenceSources.map((source) => (
+                        <span
+                          key={source}
+                          className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]"
+                        >
+                          {t(EVIDENCE_BADGE_LABELS[source] ?? source)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Gap Indicator */}
@@ -281,13 +403,21 @@ export const SkillsCenterView: React.FC = () => {
             </div>
 
             <form onSubmit={handleAddSubmit} className="space-y-4">
+              {skillError && (
+                <div role="alert" className="rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 px-3 py-2 text-xs text-[var(--color-danger)]">
+                  {skillError}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">{t('Skill Name')}</label>
                 <input
                   type="text"
                   required
                   value={newSkillName}
-                  onChange={(e) => setNewSkillName(e.target.value)}
+                  onChange={(e) => {
+                    setNewSkillName(e.target.value);
+                    if (skillError) setSkillError(null);
+                  }}
                   placeholder={t('e.g. Next.js, Redis, Prompt Engineering')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />

@@ -87,6 +87,10 @@ function isSeoPath(pathname: string): boolean {
   // a request that falls through to the asset binding would answer with the
   // SPA shell instead of the document.
   if (pathname === '/about' || pathname === '/privacy' || pathname === '/terms') return true;
+  // The Contact Us page is server-rendered for the same reason as the legal
+  // documents: it carries the business contact details, and a request for it
+  // must reach the document rather than the application shell.
+  if (pathname === '/contact') return true;
   // The asset binding answers the `.html` path of the verification file with
   // a permanent redirect. Google asks for that exact path, so the request is
   // answered by the application instead.

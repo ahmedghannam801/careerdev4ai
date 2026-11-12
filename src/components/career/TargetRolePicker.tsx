@@ -175,7 +175,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-bold text-[var(--text-primary)] truncate">
-                {domain.label}
+                {t(domain.label)}
               </span>
               {isSelectionDomain && (
                 <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[var(--accent-primary)] text-[var(--color-on-primary)]">
@@ -207,9 +207,9 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs font-bold text-[var(--text-primary)]">{role.title}</div>
+            <div className="text-xs font-bold text-[var(--text-primary)]">{t(role.title)}</div>
             <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-              {role.level} · {role.category}
+              {t(role.level)} · {t(role.category)}
             </div>
           </div>
           <ChevronRight className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 mt-0.5 rtl:rotate-180" />
@@ -262,9 +262,9 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
                       : 'bg-[var(--surface-main)] border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
                   }`}
                 >
-                  <div className="text-xs font-bold text-[var(--text-primary)]">{role.title}</div>
+                  <div className="text-xs font-bold text-[var(--text-primary)]">{t(role.title)}</div>
                   <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    {role.category} · {role.level}
+                    {t(role.category)} · {t(role.level)}
                   </div>
                 </button>
               </div>
@@ -305,7 +305,7 @@ export const TargetRolePicker: React.FC<TargetRolePickerProps> = ({
           {activeDomain && (
             <div className="space-y-2 pt-1">
               <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold">
-                {t('2 · Specialisation in')} {activeDomain.label}
+                {t('2 · Specialisation in')} {t(activeDomain.label)}
               </div>
               <div className="space-y-2 max-h-[420px] overflow-y-auto pe-1">
                 {specialisations.map((role) =>

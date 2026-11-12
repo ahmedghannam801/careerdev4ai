@@ -47,6 +47,7 @@ import {
 } from '../../lib/cvAnalysisApi';
 import { extractCv } from '../../lib/cvExtractionApi';
 import { useCareer } from '../../context/CareerContext';
+import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
 import { CvMeasurementReport } from './CvMeasuredAnalysis';
 
 type StageState = 'pending' | 'active' | 'completed' | 'failed';
@@ -149,7 +150,7 @@ export const CvAnalysisPanel: React.FC<CvAnalysisPanelProps> = ({
       const request = {
         cvVersionId: target.cvVersionId ?? null,
         cv: target.cvVersionId ? undefined : target.cv,
-        targetRoleTitle: targetRole.title,
+        targetRoleTitle: targetRole?.title ?? '',
         jobDescription: jobDescription.trim() || null,
       };
 
@@ -186,7 +187,7 @@ export const CvAnalysisPanel: React.FC<CvAnalysisPanelProps> = ({
         setIsRunning(false);
       }
     },
-    [jobDescription, onMeasured, onStage, refreshHistory, resetStages, t, targetRole.title]
+    [jobDescription, onMeasured, onStage, refreshHistory, resetStages, t, targetRole?.title ?? '']
   );
 
   /**
@@ -526,8 +527,10 @@ export const CvAnalysisPanel: React.FC<CvAnalysisPanelProps> = ({
                 </span>
               )}
               {atsScore !== null && (
-                <span className="px-2 py-1 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-secondary)]">
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-secondary)]">
                   {t('AI ATS score')}: <span className="font-mono">{atsScore}</span>
+                  {/* The score says what it measures and how. */}
+                  <ScoreInfoTooltip score="cvAts" value={atsScore} />
                 </span>
               )}
             </div>

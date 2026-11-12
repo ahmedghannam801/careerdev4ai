@@ -139,6 +139,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const [source, setSource] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ code: string | null } | null>(null);
+  /** When the vacancies were last read from the provider, in epoch millis. */
+  const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null);
   const [sort, setSort] = useState<SortOrder>('match');
   const [trackingId, setTrackingId] = useState<string | null>(null);
   /** The outcome of the last application the user tracked from this screen. */
@@ -161,6 +163,10 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       setResults(response.jobs);
       setQuota(response.quota);
       setSource(response.source);
+      // When the vacancies were actually read. The candidate is told how old
+      // the list is, because a job board that was checked an hour ago is not
+      // the same thing as one that was checked a minute ago.
+      setLastCheckedAt(Date.now());
     } catch (caught) {
       // The failure code is kept; the server's English sentence is not shown
       // to the user, because the interface has its own sentence per code.
@@ -176,14 +182,14 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   useEffect(() => {
     if (!isHydrated || startedRef.current) return;
     startedRef.current = true;
-    const roleTitle = targetRole.title?.trim();
+    const roleTitle = targetRole?.title?.trim();
     const next: JobSearchFilters = {
       ...filters,
-      query: roleTitle && roleTitle.toLowerCase() !== 'target role' ? roleTitle : '',
+      query: roleTitle ?? '',
     };
     setFilters(next);
     void runSearch(next);
-  }, [isHydrated, targetRole.title, filters, runSearch]);
+  }, [isHydrated, targetRole?.title ?? '', filters, runSearch]);
 
   const update = (patch: Partial<JobSearchFilters>) => {
     setFilters((previous) => ({ ...previous, ...patch }));
@@ -236,14 +242,17 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const expiredCount = useMemo(() => ordered.filter((entry) => entry.job.expired).length, [ordered]);
 
   const linkedInSearchUrl = useMemo(() => {
-    const q = filters.query?.trim() || targetRole.title?.trim() || 'Software Engineer';
+    // The search is seeded from the candidate's own target role. With no role
+    // there is nothing to seed it with, so the keyword is left out rather
+    // than filled with a default career the candidate never chose.
+    const q = filters.query?.trim() || targetRole?.title?.trim() || '';
     const loc = filters.location?.trim() || (filters.country === 'eg' ? 'Egypt' : '');
     const params = new URLSearchParams({
-      keywords: q,
+      ...(q ? { keywords: q } : {}),
       ...(loc ? { location: loc } : {}),
     });
     return `https://www.linkedin.com/jobs/search/?${params.toString()}`;
-  }, [filters.query, filters.location, filters.country, targetRole.title]);
+  }, [filters.query, filters.location, filters.country, targetRole?.title ?? '']);
 
   const handleTrackApplication = async (item: MatchedJob) => {
     setTrackingId(item.job.id);
@@ -530,9 +539,26 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
-          <span>
-            {ordered.length} {t('live vacancies')}
-          </span>
+          {/* The count is only shown when it MEANS something.
+              While the search is running there is no count yet, and printing
+              "0 live vacancies" next to "Searching live job boards…" told
+              the candidate the boards had nothing, which was never true. */}
+          {!loading && !error && (
+            <span>
+              {ordered.length} {t('live vacancies')}
+            </span>
+          )}
+          {!loading && !error && lastCheckedAt && (
+            <span>
+              {t('Last checked: {time}').replace(
+                '{time}',
+                new Date(lastCheckedAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              )}
+            </span>
+          )}
           {expiredCount > 0 && (
             <span className="text-[var(--color-warning)]">
               {t('({count} expired)').replace('{count}', String(expiredCount))}
@@ -591,18 +617,52 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           className="flex items-start gap-3 rounded-2xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 p-5"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-warning)]" />
-          <div className="space-y-2 text-xs text-[var(--text-secondary)]">
+          <div className="space-y-2.5 text-xs text-[var(--text-secondary)]">
             <p className="font-semibold text-[var(--text-primary)]">
               {t('Live jobs could not be loaded.')}
             </p>
             <p>{providerFailureMessage(error.code, t)}</p>
-            <button
-              type="button"
-              onClick={() => void runSearch(filters)}
-              className="rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)]"
-            >
-              {t('Try again')}
-            </button>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => void runSearch(filters)}
+                className="rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)]"
+              >
+                {t('Try again')}
+              </button>
+              {(() => {
+                const q = (filters.query || targetRole?.title || '').trim();
+                const loc = (filters.location || '').trim();
+                const qEnc = encodeURIComponent(q);
+                const locEnc = encodeURIComponent(loc);
+                const links = [
+                  {
+                    label: 'LinkedIn Jobs',
+                    href: `https://www.linkedin.com/jobs/search/?keywords=${qEnc}${loc ? `&location=${locEnc}` : ''}`,
+                  },
+                  {
+                    label: 'Wuzzuf',
+                    href: `https://wuzzuf.net/search/jobs/?q=${qEnc}`,
+                  },
+                  {
+                    label: 'Glassdoor',
+                    href: `https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${qEnc}`,
+                  },
+                ];
+                return links.map((board) => (
+                  <a
+                    key={board.label}
+                    href={board.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] hover:border-[var(--accent-primary)]"
+                  >
+                    <span>{t('Search on')} {board.label}</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                ));
+              })()}
+            </div>
           </div>
         </div>
       )}

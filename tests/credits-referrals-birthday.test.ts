@@ -42,6 +42,28 @@ async function clearCredits(profileId: string): Promise<void> {
   await admin.from('ai_credit_ledger').delete().eq('profile_id', profileId);
 }
 
+/**
+ * Waits for the balance to settle on an expected figure.
+ *
+ * A refund the route performs itself lands before the response is sent. A
+ * refund the credits middleware performs when the response finishes lands
+ * just after it, because the response has already gone. The balance is
+ * therefore read until it reaches the expected figure or the wait runs out.
+ */
+async function settleBalance(
+  profileId: string,
+  expected: number,
+  timeoutMs = 8000
+): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  let balance = await runningBalance(profileId);
+  while (balance !== expected && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    balance = await runningBalance(profileId);
+  }
+  return balance;
+}
+
 test.describe('the daily credit allowance', () => {
   let user: TestUser;
 
@@ -595,7 +617,7 @@ test.describe('the Learning Hub and the credit it spends', () => {
     return res.body?.balance as number;
   }
 
-  test('the daily allowance is enough to use the Learning Hub', async () => {
+  test('the deterministic Learning Hub request costs nothing', async () => {
     await clearCredits(user.id);
 
     const before = await reportedBalance();
@@ -604,8 +626,13 @@ test.describe('the Learning Hub and the credit it spends', () => {
       `the daily allowance of ${DAILY_CREDIT_ALLOWANCE} must be available, found ${before}`
     );
 
-    // The Learning Hub is one credit. With the allowance it can be used and
-    // the balance afterwards must be exactly one credit lower.
+    // The Learning Hub asks for its deterministic ranking on its own: when the
+    // career graph is hydrated, when a course is saved, started, dismissed or
+    // completed, and when the page is opened. Those are ordinary product
+    // actions, no model is involved, and none of them may cost a token.
+    //
+    // This used to cost exactly one credit, which meant that two page loads
+    // spent a candidate's entire daily allowance.
     const hub = await api('POST', '/api/learning/recommendations', {
       token: user.token,
       body: { ai: false },
@@ -615,13 +642,33 @@ test.describe('the Learning Hub and the credit it spends', () => {
     const after = await reportedBalance();
     assert.equal(
       after,
-      before - 1,
-      'a successful Learning Hub request costs exactly one credit'
+      before,
+      'a deterministic Learning Hub request must not spend a credit'
     );
+    assert.ok(
+      hub.body?.creditBalance === undefined || hub.body?.creditBalance === after,
+      'the response must not report a balance that was never spent'
+    );
+  });
+
+  test('refreshing the Learning Hub again and again costs nothing', async () => {
+    // The page refreshes the ranking on every open and on every change to a
+    // learning item. Repeating the request must not repeat the charge either.
+    await clearCredits(user.id);
+    const before = await reportedBalance();
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const hub = await api('POST', '/api/learning/recommendations', {
+        token: user.token,
+        body: { ai: false },
+      });
+      assert.equal(hub.status, 200, hub.body?.error);
+    }
+
     assert.equal(
-      hub.body?.creditBalance,
-      after,
-      'the balance the request reports must be the balance the ledger holds'
+      await reportedBalance(),
+      before,
+      'refreshing the Learning Hub must not spend a credit'
     );
   });
 
@@ -642,7 +689,7 @@ test.describe('the Learning Hub and the credit it spends', () => {
     assert.equal(after, before, 'a failed request must not spend a credit');
   });
 
-  test('the allowance is spent before anything else, and the ledger agrees', async () => {
+  test('the ledger and the API agree about a balance that was not spent', async () => {
     await clearCredits(user.id);
     const before = await reportedBalance();
 
@@ -654,8 +701,34 @@ test.describe('the Learning Hub and the credit it spends', () => {
 
     assert.equal(
       await runningBalance(user.id),
-      before - 1,
+      before,
       'the ledger must hold the same balance the API reported'
+    );
+  });
+
+  test('a request the server refuses after taking the credit gives it back', async () => {
+    await clearCredits(user.id);
+    const before = await reportedBalance();
+    assert.ok(before > 0, 'the account starts with credits');
+
+    // The job description route takes its credit before it reads the
+    // description, and then refuses the request because there is no
+    // description to read. The candidate received nothing at all, so the
+    // credit must come back.
+    const refused = await api('POST', '/api/cv/job-description/analyze', {
+      token: user.token,
+      body: {},
+    });
+    assert.ok(
+      refused.status >= 400,
+      `the request is refused, got ${refused.status}`
+    );
+
+    const after = await settleBalance(user.id, before);
+    assert.equal(
+      after,
+      before,
+      'a request that was refused after the credit was taken must give it back'
     );
   });
 });

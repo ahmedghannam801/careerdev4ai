@@ -30,6 +30,7 @@ import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
 import { CourseCard } from '../learning/CourseCard';
 import { LEARNING_TABS } from '../../lib/routing';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { useRouteParam } from '../../lib/useRouteParams';
 import {
   availabilityBucket,
@@ -190,10 +191,14 @@ export const LearningCenterView: React.FC = () => {
   }, [learningRecommendations]);
 
   const roleOptions = useMemo(() => {
+    // The candidate's target role may be unset, in which case the saved
+    // tracks are the only roles to offer.
     const entries = [targetRole, ...savedRoles].filter(
+      (role): role is NonNullable<typeof role> => Boolean(role)
+    );
+    return entries.filter(
       (role, index, list) => list.findIndex((entry) => entry.id === role.id) === index
     );
-    return entries;
   }, [savedRoles, targetRole]);
 
   const skillOptions = useMemo(
@@ -323,11 +328,11 @@ export const LearningCenterView: React.FC = () => {
     const targetRoleCourses = learningCatalog
       .filter(
         (course) =>
-          course.roles.some((role) => role.roleSlug === targetRole.id) ||
+          course.roles.some((role) => role.roleSlug === targetRole?.id) ||
           course.roles.some(
             (role) =>
               course.roles.length === 1 &&
-              role.roleSlug.toLowerCase() === targetRole.title.toLowerCase()
+              role.roleSlug.toLowerCase() === (targetRole?.title ?? '').toLowerCase()
           )
       )
       .sort((a, b) => {
@@ -335,7 +340,7 @@ export const LearningCenterView: React.FC = () => {
           Math.max(
             0,
             ...course.roles
-              .filter((role) => role.roleSlug === targetRole.id)
+              .filter((role) => role.roleSlug === targetRole?.id)
               .map((role) => role.relevanceScore)
           );
         return score(b) - score(a) || byRecommendation(a, b);
@@ -382,7 +387,7 @@ export const LearningCenterView: React.FC = () => {
       newCourses,
       popularCourses,
     };
-  }, [learningCatalog, learningRecommendations, targetRole.id, targetRole.title]);
+  }, [learningCatalog, learningRecommendations, targetRole?.id, targetRole?.title ?? '']);
 
   const renderRail = (
     id: string,
@@ -492,7 +497,7 @@ export const LearningCenterView: React.FC = () => {
 
   const top = learningRecommendations[0];
   const roleLabel =
-    learningRecommendationMeta.targetRoleTitle || targetRole.title || t('your target role');
+    learningRecommendationMeta.targetRoleTitle || targetRole?.title || t('your target role');
 
   const filterSelectClass =
     'rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-xs text-[var(--text-primary)]';
@@ -531,7 +536,7 @@ export const LearningCenterView: React.FC = () => {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90 disabled:opacity-50"
           >
             <Sparkles size={15} />
-            {t('Explain with AI')}
+            {aiButtonLabel(t('Explain with AI'), 'learning_recommendation', t)}
           </button>
         </div>
       </div>

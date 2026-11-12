@@ -334,7 +334,53 @@ function clampLevel(level: number): number {
 }
 
 /**
+ * Why a gap has the priority it has, as separate pieces.
+ *
+ * `describeGap` builds a sentence out of these. The pieces are exposed
+ * separately so the interface can build the same sentence in the user's own
+ * language: a reason that is only ever available in English is a reason the
+ * Arabic interface cannot show.
+ */
+export interface GapExplanation {
+  /** The skill the gap is about. */
+  name: string;
+  /** The level the user is at now. */
+  currentLevel: number;
+  /** The level the role expects. */
+  requiredLevel: number;
+  /** True when the user already meets the required level. */
+  met: boolean;
+  /** How urgent the gap is, as a key the interface can translate. */
+  urgency: 'blocks_the_role' | 'major_requirement' | 'worth_closing_next' | 'nice_to_have';
+}
+
+/**
+ * The structured reason a gap has its priority.
+ *
+ * Kept here so the same explanation appears in the skills centre, the roadmap
+ * and the AI context.
+ */
+export function explainGap(gap: SkillGap): GapExplanation {
+  const urgency =
+    gap.priority === 'critical'
+      ? 'blocks_the_role'
+      : gap.priority === 'high'
+        ? 'major_requirement'
+        : gap.priority === 'medium'
+          ? 'worth_closing_next'
+          : 'nice_to_have';
+  return {
+    name: gap.name,
+    currentLevel: gap.currentLevel,
+    requiredLevel: gap.requiredLevel,
+    met: gap.gap === 0,
+    urgency,
+  };
+}
+
+/**
  * A one-line, user-facing explanation of why a gap has its priority.
+ *
  * Kept here so the same sentence appears in the skills centre, the roadmap
  * and the AI context.
  */

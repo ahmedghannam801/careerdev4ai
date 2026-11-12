@@ -129,4 +129,5 @@ export const jobsAr: Record<string, string> = {
   'Search verified vacancies directly on LinkedIn matching your target role and keywords.':
     'ابحث عن شواغر موثقة مباشرةً على LinkedIn تطابق مسارك الوظيفي وكلماتك المفتاحية.',
   'Search on LinkedIn': 'ابحث عبر LinkedIn',
+  'Search on': 'ابحث عبر',
 };
