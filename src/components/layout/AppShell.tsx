@@ -178,7 +178,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       items: [
         { id: 'documents', label: t('My Documents'), icon: FolderClosed },
         { id: 'evidence', label: t('Evidence'), icon: Activity },
-        { id: 'profile-certifications', label: t('Certifications'), icon: Sparkles },
       ],
     },
     {

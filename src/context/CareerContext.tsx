@@ -2667,7 +2667,6 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const deleteCVVersion = async (versionId: string) => {
-    if (cvVersions.length <= 1) return;
     try {
       await deleteCvVersion(versionId);
       setCvVersions(prev => prev.filter(v => v.id !== versionId));
@@ -5257,7 +5256,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
    */
   const loadCVFromMyData = () => {
     setActiveCV((previous) =>
-      mergeCanonicalCvDocument(cvSource, { ...previous, hiddenSkills: [] })
+      mergeCanonicalCvDocument(cvSource, { ...previous, hiddenSkills: [], hiddenRecordIds: [] })
     );
   };
 

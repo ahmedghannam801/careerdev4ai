@@ -383,6 +383,8 @@ export interface CVProfile {
   linkedin?: string;
   github?: string;
   website?: string;
+  /** Canonical source records intentionally omitted from this CV. */
+  hiddenRecordIds?: string[];
   experiences: {
     id: string;
     company: string;

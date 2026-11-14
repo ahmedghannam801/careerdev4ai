@@ -7,6 +7,7 @@ import {
   Printer,
   Download,
   Loader2,
+  Trash2,
   PenLine,
   LayoutTemplate,
   Database,
@@ -51,6 +52,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
     loadCVFromMyData,
     cvVersions,
     saveCVVersion,
+    deleteCVVersion,
     runAiCvOptimization,
     isOptimizingCV,
     cvAnalysisError,
@@ -793,6 +795,16 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                         ATS {v.atsAnalysis.overallScore}%
                       </span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(t('Delete this item?'))) void deleteCVVersion(v.id);
+                      }}
+                      aria-label={`${t('Delete')}: ${v.name}`}
+                      className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-main)] hover:text-[var(--color-danger)]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() => updateCV(v.profile)}
                       className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)]"

@@ -53,6 +53,8 @@ export const cvAr: Record<string, string> = {
   'Step': 'الخطوة',
   'of': 'من',
   'Contact & Header': 'التواصل والترويسة',
+  'Clear': 'مسح',
+  'Clear All Skills': 'مسح كل المهارات',
   'Target Role Headline': 'عنوان الدور المستهدف',
   'Executive Summary': 'الملخّص التنفيذي',
   'Save as New Version Snapshot': 'حفظ كنسخة جديدة',

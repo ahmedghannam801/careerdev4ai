@@ -105,6 +105,11 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
 }) => {
   const { t } = useCareer();
   const links = cv.links ?? [];
+  const hideRecord = (id: string, changes: Partial<CVProfile>) =>
+    update({
+      ...changes,
+      hiddenRecordIds: [...new Set([...(cv.hiddenRecordIds ?? []), id])],
+    });
 
   const updateLink = (id: string, changes: Partial<CVLink>) => {
     update({
@@ -126,10 +131,13 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
     <div className="space-y-4">
       {/* ---- Contact & Header ---- */}
       <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Contact & Header')}
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+            <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+            {t('Contact & Header')}
+          </h3>
+          <button type="button" onClick={() => update({ email: '', phone: '', location: '', links: [], hiddenRecordIds: [...new Set([...(cv.hiddenRecordIds ?? []), ...links.map((link) => link.id)])] })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear')}</button>
+        </div>
         <div className="space-y-3">
           <div>
             <label className={LABEL_CLASS}>{t('Full Name')}</label>
@@ -201,7 +209,10 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
 
       {/* ---- Executive Summary ---- */}
       <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Executive Summary')}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Executive Summary')}</h3>
+          <button type="button" onClick={() => update({ summary: '' })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear')}</button>
+        </div>
         <CvSectionAdvice section="summary" report={advice ?? null} />
         <textarea
           rows={4}
@@ -235,8 +246,11 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               key={exp.id}
               className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3 space-y-2"
             >
-              <div className="text-xs font-bold text-[var(--text-primary)]">
-                {exp.role} {exp.company ? `— ${exp.company}` : ''}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-bold text-[var(--text-primary)]">
+                  {exp.role} {exp.company ? `— ${exp.company}` : ''}
+                </div>
+                <button type="button" onClick={() => { if (window.confirm(t('Delete this item?'))) hideRecord(exp.id, { experiences: cv.experiences.filter((entry) => entry.id !== exp.id) }); }} aria-label={`${t('Delete')}: ${exp.role}`} className="text-[var(--text-muted)] hover:text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
               {exp.period && (
                 <div className="text-[11px] text-[var(--text-muted)]">{exp.period}</div>
@@ -285,10 +299,13 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               key={edu.id}
               className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3 space-y-2"
             >
-              <div className="text-xs font-bold text-[var(--text-primary)]">
-                {[edu.degree, /[a-z]/i.test(edu.field ?? '') ? edu.field : '']
-                  .filter(Boolean)
-                  .join(' in ') || edu.institution}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-bold text-[var(--text-primary)]">
+                  {[edu.degree, /[a-z]/i.test(edu.field ?? '') ? edu.field : '']
+                    .filter(Boolean)
+                    .join(' in ') || edu.institution}
+                </div>
+                <button type="button" onClick={() => { if (window.confirm(t('Delete this item?'))) hideRecord(edu.id, { education: cv.education.filter((entry) => entry.id !== edu.id) }); }} aria-label={`${t('Delete')}: ${edu.institution}`} className="text-[var(--text-muted)] hover:text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
               <div className="text-[11px] text-[var(--text-muted)]">
                 {edu.institution}
@@ -330,10 +347,13 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
 
       {/* ---- Skills ---- */}
       <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <Wrench className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Core Skills & Technologies')}
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+            <Wrench className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+            {t('Core Skills & Technologies')}
+          </h3>
+          {cv.skillsList.length > 0 && <button type="button" onClick={() => update({ skillsList: [] })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear All Skills')}</button>}
+        </div>
         <CvSectionAdvice section="skills" report={advice ?? null} />
         {cv.skillsList.length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No skills yet.')}</p>
@@ -394,7 +414,10 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               key={project.id}
               className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3 space-y-2"
             >
-              <div className="text-xs font-bold text-[var(--text-primary)]">{project.title}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-bold text-[var(--text-primary)]">{project.title}</div>
+                <button type="button" onClick={() => { if (window.confirm(t('Delete this item?'))) hideRecord(project.id, { projects: cv.projects.filter((entry) => entry.id !== project.id) }); }} aria-label={`${t('Delete')}: ${project.title}`} className="text-[var(--text-muted)] hover:text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
               {project.technologies.length > 0 && (
                 <div className="text-[11px] text-[var(--text-muted)]">
                   {project.technologies.join(' · ')}
@@ -444,8 +467,11 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               key={entry.id}
               className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3 space-y-2"
             >
-              <div className="text-xs font-bold text-[var(--text-primary)]">
-                {entry.role} {entry.organization ? `— ${entry.organization}` : ''}
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-bold text-[var(--text-primary)]">
+                  {entry.role} {entry.organization ? `— ${entry.organization}` : ''}
+                </div>
+                <button type="button" onClick={() => { if (window.confirm(t('Delete this item?'))) hideRecord(entry.id, { volunteering: (cv.volunteering ?? []).filter((item) => item.id !== entry.id) }); }} aria-label={`${t('Delete')}: ${entry.organization}`} className="text-[var(--text-muted)] hover:text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
               {entry.period && (
                 <div className="text-[11px] text-[var(--text-muted)]">{entry.period}</div>
@@ -494,7 +520,10 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               key={`${cert.name}-${index}`}
               className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3 space-y-2"
             >
-              <div className="text-xs font-bold text-[var(--text-primary)]">{cert.name}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-bold text-[var(--text-primary)]">{cert.name}</div>
+                <button type="button" onClick={() => { if (window.confirm(t('Delete this item?'))) hideRecord(cert.id ?? `cert:${cert.name}`, { certificationDetails: (cv.certificationDetails ?? []).filter((_, i) => i !== index), certifications: (cv.certifications ?? []).filter((name) => name !== cert.name) }); }} aria-label={`${t('Delete')}: ${cert.name}`} className="text-[var(--text-muted)] hover:text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
               {cert.issuer && (
                 <div className="text-[11px] text-[var(--text-muted)]">{cert.issuer}</div>
               )}
@@ -546,7 +575,10 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               key={course.id}
               className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3 space-y-2"
             >
-              <div className="text-xs font-bold text-[var(--text-primary)]">{course.title}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-bold text-[var(--text-primary)]">{course.title}</div>
+                <button type="button" onClick={() => { if (window.confirm(t('Delete this item?'))) hideRecord(course.id, { courses: (cv.courses ?? []).filter((entry) => entry.id !== course.id) }); }} aria-label={`${t('Delete')}: ${course.title}`} className="text-[var(--text-muted)] hover:text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
               <div className="text-[11px] text-[var(--text-muted)]">{course.provider}</div>
               <div>
                 <label className={LABEL_CLASS}>{t('Description')}</label>

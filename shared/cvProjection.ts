@@ -169,6 +169,7 @@ export function mergeCanonicalCvDocument(
   const previousCourses = previous.courses ?? [];
   const previousCertifications = previous.certificationDetails ?? [];
   const previousLinks = previous.links ?? [];
+  const hiddenRecordIds = new Set(previous.hiddenRecordIds ?? []);
 
   /* -- the header -------------------------------------------------------- */
   // A fact the records know wins. What they do not know is left as the
@@ -194,7 +195,7 @@ export function mergeCanonicalCvDocument(
   // the same title at the same organisation with the same dates is one job,
   // and its location, employment type and bullets are merged rather than
   // shown twice.
-  const sourceExperiences = dedupeExperience(dropEmptyExperience(source.experiences ?? []));
+  const sourceExperiences = dedupeExperience(dropEmptyExperience((source.experiences ?? []).filter((entry) => !hiddenRecordIds.has(entry.id))));
   const experiences: CVProfile['experiences'] = sourceExperiences.map((entry) => {
     const previousEntry = findPreviousExperience(entry, previousExperiences, consumedExperiences);
     if (previousEntry) consumedExperiences.add(previousEntry.id);
@@ -219,6 +220,7 @@ export function mergeCanonicalCvDocument(
   // record, in which case it is imported content waiting to be imported.
   for (const entry of previousExperiences) {
     if (consumedExperiences.has(entry.id)) continue;
+    if (hiddenRecordIds.has(entry.id)) continue;
     if (isCanonicalRecordId(entry.id)) continue;
     experiences.push(entry);
   }
@@ -227,7 +229,7 @@ export function mergeCanonicalCvDocument(
   const consumedEducation = new Set<string>();
   // Two rows for the same degree at the same university are one row. The
   // profile shows the count the candidate expects, and so does the CV.
-  const sourceEducation = mergeEducationRecords(source.education ?? []);
+  const sourceEducation = mergeEducationRecords((source.education ?? []).filter((entry) => !hiddenRecordIds.has(entry.id)));
   const education: CVProfile['education'] = sourceEducation.map((entry) => {
     const previousEntry = findPrevious(
       entry,
@@ -250,13 +252,14 @@ export function mergeCanonicalCvDocument(
   });
   for (const entry of previousEducation) {
     if (consumedEducation.has(entry.id)) continue;
+    if (hiddenRecordIds.has(entry.id)) continue;
     if (isCanonicalRecordId(entry.id)) continue;
     education.push(entry);
   }
 
   /* -- projects ---------------------------------------------------------- */
   const consumedProjects = new Set<string>();
-  const sourceProjects = dedupeProjects(source.projects ?? []);
+  const sourceProjects = dedupeProjects((source.projects ?? []).filter((entry) => !hiddenRecordIds.has(entry.id)));
   const projects: CVProfile['projects'] = sourceProjects.map((entry) => {
     const previousEntry =
       previousProjects.find(
@@ -283,13 +286,14 @@ export function mergeCanonicalCvDocument(
   });
   for (const entry of previousProjects) {
     if (consumedProjects.has(entry.id)) continue;
+    if (hiddenRecordIds.has(entry.id)) continue;
     if (isCanonicalRecordId(entry.id)) continue;
     projects.push(entry);
   }
 
   /* -- volunteering ------------------------------------------------------ */
   const consumedVolunteering = new Set<string>();
-  const volunteering: NonNullable<CVProfile['volunteering']> = (source.volunteering ?? []).map((entry) => {
+  const volunteering: NonNullable<CVProfile['volunteering']> = (source.volunteering ?? []).filter((entry) => !hiddenRecordIds.has(entry.id)).map((entry) => {
     const previousEntry = findPrevious(
       entry,
       previousVolunteering,
@@ -316,13 +320,14 @@ export function mergeCanonicalCvDocument(
   });
   for (const entry of previousVolunteering) {
     if (consumedVolunteering.has(entry.id)) continue;
+    if (hiddenRecordIds.has(entry.id)) continue;
     if (isCanonicalRecordId(entry.id)) continue;
     volunteering.push(entry);
   }
 
   /* -- courses ----------------------------------------------------------- */
   const consumedCourses = new Set<string>();
-  const courses: NonNullable<CVProfile['courses']> = (source.courses ?? []).map((entry) => {
+  const courses: NonNullable<CVProfile['courses']> = (source.courses ?? []).filter((entry) => !hiddenRecordIds.has(entry.id)).map((entry) => {
     const previousEntry = findPrevious(
       entry,
       previousCourses,
@@ -339,6 +344,7 @@ export function mergeCanonicalCvDocument(
   });
   for (const entry of previousCourses) {
     if (consumedCourses.has(entry.id)) continue;
+    if (hiddenRecordIds.has(entry.id)) continue;
     if (isCanonicalRecordId(entry.id)) continue;
     courses.push(entry);
   }
@@ -349,7 +355,7 @@ export function mergeCanonicalCvDocument(
   // becomes one entry rather than two.
   const consumedCertificates = new Set<number>();
   const certificationDetails: NonNullable<CVProfile['certificationDetails']> = [];
-  for (const entry of dedupeCertifications(source.certifications ?? [])) {
+  for (const entry of dedupeCertifications((source.certifications ?? []).filter((item) => !hiddenRecordIds.has(item.id)))) {
     const previousIndex = previousCertifications.findIndex(
       (candidate, index) =>
         !consumedCertificates.has(index) &&
@@ -373,6 +379,7 @@ export function mergeCanonicalCvDocument(
   }
   for (const [index, entry] of previousCertifications.entries()) {
     if (consumedCertificates.has(index)) continue;
+    if (hiddenRecordIds.has(entry.id ?? `cert:${entry.name}`)) continue;
     // A certificate whose record the profile no longer holds was deleted. A
     // certificate the profile never held is imported content, waiting to be
     // imported.
@@ -424,6 +431,7 @@ export function mergeCanonicalCvDocument(
   const sourceLinksById = new Map(sourceLinks.map((link) => [link.id, link]));
   const links: CVLink[] = [];
   for (const link of previousLinks) {
+    if (hiddenRecordIds.has(link.id)) continue;
     const canonical = sourceLinksById.get(link.id);
     if (!canonical) continue;
     links.push({
@@ -435,6 +443,7 @@ export function mergeCanonicalCvDocument(
     });
   }
   for (const link of sourceLinks) {
+    if (hiddenRecordIds.has(link.id)) continue;
     if (links.some((entry) => entry.id === link.id)) continue;
     links.push({
       id: link.id,
@@ -474,5 +483,6 @@ export function mergeCanonicalCvDocument(
     research: previous.research ?? [],
     leadership: previous.leadership ?? [],
     hiddenSkills: previous.hiddenSkills,
+    hiddenRecordIds: [...hiddenRecordIds],
   };
 }

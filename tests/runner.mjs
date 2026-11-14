@@ -381,6 +381,7 @@ async function main() {
     // The CV studio's writing assistant and the document it builds from the
     // platform's records. Pure, like the two above: no database needed.
     join(TESTS_DIR, 'cv-studio.test.ts'),
+    join(TESTS_DIR, 'cv-studio-deletion.test.ts'),
     join(TESTS_DIR, 'cv-preview.test.ts'),
     // The studio's own data: the resume language and its separation from the
     // interface language, the AI actions offered on each section, the order
