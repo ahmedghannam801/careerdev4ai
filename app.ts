@@ -2418,15 +2418,11 @@ Return JSON schema:
   "suggestedAnswer": string
 }`;
 
-    // No model on this server means no evaluation can be produced. This is
-    // checked before the daily budget is touched, so a missing key is never
-    // reported as an exhausted quota.
+    // Interview practice is a free conversational feature. It remains usable
+    // at zero balance; only provider availability and abuse rate limits apply.
     if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
-
-    const blocked = consumeAiBudget(res, req.authUser!.id);
-    if (blocked) return blocked;
 
     try {
       const response = await ai.models.generateContent({
