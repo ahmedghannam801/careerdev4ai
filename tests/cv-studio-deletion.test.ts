@@ -22,8 +22,9 @@ describe('CV Studio deletion regression', () => {
       endDate: '2023-01-01', isCurrent: false, description: 'Built systems',
     };
     const source = {
-      profile: { fullName: 'Candidate' }, experiences: [job], education: [],
-      projects: [], volunteering: [], certifications: [], courses: [], skills: [], links: [],
+      profile: { fullName: 'Candidate', email: 'candidate@example.test', summary: 'Profile summary' },
+      experiences: [job], education: [], projects: [], volunteering: [],
+      certifications: [], courses: [], skills: [], links: [],
     };
     const before = mergeCanonicalCvDocument(source, emptyCv);
     assert.equal(before.experiences.length, 1);
@@ -32,10 +33,15 @@ describe('CV Studio deletion regression', () => {
       ...before,
       experiences: before.experiences.filter((entry) => entry.id !== job.id),
       hiddenRecordIds: [job.id],
+      hiddenContactFields: ['email'],
+      hiddenSummary: true,
+      summary: '',
     };
     const afterRefreshProjection = mergeCanonicalCvDocument(source, deleted);
     assert.deepEqual(afterRefreshProjection.experiences, []);
     assert.deepEqual(afterRefreshProjection.experiences, deleted.experiences);
+    assert.equal(afterRefreshProjection.email, '');
+    assert.equal(afterRefreshProjection.summary, '');
 
     const editor = sourceFile('src/components/cv/CvSectionEditor.tsx');
     const preview = sourceFile('src/components/views/CVStudioView.tsx');
@@ -46,7 +52,9 @@ describe('CV Studio deletion regression', () => {
   it('does not expose a standalone Certifications destination while preserving its old profile alias', () => {
     const shell = sourceFile('src/components/layout/AppShell.tsx');
     const routing = sourceFile('src/lib/routing.ts');
+    const app = sourceFile('src/App.tsx');
     assert.doesNotMatch(shell, /id:\s*'profile-certifications'/);
     assert.match(routing, /'profile-certifications':\s*\{ route: 'profile', params: \{ section: 'certifications' \} \}/);
+    assert.match(app, /getElementById\('profile-certifications'\).*scrollIntoView/);
   });
 });

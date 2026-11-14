@@ -192,6 +192,13 @@ function AppRoutes() {
     refreshRoute();
   }, []);
 
+  useEffect(() => {
+    const parsed = parseRouteHash(window.location.hash);
+    if (currentView === 'profile' && parsed.params.section === 'certifications') {
+      document.getElementById('profile-certifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentView]);
+
   // Document metadata and the page view of the current route.
   //
   // The application is one document served from one address, so the metadata

@@ -170,23 +170,24 @@ export function mergeCanonicalCvDocument(
   const previousCertifications = previous.certificationDetails ?? [];
   const previousLinks = previous.links ?? [];
   const hiddenRecordIds = new Set(previous.hiddenRecordIds ?? []);
+  const hiddenContactFields = new Set(previous.hiddenContactFields ?? []);
 
   /* -- the header -------------------------------------------------------- */
   // A fact the records know wins. What they do not know is left as the
   // document has it, so a candidate who typed something before the profile
   // caught up does not lose it.
   const fullName = profile.fullName?.trim() || previous.fullName?.trim() || '';
-  const email = profile.email?.trim() || previous.email?.trim() || '';
-  const phone = profile.phone?.trim() || previous.phone?.trim() || '';
-  const location = profile.location?.trim() || previous.location?.trim() || '';
+  const email = hiddenContactFields.has('email') ? '' : profile.email?.trim() || previous.email?.trim() || '';
+  const phone = hiddenContactFields.has('phone') ? '' : profile.phone?.trim() || previous.phone?.trim() || '';
+  const location = hiddenContactFields.has('location') ? '' : profile.location?.trim() || previous.location?.trim() || '';
   const title = profile.title?.trim() || previous.title?.trim() || '';
   // The summary is the candidate's wording for this CV, so the document wins.
   // A paragraph that repeats an earlier one is folded away either way: the
   // candidate pasted it twice, and a CV that says the same thing twice reads
   // as noise.
-  const summary = dedupeSummaryParagraphs(
-    previous.summary?.trim() || profile.summary?.trim() || ''
-  );
+  const summary = previous.hiddenSummary
+    ? ''
+    : dedupeSummaryParagraphs(previous.summary?.trim() || profile.summary?.trim() || '');
 
   /* -- experience -------------------------------------------------------- */
   const consumedExperiences = new Set<string>();
@@ -484,5 +485,7 @@ export function mergeCanonicalCvDocument(
     leadership: previous.leadership ?? [],
     hiddenSkills: previous.hiddenSkills,
     hiddenRecordIds: [...hiddenRecordIds],
+    hiddenContactFields: [...hiddenContactFields] as CVProfile['hiddenContactFields'],
+    hiddenSummary: previous.hiddenSummary,
   };
 }

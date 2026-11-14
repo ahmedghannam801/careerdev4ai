@@ -385,6 +385,10 @@ export interface CVProfile {
   website?: string;
   /** Canonical source records intentionally omitted from this CV. */
   hiddenRecordIds?: string[];
+  /** Profile fields intentionally cleared from this CV. */
+  hiddenContactFields?: Array<'email' | 'phone' | 'location'>;
+  /** Whether the profile summary is intentionally omitted from this CV. */
+  hiddenSummary?: boolean;
   experiences: {
     id: string;
     company: string;

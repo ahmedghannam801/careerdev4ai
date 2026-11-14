@@ -110,6 +110,11 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
       ...changes,
       hiddenRecordIds: [...new Set([...(cv.hiddenRecordIds ?? []), id])],
     });
+  const updateContactField = (field: 'email' | 'phone' | 'location', value: string) =>
+    update({
+      [field]: value,
+      hiddenContactFields: (cv.hiddenContactFields ?? []).filter((item) => item !== field),
+    });
 
   const updateLink = (id: string, changes: Partial<CVLink>) => {
     update({
@@ -136,7 +141,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
             {t('Contact & Header')}
           </h3>
-          <button type="button" onClick={() => update({ email: '', phone: '', location: '', links: [], hiddenRecordIds: [...new Set([...(cv.hiddenRecordIds ?? []), ...links.map((link) => link.id)])] })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear')}</button>
+          <button type="button" onClick={() => update({ email: '', phone: '', location: '', links: [], hiddenContactFields: ['email', 'phone', 'location'], hiddenRecordIds: [...new Set([...(cv.hiddenRecordIds ?? []), ...links.map((link) => link.id)])] })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear')}</button>
         </div>
         <div className="space-y-3">
           <div>
@@ -170,7 +175,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               <input
                 type="email"
                 value={cv.email}
-                onChange={(e) => update({ email: e.target.value })}
+                onChange={(e) => updateContactField('email', e.target.value)}
                 className={LINK_INPUT_CLASS}
               />
             </div>
@@ -179,7 +184,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
               <input
                 type="tel"
                 value={cv.phone}
-                onChange={(e) => update({ phone: e.target.value })}
+                onChange={(e) => updateContactField('phone', e.target.value)}
                 className={LINK_INPUT_CLASS}
               />
             </div>
@@ -189,7 +194,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             <input
               type="text"
               value={cv.location}
-              onChange={(e) => update({ location: e.target.value })}
+              onChange={(e) => updateContactField('location', e.target.value)}
               className={LINK_INPUT_CLASS}
             />
           </div>
@@ -211,20 +216,20 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
       <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Executive Summary')}</h3>
-          <button type="button" onClick={() => update({ summary: '' })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear')}</button>
+          <button type="button" onClick={() => update({ summary: '', hiddenSummary: true })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear')}</button>
         </div>
         <CvSectionAdvice section="summary" report={advice ?? null} />
         <textarea
           rows={4}
           value={cv.summary}
-          onChange={(e) => update({ summary: e.target.value })}
+          onChange={(e) => update({ summary: e.target.value, hiddenSummary: false })}
           className="w-full p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] leading-relaxed"
         />
         <AiAssist
           field="summary"
           existingText={cv.summary}
           targetRoleTitle={targetRoleTitle}
-          onApply={(text) => update({ summary: text })}
+          onApply={(text) => update({ summary: text, hiddenSummary: false })}
         />
         <div className="text-[11px] text-[var(--text-muted)]">
           {t('Tip: Quantify your results using the X-Y-Z format: "Accomplished [X], as measured by [Y], by doing [Z]".')}
