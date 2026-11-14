@@ -38,6 +38,8 @@ export interface JobSearchFilters {
   employmentTypes: string[];
 }
 
+export const LIVE_JOBS_REQUEST_TIMEOUT_MS = 20_000;
+
 /** Builds the query string the server expects. */
 function toQueryString(filters: JobSearchFilters): string {
   const params = new URLSearchParams();
@@ -53,14 +55,14 @@ function toQueryString(filters: JobSearchFilters): string {
 }
 
 /**
- * Searches live vacancies.
- *
- * A failure throws the shared ApiRequestError, so the screen can tell a
- * missing credential from a rate limit from a genuine outage.
+ * Searches live vacancies, giving a slow upstream request a bounded lifetime
+ * so the page can always move from Loading to Results, Empty, or Error.
  */
 export async function fetchLiveJobs(filters: JobSearchFilters): Promise<JobSearchResponse> {
   const query = toQueryString(filters);
-  return apiRequest<JobSearchResponse>(`/api/jobs/search${query ? `?${query}` : ''}`);
+  return apiRequest<JobSearchResponse>(`/api/jobs/search${query ? `?${query}` : ''}`, {
+    signal: AbortSignal.timeout(LIVE_JOBS_REQUEST_TIMEOUT_MS),
+  });
 }
 
 /** Loads one vacancy by the provider's identifier. */
@@ -68,4 +70,8 @@ export async function fetchLiveJob(jobId: string): Promise<MatchedJob & { source
   return apiRequest<MatchedJob & { source: string }>(
     `/api/jobs/${encodeURIComponent(jobId)}`
   );
+}
+
+export function isLiveJobsTimeout(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'TimeoutError';
 }

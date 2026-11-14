@@ -32,7 +32,7 @@ import { useCareer } from '../../context/CareerContext';
 import { Reveal } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
 import { LiveJobCard } from '../jobs/LiveJobCard';
-import { fetchLiveJobs, type JobQuota, type JobSearchFilters, type MatchedJob } from '../../lib/jobsApi';
+import { fetchLiveJobs, isLiveJobsTimeout, type JobQuota, type JobSearchFilters, type MatchedJob } from '../../lib/jobsApi';
 import { ApiRequestError } from '../../lib/apiClient';
 import { buildRouteHash } from '../../lib/routing';
 import { refreshRoute } from '../../lib/useRouteParams';
@@ -108,6 +108,7 @@ const providerFailureMessage = (
     case 'upstream_unavailable':
       return t('The job provider is not answering right now. Try again in a few minutes.');
     case 'upstream_timeout':
+    case 'request_timeout':
       return t('The job provider took too long to answer. Try again in a few minutes.');
     case 'bad_response':
       return t('The job provider sent an answer this server could not read. Try again in a few minutes.');
@@ -170,7 +171,11 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
     } catch (caught) {
       // The failure code is kept; the server's English sentence is not shown
       // to the user, because the interface has its own sentence per code.
-      const code = caught instanceof ApiRequestError ? caught.code : null;
+      const code = caught instanceof ApiRequestError
+        ? caught.code
+        : isLiveJobsTimeout(caught)
+          ? 'request_timeout'
+          : null;
       setResults([]);
       setError({ code });
     } finally {
