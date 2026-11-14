@@ -88,6 +88,68 @@ export interface MetricSkill {
   importance?: SkillImportance;
   /** True when the skill is a core requirement of the role. */
   required?: boolean;
+  /**
+   * What backs the level.
+   *
+   * `'none'` means the candidate only claims it: the number is self-reported
+   * or estimated, and nothing the platform can check confirms it. A skill like
+   * that is never counted as mastered, however high the claim is — that is
+   * what stops "add it to your profile" from closing a gap.
+   *
+   * When the caller has no proof information at all the field is left out, and
+   * the level is taken at face value. That keeps the engine usable by callers
+   * that only know the level, without weakening the rule where the proof is
+   * actually known.
+   */
+  proof?: SkillProof;
+}
+
+/**
+ * How a skill's level is backed.
+ *
+ * `'assessment'` — a diagnostic knowledge check measured it.
+ * `'evidence'` — a project, a certificate or work experience proves it.
+ * `'none'` — the candidate only claims it.
+ */
+export type SkillProof = 'none' | 'assessment' | 'evidence';
+
+/**
+ * Whether a skill's level is backed by something the platform can check.
+ *
+ * A missing proof field means the caller had nothing to say, so the level is
+ * taken at face value. Only an explicit `'none'` withholds the credit.
+ */
+export function isSkillProven(skill: Pick<MetricSkill, 'proof'>): boolean {
+  return skill.proof !== 'none';
+}
+
+/**
+ * Reads the proof out of a skill's source.
+ *
+ * The vocabulary differs slightly between the browser and the server — the
+ * browser also names the individual kinds of evidence — so every spelling that
+ * means the same thing is accepted here:
+ *
+ *   * `assessment` — a diagnostic check measured the skill;
+ *   * `verified_evidence`, `project_evidence`, `experience`, `certificate`,
+ *     `course_completed` — a record proves it;
+ *   * `self_reported`, `ai_estimated` — the candidate only claims it.
+ */
+export function skillProofFromSource(source: string | null | undefined): SkillProof {
+  const raw = (source ?? '').trim().toLowerCase();
+  if (raw === 'assessment') return 'assessment';
+  if (
+    raw === 'verified_evidence' ||
+    raw === 'project_evidence' ||
+    raw === 'experience' ||
+    raw === 'certificate' ||
+    raw === 'course_completed' ||
+    raw === 'verified_project' ||
+    raw === 'work_experience'
+  ) {
+    return 'evidence';
+  }
+  return 'none';
 }
 
 /** One roadmap step, as the engine needs to see it. */
@@ -146,10 +208,26 @@ export interface CareerMetrics {
   criticalGaps: CareerMetricGap[];
   /** Definition 3 — the critical gaps that block the current stage or goal. */
   activeBlockers: CareerMetricGap[];
-  /** How many skills the candidate meets at or above target. */
+  /** How many skills the candidate meets at or above target, with proof. */
   skillsMastered: number;
   /** How many target-role skills were considered. */
   skillsTotal: number;
+  /**
+   * How many skills meet their target on a claim alone.
+   *
+   * These are not gaps — the candidate says they can do the work — but they
+   * are not mastered either, because nothing the platform can check confirms
+   * them. They are the skills that need an assessment or a piece of evidence.
+   */
+  skillsClaimedOnly: number;
+  /**
+   * How many skills are not yet mastered: the ones below target plus the ones
+   * that are only claimed.
+   *
+   * This is the "Skills Below Target" figure the identity
+   * `Target Role Skills = Skills Mastered + Skills Below Target` is built on.
+   */
+  skillsBelowTarget: number;
   /** Definition 4 — weighted match against the target role's requirements. */
   roleReadinessPct: number;
   /** Definition 5 — completed roadmap steps over total steps. */
@@ -380,10 +458,26 @@ export function computeCareerMetrics(input: {
   // "Skills mastered" is counted across every target-role skill, because a
   // candidate is not "half ready" for a role — the mastered count is a
   // progress indicator over the whole skill list.
+  //
+  // A skill counts as mastered only when the platform can back the level: it
+  // was measured by an assessment, or proved by a project, a certificate or
+  // work experience. A level the candidate only claims never closes a gap.
   const skillsTotal = skills.filter((skill) => clamp(skill.targetLevel) > 0).length;
   const skillsMastered = skills.filter(
-    (skill) => clamp(skill.targetLevel) > 0 && clamp(skill.currentLevel) >= clamp(skill.targetLevel)
+    (skill) =>
+      clamp(skill.targetLevel) > 0 &&
+      clamp(skill.currentLevel) >= clamp(skill.targetLevel) &&
+      isSkillProven(skill)
   ).length;
+  const skillsClaimedOnly = skills.filter(
+    (skill) =>
+      clamp(skill.targetLevel) > 0 &&
+      clamp(skill.currentLevel) >= clamp(skill.targetLevel) &&
+      !isSkillProven(skill)
+  ).length;
+  // Everything that is not yet mastered. This is what keeps the identity
+  // exact: Target Role Skills = Skills Mastered + Skills Below Target.
+  const skillsBelowTarget = skillsTotal - skillsMastered;
 
   /* 5. Roadmap completion ------------------------------------------------ */
 
@@ -413,6 +507,8 @@ export function computeCareerMetrics(input: {
     activeBlockers: blockers,
     skillsMastered,
     skillsTotal,
+    skillsClaimedOnly,
+    skillsBelowTarget,
     roleReadinessPct,
     roadmapCompletionPct,
     roadmapCompleted,
@@ -519,8 +615,9 @@ export const METRIC_EXPLANATIONS: Record<string, MetricExplanation> = {
   skillsMastered: {
     title: 'Skills mastered',
     definition:
-      'How many of your target role’s skills you already meet at the level the role expects. A skill counts as mastered only when your level is at or above its target.',
-    formula: 'count(level ≥ target) ÷ count(target role skills) × 100',
+      'How many of your target role’s skills you already meet at the level the role expects. A skill counts as mastered only when your level is at or above its target AND the platform can back it — an assessment measured it, or a project, a certificate or work experience proves it. A level you only claim is not a mastered skill.',
+    formula:
+      'count(level ≥ target AND backed by an assessment or verified evidence) ÷ count(target role skills) × 100',
   },
   roadmapCompletion: {
     title: 'Roadmap completion',
@@ -575,11 +672,65 @@ export function explainMetric(
     case 'skillsMastered':
       return {
         ...base,
-        arithmetic: `${metrics.skillsMastered} ÷ ${metrics.skillsTotal} skills at or above target`,
+        arithmetic:
+          `${metrics.skillsMastered} ÷ ${metrics.skillsTotal} skills at or above target and backed by proof` +
+          (metrics.skillsClaimedOnly > 0
+            ? ` — ${metrics.skillsClaimedOnly} more meet the level but are only claimed, so they are not counted`
+            : ''),
       };
     default:
       return { ...base, arithmetic: base.formula };
   }
+}
+
+/**
+ * The candidate's role readiness, read from their own skill list.
+ *
+ * The same engine the Dashboard and the Roadmap use, so a caller that only
+ * needs the readiness figure cannot get a different one.
+ */
+export function roleReadinessFromSkills(
+  skills: readonly {
+    currentLevel: number;
+    targetLevel: number;
+    gap: number;
+    required?: boolean;
+    source?: string | null;
+  }[]
+): number {
+  return computeCareerMetrics({
+    skills: skills.map((skill) => ({
+      name: '',
+      currentLevel: skill.currentLevel,
+      targetLevel: skill.targetLevel,
+      importance: skill.required ? 'core' : skill.gap > 0 ? 'high' : 'medium',
+      required: skill.required === true,
+      proof: skillProofFromSource(skill.source),
+    })),
+  }).roleReadinessPct;
+}
+
+/**
+ * Whether one of the candidate's own skills counts as mastered.
+ *
+ * The same rule the engine uses, expressed against a stored skill record: the
+ * level meets the target, and the platform can back the level. A skill the
+ * candidate only claims is at target but not mastered — it still needs an
+ * assessment or a piece of evidence.
+ *
+ * The views use this so the Dashboard, the Skills Center and the Progress page
+ * cannot disagree about which skills are mastered.
+ */
+export function isSkillMastered(skill: {
+  gap: number;
+  targetLevel: number;
+  source?: string | null;
+}): boolean {
+  return (
+    skill.gap === 0 &&
+    skill.targetLevel > 0 &&
+    skillProofFromSource(skill.source) !== 'none'
+  );
 }
 
 /* -------------------------------------------------------------------------- */

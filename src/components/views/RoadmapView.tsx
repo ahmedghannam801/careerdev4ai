@@ -28,7 +28,7 @@ import {
   journeyStageForPhase,
 } from '../../../shared/roadmapJourney';
 import { computeTimeBreakdown } from '../../../shared/roadmapTimeBreakdown';
-import { computeCareerMetrics } from '../../../shared/careerMetrics';
+import { computeCareerMetrics, skillProofFromSource } from '../../../shared/careerMetrics';
 import {
   RESOURCE_TYPE_LABELS,
   isVideoResource,
@@ -148,8 +148,13 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           name: skill.name,
           currentLevel: skill.currentLevel,
           targetLevel: skill.targetLevel,
-          importance: skill.gap > 0 ? 'high' : 'medium',
-          required: skill.gap > 0,
+          // A required skill of the role counts towards readiness whether the
+          // candidate has met it yet or not. A preferred (stretch) skill is
+          // shown with its gap, but it does not count.
+          importance: skill.required ? 'core' : skill.gap > 0 ? 'high' : 'medium',
+          required: skill.required === true,
+          // A level the candidate only claims does not make a skill mastered.
+          proof: skillProofFromSource(skill.source),
         })),
         roadmapTasks: allTasks.map((task) => ({
           id: task.id,

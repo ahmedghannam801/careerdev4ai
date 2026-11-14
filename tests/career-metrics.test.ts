@@ -20,8 +20,10 @@ import {
   fromSkillGaps,
   gapReason,
   isCriticalGap,
+  isSkillMastered,
   METRIC_EXPLANATIONS,
   normalizeImportance,
+  skillProofFromSource,
   type CareerJourneyFacts,
   type MetricSkill,
 } from '../shared/careerMetrics.ts';
@@ -330,6 +332,96 @@ describe('the career metrics engine', () => {
       assert.equal(high.reasonKey, 'gap_high_importance');
       assert.equal(deep.reasonKey, 'gap_two_levels');
       assert.equal(minor.reasonKey, 'gap_below_target');
+    });
+  });
+
+  describe('a skill is mastered only when the platform can back it', () => {
+    it('does not count a self-reported level as mastered', () => {
+      const metrics = computeCareerMetrics({
+        skills: [
+          {
+            name: 'SQL',
+            currentLevel: 4,
+            targetLevel: 4,
+            importance: 'core',
+            required: true,
+            proof: 'none',
+          },
+        ],
+      });
+
+      assert.equal(metrics.skillsMastered, 0, 'a claim is not a mastered skill');
+      assert.equal(metrics.skillsClaimedOnly, 1, 'the claim is reported separately');
+      assert.equal(metrics.skillsTotal, 1);
+    });
+
+    it('counts a measured or proved level as mastered', () => {
+      const measured = computeCareerMetrics({
+        skills: [
+          { name: 'SQL', currentLevel: 4, targetLevel: 4, required: true, proof: 'assessment' },
+        ],
+      });
+      const proved = computeCareerMetrics({
+        skills: [
+          { name: 'SQL', currentLevel: 4, targetLevel: 4, required: true, proof: 'evidence' },
+        ],
+      });
+
+      assert.equal(measured.skillsMastered, 1);
+      assert.equal(measured.skillsClaimedOnly, 0);
+      assert.equal(proved.skillsMastered, 1);
+    });
+
+    it('keeps the identity: target skills = mastered + below target', () => {
+      const metrics = computeCareerMetrics({
+        skills: [
+          { name: 'SQL', currentLevel: 4, targetLevel: 4, required: true, proof: 'none' },
+          { name: 'Python', currentLevel: 4, targetLevel: 4, required: true, proof: 'assessment' },
+          { name: 'Excel', currentLevel: 1, targetLevel: 4, required: true, proof: 'assessment' },
+        ],
+      });
+
+      assert.equal(metrics.skillsTotal, 3);
+      assert.equal(metrics.skillsMastered, 1);
+      assert.equal(metrics.skillsBelowTarget, 2);
+      assert.equal(
+        metrics.skillsMastered + metrics.skillsBelowTarget,
+        metrics.skillsTotal,
+        'the identity holds exactly'
+      );
+    });
+
+    it('reads the proof out of the skill source', () => {
+      assert.equal(skillProofFromSource('assessment'), 'assessment');
+      assert.equal(skillProofFromSource('verified_evidence'), 'evidence');
+      assert.equal(skillProofFromSource('certificate'), 'evidence');
+      assert.equal(skillProofFromSource('work_experience'), 'evidence');
+      assert.equal(skillProofFromSource('self_reported'), 'none');
+      assert.equal(skillProofFromSource('ai_estimated'), 'none');
+      assert.equal(skillProofFromSource(null), 'none');
+    });
+
+    it('counts a claimed skill as not mastered in the views too', () => {
+      assert.equal(
+        isSkillMastered({ gap: 0, targetLevel: 4, source: 'self_reported' }),
+        false
+      );
+      assert.equal(isSkillMastered({ gap: 0, targetLevel: 4, source: 'assessment' }), true);
+      assert.equal(isSkillMastered({ gap: 0, targetLevel: 4, source: 'verified_evidence' }), true);
+      assert.equal(isSkillMastered({ gap: 1, targetLevel: 4, source: 'assessment' }), false);
+    });
+
+    it('keeps a required skill in the readiness figure once it is met', () => {
+      // The readiness figure is the match against the role's requirements.
+      // A requirement the candidate already meets still counts towards the
+      // denominator — otherwise meeting every requirement would report 0%.
+      const metrics = computeCareerMetrics({
+        skills: [
+          { name: 'SQL', currentLevel: 4, targetLevel: 4, importance: 'core', required: true },
+        ],
+      });
+
+      assert.equal(metrics.roleReadinessPct, 100);
     });
   });
 

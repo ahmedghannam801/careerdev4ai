@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
-import { computeCareerMetrics, type CareerJourneyStage } from '../../../shared/careerMetrics';
+import { computeCareerMetrics, skillProofFromSource, type CareerJourneyStage } from '../../../shared/careerMetrics';
 import { EmptyState } from '../ui/EmptyState';
 import { CareerJourneyStepper } from '../career/CareerJourneyStepper';
 import { MetricCard } from '../career/MetricCard';
@@ -141,11 +141,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           name: skill.name,
           currentLevel: skill.currentLevel,
           targetLevel: skill.targetLevel,
-          // A skill the candidate still has below its target is treated as a
-          // required skill of the role, because that is exactly what the
-          // platform compares them against.
-          importance: skill.gap > 0 ? 'high' : 'medium',
-          required: skill.gap > 0,
+          // A required skill of the role counts towards readiness whether the
+          // candidate has met it yet or not. A preferred (stretch) skill is
+          // shown with its gap, but it does not count.
+          importance: skill.required ? 'core' : skill.gap > 0 ? 'high' : 'medium',
+          required: skill.required === true,
+          // A level the candidate only claims does not make a skill mastered.
+          proof: skillProofFromSource(skill.source),
         })),
         roadmapTasks: allTasks.map((task) => ({
           id: task.id,

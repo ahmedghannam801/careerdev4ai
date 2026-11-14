@@ -398,8 +398,15 @@ describe('CV analysis requires current legal acceptance', () => {
     });
     const history = await api('GET', '/api/cv/analyses', { token: user.token });
     assert.equal(res.status, 200);
+    assert.equal(typeof res.body?.analysis?.overallScore, 'number');
     assert.equal(history.status, 200);
-    assert.ok(history.body?.measurements?.length > 0);
+
+    // The history holds the measurements of the candidate's STORED CVs. This
+    // measurement was about the copy in the studio, which is not a saved CV,
+    // so it is deliberately not written to the history — the schema says the
+    // same thing: a measurement without a CV has no CV and is not stored.
+    // The suite above covers the stored case, where a measurement IS recorded.
+    assert.equal(history.body?.measurements?.length ?? 0, 0);
   });
 
   test('the gate is still closed for an anonymous caller', async () => {

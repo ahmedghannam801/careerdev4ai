@@ -98,6 +98,42 @@ describe('interview readiness', () => {
   });
 });
 
+describe('interview readiness and skill readiness', () => {
+  it('weighs skill readiness in when the platform can measure it', () => {
+    // Practice 3/3 = 100%, performance 8/10 = 80%, skill readiness 60%.
+    // (100 + 80 + 60) / 3 = 80.
+    const metrics = computeInterviewReadiness(
+      [{ score: 8 }, { score: 8 }, { score: 8 }],
+      60
+    );
+
+    assert.equal(metrics.readinessPct, 80);
+    assert.equal(metrics.skillReadinessPct, 60);
+    assert.match(metrics.formula, /skill readiness/i);
+  });
+
+  it('leaves the figure alone when skill readiness cannot be measured', () => {
+    const metrics = computeInterviewReadiness([{ score: 8 }, { score: 8 }, { score: 8 }]);
+
+    assert.equal(metrics.readinessPct, 90, 'the two interview halves still stand');
+    assert.equal(metrics.skillReadinessPct, null);
+  });
+
+  it('still reports not-measured when there is no scored interview', () => {
+    const metrics = computeInterviewReadiness([], 80);
+
+    assert.equal(metrics.readinessPct, null);
+    assert.equal(metrics.isUnmeasured, true);
+    assert.equal(metrics.skillReadinessPct, 80);
+  });
+
+  it('never lets a skill readiness above a hundred inflate the figure', () => {
+    const metrics = computeInterviewReadiness([{ score: 10 }], 100);
+
+    assert.ok((metrics.readinessPct ?? 0) <= 100);
+  });
+});
+
 describe('the portfolio target', () => {
   it('is at least two projects', () => {
     assert.equal(portfolioTarget([]), DEFAULT_PORTFOLIO_TARGET);

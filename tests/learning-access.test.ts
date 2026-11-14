@@ -12,11 +12,15 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   ACCESS_TIER_LABELS,
+  ACCESS_TIER_LIMITS,
   accessTier,
   accessTierLabel,
+  accessTierLimit,
   certificateBadge,
   completionPaceLabel,
   dedupeAcrossShelves,
@@ -25,6 +29,7 @@ import {
   isFullyFree,
 } from '../shared/learningAccess.ts';
 import { deriveResourceType } from '../shared/learningResources.ts';
+import { AR_STRINGS } from '../src/translations/sourceStrings.ts';
 
 describe('honest access tiers', () => {
   it('calls a genuinely free resource 100% free', () => {
@@ -89,6 +94,42 @@ describe('the certificate badge', () => {
 
   it('says when there is no certificate at all', () => {
     assert.equal(certificateBadge(false), 'Learning Content Only (No Certificate)');
+  });
+});
+
+describe('the access tier tooltip', () => {
+  it('never promises a certificate on a free resource', () => {
+    // The free tier covers resources that hand over no certificate at all — a
+    // free YouTube playlist is the common case. The tier sentence sits on the
+    // card, so claiming a certificate there described some resources falsely.
+    assert.doesNotMatch(accessTierLimit('free'), /certificate/i);
+    assert.doesNotMatch(accessTierLimit('youtube_free'), /certificate/i);
+  });
+
+  it('still states the certificate rule for the audit tier', () => {
+    // "Free to audit" exists precisely because the certificate costs money,
+    // so that tier is defined by the certificate.
+    assert.match(accessTierLimit('audit'), /certificate/i);
+    assert.match(accessTierLimit('free_course_paid_certificate'), /certificate/i);
+  });
+
+  it('is routed through the translator, so the Arabic interface is not left in English', () => {
+    const card = readFileSync(
+      join(import.meta.dirname, '..', 'src', 'components', 'learning', 'CourseCard.tsx'),
+      'utf8'
+    );
+
+    assert.match(
+      card,
+      /title=\{t\(accessTierLimit\(course\.availability\)\)\}/,
+      'the tier tooltip must go through t() to reach Arabic'
+    );
+  });
+
+  it('has an Arabic entry for every tier sentence', () => {
+    for (const limit of Object.values(ACCESS_TIER_LIMITS)) {
+      assert.ok(AR_STRINGS[limit], `no Arabic entry for the tier sentence: ${limit}`);
+    }
   });
 });
 

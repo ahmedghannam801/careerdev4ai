@@ -52,11 +52,18 @@ export const ACCESS_TIER_BADGES: Record<LearningAccessTier, string> = {
 /**
  * What each tier means, in plain words.
  *
- * This is shown on the card itself, not hidden in a tooltip: a candidate
- * should know what they are signing up for before they click.
+ * This is the sentence on the access badge, so a candidate knows what they
+ * are signing up for before they click.
+ *
+ * The free tier deliberately says nothing about a certificate. The catalogue
+ * records whether a resource hands one over, and a free YouTube playlist does
+ * not — so a sentence that promised a certificate on every free resource
+ * described some of them falsely. The certificate is stated by the card's own
+ * certificate badge, which knows the answer for that resource; the tier
+ * answers a different question, which is what it costs to get into.
  */
 export const ACCESS_TIER_LIMITS: Record<LearningAccessTier, string> = {
-  free: 'Free to access and free to finish, including the certificate.',
+  free: 'Free to access and free to finish.',
   free_audit: 'The learning content is free, but the certificate is not included.',
   free_trial: 'Only part of the content is free — the rest needs a paid subscription.',
   paid: 'The content needs a paid subscription.',

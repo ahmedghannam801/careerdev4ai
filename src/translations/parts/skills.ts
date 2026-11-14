@@ -97,6 +97,7 @@ export const skillsAr: Record<string, string> = {
   'self reported': 'مُعلَن ذاتيًا',
   'ai estimated': 'مُقدَّر بالذكاء الاصطناعي',
   'assessment': 'تقييم',
+  'verified evidence': 'دليل موثَّق',
   'project evidence': 'دليل من مشروع',
   'experience': 'خبرة',
   'certificate': 'شهادة',
@@ -161,6 +162,8 @@ export const skillsAr: Record<string, string> = {
     'عناوين الأقسام مثل المهارات الشخصية أو التقنية لا تُضاف كمهارات فردية. أدخل اسم مهارة محددة بدلًا منها.',
   'Invalid skill name': 'اسم مهارة غير صالح',
   'Failed to save skill': 'تعذّر حفظ المهارة',
+  'Your previous skill level was restored. Please try again.':
+    'تمت استعادة مستوى مهارتك السابق. يُرجى المحاولة مرة أخرى.',
   'Current Level vs General Target': 'المستوى الحالي مقابل الهدف العام',
   'Self': 'التقييم الذاتي',
 };

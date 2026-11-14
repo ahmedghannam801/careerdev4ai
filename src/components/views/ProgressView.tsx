@@ -21,6 +21,7 @@ import {
   computeInterviewReadiness,
   portfolioTarget,
 } from '../../../shared/interviewReadiness';
+import { isSkillMastered, roleReadinessFromSkills } from '../../../shared/careerMetrics';
 
 export const ProgressView: React.FC = () => {
   const {
@@ -40,7 +41,7 @@ export const ProgressView: React.FC = () => {
   const completedTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks.filter(t => t.status === 'completed'))).length;
   const roadmapPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const masteredSkills = skills.filter(s => s.gap === 0);
+  const masteredSkills = skills.filter(isSkillMastered);
   const inProgressSkills = skills.filter(s => s.gap > 0);
   const completedProjects = projects.filter(p => p.status === 'completed' || p.status === 'published');
   const activeApplications = applications.filter(a => !['rejected', 'withdrawn'].includes(a.stage));
@@ -58,9 +59,9 @@ export const ProgressView: React.FC = () => {
   /**
    * The four interview measures, kept independent of one another.
    *
-   * Readiness is measured from the mock interviews alone. It is not reduced
-   * by having no job applications: a candidate who has not applied yet has
-   * not failed to interview.
+   * Readiness is measured from the mock interviews and the candidate's skill
+   * readiness. It is not reduced by having no job applications: a candidate
+   * who has not applied yet has not failed to interview.
    */
   const interviewMetrics = useMemo(
     () =>
@@ -68,9 +69,10 @@ export const ProgressView: React.FC = () => {
         interviewSessions.map((session) => ({
           score: session.aiFeedback?.score ?? null,
           roleTitle: session.roleTitle ?? null,
-        }))
+        })),
+        roleReadinessFromSkills(skills)
       ),
-    [interviewSessions]
+    [interviewSessions, skills]
   );
 
   // The streak comes from the user's own recorded activity, so it reflects

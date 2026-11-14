@@ -295,7 +295,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         <Thumbnail course={course} compact={compact} />
         <span
           className={`absolute right-2 top-2 z-20 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide backdrop-blur-sm ${BUCKET_STYLES[tier]}`}
-          title={accessTierLimit(course.availability)}
+          title={t(accessTierLimit(course.availability))}
         >
           {badge}
         </span>

@@ -33,13 +33,18 @@ export type CareerGoal =
   | 'explore_careers'
   | 'custom';
 
-export type SkillSource = 
+/**
+ * The strongest signal behind a skill's level.
+ *
+ * The same vocabulary the server and the shared normalizer use, so a skill
+ * shows one source everywhere: evidence beats a measurement, a measurement
+ * beats a claim, and a claim beats a guess.
+ */
+export type SkillSource =
   | 'self_reported'
   | 'ai_estimated'
   | 'assessment'
-  | 'project_evidence'
-  | 'experience'
-  | 'certificate';
+  | 'verified_evidence';
 
 /**
  * The evidence that backs a skill.
@@ -69,6 +74,15 @@ export interface UserSkill {
   targetLevel: number;  // 1-5
   gap: number;          // targetLevel - currentLevel (min 0)
   source: SkillSource;
+  /**
+   * True when the target role requires this skill.
+   *
+   * Required skills count towards role readiness — including the ones the
+   * candidate already meets, which is what stops the figure collapsing to
+   * zero once every requirement is satisfied. A preferred (stretch) skill is
+   * shown with its gap but does not count.
+   */
+  required?: boolean;
   evidenceIds: string[];
   lastUpdated: string;
   /** What the candidate says they can do (1-5). Null when never rated. */

@@ -50,6 +50,13 @@ export interface InterviewReadinessMetrics {
   readinessPct: number | null;
   /** True when readiness could not be measured. */
   isUnmeasured: boolean;
+  /**
+   * The skill-readiness part of the figure, when it could be measured.
+   *
+   * Null when the caller has no skill readiness to offer — the figure is then
+   * the two interview halves alone.
+   */
+  skillReadinessPct: number | null;
   /** How the readiness figure was arrived at, for the tooltip. */
   formula: string;
 }
@@ -66,16 +73,22 @@ export const MOCK_INTERVIEW_TARGET = 3;
 /**
  * The readiness figure.
  *
- * Two halves, equally weighted:
+ * Three parts, equally weighted, when the platform can measure all three:
  *
  *   * practice — how many mock interviews were completed against the target,
  *     capped at 100%;
- *   * performance — the mean rubric score, as a percentage of the maximum.
+ *   * performance — the mean rubric score, as a percentage of the maximum;
+ *   * skill readiness — how ready the candidate is for the role's skills.
+ *
+ * The third part is optional: when the caller cannot measure skill readiness
+ * the figure is the two interview halves alone, so the number is never
+ * silently diluted by a part that could not be measured.
  *
  * Readiness is never reduced by how many jobs the candidate has applied to.
  */
 export function computeInterviewReadiness(
-  sessions: readonly InterviewSessionInput[]
+  sessions: readonly InterviewSessionInput[],
+  skillReadinessPct?: number | null
 ): InterviewReadinessMetrics {
   const scored = sessions
     .map((session) => session.score)
@@ -84,6 +97,11 @@ export function computeInterviewReadiness(
   const averagePerformance =
     scored.length > 0 ? scored.reduce((sum, score) => sum + score, 0) / scored.length : null;
 
+  const skillReadiness =
+    typeof skillReadinessPct === 'number' && Number.isFinite(skillReadinessPct)
+      ? Math.max(0, Math.min(100, skillReadinessPct))
+      : null;
+
   if (scored.length === 0) {
     return {
       mockInterviewsCompleted: sessions.length,
@@ -91,6 +109,7 @@ export function computeInterviewReadiness(
       averagePerformance: null,
       readinessPct: null,
       isUnmeasured: true,
+      skillReadinessPct: skillReadiness,
       formula:
         'Interview readiness = half practice + half performance. Practice = mock interviews completed ÷ 3. Performance = your average rubric score ÷ 10. It is not measured yet because no mock interview has been scored.',
     };
@@ -98,7 +117,10 @@ export function computeInterviewReadiness(
 
   const practicePct = Math.min(100, (sessions.length / MOCK_INTERVIEW_TARGET) * 100);
   const performancePct = Math.min(100, ((averagePerformance ?? 0) / 10) * 100);
-  const readinessPct = Math.round((practicePct + performancePct) / 2);
+  const readinessPct =
+    skillReadiness === null
+      ? Math.round((practicePct + performancePct) / 2)
+      : Math.round((practicePct + performancePct + skillReadiness) / 3);
 
   return {
     mockInterviewsCompleted: sessions.length,
@@ -106,8 +128,11 @@ export function computeInterviewReadiness(
     averagePerformance,
     readinessPct,
     isUnmeasured: false,
+    skillReadinessPct: skillReadiness,
     formula:
-      'Interview readiness = half practice + half performance. Practice = mock interviews completed ÷ 3. Performance = your average rubric score ÷ 10.',
+      skillReadiness === null
+        ? 'Interview readiness = half practice + half performance. Practice = mock interviews completed ÷ 3. Performance = your average rubric score ÷ 10.'
+        : 'Interview readiness = a third practice, a third performance, a third skill readiness. Practice = mock interviews completed ÷ 3. Performance = your average rubric score ÷ 10. Skill readiness = how much of the role’s required skill level you already meet.',
   };
 }
 

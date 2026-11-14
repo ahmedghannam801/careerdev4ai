@@ -1,213 +1,494 @@
-# CareerDev4AI — November 2026 QA Remediation Verification
+# QA remediation verification — CareerDev4AI
 
-**Scope:** the November 2026 Comprehensive QA Report (`BUG-01`–`BUG-30`), the UI polish
-items (`UI-01`–`UI-06`), the New Dashboard Layout Redesign, the Centralized Career Data
-Architecture, the token-economy rules, and the automated functional integration tests
-(`FT-01`–`FT-08`).
-
-**Date:** 20 November 2026
+**Date:** 14 November 2026
+**Repository:** `D:/Saas/careerpilot-ai` (CareerDev4AI)
+**Production:** <https://careerdev4ai.pages.dev>
+**Scope:** the master remediation spec, Workstreams 0–3, audited against the
+running code, fixed, gated and published.
 
 ---
 
-## 1. Release gates
+## 1. What this pass did
+
+The previous remediation pass had already implemented the bulk of the spec and
+had published it. This pass did three things, in this order:
+
+1. **Verified** every workstream against the actual code and the actual live
+   site, rather than against the previous pass's own report.
+2. **Fixed** the gaps that verification found — five product defects, two
+   regressions left behind by a concurrent session, and the test coverage that
+   pins the new rules down.
+3. **Gated and published** — typecheck, build, the full test suite, the
+   localisation check, and a live probe of the published site.
+
+### 1.1 A concurrent session was committing to this workspace
+
+Part-way through the audit the git history moved under us: `HEAD` advanced
+from `97052d5` to `6359d7b` through eight commits authored by another agent
+(`Dyad`), including `281a45e "Reverted all changes back to version 858364e…"`
+and a re-implementation in `9a70561 "Audit remaining CareerDev4AI workstreams
+and implement grounded fixes"`.
+
+Consequences that were checked rather than assumed:
+
+* every file this pass edited was re-read after the commits landed, and the
+  work was confirmed to be intact and coherent with the new tree;
+* the two test failures this pass inherited were traced to those commits, not
+  to its own changes;
+* the last commit from that session is from 20:32, and no source file has been
+  touched since except by this pass, so the tree was stable before publishing.
+
+---
+
+## 2. Gates
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| Type safety | `npm run lint` (`tsc --noEmit`) | **Pass — 0 errors** |
-| Full test suite | `npm test` | **Pass — 1590 passed, 0 failed, 2 skipped**, 369 suites, 95 test files |
-| Localisation parity | `tests/localization.test.ts` | **Pass — 2295/2295 source strings (100%)**, EN + AR, no empty Arabic |
-| Production build | `npm run build` | **Pass — exit 0**, `dist/` + `dist/_worker.js` (4.20 MiB), bundle-auth check passed (4 sign-in methods carried) |
+| Type check | `npm run lint` (`tsc --noEmit`) | **0 errors** |
+| Production build | `npm run build` | **pass** — vite bundle, 4.20 MiB worker, bundle carries the public Supabase config and all 4 sign-in methods |
+| Test suite (baseline) | `node tests/runner.mjs` | 1622 tests, **1620 pass, 0 fail**, 2 skipped |
+| Test suite (after the fixes) | `node tests/runner.mjs` | 1638 tests, **1634 pass, 1 fail**, 3 skipped |
+| Localisation | `tests/localization.test.ts` | **2297 / 2297** source strings translated (100 %) |
+| Live site | `GET /api/health` | 200, `modelConfigured: true`, gemini + openrouter both configured |
 
-Two of the 95 registered test files are skipped by design (`coverage.test.ts`: "the AI
-routes fail honestly when no model is available" — the test server *has* a model
-configured, so the no-model contract does not apply). The build emits the pre-existing
->600 kB chunk-size advisory; it is not an error and was present before this work.
+### 2.1 The one remaining failure is the provider, not the product
 
-### A runner defect found and fixed during this pass
+```
+✖ an AI route never invents a result when it fails (302945ms)
+  [TypeError: fetch failed]
+  [cause]: Error [HeadersTimeoutError]: Headers Timeout Error
+```
 
-`tests/runner.mjs` keeps an explicit list of the test files the suite runs. The eleven
-new suites written for this report were **not in that list**, so `npm test` was silently
-skipping every one of them — including `FT-01`–`FT-08`. The files are now registered
-(with the reason each one exists, in the runner's own comment style), and the full run
-above executes them.
+`tests/coverage.test.ts` walks five AI routes and asserts that each one either
+returns a real model answer or an explicit failure — never invented content.
+It failed by **not receiving a response at all**: undici's 300 s headers
+timeout fired while the local test server was still waiting on the model.
 
-To prove the coverage is complete, the 95 registered files were partitioned into eight
-chunks and every file was run; the result was **95/95 files, 1590 passed, 0 failed**,
-which is the same total the single full run reports.
+The same five routes were then timed directly, on the same machine, against
+the **published site** and against a **locally started test server**:
 
----
-
-## 2. `BUG-01`–`BUG-30`
-
-| ID | Requirement | Files | Proof | Result |
-| --- | --- | --- | --- | --- |
-| BUG-01 | One identity and one avatar across every page | `shared/identity.ts`, `src/components/layout/AppShell.tsx`, `src/context/CareerContext.tsx`, `src/components/views/ProfileView.tsx` | `tests/identity.test.ts` (12) | Pass |
-| BUG-02 | One metrics engine for readiness, progress and gaps | `shared/careerMetrics.ts`, `src/components/career/MetricCard.tsx`, `src/components/views/DashboardView.tsx` | `tests/career-metrics.test.ts` (33) | Pass |
-| BUG-03 | Every metric explains itself (definition + formula + the candidate's own arithmetic) | `shared/careerMetrics.ts` (`METRIC_EXPLANATIONS`, `explainMetric`), `src/components/career/MetricCard.tsx` | `tests/career-metrics.test.ts` | Pass |
-| BUG-04 | The roadmap may never call a core skill covered while a gap for it is open | `shared/careerMetrics.ts`, `src/components/views/RoadmapView.tsx` | `tests/roadmap-gap-sync.test.ts` (5) | Pass |
-| BUG-05 | Duplicate summary paragraphs are removed | `shared/cvDocument.ts`, `shared/cvProjection.ts` | `tests/cv-projection.test.ts` (34) | Pass |
-| BUG-06 | One canonical name per skill; merged names read canonically (`SQL`+`SQL Fundamentals`→`SQL`; `Microsoft Excel`+`Excel / Spreadsheets Modeling`→`Microsoft Excel & Spreadsheets Modeling`) | `shared/cvCanonical.ts`, `shared/cvProjection.ts` | `tests/cv-canonical.test.ts` (23) | Pass |
-| BUG-07 | Target opportunity type (internship / full-time entry / both) | `shared/careerIdentity.ts`, `src/components/career/CareerGoalRolePanel.tsx`, `server/db/profile.ts`, `app.ts`, `src/lib/roadmapApi.ts`, `supabase/migrations/20261120000001_target_opportunity_and_headline.sql` | `tests/career-identity-opportunity.test.ts` (13) | Pass |
-| BUG-08 | The Learning Hub only recommends what fits the target role and the open gaps | `server/learning/recommendation.ts` | `tests/learning-access.test.ts` (19), `tests/recommendation-relevance.test.ts` | Pass |
-| BUG-09 | Honest pricing tier per resource — four tiers: `100% Free`, `Free Audit (Certificate Paid)`, `Free Trial / Limited`, `Paid Subscription` | `shared/learningAccess.ts`, `src/components/learning/CourseCard.tsx`, `src/components/views/LearningCenterView.tsx` | `tests/learning-access.test.ts` | Pass |
-| BUG-10 | "Free only" keeps only resources whose core learning content can be completed for nothing; a limited/trial/paid resource and an unknown one are excluded | `shared/learningAccess.ts` (`isFreeOnlyEligible`), `server/learning/recommendation.ts`, `src/components/views/LearningCenterView.tsx` | `tests/learning-access.test.ts` | Pass |
-| BUG-11 | The same opportunity is never shown twice | `shared/opportunityMatching.ts`, `src/components/volunteer/VolunteerOpportunities.tsx` | `tests/opportunity-matching.test.ts` (20) | Pass |
-| BUG-12 | Expired opportunities are never offered | `shared/opportunityMatching.ts` (`isExpired`, `opportunityListing`) | `tests/opportunity-matching.test.ts` | Pass |
-| BUG-13 | Organisation career pages are separated from real openings | `shared/opportunityMatching.ts` (`isOrganizationDirectory`), `src/components/volunteer/VolunteerOpportunities.tsx` | `tests/opportunity-matching.test.ts` | Pass |
-| BUG-14 | Evidence passes through named validation stages (project completion → evidence submission → skill validation → skill mastery) and named validation states | `shared/assessment.ts` (`EVIDENCE_STAGES`, `SKILL_VALIDATION_STATES`), `shared/skillEvidence.ts` | `tests/assessment.test.ts` (15) | Pass |
-| BUG-15 | Every assessment is logged as an attempt | `shared/assessment.ts` (`AssessmentAttempt`, `describeAttempt`) | `tests/assessment.test.ts` | Pass |
-| BUG-16 | A knowledge check alone cannot reach 5/5 — the diagnostic ceiling is 4/5; 5/5 "Verified Mastery" needs practical proof (project, certificate or work experience) | `shared/assessment.ts` (`DIAGNOSTIC_CEILING`, `VERIFIED_MASTERY_LEVEL`), `shared/skillEvidence.ts` | `tests/assessment.test.ts`, `tests/functional-flows.test.ts` (FT-02) | Pass |
-| BUG-17 | The roadmap time breakdown is additive and honest | `shared/roadmapTimeBreakdown.ts`, `src/components/views/ProgressView.tsx` | `tests/progress-measurement.test.ts` (21) | Pass |
-| BUG-18 | A course never appears on two shelves | `shared/learningAccess.ts` (`dedupeAcrossShelves`), `src/components/views/LearningCenterView.tsx` | `tests/learning-access.test.ts` | Pass |
-| BUG-19 | Completion pace and weeks are estimated and shown | `shared/learningAccess.ts` (`estimatedCompletionWeeks`, `completionPaceLabel`), `src/components/learning/CourseCard.tsx` | `tests/learning-access.test.ts` | Pass |
-| BUG-20 | Every skill level states where it came from (Direct Assessment / Self-Reported / AI-Estimated from CV / Project Evidence …) | `shared/assessment.ts` (`SKILL_LEVEL_SOURCES`), `src/components/views/SkillAssessmentView.tsx` | `tests/assessment.test.ts` | Pass |
-| BUG-21 | The project advisor distinguishes recommending projects from checking existing ones | `src/components/projects/ProjectAiPanel.tsx`, `shared/projectRecommendation.ts` | `tests/project-recommendation.test.ts` (48, incl. "checking an existing project"), `tests/project-advisor-ai.test.ts` (5) | Pass |
-| BUG-22 | The Progress page says "Shipped Projects" | `src/components/views/ProgressView.tsx` | `tests/progress-measurement.test.ts` | Pass |
-| BUG-23 | Interview Readiness % is derived from the mock interview sessions, so it cannot disagree with the Interviews page | `shared/interviewReadiness.ts`, `src/components/views/ProgressView.tsx`, `src/components/views/InterviewsView.tsx` | `tests/interview-readiness.test.ts` (12), FT-05 | Pass |
-| BUG-24 | The gap badge names the specific skill it closes | `shared/opportunityMatching.ts` (`matchedGapSkills`), `src/components/volunteer/VolunteerOpportunities.tsx` | `tests/opportunity-matching.test.ts` | Pass |
-| BUG-25 | The action fits the kind of opportunity (apply / join / enrol / track / record volunteering) | `shared/opportunityMatching.ts` (`opportunityCta`), `src/components/volunteer/VolunteerOpportunities.tsx` | `tests/opportunity-matching.test.ts` | Pass |
-| BUG-26 | Education records are merged; empty experience entries are dropped | `shared/cvDocument.ts`, `shared/cvProjection.ts` | `tests/cv-projection.test.ts` | Pass |
-| BUG-27 | Profile completeness names what is missing | `shared/profileCompleteness.ts`, `src/components/views/ProfileView.tsx` | `tests/qa-scenarios.test.ts` (29) | Pass |
-| BUG-28 | A student is asked when they graduate | `shared/careerIdentity.ts` | `tests/career-identity-opportunity.test.ts` | Pass |
-| BUG-29 | The professional headline is not the job title | `shared/careerIdentity.ts`, `src/components/career/CareerGoalRolePanel.tsx`, `server/db/profile.ts` | `tests/career-identity-opportunity.test.ts` | Pass |
-| BUG-30 | The jobs page has real loading, error, empty and results states, with "Try again", external board links and "Clear filters" | `src/components/views/JobsView.tsx` | `tests/jobs.test.ts` (36) | Pass |
-
----
-
-## 3. `UI-01`–`UI-06`
-
-| ID | Requirement | Files | Proof | Result |
-| --- | --- | --- | --- | --- |
-| UI-01 | "Recommend projects for me" and "Check my existing projects" are two clearly explained, separate actions | `src/components/projects/ProjectAiPanel.tsx` | `tests/project-advisor-ai.test.ts`, `tests/project-recommendation.test.ts` | Pass |
-| UI-02 | A skill-appropriate visual, or a clean unified category badge when no picture belongs to that skill — never one generic photograph for everything | `src/lib/imageAssets.ts` (`getSpecificIndustryVisual`), `src/components/views/SkillAssessmentView.tsx` | `tests/assessment-visuals.test.ts` (4) | Pass |
-| UI-03 | Profile ↔ CV bidirectional sync — an edit in either view reaches the other | `src/components/cv/studio/CvDataManager.tsx`, `src/context/CareerContext.tsx`, `shared/cvProjection.ts` | `tests/cv-projection.test.ts`, FT-01, FT-07 | Pass |
-| UI-04 | The Projects empty state states the Role Readiness impact, with "+ Add Your First Project" | `src/components/views/ProjectsView.tsx` | `tests/project-recommendation.test.ts`; label parity via `tests/localization.test.ts` | Pass |
-| UI-05 | The Documents empty state states the Role Readiness impact, with "Open CV Studio to Save a Snapshot" | `src/components/views/DocumentsView.tsx` | `tests/cv-studio.test.ts` (46), `tests/cv-projection.test.ts`; label parity via `tests/localization.test.ts` | Pass |
-| UI-06 | The Evidence empty state states the Role Readiness impact, with "+ Submit Skill Evidence" | `src/components/views/EvidenceView.tsx` | `tests/skills.test.ts`, `tests/assessment.test.ts`; label parity via `tests/localization.test.ts` | Pass |
-
-The UI-01 and UI-04/05/06 items are presentation-layer changes. They are covered by the
-logic suites that drive the same code paths, by `tsc --noEmit` (0 errors) and by the
-localisation gate (every new label exists in English and Arabic). The exact rendered
-labels are asserted by the localisation test rather than by a dedicated DOM assertion.
-
----
-
-## 4. New Dashboard Layout Redesign (Part 3)
-
-Five sections, all reading from the one metrics engine so no two surfaces can disagree.
-
-| Element | Files | Proof | Result |
-| --- | --- | --- | --- |
-| The five-stage journey on one line — Profile → Assessment → Learning → Projects → Apply | `src/components/career/CareerJourneyStepper.tsx`, `shared/careerMetrics.ts` (`CAREER_JOURNEY_STAGES`) | `tests/career-metrics.test.ts`, `tests/roadmap-gap-sync.test.ts` | Pass |
-| The metric cards, each with an explanation popover | `src/components/career/MetricCard.tsx`, `src/components/views/DashboardView.tsx` | `tests/career-metrics.test.ts` | Pass |
-| The current stage and the overall completion | `shared/careerMetrics.ts` (`determineCurrentStage`, `computeStageProgress`) | `tests/career-metrics.test.ts` | Pass |
-| The gap list, with the reason each gap is critical | `shared/careerMetrics.ts` (`gapReason`, `isCriticalGap`) | `tests/career-metrics.test.ts`, `tests/roadmap-gap-sync.test.ts` | Pass |
-| The translated copy | `src/translations/parts/dashboard.ts` | `tests/localization.test.ts` (100%) | Pass |
-
----
-
-## 5. Token economy (Part 4)
-
-No regression. The rules are asserted by three suites.
-
-| Rule | Proof | Result |
+| Route | Production (Cloudflare Pages) | Local test server |
 | --- | --- | --- |
-| The daily claim is exactly **+2** tokens | `tests/token-economy.test.ts` (5), `tests/credits-referrals-birthday.test.ts` (25) | Pass |
-| A premium CV template unlock is exactly **5** tokens | `tests/token-economy.test.ts`, `tests/cv-templates.test.ts` (45) | Pass |
-| A token is spent **only** on an explicit AI generation, after a valid response; a failed generation is refunded | `tests/token-deduction-contract.test.ts` (20) | Pass |
-| Tokens are **never** spent on manual edits, "Fill from my records", a profile or settings save, a skill sync, or a page load | `tests/token-deduction-contract.test.ts` (the route table is scanned so no passive action can be priced like an AI action) | Pass |
-| A duplicate request is charged once, and the ledger key is derived from the content of the request | `tests/token-deduction-contract.test.ts` | Pass |
+| `/api/analyze-career` | 200 in 2 271 ms | hung past 120 s |
+| `/api/optimize-cv` | 200 in 12 033 ms | hung past 120 s |
+| `/api/mock-interview` | 200 in 4 157 ms | 429 (quota) |
+| `/api/suggest-summary` | 200 in 1 066 ms | hung past 120 s |
+| `/api/generate-cover-letter` | 200 in 1 794 ms | hung past 120 s |
+
+So every route is healthy and returns its real payload from the deployed site;
+from this machine the model provider is exhausted or throttled — one route
+answers 429 (quota) and four hang. A direct probe of the provider answered a
+one-word prompt in **10.2 s** at that moment, and the Copilot suite immediately
+before it took **139 s** instead of seconds.
+
+Further evidence that this is the environment and not the code:
+
+* `tests/coverage.test.ts` was **not** changed by the concurrent session
+  (`git diff 97052d5 HEAD -- tests/coverage.test.ts` is empty), and this pass
+  changed nothing on the AI request path;
+* the same test passed in the baseline run at 15:34, when the quota was fresh;
+* the failure reproduces in isolation and is the only test in the suite that
+  talks to the model.
+
+It should be re-run once the provider's quota is comfortable. Nothing in the
+product needs to change.
 
 ---
 
-## 6. `FT-01`–`FT-08` — automated functional integration tests
+## 3. Live verification of Workstream 0
 
-All eight live in `tests/functional-flows.test.ts` (21 tests). They exercise the real
-shared modules the browser and the server run — no mocks — so a change that breaks a
-journey breaks a test.
+A disposable account was created against the live site, exercised, and deleted
+again (`.tmp-qa/probe-free-ai-production.mjs`). Final run, after publishing:
 
-| ID | Journey | Tests | Result |
-| --- | --- | --- | --- |
-| FT-01 | The CV Studio integration — the records come in, and come in once; the candidate's certificate is kept | 2 | Pass |
-| FT-02 | The assessment integration — the attempt is recorded and every surface moves together; the level is capped at 4 without practical proof | 2 | Pass |
-| FT-03 | The evidence validation — every stage and every validation state is named; a skill is not mastered until the evidence is verified | 3 | Pass |
-| FT-04 | The job application pipeline — the four stages are kept; a saved job is never counted as an active application | 2 | Pass |
-| FT-05 | The interview session — readiness is measured from the sessions alone; no penalty for having no applications; the portfolio target is at least two | 3 | Pass |
-| FT-06 | The documents snapshot — every snapshot is kept; the count grows | 2 | Pass |
-| FT-07 | The settings synchronisation — one identity is derived from the profile wherever it was changed; no stale data when the target role changes | 2 | Pass |
-| FT-08 | The live jobs filters — each filter reads on its own, they combine, nonsense falls back to the defaults, an expired posting is never shown | 4 | Pass |
-| — | The scenarios share one set of rules — a near-duplicate skill is folded the same way everywhere | 1 | Pass |
+```
+=== https://careerdev4ai.pages.dev — Workstream 0 free-AI probe ===
 
----
+  balance before: 5 (daily allowance {"allowance":2,"remaining":0,"claimedToday":false})
 
-## 7. New files added
+-- AI chat (must be free and must answer) --
+  PASS  the chat answers with 200
+  PASS  the answer is real text, not a canned error — 1186 chars in 1547ms
+  PASS  the chat returns suggestions
 
-| File | Purpose |
-| --- | --- |
-| `shared/identity.ts` | The one place the display name, the initials and the avatar are resolved |
-| `shared/careerMetrics.ts` | The metrics engine: readiness, progress, gaps, journey stages, metric explanations |
-| `shared/interviewReadiness.ts` | Interview readiness, measured from the mock interview sessions |
-| `shared/cvCanonical.ts` | The canonical skill-naming engine |
-| `shared/learningAccess.ts` | The four access tiers, the free-only rule, certificate badges, pace estimates |
-| `shared/opportunityMatching.ts` | Opportunity relevance, deduplication, listing kind and per-kind actions |
-| `shared/assessment.ts` | The rubric, the scoring ceiling, the scope, the level sources, the attempt log, the evidence stages |
-| `src/components/career/MetricCard.tsx` | The metric card and its explanation popover |
-| `src/components/career/CareerJourneyStepper.tsx` | The compact five-stage journey |
-| `supabase/migrations/20261120000001_target_opportunity_and_headline.sql` | `profiles.target_opportunity_type` (nullable, CHECK-constrained; NULL is read as "both") |
-| `tests/identity.test.ts`, `tests/career-metrics.test.ts`, `tests/roadmap-gap-sync.test.ts`, `tests/interview-readiness.test.ts`, `tests/cv-canonical.test.ts`, `tests/learning-access.test.ts`, `tests/opportunity-matching.test.ts`, `tests/career-identity-opportunity.test.ts`, `tests/assessment.test.ts`, `tests/assessment-visuals.test.ts`, `tests/functional-flows.test.ts` | The new suites, all registered in `tests/runner.mjs` |
+-- Mock interview (must be free and must score) --
+  PASS  the mock interview scores the answer — status=200 body={"score":4,...}
+  PASS  the mock interview returns feedback — 1676ms
 
-`tests/cv-projection.test.ts` was extended with seven canonicalization cases.
+-- The session is persisted (so readiness can move) --
+  PASS  the interview session is saved — status=201
+  PASS  the balance is untouched after chat + interview — balance=5 -> 5
+  PASS  nothing was charged to the ledger — 0 rows
 
-The migration reuses the existing `profiles.headline` column as the professional
-headline rather than adding a redundant one; `target_opportunity_type` is the only
-column added. NULL means "not chosen" and is read as "both", so it never narrows a
-search or claims an unstated preference.
+=== 9 passed, 0 failed ===
+```
+
+The assistant's answer was grounded in the account's own record (target role
+*Data Analyst*), not a canned string.
 
 ---
 
-## 8. Production deployment
+## 4. What was verified as already implemented
 
-**Deployed.** `npm run cf:deploy` (`npm run build` + `wrangler pages deploy dist
---project-name careerdev4ai --branch main`).
+Each clause below was read in the code, not inferred from a report.
 
-| | |
-| --- | --- |
-| Deployment id | `79ae2c29-8ffe-48a6-a030-58bf0b1b1cf0` |
-| Environment | Production, branch `main` |
-| Deployment URL | <https://79ae2c29.careerdev4ai.pages.dev> |
-| Production alias | <https://careerdev4ai.pages.dev> |
-| Source commit | `97052d5` (the working tree carries the uncommitted changes of this remediation) |
-| Build | `dist/` + `dist/_worker.js` (4.20 MiB); bundle-auth check passed (4 sign-in methods carried) |
+### Workstream 0 — the broken chat and the 0-token features
 
-### The database was already in place
+| Requirement | Where | Verdict |
+| --- | --- | --- |
+| Chat answers, with the candidate's context | `app.ts:2071` (`POST /api/copilot`), `src/components/copilot/CopilotDrawer.tsx`, `src/context/CareerContext.tsx` | implemented, live-probed |
+| Chat costs 0 tokens | the route calls no credit middleware; `shared/credits.ts` prices `career_consultation_chat: 0` | implemented |
+| Mock interview costs 0 tokens and scores | `app.ts:2394` (`POST /api/mock-interview`), `server/interviewSessions.ts` | implemented, live-probed |
+| The four paid actions still charge | premium template 5, CV tailoring / ATS audit / project analysis 1 | implemented, asserted by `tests/token-deduction-contract.test.ts` |
+| No token badge on the free surfaces | `src/lib/aiTokenCosts.ts` renders no badge at weight 0 | implemented |
 
-The production Pages project and the test environment resolve to the **same**
-Supabase project (`ciihprsfdojzvjnqgbxl`) — `.env`, `.env.test` and the
-`supabase-local` MCP target all point at it — so the migration
-`20261120000001_target_opportunity_and_headline.sql` was already applied to the
-production database before the deploy. `information_schema` confirms
-`profiles.target_opportunity_type` (text, nullable) next to `headline` and
-`expected_graduation_year`.
+### Workstream 1 — backend and data integrity
 
-All thirteen Pages secrets are present and encrypted (including
-`SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `STRIPE_SECRET_KEY` and the
-GA4 credentials), and the three plain-text variables in `wrangler.jsonc` match
-the `.env` values, so the deploy cleared nothing.
+| Requirement | Where | Verdict |
+| --- | --- | --- |
+| No hardcoded demo candidate | grep of `src/` for `Omar`, `Era`, `Nour`, `Alex` — no matches; `shared/identity.ts` is the single resolver | implemented |
+| De-duplication on import | `shared/cvDedupe.ts` — experience by normalised title + organisation + dates, education by institution + degree, skills by normalised name, section headers removed | implemented |
+| "Fill from my records" is idempotent | `shared/cvProjection.ts` (`mergeCanonicalCvDocument`), pinned by `tests/functional-flows.test.ts` (FT-01) | implemented |
+| Every skill carries its source | `shared/skillNormalizer.ts` (`resolveSkillSource`) — evidence beats a measurement beats a claim beats a guess | implemented |
+| Education date validation | `app.ts:5789` and `shared/careerIdentity.ts:322` — a graduation year in the future always means *currently studying* | implemented |
+| Recent Activity is idempotent | `server/db/activities.ts` — deterministic UUID, unique-violation returns the existing row | implemented |
 
-### Post-deployment verification
+### Workstream 2 — the career intelligence engine
 
-| Check | Result |
-| --- | --- |
-| `GET /api/health` on the production alias | `status: ok`, model configured (Gemini + OpenRouter) |
-| The production alias serves the new bundle | HTML references `/assets/index-AfbB3RAA.js` — the same entry chunk the local build produced |
-| `scripts/probe-career-target-production.mjs` against the live site | **All 19 checks PASS** — a new account has no invented target role, the role, track and experience level are stored and re-read, the database holds them, an invalid level is refused with 400 and the stored value is left alone |
-| A production probe of the two new profile fields | **All 10 checks PASS** — a new account states no opportunity type; `internship` and `full_time_entry` are accepted, stored and re-read; the professional headline round-trips; the database holds both; an unknown opportunity type is refused with 400 and does not overwrite the stored value |
+| Requirement | Where | Verdict |
+| --- | --- | --- |
+| All 7 scores with documented formulas | `shared/careerScores.ts` + `shared/careerMetrics.ts` + `shared/scoreBreakdowns.ts` | implemented |
+| A knowledge check cannot reach 5/5 | `shared/assessment.ts` — diagnostic ceiling of 4; 5 needs practical evidence | implemented |
+| Self-reported vs assessed vs verified are shown apart | `src/types/career.ts` (`selfReportedLevel`, `assessedLevel`, `evidenceSources`), `shared/skillEvidence.ts` | implemented |
+| Gap priority is deterministic | `shared/skillGap.ts` (`priorityForGap`) | implemented |
+| "Your skills cover the core requirements" is guarded | `src/components/views/RoadmapView.tsx` — the sentence is only shown when there is no open gap | implemented |
+| Learning resources match the step's skill | `shared/roadmapGenerator.ts` (`matchResources`) — a resource must declare the step's skill | implemented |
+| Stage time is the sum of what is inside it | `shared/roadmapTimeBreakdown.ts` — additive and pure | implemented |
+| The identity `Target Role Skills = Mastered + Below Target` | `shared/careerMetrics.ts` — held by construction | implemented, extended below |
 
-Both probes create a real account, exercise it, and remove it afterwards.
+### Workstream 3 — the interface
 
-### Note on the previous deployment
+| Requirement | Where | Verdict |
+| --- | --- | --- |
+| Six Dashboard sections | `src/components/views/DashboardView.tsx` — header, YOUR CAREER OVERVIEW, YOUR NEXT STEP, MY CAREER JOURNEY, RECENT ACTIVITY, QUICK ACCESS | implemented |
+| No "Switch Target Role" on the Dashboard | removed from the header | implemented |
+| Learning Hub access tiers | `shared/learningAccess.ts` — 100 % Free / Free Audit (Certificate Paid) / Free Trial / Paid, plus a certificate badge that distinguishes "Includes Certificate" from "Learning Content Only" | implemented |
+| Live Jobs states | `src/components/views/JobsView.tsx` — loading, error + retry, empty, results + filters | implemented |
+| Profile separates title, headline and target role | `profiles.current_title`, `profiles.headline`, `profiles.target_role` (and `target_opportunity_type`) | implemented |
 
-The deployment immediately before this one (`ce0f7317`, same source commit `97052d5`)
-is recorded by Cloudflare with the status **Failure**, which is why the live site was
-still serving the older commit `aa2ded2` when this pass began. The deploy run here
-succeeded on the first attempt; the earlier failure was not reproduced.
+---
+
+## 5. What this pass fixed
+
+### 5.1 The dashboard header had no daily-token pill (WS3.A)
+
+The spec asks for a compact `+2 Daily Tokens` pill beside the balance in the
+Dashboard header. The widget existed (`src/components/subscription/DailyTokenClaim.tsx`)
+and was shown inside the topbar badge, but not on the Dashboard itself.
+
+* `src/components/views/DashboardView.tsx` — the compact claim now sits beside
+  the [Ask Copilot] button.
+
+### 5.2 A skill could be "Mastered" on a bare claim (WS2.B)
+
+> Never mark a skill as "Mastered" simply because the user added it to their
+> Profile; require effectiveLevel >= requiredLevel backed by Assessment or
+> Verified Evidence.
+
+`computeCareerMetrics` counted a skill as mastered whenever the level met the
+target — and the level included the candidate's own claim. Adding SQL to the
+profile and rating it 4/5 closed the gap.
+
+* `shared/careerMetrics.ts` — `MetricSkill` gained a `proof` field
+  (`'none' | 'assessment' | 'evidence'`), `skillsMastered` now requires proof,
+  and `skillsClaimedOnly` reports the skills that meet the level but are only
+  claimed.
+* `shared/careerMetrics.ts` — `skillProofFromSource()` reads the proof out of a
+  skill's source; `isSkillMastered()` gives the views the same rule, so the
+  Dashboard, the Skills Center and the Progress page cannot disagree.
+* The tooltip now says so: *"A skill counts as mastered only when your level is
+  at or above its target AND the platform can back it — an assessment measured
+  it, or a project, a certificate or work experience proves it."*
+
+### 5.3 The browser ignored verified evidence when naming a skill's source (WS1.D)
+
+`src/context/CareerContext.tsx` resolved the source itself and stopped at
+"self-reported, else assessment, else AI-estimated" — so a skill backed by a
+verified project was labelled `ai_estimated` in the browser while the server
+reported `verified_evidence`.
+
+* `src/context/CareerContext.tsx` — the client now uses the shared
+  `resolveSkillSource`, so evidence beats a measurement beats a claim beats a
+  guess on both sides.
+
+### 5.4 Role Readiness excluded the skills the candidate had already met (WS2.E)
+
+The Dashboard and the Roadmap mapped `required: skill.gap > 0` — "a skill with
+an open gap is a requirement of the role". That contradicted the documented
+formula (`sum(min(your level, required level)) ÷ sum(required levels)`), and
+it collapsed: a candidate who had met **every** requirement had no required
+skills left, so the denominator was zero and the figure read **0 %**.
+
+* `src/types/career.ts` — `UserSkill.required` marks the skills the target
+  role actually requires.
+* `src/context/CareerContext.tsx` — the catalogue records `required: true` for
+  the role's requirements and `false` for its preferred (stretch) skills.
+* `src/components/views/DashboardView.tsx`, `src/components/views/RoadmapView.tsx`
+  — readiness is computed over the role's requirements, met or not.
+
+### 5.5 Interview Readiness ignored skill readiness (WS2.E)
+
+> Interview Readiness % — driven by Mock Interview rubrics + skill readiness,
+> independent of job application count.
+
+It was driven by the rubrics and the practice count only.
+
+* `shared/interviewReadiness.ts` — a third part, the candidate's skill
+  readiness, is weighed in when it can be measured. When it cannot, the
+  two-part figure stands, so the number is never diluted by a part that was
+  never measured.
+* `src/components/views/InterviewsView.tsx`, `src/components/views/ProgressView.tsx`
+  — both pages pass the same skill readiness, so they cannot disagree.
+
+### 5.6 Two translations were missing (WS3.I)
+
+* `src/translations/parts/skills.ts` — `verified evidence` (the new source
+  vocabulary) had no Arabic entry.
+* `src/translations/parts/skills.ts` — `Your previous skill level was
+  restored. Please try again.` had no Arabic entry; this is the string the
+  concurrent session's commit `147fcfb` introduced. The localisation suite now
+  reports **2297 / 2297**.
+
+### 5.7 A test contradicted the schema (not a code change)
+
+`tests/cv-analysis-route.test.ts` asserted that an analysis of an **unsaved**
+CV appears in the candidate's history. The schema says the opposite:
+
+```sql
+-- A measurement that is not about a stored CV
+-- (the studio measures the document the candidate is editing) has no CV and
+-- no version, and is not written here at all.
+```
+
+The assertion was corrected to match the documented design. The stored case —
+where a measurement *is* recorded, and both runs are kept — is still asserted
+in the suite above it.
+
+---
+
+## 6. Tests added
+
+* `tests/career-metrics.test.ts` — a claim is not a mastered skill; a measured
+  or proved level is; the identity `mastered + below target = total` holds
+  exactly; the proof is read out of the source; the views agree with the
+  engine; a required skill stays in the readiness figure once it is met.
+* `tests/interview-readiness.test.ts` — skill readiness is weighed in when it
+  is measurable, the two-part figure stands when it is not, an unmeasured
+  readiness stays unmeasured, and a readiness above 100 cannot inflate the
+  figure.
+
+---
+
+## 7. Publication
+
+| Target | Identifier | Status |
+| --- | --- | --- |
+| Cloudflare Pages (`careerdev4ai`, branch `main`) | `6e8e7fdc-855e-41b0-9bc0-d7b6da67ad4e` — <https://6e8e7fdc.careerdev4ai.pages.dev> | live, 200 on `/api/health` |
+| Production alias | <https://careerdev4ai.pages.dev> | serving the new bundle |
+| Jobs Worker (`careerdev4ai-jobs`) | version `98652694-0c21-4650-89eb-0f88e904003e` — <https://careerdev4ai-jobs.mohamedghnnam801.workers.dev> | deployed, schedule `*/5 * * * *` |
+
+The database was checked against the code and needs nothing: every column the
+profile writes exists (`current_title`, `headline`, `target_opportunity_type`,
+`education_status`, `expected_graduation_year`, `experience_level`), and every
+migration the code depends on is applied.
+
+---
+
+## 8. Left undone, on purpose
+
+* **The changes are not committed.** This pass published the work but left the
+  working tree as it found it plus its own edits, because committing was not
+  asked for.
+* **The provider-throttled test was not "fixed".** It is not broken; the
+  upstream model was exhausted on this machine while it ran, and the same five
+  routes answer in 1–12 s from the published site. It should be re-run once the
+  quota is comfortable.
+* **One audit item is a judgement call, left as the previous pass wrote it.**
+  Score 6, *Career Asset Score*, is implemented as the same auditable 100-point
+  career-asset checklist that *Profile Completeness %* uses. The spec ties the
+  two together ("Profile Completeness % (dynamic calculation matching Career
+  Asset Score weights: +15 % Project, +7 % Certification, +3 % Links, +2 % CV)"),
+  and the weights match exactly, so the two numbers are equal by design rather
+  than by accident — but they are not two distinct measurements.
+
+---
+
+## 9. Third pass — clause-by-clause audit of both master specifications
+
+This pass was given the two master specifications directly: the three-workstream
+QA and product plan, and the motion specification (GSAP + Lenis + React Bits
+plus the smooth skill-level interaction).
+
+Unlike the passes before it, this one did **not** trust the previous report. It
+read the code against every clause of both specifications and asked, for each
+one, "is this true here?" The previous passes' own summary was treated as a
+claim to be checked, not as evidence.
+
+### 9.1 What was found already in place
+
+Every clause of Workstream 0 (the free AI chat and the token rules),
+Workstream 1 (data integrity), Workstream 2 (the career intelligence engine)
+and Workstream 3 (the interface) was located in the code and confirmed
+implemented. The ones worth naming, with where they live:
+
+| Clause | Where it lives | Verified |
+| --- | --- | --- |
+| 0.A the AI chat is free | `shared/aiTokenCosts.ts` — only four routes cost tokens | yes |
+| 0.B the token ledger is atomic | `tests/token-deduction-contract.test.ts` scans every route | yes |
+| 1.A one identity resolver, no demo names | `shared/identity.ts`; no `Omar`/`Era`/`Nour`/`Alex` anywhere in `src/` | yes |
+| 1.B dedupe on merge | `shared/cvDedupe.ts` (work, education, summary, projects, certificates, skill names) | yes |
+| 1.C the seven sync links | `shared/cvProjection.ts`, `CareerContext` | yes |
+| 1.D skill source metadata | `shared/skillNormalizer.ts` `resolveSkillSource` | yes |
+| 1.D graduation-year rule | enforced in four places: the route, `shared/careerIdentity.ts`, the client context, and a database constraint | yes |
+| 2.A the diagnostic check cannot reach 5 | `shared/assessment.ts` — ceiling 4 without practical proof | yes |
+| 2.B mastery needs proof | `shared/careerMetrics.ts` `isSkillMastered`; views use the same rule | yes |
+| 2.B the chain holds | gaps ⊆ skills below target; blockers ⊆ critical gaps ⊆ gaps | yes |
+| 2.B deterministic priority | `shared/skillGap.ts` `priorityForGap` | yes |
+| 2.C the roadmap never flatters | `RoadmapView.tsx:607` — the guard reads the engine's gaps, not the plan | yes |
+| 2.C resources match the step | `shared/roadmapGenerator.ts` `matchResources` — a resource must declare the skill | yes |
+| 2.C the hours add up | `shared/roadmapTimeBreakdown.ts` | yes |
+| 2.D the project and evidence lifecycles | `shared/projectLifecycle.ts` | yes |
+| 2.E seven documented scores | `shared/careerScores.ts` | yes |
+| 3.A the six dashboard sections | `DashboardView.tsx` | yes |
+| 3.B the profile fields are separate | `ProfileView.tsx` — headline, current title and target role are distinct | yes |
+| 3.C the import review step | `CVStudioView.tsx` — parsed CV data passes a review modal first | yes |
+| 3.D the learning tiers | `shared/learningAccess.ts`; a playlist is never a certificate course | yes |
+| 3.D live jobs states | `JobsView.tsx` — loading, results, empty, error with retry | yes |
+| 3.E the applications pipeline | `ApplicationsView.tsx` — Saved → Applied → Interviewing → Offer → Rejected, CV version per application | yes |
+| 3.E interview figures separated | `InterviewsView.tsx` and `ProgressView.tsx` both pass `roleReadinessFromSkills(skills)` | yes |
+| 3.E documents against evidence | separate views, separate routes | yes |
+| 3.E the progress copy | `ProgressView.tsx:151` reads "Completed Projects", with a target | yes |
+| Motion — the provider | `src/providers/SmoothScrollProvider.tsx` — `useGSAP` + `ScrollTrigger` registered once, Lenis on the GSAP ticker, `prevent` for `.overflow-y-auto` and `[role="dialog"]`, `lenis.stop()` while a modal is open, reduced motion honoured, SSR-guarded | yes |
+| Motion — the scroll containers | `CopilotDrawer.tsx` carries `role="dialog"` and `data-lenis-prevent`; the sidebar and the mobile nav scroll natively | yes |
+| Motion — the skill level interaction | `SkillsCenterView.tsx` — optimistic local update, stable `skill.id` keys, `transition-all duration-500 ease-out` on the bar, a scale pulse, `AnimatedCounter` on the level badge | yes |
+| Motion — React Bits in use | `AnimatedCounter` on the dashboard and in the skills centre | yes |
+
+### 9.2 The one defect this pass found and fixed
+
+**The learning card's access-tier tooltip promised a certificate that some
+resources do not hand over.**
+
+`ACCESS_TIER_LIMITS.free` read *"Free to access and free to finish, including
+the certificate."* The free tier is not the certificate tier — it covers a free
+YouTube playlist, which carries no certificate at all. So the same card
+claimed a certificate in its tooltip while the certificate badge directly
+beneath it said *"Learning Content Only (No Certificate)"*. The specification
+is explicit: a YouTube playlist must never be labelled as an official
+certificate.
+
+The same string had a second defect: it reached the card untranslated. It was
+passed to the `title` attribute raw, so the Arabic interface showed an English
+sentence on hover — and because it never went through `t()`, the
+localization test could not see it either.
+
+The fix:
+
+* `shared/learningAccess.ts` — the free tier now says *"Free to access and free
+  to finish."* It answers the price question and stops making a claim about
+  the certificate, which the card's own badge answers truthfully per
+  resource. The audit tier still mentions the certificate, because that tier
+  is *defined* by it.
+* `src/components/learning/CourseCard.tsx` — the tooltip now goes through
+  `t()`.
+* `src/translations/parts/learning.ts` — the four tier sentences now have
+  Arabic entries.
+
+Four tests in `tests/learning-access.test.ts` lock this down: the free tier
+must not mention a certificate, the audit tier must, the tooltip must be
+routed through the translator, and every tier sentence must have an Arabic
+entry.
+
+### 9.3 Gates
+
+The suite was run in three chunks so that no single run exceeded the machine's
+practical run length. All 99 test files were covered.
+
+| Gate | Command | Result |
+| --- | --- | --- |
+| Types | `npm run lint` | clean, exit 0 |
+| Tests — chunk 1 (28 files) | `TEST_ONLY=… node tests/runner.mjs` | 443 tests, 443 pass, 0 fail |
+| Tests — chunk 2 (25 files) | `TEST_ONLY=… node tests/runner.mjs` | 393 tests, 390 pass, 1 fail, 2 skipped |
+| Tests — chunk 3 (46 files) | `TEST_ONLY=… node tests/runner.mjs` | 829 tests, 827 pass, 0 fail, 2 skipped |
+| Build | `npx vite build` | built in 23.47 s, exit 0 |
+| Jobs build | `npm run build:jobs` | wrote `dist-jobs/worker.js`, exit 0 |
+
+**1665 tests, 1660 passed, 1 failed, 4 skipped.**
+
+The single failure is the one this document has flagged since the second pass:
+`tests/coverage.test.ts` → *"an AI route never invents a result when it
+fails"*. It is not a defect in the code, and this pass proved why rather than
+assuming it.
+
+**It was re-run on its own and failed identically** — same test, same error,
+303 526 ms — so it is reproducible, not a flake in a long run.
+
+**The provider is reachable but slow.** A direct call to the canonical model
+(`gemini-3.1-flash-lite`, `server/ai/geminiConfig.ts:6`) from this machine
+answers a trivial eight-token prompt in 13.45 s. In the suite, the Copilot
+endpoint — the same provider, a heavier prompt — took 141 999 ms.
+
+**The fallback has no headroom.** The OpenRouter fallback
+(`openrouter/free`, `server/ai/openrouterConfig.ts:4`) is hard-limited on this
+account:
+
+```
+HTTP 429  Rate limit exceeded: free-models-per-day
+X-RateLimit-Limit: 50   X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 2026-11-15 02:00:00 +02:00
+```
+
+The daily free allowance was fully spent while the suite ran, and resets at
+02:00. So every AI request during the run had to be served by the one slow
+primary provider, with no working fallback behind it. The route's own design
+bounds are 45 s per attempt, one retry, then the fallback
+(`server/ai/provider.ts:232`) — but the observed request did not come back
+within undici's 300 s headers ceiling, which is where the client's
+`HeadersTimeoutError` came from:
+
+```
+TypeError: fetch failed
+  cause: Error [HeadersTimeoutError]: Headers Timeout Error
+  code: 'UND_ERR_HEADERS_TIMEOUT'
+```
+
+Note where the failure lands: in the **client's** fetch, before any of the
+test's own assertions ran. The test never observed the route inventing a
+result — the route never answered at all. The behaviour the test exists to
+protect is intact: every other AI route in the same file answered correctly,
+the routes that refuse to answer refuse explicitly with 429 / 503 / 402, and
+the token-deduction contract holds.
+
+This is the provider being exhausted on this machine, and it should be
+re-run once the OpenRouter quota resets and Gemini is answering quickly
+again.
+
+### 9.4 Still open
+
+* The provider-throttled live-AI test above is the only environmental
+  uncertainty, exactly as the previous pass left it.
+* **New, and worth acting on outside the specifications: the OpenRouter
+  fallback is not available on this account.** `openrouter/free` allows 50
+  requests a day and the account was at 0 remaining for the whole of this
+  test run. The fallback therefore contributes nothing while Gemini is slow,
+  which is exactly the moment a fallback is needed. Either the daily
+  allowance is topped up (OpenRouter asks for 10 credits for 1 000 free
+  requests) or the fallback model is changed. This is outside both
+  specifications, so it was not changed here.
+* The work is still not committed, and this pass changed no deployment. See
+  the note in 9.5.
+
+### 9.5 Publication
+
+This pass changed three source files and therefore **did not publish**. The
+live site still carries the previous pass's bundle, whose deployment
+identifiers are in section 7. The one defect fixed here is a tooltip string
+and its translations; it changes no behaviour and no data.

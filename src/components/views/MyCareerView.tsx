@@ -19,6 +19,7 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
+import { isSkillMastered } from '../../../shared/careerMetrics';
 import { MilestoneCategory, CareerGoal } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 
@@ -174,7 +175,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     {
       name: t('Skills Taxonomy'),
       status: skills.length >= 8 ? 'Complete' : 'Needs Improvement',
-      desc: `${skills.filter(s => s.gap === 0).length} ${t('of')} ${skills.length} ${t('mastered')}`,
+      desc: `${skills.filter(isSkillMastered).length} ${t('of')} ${skills.length} ${t('mastered')}`,
       view: 'skills'
     },
     {

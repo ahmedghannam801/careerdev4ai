@@ -51,6 +51,7 @@ import {
   effectiveSkillLevel,
   type SkillRecord as SkillEvidenceRecord,
 } from '../../shared/skillEvidence';
+import { resolveSkillSource } from '../../shared/skillNormalizer';
 import {
   computeSkillGaps,
   summarizeSkillGaps,
@@ -64,6 +65,7 @@ import {
   type TargetOpportunityType,
 } from '../../shared/careerIdentity';
 import { computeProfileCompleteness } from '../../shared/profileCompleteness';
+import { isSkillMastered } from '../../shared/careerMetrics';
 import {
   isActiveProjectStatus,
   isShippedStatus,
@@ -2066,7 +2068,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // hid the largest possible gap behind an optimistic number.
   const skills: UserSkill[] = useMemo(() => {
     const role = targetRole;
-    const catalogue: Array<{ name: string; category: SkillCategory; targetLevel: number }> = [];
+    const catalogue: Array<{
+      name: string;
+      category: SkillCategory;
+      targetLevel: number;
+      required: boolean;
+    }> = [];
 
     // No role means no role catalogue. The candidate's own skills still show,
     // but the platform must not ask them to rate the requirements of a role
@@ -2077,6 +2084,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         name: req.name,
         category: (req.category as SkillCategory) ?? 'technical',
         targetLevel: req.minLevel,
+        // A required skill counts towards role readiness whether the
+        // candidate has met it yet or not. That is what keeps the readiness
+        // figure from collapsing to zero the moment every requirement is met.
+        required: true,
       });
     }
     for (const pref of role?.preferredSkills ?? []) {
@@ -2085,6 +2096,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         name: pref.name,
         category: (pref.category as SkillCategory) ?? 'technical',
         targetLevel: pref.minLevel,
+        // A preferred skill is a stretch goal. It is shown, and its gap is
+        // shown, but it does not count towards readiness.
+        required: false,
       });
     }
 
@@ -2101,12 +2115,15 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         currentLevel: level,
         targetLevel: entry.targetLevel,
         gap: Math.max(0, entry.targetLevel - level),
-        source:
-          selfReported !== null
-            ? 'self_reported'
-            : assessed !== null
-              ? 'assessment'
-              : 'ai_estimated',
+        // The strongest source behind the level. The server resolves it the
+        // same way, so a skill backed by a verified project is never shown as
+        // a bare claim here.
+        source: resolveSkillSource({
+          selfReportedLevel: selfReported,
+          assessedLevel: assessed,
+          evidenceSources: record?.evidenceSources ?? [],
+        }),
+        required: entry.required,
         evidenceIds: [],
         lastUpdated: new Date().toISOString().split('T')[0],
         selfReportedLevel: selfReported,
@@ -3338,8 +3355,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const completedTasks = allTasks.filter((t) => t.status === 'completed').length;
 
     const dimensions = {
+      // A skill the candidate only claims is not a mastered skill, so it does
+      // not count towards confidence in the skill set.
       skillsConfidence: skills.length > 0
-        ? Math.round((skills.filter(s => s.gap === 0).length / skills.length) * 100)
+        ? Math.round((skills.filter(isSkillMastered).length / skills.length) * 100)
         : 0,
       evidenceCoverage: Math.min(100, evidenceItems.length * 25),
       roadmapVelocity: allTasks.length > 0
