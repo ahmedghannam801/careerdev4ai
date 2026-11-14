@@ -38,6 +38,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
         <motion.div
           role="dialog"
           aria-label={t('CareerDev4AI Copilot')}
+          data-lenis-prevent
           className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[440px]"
           variants={settings.language === 'ar' ? drawerLeftVariants(reduced) : drawerVariants(reduced)}
           initial="hidden"

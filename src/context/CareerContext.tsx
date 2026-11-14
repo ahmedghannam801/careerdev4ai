@@ -576,7 +576,7 @@ interface CareerContextType {
    * and it is what a CV may show.
    */
   ownedSkills: Array<{ name: string; level: number }>;
-  updateSkillLevel: (skillId: string, currentLevel: number) => void;
+  updateSkillLevel: (skillId: string, currentLevel: number) => Promise<boolean>;
   addCustomSkill: (skill: Omit<UserSkill, 'id' | 'gap' | 'lastUpdated'>) => void;
   removeSkill: (skillId: string) => void;
 
@@ -4427,19 +4427,28 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // ---- Skills ----
   //
-  // Skill levels are persisted per user in public.user_skills through
-  // /api/user-skills. The local state is only updated AFTER the server
-  // confirms the write, so the level the UI shows is the level that is stored
-  // (B.3.9, finding H-2).
-  //
-  // Every write is followed by a RECALCULATION. The server rebuilds the
-  // roadmap and recomputes the gap summary as part of answering, so a skill
-  // that now meets the role requirement leaves the blockers and the roadmap's
-  // opening steps on its own — there is no "Sync With Profile" step the user
-  // has to remember. The manual control is kept as a secondary fallback.
-  const updateSkillLevel = async (skillId: string, currentLevel: number) => {
+  // Skill levels are optimistically reflected in local state, then persisted
+  // per user through /api/user-skills. The server response remains authoritative
+  // and supplies the roadmap/readiness recalculation.
+  const updateSkillLevel = async (skillId: string, currentLevel: number): Promise<boolean> => {
     const skill = skills.find(s => s.id === skillId);
-    if (!skill) return;
+    if (!skill) return false;
+    const key = skill.name.toLowerCase();
+    const previous = skillEvidence[key];
+    const optimistic = buildSkillRecord({
+      name: skill.name,
+      category: skill.category,
+      targetLevel: skill.targetLevel,
+      selfReportedLevel: currentLevel,
+      assessedLevel: previous?.assessedLevel,
+      assessmentScore: previous?.assessmentScore,
+      assessmentAt: previous?.assessmentAt,
+      evidenceLevel: previous?.evidenceLevel,
+      evidenceSources: previous?.evidenceSources,
+    });
+    setSkillEvidence((prev) => ({ ...prev, [key]: optimistic }));
+    setSkillLevels((prev) => ({ ...prev, [key]: currentLevel }));
+
     try {
       const { skill: stored, recalculation } = await postUserSkill({
         name: skill.name,
@@ -4448,8 +4457,24 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
       applyStoredSkill(stored);
       applyRecalculation(recalculation);
+      return true;
     } catch (error) {
       console.error('Failed to persist skill level:', error);
+      setSkillEvidence((prev) => {
+        if (prev[key]?.selfReportedLevel !== currentLevel) return prev;
+        const next = { ...prev };
+        if (previous) next[key] = previous;
+        else delete next[key];
+        return next;
+      });
+      setSkillLevels((prev) => {
+        if (prev[key] !== currentLevel) return prev;
+        const next = { ...prev };
+        if (previous?.selfReportedLevel != null) next[key] = previous.selfReportedLevel;
+        else delete next[key];
+        return next;
+      });
+      return false;
     }
   };
 

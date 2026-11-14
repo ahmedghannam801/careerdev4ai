@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, CheckCircle2, X, Target } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { SKILL_CATEGORIES } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { SkillCategory, SkillSource, SkillEvidenceSource } from '../../types/career';
 import { Reveal } from '../motion/Motion';
+import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 import {
   computeSkillGaps,
   explainGap,
@@ -48,6 +49,12 @@ export const SkillsCenterView: React.FC = () => {
   const [skillError, setSkillError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useRouteParam<string>('category', SKILL_CATEGORIES, 'all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [pulsedSkillId, setPulsedSkillId] = useState<string | null>(null);
+  const pulseTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (pulseTimer.current !== null) window.clearTimeout(pulseTimer.current);
+  }, []);
 
   // New skill form state
   const [newSkillName, setNewSkillName] = useState('');
@@ -147,7 +154,7 @@ export const SkillsCenterView: React.FC = () => {
               {t('Role readiness')}
             </div>
             <div className="mt-1 text-2xl font-bold font-mono text-[var(--color-primary-text)]">
-              {gapAnalysis.summary.readinessPct}%
+              <AnimatedCounter value={gapAnalysis.summary.readinessPct} format={(value) => `${Math.round(value)}%`} />
             </div>
             <div className="text-[10px] text-[var(--text-muted)]">
               {t('of the role requirement set')}
@@ -226,9 +233,11 @@ export const SkillsCenterView: React.FC = () => {
             const evidenceRec = skillEvidence[skill.name.toLowerCase()];
 
             return (
-              <div 
+              <div
                 key={skill.id}
-                className="p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-4"
+                className={`p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ease-out ${
+                  pulsedSkillId === skill.id ? 'scale-[1.01] ring-2 ring-[var(--color-success-strong)]/30 shadow-lg' : ''
+                }`}
               >
                 {/* Skill Name & Metadata (Clean unboxed separators) */}
                 <div className="md:w-1/3 space-y-1">
@@ -267,7 +276,7 @@ export const SkillsCenterView: React.FC = () => {
                 <div data-tour="skill-rate-widget" className="md:w-1/3 space-y-1.5">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
                     <span className="text-[var(--text-primary)] font-semibold">
-                      {t('Current:')} {skill.currentLevel} / 5
+                      {t('Current:')} <AnimatedCounter value={skill.currentLevel} duration={0.35} /> / 5
                     </span>
                     {evidenceRec && (
                       <span className="text-[10px] text-[var(--text-muted)] font-sans">
@@ -298,7 +307,7 @@ export const SkillsCenterView: React.FC = () => {
                       .replace('{target}', String(skill.targetLevel))}
                   >
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${
+                      className={`h-full rounded-full transition-all duration-500 ease-out ${
                         skill.gap > 0
                           ? 'bg-[var(--color-primary)]'
                           : 'bg-[var(--color-success-strong)]'
@@ -320,17 +329,19 @@ export const SkillsCenterView: React.FC = () => {
                     value={skill.currentLevel}
                     onChange={(e) => {
                       const level = parseInt(e.target.value, 10);
-                      updateSkillLevel(skill.id, level);
-                      // The rating is saved on the server and the roadmap is
-                      // rebuilt from it, so the candidate is told what
-                      // happened rather than left watching a slider move.
-                      showToast({
-                        variant: 'success',
-                        title: t('Skill level saved.'),
-                        description: t('{skill} is now rated {level}/5. Your roadmap was rebuilt from it.').replace(
-                          '{skill}',
-                          skill.name
-                        ).replace('{level}', String(level)),
+                      setPulsedSkillId(skill.id);
+                      if (pulseTimer.current !== null) window.clearTimeout(pulseTimer.current);
+                      pulseTimer.current = window.setTimeout(() => setPulsedSkillId(null), 420);
+                      void updateSkillLevel(skill.id, level).then((saved) => {
+                        showToast({
+                          variant: saved ? 'success' : 'error',
+                          title: saved ? t('Skill level saved.') : t('Failed to save skill'),
+                          description: saved
+                            ? t('{skill} is now rated {level}/5. Your roadmap was rebuilt from it.')
+                                .replace('{skill}', skill.name)
+                                .replace('{level}', String(level))
+                            : t('Your previous skill level was restored. Please try again.'),
+                        });
                       });
                     }}
                     className="w-full accent-[var(--accent-primary)] cursor-pointer"

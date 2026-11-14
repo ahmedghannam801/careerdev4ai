@@ -28,6 +28,7 @@ import { MetricCard } from '../career/MetricCard';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
+import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -458,7 +459,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <MetricCard
             metricId="roleReadiness"
             label={t('Role readiness')}
-            value={`${metrics.roleReadinessPct}%`}
+            value={<AnimatedCounter value={metrics.roleReadinessPct} format={(value) => `${Math.round(value)}%`} />}
             hint={readinessLabel}
             metrics={metrics}
             tone="primary"
@@ -466,7 +467,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <MetricCard
             metricId="skillsMastered"
             label={t('Skills mastered')}
-            value={`${metrics.skillsMastered}/${metrics.skillsTotal}`}
+            value={<AnimatedCounter value={metrics.skillsMastered} format={(value) => `${Math.round(value)}/${metrics.skillsTotal}`} />}
             hint={t('mastered')}
             metrics={metrics}
             tone="success"
@@ -474,7 +475,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <MetricCard
             metricId="roadmapCompletion"
             label={t('Roadmap progress')}
-            value={`${metrics.roadmapCompleted}/${metrics.roadmapTotal}`}
+            value={<AnimatedCounter value={metrics.roadmapCompleted} format={(value) => `${Math.round(value)}/${metrics.roadmapTotal}`} />}
             hint={t('steps done')}
             metrics={metrics}
             tone="warning"

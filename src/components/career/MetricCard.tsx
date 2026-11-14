@@ -24,7 +24,7 @@ export interface MetricCardProps {
   /** The metric's display name. */
   label: string;
   /** The big number, already formatted for display. */
-  value: string;
+  value: React.ReactNode;
   /** The small caption under the number. */
   hint?: string;
   /** The metrics the explanation is computed from. */

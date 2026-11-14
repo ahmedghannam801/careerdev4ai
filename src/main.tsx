@@ -3,6 +3,7 @@ import App from './App.tsx';
 import './index.css';
 import { startNativeBridge } from './lib/nativeBridge';
 import { initializeAnalytics } from './lib/analytics';
+import { SmoothScrollProvider } from './providers/SmoothScrollProvider';
 
 // On the web this does nothing. On Android it wires the back button, the
 // external links and the OAuth deep link into the native shell.
@@ -13,4 +14,8 @@ startNativeBridge();
 // is known — see `src/lib/analytics.ts`.
 initializeAnalytics();
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <SmoothScrollProvider>
+    <App />
+  </SmoothScrollProvider>
+);
