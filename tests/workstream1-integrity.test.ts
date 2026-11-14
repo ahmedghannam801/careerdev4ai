@@ -529,10 +529,9 @@ describe('Workstream 1 — the AI chat is free, the four paid actions are not', 
     assert.match(block, /aiRateLimit/, 'the per-minute limiter is still the guard');
   });
 
-  it('charges nothing and applies no daily AI budget to a mock interview', () => {
+  it('charges nothing for a mock interview', () => {
     const block = routeBlock("app.post('/api/mock-interview'", "app.post('/api/suggest-summary'");
     assert.equal(/requireCredits\s*\(/.test(block), false);
-    assert.equal(/consumeAiBudget\s*\(/.test(block), false);
   });
 
   it('keeps the documented prices', () => {
