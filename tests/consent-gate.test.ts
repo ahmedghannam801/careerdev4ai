@@ -56,6 +56,16 @@ describe('the consent gate', () => {
       assert.equal(blocked.body?.privacyVersion, PRIVACY_VERSION);
     }
 
+    const legacyRead = await api('GET', '/api/state', { token: user.token });
+    assert.equal(legacyRead.status, 403);
+    assert.equal(legacyRead.body?.code, 'CONSENT_REQUIRED');
+    const legacyWrite = await api('POST', '/api/state', {
+      token: user.token,
+      body: { profile: { full_name: 'Blocked update' } },
+    });
+    assert.equal(legacyWrite.status, 403);
+    assert.equal(legacyWrite.body?.code, 'CONSENT_REQUIRED');
+
     // The consent endpoint itself stays reachable: it is how the client
     // learns which versions are missing.
     const state = await api('GET', '/api/consent', { token: user.token });

@@ -16,7 +16,6 @@ import multer from 'multer';
 // in Node and in the Workers runtime. The Node build pulls in authentication
 // code that is useless here and cannot be bundled for Cloudflare.
 import { GoogleGenAI } from '@google/genai/web';
-import { verifySupabaseToken } from './server/auth/supabase-auth.ts';
 import { normalizeTargetOpportunityType } from './shared/careerIdentity.ts';
 import {
   assessDocumentQuality,
@@ -931,14 +930,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
 // certifications, languages, links, career identity, saved roles, job
 // applications, interviews, activities, secondary goals, milestones, cover
 // letters) is read from ITS OWN table, never from this payload.
-app.get('/api/state', async (req: Request, res: Response) => {
+app.get('/api/state', requireAuth, async (req: Request, res: Response) => {
   try {
-    // Authoritative identity: verified Supabase Auth token only.
-    const auth = await verifySupabaseToken(req.headers.authorization);
-    if (auth.status !== 'valid') {
-      return res.status(401).json({ error: 'Invalid or missing session' });
-    }
-    const state = await loadState(auth.userId);
+    const state = await loadState((req as AuthedRequest).authUser!.id);
     return res.json({ success: true, state });
   } catch (error) {
     console.error('Error reading state:', error);
@@ -960,20 +954,16 @@ app.get('/api/state', async (req: Request, res: Response) => {
 // preferences columns. It NEVER replaces a collection: the collection-owning
 // fields are reported as unmapped so the caller can see they were not applied,
 // and the caller must use the dedicated endpoints for them.
-app.post('/api/state', async (req: Request, res: Response) => {
+app.post('/api/state', requireAuth, async (req: Request, res: Response) => {
   try {
-    // Authoritative identity: verified Supabase Auth token only.
-    const auth = await verifySupabaseToken(req.headers.authorization);
-    if (auth.status !== 'valid') {
-      return res.status(401).json({ error: 'Invalid or missing session' });
-    }
+    const userId = (req as AuthedRequest).authUser!.id;
     const stateData = req.body || {};
     const unmapped = unmappedStateFields(stateData);
     if (unmapped.length > 0) {
       // Report, never silently drop.
       console.warn('Unmapped state fields (no column in current schema):', unmapped.join(', '));
     }
-    const { unmappedCollections } = await saveState(auth.userId, stateData);
+    const { unmappedCollections } = await saveState(userId, stateData);
     if (unmappedCollections.length > 0) {
       // These collections are owned by their own endpoints. They are reported
       // so the caller knows they were NOT applied here — this endpoint never
