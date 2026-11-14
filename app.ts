@@ -2439,7 +2439,6 @@ Return JSON schema:
             'Interview evaluation returned an invalid response. No feedback was accepted; please try again shortly.',
         });
       }
-      markAiCreditCompleted(req as AuthedRequest);
       return res.json(payload);
     } catch (e) {
       // A fabricated score and a fabricated "model answer" would teach the
