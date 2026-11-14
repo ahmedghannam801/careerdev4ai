@@ -488,7 +488,30 @@ again.
 
 ### 9.5 Publication
 
-This pass changed three source files and therefore **did not publish**. The
-live site still carries the previous pass's bundle, whose deployment
-identifiers are in section 7. The one defect fixed here is a tooltip string
-and its translations; it changes no behaviour and no data.
+This pass changed three source files and therefore **did publish**.
+
+| Target | Identifier | Status |
+| --- | --- | --- |
+| Cloudflare Pages (`careerdev4ai`, branch `main`) | `64845edb-05ec-4813-939e-dc7b199a831e` — <https://64845edb.careerdev4ai.pages.dev> | live |
+| Production alias | <https://careerdev4ai.pages.dev> | serving the new bundle |
+| Source commit | `1873111` — all 19 files from both passes | committed on `main` |
+
+The build's own guard passed before the upload: *"the bundle carries the public
+Supabase configuration and all 4 sign-in methods"*.
+
+The live site was then checked, not assumed:
+
+* `https://careerdev4ai.pages.dev/` answers 200 and serves the entry chunk
+  `assets/index-DkYIDRth.js` — the exact chunk this build produced.
+* `https://careerdev4ai.pages.dev/api/health` answers 200 with
+  `{"status":"ok","modelConfigured":true,"modelName":"gemini-3.1-flash-lite"}`.
+* The deployed bundle was downloaded and searched. The corrected sentence
+  *"Free to access and free to finish."* is present, its Arabic translation
+  *مجاني الوصول وإكماله.* is present, and the old overclaiming sentence
+  *"…including the certificate"* is **gone** from the bundle.
+
+The Jobs Worker was not redeployed: nothing in this pass touched
+`worker/jobs`, and it remains on version `98652694` from the previous pass.
+
+The work is now committed. `main` is one commit ahead of the source the
+previous pass published, and the live site matches `1873111`.
