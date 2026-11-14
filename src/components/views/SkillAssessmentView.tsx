@@ -404,7 +404,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
         prompt: 'Which phrase is most appropriate for a polite, professional follow-up email to a hiring team?',
         options: [
           'Why haven\'t you replied to my application yet?',
-          'I am writing to politely inquire about the status of my application for the Software Engineer position.',
+          'I am writing to politely inquire about the status of my application for the position.',
           'Check my CV again.',
           'Hoping you will hire me soon.',
         ],
