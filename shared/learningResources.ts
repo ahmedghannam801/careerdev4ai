@@ -116,6 +116,13 @@ export function deriveResourceType(input: {
   const title = (input.title ?? '').toLowerCase();
   const format = (input.format ?? '').toLowerCase();
 
+  // An official professional certificate programme is a course that hands
+  // over a certificate — not a playlist of lessons, even when the
+  // provider's own link happens to point at one. Calling the Google Data
+  // Analytics Certificate a "YouTube Playlist" told the learner the wrong
+  // thing about what they were signing up for.
+  if (format === 'professional_certificate') return 'course';
+
   if (isYoutubePlaylist(input.url)) return 'video_playlist';
   if (youtubeVideoId(input.url)) {
     return format === 'playlist' ? 'video_playlist' : 'video_course';

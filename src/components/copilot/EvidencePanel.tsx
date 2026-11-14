@@ -34,6 +34,7 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ onNavigate }) => {
     evidenceItems,
     applications,
     profile,
+    identity,
     t,
   } = useCareer();
 
@@ -164,7 +165,7 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ onNavigate }) => {
           )}
 
           <p className="text-[10px] leading-relaxed text-[var(--text-muted)]">
-            {t('Account')}: {profile.name}
+            {t('Account')}: {identity.displayName}
           </p>
         </div>
       )}

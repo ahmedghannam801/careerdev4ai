@@ -615,3 +615,104 @@ export function getIndustryVisual(identifier: string | null | undefined): Platfo
   return PLATFORM_ASSETS['software-engineering'];
 }
 
+/**
+ * Resolves the visual that genuinely belongs to this identifier, or null.
+ *
+ * `getIndustryVisual` falls back to the software-engineering photograph,
+ * which is right for a page that must always show something and wrong for a
+ * card that claims to depict a specific subject. Four assessment cards —
+ * Excel, Communication, English and SQL — all wore that one photograph,
+ * which told the candidate they were all the same thing.
+ *
+ * A caller that can live without a photograph asks this instead, and renders
+ * its own badge when the answer is "there is no picture of this".
+ */
+export function getSpecificIndustryVisual(
+  identifier: string | null | undefined
+): PlatformVisualAsset | null {
+  if (!identifier) return null;
+
+  const raw = identifier.trim().toLowerCase();
+  if (!raw) return null;
+  const slug = raw.replace(/[_\s]+/g, '-');
+
+  // An exact asset id is always specific.
+  if (PLATFORM_ASSETS[slug]) return PLATFORM_ASSETS[slug];
+
+  // The skills that used to share the software-engineering photograph.
+  const SKILL_VISUALS: Record<string, string> = {
+    sql: 'data-analysis',
+    'sql fundamentals': 'data-analysis',
+    excel: 'data-analysis',
+    spreadsheet: 'data-analysis',
+    powerbi: 'data-analysis',
+    'power bi': 'data-analysis',
+    tableau: 'data-analysis',
+    statistics: 'data-analysis',
+    communication: 'human-resources',
+    'business communication': 'business-admin',
+    english: 'education',
+    'english proficiency': 'education',
+    writing: 'education',
+    grammar: 'education',
+    python: 'software-engineering',
+    javascript: 'software-engineering',
+    typescript: 'software-engineering',
+    react: 'frontend',
+    frontend: 'frontend',
+    backend: 'backend',
+    node: 'backend',
+    'node.js': 'backend',
+    'data analysis': 'data-analysis',
+    'data analytics': 'data-analysis',
+    'digital marketing': 'digital-marketing',
+    seo: 'digital-marketing',
+    'project management': 'project-management',
+    agileproject: 'project-management',
+    agile: 'project-management',
+    'human resources': 'human-resources',
+    hr: 'human-resources',
+    cybersecurity: 'cybersecurity',
+    cloud: 'cloud',
+    aws: 'cloud',
+    devops: 'devops',
+    'machine learning': 'data-science',
+    'artificial intelligence': 'ai',
+    'user experience': 'ui-ux',
+    ux: 'ui-ux',
+    ui: 'ui-ux',
+    graphic: 'ui-ux',
+  };
+
+  const direct = SKILL_VISUALS[raw] ?? SKILL_VISUALS[slug];
+  if (direct && PLATFORM_ASSETS[direct]) return PLATFORM_ASSETS[direct];
+
+  // A domain slug resolves to the visual that represents it.
+  const DOMAIN_VISUALS: Record<string, string> = {
+    data: 'data-analysis',
+    technology: 'software-engineering',
+    design: 'ui-ux',
+    product: 'project-management',
+    business: 'business-admin',
+    finance: 'finance',
+    marketing: 'digital-marketing',
+    sales: 'sales',
+    'human-resources': 'human-resources',
+    healthcare: 'healthcare',
+    engineering: 'engineering',
+    education: 'education',
+    legal: 'legal',
+    operations: 'operations',
+    security: 'cybersecurity',
+  };
+  const domain = DOMAIN_VISUALS[raw];
+  if (domain && PLATFORM_ASSETS[domain]) return PLATFORM_ASSETS[domain];
+
+  // A partial match on the skill's words.
+  for (const [skill, assetId] of Object.entries(SKILL_VISUALS)) {
+    if (raw.includes(skill) && PLATFORM_ASSETS[assetId]) return PLATFORM_ASSETS[assetId];
+  }
+
+  return null;
+}
+

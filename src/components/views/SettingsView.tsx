@@ -60,6 +60,7 @@ const getClientLabel = (): string => {
 export const SettingsView: React.FC = () => {
   const {
     profile,
+    identity,
     updateProfile,
     settings, 
     updateSettings, 
@@ -382,7 +383,7 @@ export const SettingsView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('User Name')}</span>
-                <p className="font-semibold text-[var(--text-primary)]">{profile.name}</p>
+                <p className="font-semibold text-[var(--text-primary)]">{identity.displayName}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">

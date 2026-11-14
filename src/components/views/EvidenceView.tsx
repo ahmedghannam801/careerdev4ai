@@ -111,10 +111,10 @@ export const EvidenceView: React.FC = () => {
           }
           description={
             evidenceItems.length === 0
-              ? t('Evidence is what turns a claim into proof. Add a repository, a live demo, a certificate or an assessment, and the skills it covers count towards your gaps.')
+              ? t('Evidence is what turns a claim into proof. Add a repository, a live demo, a certificate or an assessment, and the skills it covers count towards your gaps. Once it is validated, the linked skill’s practical level rises and your Role Readiness goes up by the exact amount.')
               : t('Try another type, or add evidence of this kind.')
           }
-          actionLabel={evidenceItems.length === 0 ? t('Add your first evidence') : undefined}
+          actionLabel={evidenceItems.length === 0 ? t('+ Submit Skill Evidence') : undefined}
           onAction={evidenceItems.length === 0 ? () => setShowAddModal(true) : undefined}
         />
       ) : (

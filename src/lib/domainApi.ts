@@ -68,6 +68,7 @@ export async function postActivity(input: {
   subtitle?: string;
   relatedObject?: string;
   linkView?: string;
+  idempotencyKey?: string;
 }): Promise<ActivityDTO> {
   const data = await request<{ success: boolean; activity: ActivityDTO }>('/api/activities', {
     method: 'POST',

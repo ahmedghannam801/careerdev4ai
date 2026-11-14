@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
-  BookOpen,
   Briefcase,
   Calendar,
   CheckCircle2,
@@ -11,26 +10,24 @@ import {
   Clock,
   FileText,
   FolderGit2,
-  HeartHandshake,
-  Languages,
+  LayoutGrid,
   PlayCircle,
   ShieldCheck,
   Sparkles,
   Square,
   Target,
   TrendingUp,
+  Zap,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
-import { AnimatedProgress } from '../motion/AnimatedProgress';
-import { CountUp } from '../motion/CountUp';
+import { computeCareerMetrics, type CareerJourneyStage } from '../../../shared/careerMetrics';
 import { EmptyState } from '../ui/EmptyState';
-import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
-import { WhyWeRecommend } from '../ui/WhyWeRecommend';
+import { CareerJourneyStepper } from '../career/CareerJourneyStepper';
+import { MetricCard } from '../career/MetricCard';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
-import { CareerImage } from '../ui/CareerImage';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -87,11 +84,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     careerHealth,
     cvVersions,
     learningRecommendations,
+    learningItems,
     evidenceItems,
     interviewSessions,
     visibleNotifications,
     markNotificationRead,
     recordNotificationClick,
+    identity,
     t,
   } = useCareer();
 
@@ -111,51 +110,156 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     (task) => task.status !== 'completed' && task.status !== 'skipped'
   );
   const nextTask = pendingTasks[0];
-  const totalTasks = allTasks.length;
-  const completedTasks = allTasks.filter((task) => task.status === 'completed').length;
-  const masteredSkillsCount = skills.filter((skill) => skill.gap === 0).length;
   const activeApplications = applications.filter(
     (application) => !['rejected', 'withdrawn', 'offer'].includes(application.stage)
   );
-  const interviewCount = applications.filter((application) =>
-    ['interview', 'technical', 'final'].includes(application.stage)
-  ).length;
-  const activeProject = projects.find((project) => project.status === 'in_progress') || projects[0];
-  const topLearning = learningRecommendations[0];
 
-  const readiness = Math.round(analysis.matchPercentage);
+  // How much of the candidate's learning is actually finished. A course that
+  // was only saved is not progress.
+  const completedLearningCount = useMemo(
+    () => learningItems.filter((item) => item.status === 'completed').length,
+    [learningItems]
+  );
+
+  /* --------------------------------------------------------------------
+   * THE ONE SET OF NUMBERS
+   *
+   * The Dashboard used to compute its own readiness, its own skills-mastered
+   * count and its own roadmap progress, each with its own formula. The
+   * Career Journey page computed a fourth set. The candidate was told four
+   * different numbers for the same thing.
+   *
+   * Everything below now comes from the Career Intelligence Engine, so the
+   * Dashboard shows the same figures as the Skills Center, the Roadmap and
+   * the Career Journey — and every one of them can explain itself.
+   * -------------------------------------------------------------------- */
+  const metrics = useMemo(
+    () =>
+      computeCareerMetrics({
+        skills: skills.map((skill) => ({
+          name: skill.name,
+          currentLevel: skill.currentLevel,
+          targetLevel: skill.targetLevel,
+          // A skill the candidate still has below its target is treated as a
+          // required skill of the role, because that is exactly what the
+          // platform compares them against.
+          importance: skill.gap > 0 ? 'high' : 'medium',
+          required: skill.gap > 0,
+        })),
+        roadmapTasks: allTasks.map((task) => ({
+          id: task.id,
+          status: task.status,
+          skillName: task.skillName ?? null,
+        })),
+        journey: {
+          profile: { complete: Boolean(profile?.name && targetRole) },
+          assessment: { attempted: skills.some((skill) => skill.assessedLevel != null) },
+          learning: {
+            started: learningRecommendations.length > 0,
+            completedCourses: completedLearningCount,
+            totalCourses: learningRecommendations.length,
+          },
+          projects: {
+            completed: projects.filter((project) => project.status === 'completed').length,
+            target: 2,
+          },
+          apply: { applications: activeApplications.length, target: 1 },
+        },
+        blockingSkillNames: allTasks
+          .filter((task) => task.status !== 'completed' && task.status !== 'skipped')
+          .map((task) => task.skillName)
+          .filter((name): name is string => Boolean(name)),
+        careerGoal: targetRole?.title ?? null,
+      }),
+    [
+      skills,
+      allTasks,
+      profile?.name,
+      targetRole,
+      completedLearningCount,
+      learningRecommendations.length,
+      projects,
+      activeApplications.length,
+    ]
+  );
+
+  /**
+   * The one next step.
+   *
+   * It is driven by the highest-priority skill gap rather than by whichever
+   * roadmap task happens to be first in the list, because the gap is what the
+   * candidate is actually short of and what the recommendation is for.
+   */
+  const priorityGap = metrics.gaps[0] ?? null;
+
+  const gapLearning = useMemo(() => {
+    if (!priorityGap) return null;
+    const needle = priorityGap.name.toLowerCase();
+    return (
+      learningRecommendations.find(
+        (recommendation) =>
+          recommendation.course.title.toLowerCase().includes(needle) ||
+          recommendation.matchedSkills.some((skill) => skill.toLowerCase().includes(needle))
+      ) ?? null
+    );
+  }, [priorityGap, learningRecommendations]);
+
+  const nextStep = useMemo(() => {
+    if (priorityGap) {
+      const recommended = gapLearning?.course.title ?? analysis.nextBestAction?.title ?? null;
+      return {
+        title: `${t('Improve your')} ${priorityGap.name} ${t('Skills')}`,
+        description: priorityGap.reason,
+        reason: priorityGap.blocker
+          ? `${t('Why this')}: ${priorityGap.reason}`
+          : recommended
+            ? `${t('Recommended')}: ${recommended}`
+            : priorityGap.reason,
+        hours: gapLearning?.course.durationHours ?? null,
+        skill: priorityGap.name,
+        currentLevel: priorityGap.currentLevel,
+        targetLevel: priorityGap.targetLevel,
+        recommended,
+        view: gapLearning ? 'learning' : 'skills',
+      };
+    }
+
+    if (nextTask) {
+      return {
+        title: nextTask.title,
+        description: nextTask.description,
+        reason:
+          nextTask.rationale ??
+          `${t('This is the first unfinished step in your roadmap for')} ${targetRole?.title ?? ''}.`,
+        hours: nextTask.estimatedHours ?? null,
+        skill: nextTask.skillName ?? null,
+        currentLevel: null as number | null,
+        targetLevel: null as number | null,
+        recommended: null as string | null,
+        view: 'roadmap',
+      };
+    }
+
+    return {
+      title: t('Review your plan'),
+      description: t('Open your roadmap and confirm the next step.'),
+      reason: t('Your roadmap has no unfinished step right now.'),
+      hours: null as number | null,
+      skill: null as string | null,
+      currentLevel: null as number | null,
+      targetLevel: null as number | null,
+      recommended: null as string | null,
+      view: 'roadmap',
+    };
+  }, [priorityGap, gapLearning, nextTask, analysis.nextBestAction, targetRole, t]);
+
+  const readiness = metrics.roleReadinessPct;
   const readinessLabel =
     readiness >= 80 ? t('Ready to apply') : readiness >= 55 ? t('Almost there') : t('Building foundations');
 
   // The certifications the user actually has on file. It is a count of real
   // records — never a default.
   const certificationCount = profile?.certifications?.length ?? 0;
-
-  const nextStep = nextTask
-    ? {
-        title: nextTask.title,
-        description: nextTask.description,
-        reason:
-          nextTask.rationale ??
-          `${t('This is the first unfinished step in your roadmap for')} ${targetRole?.title ?? ''}.`,
-        hours: nextTask.estimatedHours,
-        skill: nextTask.skillName ?? null,
-      }
-    : analysis.nextBestAction
-      ? {
-          title: analysis.nextBestAction.title,
-          description: analysis.nextBestAction.description,
-          reason: analysis.nextBestAction.reason,
-          hours: null as number | null,
-          skill: null as string | null,
-        }
-      : {
-          title: t('Review your plan'),
-          description: t('Open your roadmap and confirm the next step.'),
-          reason: t('Your roadmap has no unfinished step right now.'),
-          hours: null as number | null,
-          skill: null as string | null,
-        };
 
   const interviewMilestones: MilestoneEntry[] = applications
     .filter((application) => ['interview', 'technical', 'final'].includes(application.stage))
@@ -185,6 +289,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     }));
 
   const upcomingMilestones = [...interviewMilestones, ...deadlineMilestones];
+
+  /**
+   * The greeting follows the candidate's own clock.
+   *
+   * "Good morning" at 9am and "Good evening" at 8pm is a small thing, but the
+   * Dashboard opens with this line, and it is the difference between a page
+   * that knows who is looking at it and a template.
+   */
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return t('Good morning');
+    if (hour < 18) return t('Good afternoon');
+    return t('Good evening');
+  }, [t]);
 
   return (
     <div className="space-y-6">
@@ -239,204 +357,169 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         </section>
       )}
 
-      {/* The tour can be repeated at any time; restarting begins at step one. */}
-      <section className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">{t('Getting started')}</h2>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">
-            {t('Repeat the full product tour from the beginning. You can leave it at any time.')}
+      {/* The header says who you are, where you are going and what you are
+          doing about it — in three lines. The old header spent a whole band on
+          a "Switch Target Role" button and a large token banner, which pushed
+          the actual content below the fold. The token reward now lives in the
+          header's balance badge, where it belongs. */}
+      <header
+        data-tour="dashboard-greeting"
+        className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-5 sm:flex-row sm:items-start sm:justify-between"
+      >
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+            {greeting}, {identity.displayName}
+          </h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            <span className="font-semibold text-[var(--text-primary)]">
+              {t('Your Career Goal')}:
+            </span>{' '}
+            {targetRole?.title ?? t('Not set yet')}
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+            {readinessLabel}
+            {targetRole?.category ? ` · ${targetRole.category}` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            window.dispatchEvent(new CustomEvent('careerdev4ai:open-tour', { detail: { restart: true } }));
-          }}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
-          {t('Repeat tour from the beginning')}
-        </button>
-      </section>
-
-      {/* Greeting: one sentence, one target. */}
-      <div data-tour="dashboard-greeting" className="flex flex-col gap-3 border-b border-[var(--border-subtle)] pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-xs text-[var(--text-secondary)]">
-            {t('Welcome back')}, {profile.name}
-          </div>
-          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-            {targetRole
-              ? `${t('Your next move for')} ${targetRole.title}`
-              : t('Choose your target role to get your plan')}
-          </h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onNavigate('profile')}
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
-          >
-            {targetRole ? t('Switch Target Role') : t('Set my target role')}
-          </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The daily reward sits beside the balance the topbar shows. It is
+              the same widget as the one inside that badge, so the platform
+              never states two different opinions about today's tokens. */}
+          <DailyTokenClaim variant="compact" />
           <button
             type="button"
             onClick={onOpenCopilot}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
           >
             <Sparkles className="h-3.5 w-3.5" />
             <span>{t('Ask Copilot')}</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* The daily token reward.
-          *
-          * It sits directly under the greeting, before the numbered journey
-          * below, because it is the one thing on this page the candidate can
-          * act on in five seconds and see something for. Everything further
-          * down is a piece of the career; this is a piece of the platform, and
-          * it is the platform's way of saying "come back tomorrow".
-          *
-          * The widget is the same one the balance badge and the pricing page
-          * use, so the dashboard and the header cannot disagree about whether
-          * today's tokens have been claimed. */}
-      <DailyTokenClaim />
+      {/* The getting-started banner is for a candidate who has not started.
+          It used to be on every dashboard, which meant it was noise for
+          everyone else. */}
+      {!profile.onboardingCompleted && (
+        <section className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">{t('Getting started')}</h2>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {t('Complete your profile and take your first assessment to build your plan.')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate('profile')}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--accent-primary)] px-3 py-2 text-xs font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)]"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {t('Set up my profile')}
+          </button>
+        </section>
+      )}
 
-      {/* 1. Where am I? */}
+      {/* SECTION 1 — YOUR CAREER OVERVIEW
+          *
+          * Three numbers, one row, each one able to explain itself. The
+          * candidate does not have to guess what "77%" is made of: pressing
+          * any of them shows the definition, the formula and their own
+          * arithmetic.
+          *
+          * These are the same numbers the Career Journey, the Skills Center
+          * and the Roadmap show, because they all come from the Career
+          * Intelligence Engine. */}
       <section
         data-tour="dashboard-target-role"
-        aria-labelledby="dashboard-where"
+        aria-labelledby="dashboard-overview"
         className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs"
       >
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-4 min-w-0">
-            <CareerImage
-              category={targetRole?.title ?? ''}
-              size="sm"
-              aspectRatio="square"
-              rounded="rounded-2xl"
-              className="hidden h-16 w-16 shrink-0 border border-[var(--border-subtle)] object-cover shadow-xs sm:block"
-            />
-            <div className="min-w-0 space-y-2">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                <Target className="h-3 w-3" />
-                {t('Where you are')}
-              </div>
-              {targetRole ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 id="dashboard-where" className="text-lg font-bold text-[var(--text-primary)]">
-                      {targetRole.title}
-                    </h2>
-                    <span className="rounded-full bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]">
-                      {readinessLabel}
-                    </span>
-                  </div>
-                  <p className="max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
-                    {t('Readiness is measured against the real requirements of this role, not against a generic template.')}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h2 id="dashboard-where" className="text-lg font-bold text-[var(--text-primary)]">
-                    {t('No target role yet')}
-                  </h2>
-                  <p className="max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
-                    {t(
-                      'Pick the role you are aiming at and everything below — your roadmap, your skill gaps, your learning plan and your job matches — is built around it.'
-                    )}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('profile')}
-                    className="mt-1 inline-flex items-center gap-2 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
-                  >
-                    <Target className="h-3.5 w-3.5" />
-                    {t('Set my target role')}
-                  </button>
-                </>
-              )}
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            <Target className="h-3 w-3" />
+            <h2 id="dashboard-overview">{t('Your career overview')}</h2>
           </div>
-
-          <div className="w-full shrink-0 lg:w-72" data-guide="readiness">
-            <div className="flex items-end justify-between">
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
-                {t('Role readiness')}
-                <ScoreInfoTooltip score="roleReadiness" value={readiness} />
-              </span>
-              <span className="font-mono text-2xl font-bold tabular-nums text-[var(--text-primary)]">
-                <CountUp value={readiness} format={(value) => `${Math.round(value)}%`} />
-              </span>
-            </div>
-            <div className="mt-2">
-              <AnimatedProgress
-                value={readiness}
-                label={t('Role readiness match')}
-                fillClassName="bg-[var(--color-primary)]"
-              />
-            </div>
-          </div>
+          {targetRole ? (
+            <span className="rounded-full bg-[var(--accent-surface)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]">
+              {targetRole.title}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onNavigate('profile')}
+              className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)]"
+            >
+              {t('Set my target role')}
+            </button>
+          )}
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              {t('Skills')}
-            </div>
-            <div className="mt-0.5 font-mono text-sm font-bold text-[var(--text-primary)]">
-              {masteredSkillsCount}/{skills.length}
-            </div>
-            <div className="text-[10px] text-[var(--text-muted)]">{t('mastered')}</div>
-          </div>
-          <div data-tour="dashboard-roadmap-summary">
-            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              {t('Roadmap')}
-            </div>
-            <div className="mt-0.5 font-mono text-sm font-bold text-[var(--text-primary)]">
-              {completedTasks}/{totalTasks}
-            </div>
-            <div className="text-[10px] text-[var(--text-muted)]">{t('steps done')}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              {t('Applications')}
-            </div>
-            <div className="mt-0.5 font-mono text-sm font-bold text-[var(--text-primary)]">
-              {activeApplications.length}
-            </div>
-            <div className="text-[10px] text-[var(--text-muted)]">
-              {interviewCount > 0 ? `${interviewCount} ${t('interviews')}` : t('active')}
-            </div>
-          </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <MetricCard
+            metricId="roleReadiness"
+            label={t('Role readiness')}
+            value={`${metrics.roleReadinessPct}%`}
+            hint={readinessLabel}
+            metrics={metrics}
+            tone="primary"
+          />
+          <MetricCard
+            metricId="skillsMastered"
+            label={t('Skills mastered')}
+            value={`${metrics.skillsMastered}/${metrics.skillsTotal}`}
+            hint={t('mastered')}
+            metrics={metrics}
+            tone="success"
+          />
+          <MetricCard
+            metricId="roadmapCompletion"
+            label={t('Roadmap progress')}
+            value={`${metrics.roadmapCompleted}/${metrics.roadmapTotal}`}
+            hint={t('steps done')}
+            metrics={metrics}
+            tone="warning"
+          />
         </div>
 
-        {analysis.criticalGaps.length > 0 && (
+        {/* The gaps, with the classification explained. Every badge says why
+            it is critical or blocking. */}
+        {metrics.gaps.length > 0 ? (
           <div data-guide="skill-gaps" className="mt-4 border-t border-[var(--border-subtle)] pt-3">
             <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              {t('Primary Skill Gaps')}
+              {t('Your skill gaps')}
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {analysis.criticalGaps.slice(0, 3).map((gap) => (
+              {metrics.gaps.slice(0, 4).map((gap) => (
                 <button
-                  key={gap.skill}
+                  key={gap.name}
                   type="button"
                   onClick={() => onNavigate('skills')}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 px-2.5 py-1 text-[10px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--accent-primary)]"
+                  title={gap.reason}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                    gap.blocker
+                      ? 'border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 text-[var(--text-primary)]'
+                      : gap.critical
+                        ? 'border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 text-[var(--text-primary)]'
+                        : 'border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 text-[var(--text-primary)]'
+                  } hover:border-[var(--accent-primary)]`}
                 >
-                  <span>{gap.skill}</span>
+                  <span>{gap.name}</span>
                   <span className="font-mono text-[var(--text-muted)]">
-                    {gap.current}/{gap.target}
+                    {gap.currentLevel}/{gap.targetLevel}
                   </span>
                 </button>
               ))}
             </div>
           </div>
-        )}
+        ) : null}
       </section>
 
-      {/* 2. What is next? Exactly one step. */}
+      {/* SECTION 2 — YOUR NEXT STEP
+          *
+          * The most prominent card on the page, because it is the only thing
+          * on the page the candidate can act on. It is driven by their
+          * highest-priority skill gap, and it shows the two numbers that
+          * define that gap: where they are and where they need to be. */}
       <section
         aria-labelledby="dashboard-next"
         data-guide="next-action"
@@ -446,25 +529,53 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <div className="max-w-2xl space-y-2.5">
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
               <Sparkles className="h-3.5 w-3.5" />
-              {t('Your next step')}
+              <span>{t('Your next step')}</span>
             </div>
             <h2 id="dashboard-next" className="text-xl font-bold text-[var(--text-primary)]">
               {nextStep.title}
             </h2>
+
+            {/* The two numbers that define the gap, side by side. */}
+            {nextStep.currentLevel !== null && nextStep.targetLevel !== null ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 px-2.5 py-1.5 text-xs text-[var(--text-secondary)]">
+                  {t('Your current level')}:
+                  <span className="font-mono font-bold text-[var(--text-primary)]">
+                    {nextStep.currentLevel}/5
+                  </span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 px-2.5 py-1.5 text-xs text-[var(--text-secondary)]">
+                  {t('Target level')}:
+                  <span className="font-mono font-bold text-[var(--text-primary)]">
+                    {nextStep.targetLevel}/5
+                  </span>
+                </span>
+                {nextStep.hours ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 px-2.5 py-1.5 text-xs text-[var(--text-secondary)]">
+                    <Clock className="h-3.5 w-3.5" />
+                    {t('Estimated time')}:
+                    <span className="font-mono font-bold text-[var(--text-primary)]">
+                      {nextStep.hours}h
+                    </span>
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
             <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
               {nextStep.description}
             </p>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
-              {nextStep.skill && <span>{nextStep.skill}</span>}
-              {nextStep.hours ? (
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {nextStep.hours}h
+
+            {nextStep.recommended ? (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {t('Recommended')}:
                 </span>
-              ) : null}
-            </div>
+                <span>{nextStep.recommended}</span>
+              </div>
+            ) : null}
+
             <div className="rounded-xl bg-[var(--surface-secondary)]/60 px-3 py-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-              <span className="font-semibold text-[var(--text-primary)]">{t('Why this')}: </span>
               {nextStep.reason}
             </div>
           </div>
@@ -472,11 +583,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
             <button
               type="button"
-              onClick={() => onNavigate('roadmap')}
+              onClick={() => onNavigate(nextStep.view)}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-4 py-2.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
             >
               <PlayCircle className="h-4 w-4" />
-              {t('Start this step')}
+              {nextStep.view === 'learning'
+                ? t('Continue learning')
+                : nextStep.view === 'skills'
+                  ? t('Work on this skill')
+                  : t('Start this step')}
             </button>
             {nextTask && (
               <button
@@ -500,165 +615,90 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         </div>
       </section>
 
-      {/* 3. What can help? One course, one project, one local route. */}
-      <section aria-labelledby="dashboard-help" className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-              <TrendingUp className="h-3 w-3" />
-              {t('What can help')}
-            </div>
-            <h2 id="dashboard-help" className="mt-0.5 text-base font-bold text-[var(--text-primary)]">
-              {t('Pick one, not all of them')}
-            </h2>
-          </div>
+      {/* SECTION 3 — MY CAREER JOURNEY
+          *
+          * Five stages on one line, with the candidate's current stage marked
+          * and the overall completion shown. It was a tall vertical list of
+          * cards before, which meant the journey pushed everything below it
+          * off the screen. */}
+      <CareerJourneyStepper
+        currentStage={metrics.currentStage as CareerJourneyStage}
+        stageProgress={metrics.stageProgress}
+        overallPercent={metrics.journeyProgressPct}
+        onNavigate={onNavigate}
+      />
+
+      {/* SECTION 4 — RECENT ACTIVITY
+          *
+          * Only the last three items. The full history lives on its own page,
+          * and a Dashboard that lists everything is a Dashboard that never
+          * shows the end of anything. */}
+      <RecentActivityPanel onNavigate={onNavigate} limit={3} />
+
+      {/* SECTION 5 — QUICK ACCESS
+          *
+          * The five places the candidate actually work. Everything else on
+          * the platform is one step further away than this row. */}
+      <section aria-labelledby="dashboard-quick-access" className="space-y-3">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+          <LayoutGrid className="h-3 w-3" />
+          <h2 id="dashboard-quick-access">{t('Quick access')}</h2>
         </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          {/* Learning */}
-          <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-              <BookOpen className="h-3 w-3" />
-              {t('Learn')}
-            </div>
-            {topLearning ? (
-              <>
-                <div className="mt-2 overflow-hidden rounded-xl">
-                  <CareerImage
-                    category={topLearning.course.category || topLearning.course.title}
-                    size="sm"
-                    aspectRatio="16/9"
-                    className="h-24 w-full object-cover"
-                  />
-                </div>
-                <h3 className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                  {topLearning.course.title}
-                </h3>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
-                  <span className="inline-flex items-center gap-1">
-                    <Languages className="h-3 w-3" />
-                    {t(topLearning.course.language)}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    {t(
-                      topLearning.course.format
-                        .replace('_', ' ')
-                        .replace(/^\w/, (letter) => letter.toUpperCase())
-                    )}
-                  </span>
-                  <span>·</span>
-                  <span>{topLearning.course.provider}</span>
-                </div>
-                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                  {topLearning.course.description}
-                </p>
-                <WhyWeRecommend
-                  reason={topLearning.aiExplanation ?? topLearning.reason}
-                  compact
-                  className="mt-2"
-                />
-                <div className="mt-auto flex items-center gap-2 pt-3">
-                  <a
-                    href={topLearning.course.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
-                  >
-                    {t('Open resource')}
-                    <ArrowRight className="h-3 w-3 rtl:rotate-180" />
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('learning')}
-                    className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                  >
-                    {t('More in Learn')}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <EmptyState
-                compact
-                icon={BookOpen}
-                title={t('No course ranked yet')}
-                description={t('Open the Learning Hub to rank real courses against your gaps.')}
-              />
-            )}
-          </article>
-
-          {/* Project */}
-          <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-              <FolderGit2 className="h-3 w-3" />
-              {t('Build')}
-            </div>
-            {activeProject ? (
-              <>
-                <div className="mt-2 overflow-hidden rounded-xl">
-                  <CareerImage
-                    category={activeProject.skills?.[0] || activeProject.title}
-                    size="sm"
-                    aspectRatio="16/9"
-                    className="h-24 w-full object-cover"
-                  />
-                </div>
-                <h3 className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                  {activeProject.title}
-                </h3>
-                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                  {activeProject.goal}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {activeProject.skills.slice(0, 3).map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('projects')}
-                  className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
-                >
-                  {t('Open the project')}
-                  <ArrowRight className="h-3 w-3 rtl:rotate-180" />
-                </button>
-              </>
-            ) : (
-              <EmptyState
-                compact
-                icon={FolderGit2}
-                title={t('No project yet')}
-                description={t('A small project is the fastest way to prove a skill.')}
-              />
-            )}
-          </article>
-
-          {/* Volunteering */}
-          <article className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-              <HeartHandshake className="h-3 w-3" />
-              {t('Volunteer')}
-            </div>
-            <h3 className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
-              {t('Practise in Egypt')}
-            </h3>
-            <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-              {t('Egyptian organisations you can join now, filtered by the skills you still need.')}
-            </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {[
+            {
+              view: 'skills',
+              label: t('My Skills'),
+              icon: Zap,
+              badge: `${metrics.gaps.length}`,
+            },
+            {
+              view: 'roadmap',
+              label: t('My Roadmap'),
+              icon: TrendingUp,
+              badge: `${metrics.roadmapTotal}`,
+            },
+            {
+              view: 'projects',
+              label: t('My Projects'),
+              icon: FolderGit2,
+              badge: `${projects.length}`,
+            },
+            {
+              view: 'cv-studio',
+              label: t('My CV'),
+              icon: FileText,
+              badge: `${cvVersions.length}`,
+            },
+            {
+              view: 'applications',
+              label: t('Applications'),
+              icon: Briefcase,
+              badge: `${activeApplications.length}`,
+            },
+          ].map((shortcut) => (
             <button
+              key={shortcut.view}
               type="button"
-              onClick={() => onNavigate('volunteer')}
-              className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-[var(--color-primary-text)] hover:underline"
+              onClick={() => onNavigate(shortcut.view)}
+              className="flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-3 text-start shadow-xs transition-colors hover:border-[var(--accent-primary)]"
             >
-              {t('See Egypt opportunities')}
-              <ArrowRight className="h-3 w-3 rtl:rotate-180" />
+              <span
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]"
+                aria-hidden="true"
+              >
+                <shortcut.icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-semibold text-[var(--text-primary)]">
+                  {shortcut.label}
+                </span>
+                <span className="block font-mono text-[10px] tabular-nums text-[var(--text-muted)]">
+                  {shortcut.badge}
+                </span>
+              </span>
             </button>
-          </article>
+          ))}
         </div>
       </section>
 
@@ -666,9 +706,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           interruption: it sits below the work, and dismissing it never
           removes the account-menu and Settings routes. */}
       <DashboardFeedbackCard />
-
-      {/* Recent activity — the user's own record, not a generated summary. */}
-      <RecentActivityPanel onNavigate={onNavigate} />
 
       {/* Progressive disclosure: the detail is available, not in the way. */}
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">

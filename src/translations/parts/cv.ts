@@ -75,6 +75,9 @@ export const cvAr: Record<string, string> = {
   'Document Hub': 'مركز المستندات',
   'My Documents & Workspaces': 'مستنداتي ومساحات عملي',
   'Open CV Studio': 'افتح استوديو السيرة',
+  'Open CV Studio to Save a Snapshot': 'افتح استوديو السيرة لحفظ لقطة',
+  'Create a CV snapshot in CV Studio, generate a cover letter, or add a certificate or portfolio project to collect your career assets here. A saved CV version is the record that proves the work you have done, and it is what raises your Role Readiness.':
+    'أنشئ لقطة سيرة ذاتية في الاستوديو، أو ولّد خطاب تقديم، أو أضف شهادة أو مشروعًا لجمع مستنداتك المهنية هنا. ونسخة السيرة المحفوظة هي السجل الذي يُثبت عملك، وهي ما يرفع جاهزيتك المهنية.',
   'Filter by Type:': 'تصفية حسب النوع:',
   'Delete document': 'حذف المستند',
   'Target Role CV Versions': 'إصدارات السيرة للدور المستهدف',

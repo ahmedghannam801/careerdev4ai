@@ -44,12 +44,16 @@ import {
 } from '../../../shared/learningResources';
 import { getIndustryVisual } from '../../lib/imageAssets';
 import {
-  availabilityBucket,
-  availabilityDescription,
-  availabilityLabel,
   providerBrand,
-  type AvailabilityBucket,
 } from '../../../shared/courseProviders';
+import {
+  accessTier,
+  accessTierBadge,
+  accessTierLimit,
+  completionPaceLabel,
+  estimatedCompletionWeeks,
+  type LearningAccessTier,
+} from '../../../shared/learningAccess';
 import type {
   CourseFormat,
   LearningCourse,
@@ -66,9 +70,10 @@ const FORMAT_LABELS: Record<CourseFormat, string> = {
   playlist: 'Playlist',
 };
 
-const BUCKET_STYLES: Record<AvailabilityBucket, string> = {
+const BUCKET_STYLES: Record<LearningAccessTier, string> = {
   free: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30 dark:text-emerald-400',
   free_audit: 'bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400',
+  free_trial: 'bg-orange-500/15 text-orange-700 border-orange-500/30 dark:text-orange-400',
   paid: 'bg-slate-500/15 text-slate-600 border-slate-500/30 dark:text-slate-300',
 };
 
@@ -214,6 +219,13 @@ export interface CourseCardProps {
   /** Hide the "why this now" block, e.g. in the full catalogue. */
   showReason?: boolean;
   showProgress?: boolean;
+  /**
+   * The learner's own pace, in hours a week.
+   *
+   * It turns the course's duration into the number of weeks the learner
+   * will actually need, which is the number they plan around.
+   */
+  weeklyHours?: number;
   onSave?: (courseId: string, reason?: string) => void;
   onStart?: (courseId: string, reason?: string) => void;
   onComplete?: (courseId: string) => void;
@@ -231,6 +243,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   compact = false,
   showReason = true,
   showProgress = false,
+  weeklyHours,
   onSave,
   onStart,
   onComplete,
@@ -242,9 +255,17 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 }) => {
   const { t } = useCareer();
   const brand = useMemo(() => providerBrand(course.provider), [course.provider]);
-  const bucket = availabilityBucket(course.availability);
-  const badge = availabilityLabel(course.availability);
+  const tier = accessTier(course.availability);
+  const badge = accessTierBadge(course.availability);
   const url = learningActionUrl(course.url);
+
+  // The gap this course closes, when the engine found one. "SQL 2/5 -> 4/5"
+  // is the difference between "a course about SQL" and "the course that
+  // closes the gap that is holding your readiness back".
+  const closedGap = recommendation?.gapsAddressed?.[0] ?? null;
+
+  // How long the course really takes at the learner's own pace.
+  const pace = completionPaceLabel(course.durationHours, weeklyHours);
 
   const reason =
     recommendation?.aiExplanation ??
@@ -273,8 +294,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({
       <div className="relative">
         <Thumbnail course={course} compact={compact} />
         <span
-          className={`absolute right-2 top-2 z-20 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide backdrop-blur-sm ${BUCKET_STYLES[bucket]}`}
-          title={availabilityDescription(course.availability)}
+          className={`absolute right-2 top-2 z-20 rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide backdrop-blur-sm ${BUCKET_STYLES[tier]}`}
+          title={accessTierLimit(course.availability)}
         >
           {badge}
         </span>
@@ -328,33 +349,61 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             <Target className="h-3 w-3 shrink-0" />
             {t(course.level)}
           </span>
+          {closedGap && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--color-success-strong)]/25 bg-[var(--color-success-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-success-strong)]"
+              title={t(
+                'Why recommended: this course closes a skill gap you still have, and shows the exact level you are moving from and to.'
+              )}
+            >
+              <Target className="h-3 w-3 shrink-0" />
+              {t('Closes your gap:')}{' '}
+              {closedGap.skill} ({closedGap.currentLevel}/5 → {closedGap.targetLevel}/5)
+            </span>
+          )}
           {course.durationHours !== null && (
             <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
               <Clock className="h-3 w-3 shrink-0" />
               {course.durationHours}h
             </span>
           )}
+          {pace && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
+              title={t('The estimated time to finish, at the number of hours a week you chose.')}
+            >
+              <Clock className="h-3 w-3 shrink-0" />
+              {t('about')} {estimatedCompletionWeeks(course.durationHours, weeklyHours)}{' '}
+              {t(estimatedCompletionWeeks(course.durationHours, weeklyHours) === 1 ? 'week' : 'weeks')}
+            </span>
+          )}
           <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
             <Languages className="h-3 w-3 shrink-0" />
             {course.language.toLowerCase().startsWith('ar') ? t('Arabic') : course.language}
           </span>
-          {course.hasCertificate && (
-            <span
-              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
-                course.certificateIncluded
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
+              course.hasCertificate
+                ? course.certificateIncluded
                   ? 'border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
                   : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-              }`}
-              title={t(
-                course.certificateIncluded
+                : 'border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-muted)]'
+            }`}
+            title={t(
+              course.hasCertificate
+                ? course.certificateIncluded
                   ? 'The certificate is included at no extra cost.'
                   : 'A certificate is available for an additional fee.'
-              )}
-            >
-              <Award className="h-3 w-3 shrink-0" />
-              {t(course.certificateIncluded ? 'Free certificate' : 'Paid certificate')}
-            </span>
-          )}
+                : 'This resource teaches the material but does not hand over a certificate.'
+            )}
+          >
+            <Award className="h-3 w-3 shrink-0" />
+            {course.hasCertificate
+              ? course.certificateIncluded
+                ? t('Includes Certificate')
+                : t('Certificate Costs Extra')
+              : t('Learning Content Only (No Certificate)')}
+          </span>
           {isCompleted && (
             <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-success-strong)]">
               <CheckCircle2 className="h-3 w-3 shrink-0" />

@@ -20,6 +20,14 @@
 
 import type { CVProfile, CVLink } from '../src/types/career.ts';
 
+import {
+  canonicalizeSkills,
+  dedupeSummaryParagraphs,
+  dropEmptyExperience,
+  mergeEducationRecords,
+} from './cvCanonical.ts';
+import { dedupeCertifications, dedupeExperience, dedupeProjects } from './cvDedupe.ts';
+
 /** The shape the platform's records arrive in. */
 export interface CvSourceProfile {
   fullName?: string | null;
@@ -234,14 +242,35 @@ function isMeaningfulCvValue(value: string | null | undefined): boolean {
  */
 export function buildCvDocument(source: CvSourceData, existing?: Partial<CVProfile>): CVProfile {
   const profile = source.profile ?? {};
-  const experiences = source.experiences ?? [];
-  const education = source.education ?? [];
-  const projects = source.projects ?? [];
+
+  /**
+   * The records are canonicalised before they are written.
+   *
+   * A candidate describes the same degree in two slightly different ways,
+   * rates the same skill under two names, and leaves an empty row in their
+   * experience by mistake. Writing those straight onto the CV produces the
+   * unreadable list the QA audit found. The canonical module folds the
+   * duplicates together and drops the rows that say nothing — without
+   * discarding a word the candidate actually wrote.
+   */
+  const experiences = dedupeExperience(dropEmptyExperience(source.experiences ?? []));
+  const education = mergeEducationRecords(source.education ?? []);
+  const projects = dedupeProjects(source.projects ?? []);
   const volunteering = source.volunteering ?? [];
-  const certifications = source.certifications ?? [];
+  const certifications = dedupeCertifications(source.certifications ?? []);
   const courses = source.courses ?? [];
   const skills = source.skills ?? [];
   const links = source.links ?? [];
+
+  /**
+   * The summary, with a paragraph that repeats another one removed.
+   *
+   * The candidate's own summary is kept — it is folded rather than replaced,
+   * so a summary they wrote by hand survives the merge.
+   */
+  const summary = dedupeSummaryParagraphs(
+    existing?.summary?.trim() || profile.summary?.trim() || ''
+  );
 
   const previousLinks = existing?.links ?? [];
   const previousLinkIds = new Set(previousLinks.map((link) => link.id));
@@ -276,7 +305,7 @@ export function buildCvDocument(source: CvSourceData, existing?: Partial<CVProfi
     phone: existing?.phone?.trim() || profile.phone?.trim() || '',
     location: existing?.location?.trim() || profile.location?.trim() || '',
     title: existing?.title?.trim() || profile.title?.trim() || '',
-    summary: existing?.summary?.trim() || profile.summary?.trim() || '',
+    summary,
 
     experiences: experiences.map((entry) => {
       const previous = previousExperiences.get(entry.id);
@@ -302,7 +331,8 @@ export function buildCvDocument(source: CvSourceData, existing?: Partial<CVProfi
       const previous = previousEducation.get(entry.id);
       return {
         id: entry.id,
-        institution: entry.institution,
+        // The institution never repeats its own name inside itself.
+        institution: entry.institution ?? '',
         degree: entry.degree ?? '',
         field: isMeaningfulCvValue(entry.field) ? entry.field! : '',
         period: formatCvPeriod(entry.startDate, entry.endDate, entry.isCurrent),
@@ -331,7 +361,18 @@ export function buildCvDocument(source: CvSourceData, existing?: Partial<CVProfi
       };
     }),
 
-    skillsList: skills.map((skill) => skill.name),
+    /**
+     * The skills, canonicalised.
+     *
+     * "SQL" and "SQL Fundamentals" become one "SQL", with the specific
+     * wording kept beside it as a specialisation, so the candidate can see
+     * exactly what was folded in and edit it if they disagree.
+     */
+    skillsList: canonicalizeSkills(skills).map((skill) =>
+      skill.specializations.length > 0
+        ? `${skill.name} (${skill.specializations.join(', ')})`
+        : skill.name
+    ),
 
     certifications: certifications.map((entry) => entry.name),
     certificationDetails: certifications.map((entry, index) => {

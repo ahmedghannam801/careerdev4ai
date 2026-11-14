@@ -350,6 +350,11 @@ async function main() {
     // confirms its result so a request that produced nothing is refunded.
     // Pure: no key and no database are needed.
     join(TESTS_DIR, 'token-deduction-contract.test.ts'),
+    // The free AI flows against the running API: a candidate with a real zero
+    // balance can chat and complete a scored mock interview without spending
+    // anything, the manual daily claim still grants two tokens, and a premium
+    // CV template still costs five.
+    join(TESTS_DIR, 'free-ai-flows.test.ts'),
     // The career target's contract: the role is never seeded from a default,
     // the Profile page and the Settings page share one component and one
     // writer, skipping the onboarding writes no role, and the catalogue is
@@ -496,6 +501,53 @@ async function main() {
     // Subscription security and concurrency: RLS boundaries, payment confirmation idempotency,
     // AI endpoint gating, and credit expiration isolation.
     join(TESTS_DIR, 'subscriptions-security-and-concurrency.test.ts'),
+    // The identity the platform shows everywhere: the display name, the
+    // initials and the avatar are resolved once, in one shared module, so no
+    // two pages can disagree about who the candidate is. Pure.
+    join(TESTS_DIR, 'identity.test.ts'),
+    // The single metrics engine behind the dashboard: one definition of
+    // readiness, progress and the gaps between them, with the explanation
+    // each number is shown with. Pure.
+    join(TESTS_DIR, 'career-metrics.test.ts'),
+    // The roadmap may never call a core skill covered while a gap for it is
+    // open: the roadmap and the metrics engine have to read the same truth.
+    // Pure.
+    join(TESTS_DIR, 'roadmap-gap-sync.test.ts'),
+    // The interview readiness percentage and the mock interview scores are
+    // one measurement, so the Progress page cannot disagree with the
+    // Interviews page. Pure.
+    join(TESTS_DIR, 'interview-readiness.test.ts'),
+    // The canonical skill names: one skill must have one name, and a merged
+    // pair must read the way the catalogue writes it. Pure.
+    join(TESTS_DIR, 'cv-canonical.test.ts'),
+    // The access tiers of the Learning Hub: what "free" means, what a
+    // certificate costs, and how long a course really takes. Pure.
+    join(TESTS_DIR, 'learning-access.test.ts'),
+    // The opportunities the candidate is shown: the ones that match the
+    // target role, the deduplicated ones, the expired ones and the
+    // organisation directories, each with its own action. Pure.
+    join(TESTS_DIR, 'opportunity-matching.test.ts'),
+    // The identity fields the career target carries: the target opportunity
+    // type, the professional headline and the graduation year. Pure.
+    join(TESTS_DIR, 'career-identity-opportunity.test.ts'),
+    // The assessment rubric: the bands, the ceiling a knowledge check can
+    // reach on its own, the level the evidence supports and the attempt log.
+    // Pure.
+    join(TESTS_DIR, 'assessment.test.ts'),
+    // The visual each assessment category is shown with: a picture that
+    // belongs to it, or a clean category badge when none does. Pure.
+    join(TESTS_DIR, 'assessment-visuals.test.ts'),
+    // Workstream 1: one record is counted once (experience, education,
+    // summary, skills, projects, certifications), "Fill from my records" is
+    // idempotent, a skill knows its source, a future graduation year means
+    // "currently studying", the activity feed logs an action once, and the AI
+    // chat stays free while the four paid actions keep their prices. Pure.
+    join(TESTS_DIR, 'workstream1-integrity.test.ts'),
+    // The eight functional journeys of the product, end to end against the
+    // running API: the CV studio, an assessment, the evidence pipeline, an
+    // application, an interview session, a document snapshot, the settings
+    // and the live job filters.
+    join(TESTS_DIR, 'functional-flows.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

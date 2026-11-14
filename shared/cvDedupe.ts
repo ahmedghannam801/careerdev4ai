@@ -428,6 +428,210 @@ export function isDuplicateEducation(a: EducationLike, b: EducationLike): boolea
 }
 
 /* -------------------------------------------------------------------------- */
+/* Projects                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** De-duplicates a list of free-text values without changing their spelling. */
+function uniqueText(values: readonly (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const cleaned = (value ?? '').trim();
+    if (!cleaned) continue;
+    const key = normalizeText(cleaned);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(cleaned);
+  }
+  return out;
+}
+
+/**
+ * A project is identified by what it is called and where it lives.
+ *
+ * The title alone is not enough: two candidates (or one candidate) can both
+ * have a project called "Portfolio", and they are different projects when the
+ * repository URLs differ. The URL is the organisation of a project — the thing
+ * that tells two same-named pieces of work apart.
+ */
+export interface ProjectLike {
+  id?: string;
+  title?: string | null;
+  name?: string | null;
+  role?: string | null;
+  organization?: string | null;
+  link?: string | null;
+  url?: string | null;
+  repositoryUrl?: string | null;
+  technologies?: string[] | null;
+  skills?: string[] | null;
+  bullets?: string[] | null;
+  deliverables?: string[] | null;
+  description?: string | null;
+}
+
+function projectTitle(entry: ProjectLike): string {
+  return entry.title ?? entry.name ?? '';
+}
+
+function projectUrl(entry: ProjectLike): string {
+  return entry.link ?? entry.url ?? entry.repositoryUrl ?? '';
+}
+
+export function projectDedupeKey(entry: ProjectLike): string {
+  return `${normalizeText(projectTitle(entry))}|${normalizeText(projectUrl(entry))}`;
+}
+
+/**
+ * Whether two project records describe the same piece of work.
+ *
+ * The full key is tried first. When one copy has no URL — an imported project
+ * the candidate has not linked yet — the title is enough, but only while the
+ * other copy is also unlinked. Two different repositories are never merged.
+ */
+export function sameProject(a: ProjectLike, b: ProjectLike): boolean {
+  if (projectDedupeKey(a) === projectDedupeKey(b)) return true;
+  const title = normalizeText(projectTitle(a));
+  if (!title || title !== normalizeText(projectTitle(b))) return false;
+  const urlA = normalizeText(projectUrl(a));
+  const urlB = normalizeText(projectUrl(b));
+  return urlA.length === 0 || urlB.length === 0;
+}
+
+function mergeProject<T extends ProjectLike>(keeper: T, incoming: T): T {
+  return {
+    ...keeper,
+    title: keeper.title ?? incoming.title,
+    name: keeper.name ?? incoming.name,
+    role: keeper.role ?? incoming.role,
+    organization: keeper.organization ?? incoming.organization,
+    link: keeper.link ?? incoming.link,
+    url: keeper.url ?? incoming.url,
+    repositoryUrl: keeper.repositoryUrl ?? incoming.repositoryUrl,
+    technologies: uniqueText([
+      ...(keeper.technologies ?? []),
+      ...(incoming.technologies ?? []),
+    ]),
+    skills: uniqueText([...(keeper.skills ?? []), ...(incoming.skills ?? [])]),
+    bullets: uniqueText([...(keeper.bullets ?? []), ...(incoming.bullets ?? [])]),
+    deliverables: uniqueText([
+      ...(keeper.deliverables ?? []),
+      ...(incoming.deliverables ?? []),
+    ]),
+    description: keeper.description ?? incoming.description,
+  };
+}
+
+/** Collapses duplicate project records into one per project. */
+export function dedupeProjects<T extends ProjectLike>(
+  entries: readonly T[] | null | undefined
+): T[] {
+  if (!entries) return [];
+  const kept: T[] = [];
+  for (const entry of entries) {
+    const index = kept.findIndex((existing) => sameProject(existing, entry));
+    if (index === -1) {
+      kept.push(entry);
+      continue;
+    }
+    kept[index] = mergeProject(kept[index], entry);
+  }
+  return kept;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Certifications                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A certification is identified by its name, its issuer and its credential.
+ *
+ * Two vendors can each issue a certificate called "Data Fundamentals"; the
+ * issuer and the credential URL are what make them two credentials rather than
+ * one counted twice.
+ */
+export interface CertificationLike {
+  id?: string;
+  name?: string | null;
+  issuer?: string | null;
+  organization?: string | null;
+  provider?: string | null;
+  credentialUrl?: string | null;
+  url?: string | null;
+  credentialId?: string | null;
+  issueDate?: string | null;
+  expiryDate?: string | null;
+  description?: string | null;
+  skills?: string[] | null;
+}
+
+function certificationIssuer(entry: CertificationLike): string {
+  return entry.issuer ?? entry.organization ?? entry.provider ?? '';
+}
+
+function certificationUrl(entry: CertificationLike): string {
+  return entry.credentialUrl ?? entry.url ?? '';
+}
+
+export function certificationDedupeKey(entry: CertificationLike): string {
+  return [
+    normalizeText(entry.name),
+    normalizeText(certificationIssuer(entry)),
+    normalizeText(certificationUrl(entry)),
+  ].join('|');
+}
+
+/** Whether two certification records describe the same credential. */
+export function sameCertification(a: CertificationLike, b: CertificationLike): boolean {
+  if (certificationDedupeKey(a) === certificationDedupeKey(b)) return true;
+  const name = normalizeText(a.name);
+  if (!name || name !== normalizeText(b.name)) return false;
+  const issuerA = normalizeText(certificationIssuer(a));
+  const issuerB = normalizeText(certificationIssuer(b));
+  const urlA = normalizeText(certificationUrl(a));
+  const urlB = normalizeText(certificationUrl(b));
+  // A missing issuer/URL is "not known yet", not a conflicting value. Two
+  // known, different values mean two different credentials.
+  if (issuerA && issuerB && issuerA !== issuerB) return false;
+  if (urlA && urlB && urlA !== urlB) return false;
+  return true;
+}
+
+function mergeCertification<T extends CertificationLike>(keeper: T, incoming: T): T {
+  return {
+    ...keeper,
+    name: keeper.name ?? incoming.name,
+    issuer: keeper.issuer ?? incoming.issuer,
+    organization: keeper.organization ?? incoming.organization,
+    provider: keeper.provider ?? incoming.provider,
+    credentialUrl: keeper.credentialUrl ?? incoming.credentialUrl,
+    url: keeper.url ?? incoming.url,
+    credentialId: keeper.credentialId ?? incoming.credentialId,
+    issueDate: keeper.issueDate ?? incoming.issueDate,
+    expiryDate: keeper.expiryDate ?? incoming.expiryDate,
+    description: keeper.description ?? incoming.description,
+    skills: uniqueText([...(keeper.skills ?? []), ...(incoming.skills ?? [])]),
+  };
+}
+
+/** Collapses duplicate certification records into one per credential. */
+export function dedupeCertifications<T extends CertificationLike>(
+  entries: readonly T[] | null | undefined
+): T[] {
+  if (!entries) return [];
+  const kept: T[] = [];
+  for (const entry of entries) {
+    const index = kept.findIndex((existing) => sameCertification(existing, entry));
+    if (index === -1) {
+      kept.push(entry);
+      continue;
+    }
+    kept[index] = mergeCertification(kept[index], entry);
+  }
+  return kept;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Text and whole-document de-duplication                                     */
 /* -------------------------------------------------------------------------- */
 

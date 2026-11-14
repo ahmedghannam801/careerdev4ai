@@ -16,6 +16,10 @@ roles you choose to pursue in the persisted Applications pipeline.
   Cloudflare Pages advanced-mode Worker (`dist/_worker.js`) for production
 - Supabase Auth, PostgreSQL, and Storage
 - Google Gemini (`@google/genai`, web build) for the AI features
+- Motion: `motion` for product UI, plus GSAP (+ `@gsap/react`), Lenis and
+  React Bits components for landing/showcase animation. See
+  `src/lib/motion.ts` for the timing system and `npm run ui:add -- <Name>`
+  for pulling React Bits components into `src/components/react-bits/`.
 
 ## Prerequisites
 

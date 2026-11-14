@@ -53,6 +53,13 @@ import {
   type OpportunityKind,
 } from '../../../shared/opportunities';
 import { trackEvent } from '../../lib/analytics';
+import {
+  dedupeOpportunities,
+  matchedGapSkills,
+  matchesCandidate,
+  opportunityCta,
+  opportunityListing,
+} from '../../../shared/opportunityMatching';
 
 interface VolunteerOpportunitiesProps {
   /** Called when the user wants to record a stint they just started. */
@@ -146,7 +153,7 @@ function matchesFocus(item: VolunteerOpportunity, focus: string): boolean {
 export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
   onRecordStint,
 }) => {
-  const { t } = useCareer();
+  const { t, analysis, targetRole } = useCareer();
   const [opportunities, setOpportunities] = useState<VolunteerOpportunity[]>([]);
   const [search, setSearch] = useState('');
   const [activeKind, setActiveKind] = useState<OpportunityKind | 'all'>('all');
@@ -183,7 +190,54 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
 
   // Expired rows are hidden in the catalogue, not merely ranked last: an
   // application link that no longer accepts applications is not actionable.
-  const catalogue = useMemo(() => opportunities.filter((item) => item.live), [opportunities]);
+  //
+  // The catalogue is also de-duplicated: the same listing reached the
+  // database from two sources and appeared twice, which made the page look
+  // fuller than it was.
+  const catalogue = useMemo(
+    () => dedupeOpportunities(opportunities.filter((item) => item.live)),
+    [opportunities]
+  );
+
+  // The candidate's own gaps, and the role they are aiming at. They decide
+  // which opportunities are worth the candidate's time.
+  const gapSkills = useMemo(
+    () => (analysis?.criticalGaps ?? []).map((gap) => gap.skill),
+    [analysis]
+  );
+
+  /**
+   * The opportunities that belong to the candidate's field.
+   *
+   * A Data Analyst was being shown a construction site-operations role
+   * because it shared the word "operations". The matcher is strict on
+   * purpose: an opportunity that names a different field is not a match,
+   * however many words it has in common.
+   */
+  const relevantCatalogue = useMemo(() => {
+    // With no target role there is nothing to match against, and hiding
+    // everything would be worse than showing everything.
+    if (!targetRole?.title) return catalogue;
+    return catalogue.filter((item) =>
+      matchesCandidate(item, {
+        gapSkills,
+        targetRoleTitle: targetRole.title,
+        track: targetRole.domainId ?? undefined,
+      })
+    );
+  }, [catalogue, gapSkills, targetRole]);
+
+  /**
+   * The opportunities that are an organisation's careers page.
+   *
+   * They are real organisations the candidate should know about, and they are
+   * not openings. Mixing the two is what made the page look like a list of
+   * things to apply to.
+   */
+  const directoryListings = useMemo(
+    () => catalogue.filter((item) => opportunityListing(item) === 'directory'),
+    [catalogue]
+  );
 
   // The funnel records that the opportunities catalogue was reached. Only the
   // size of the catalogue and the filter that was active are reported — never
@@ -218,7 +272,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
 
   const visible = useMemo(() => {
     const term = normalize(search);
-    return catalogue
+    return relevantCatalogue
       .filter((item) => {
         if (activeKind !== 'all' && item.kind !== activeKind) return false;
         if (activeMode === 'egypt' && item.country !== 'Egypt') return false;
@@ -263,7 +317,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
         );
       });
   }, [
-    catalogue,
+    relevantCatalogue,
     search,
     activeKind,
     activeMode,
@@ -495,7 +549,10 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {visible.map((opportunity) => (
+          {visible.map((opportunity) => {
+            // The candidate's own gaps that this opportunity practises.
+            const matchedGaps = matchedGapSkills(opportunity, gapSkills);
+            return (
             <article
               key={opportunity.id}
               className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] transition-colors hover:border-[var(--border-strong)]"
@@ -652,12 +709,27 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
                   </p>
                 )}
 
+                {/* Which of the candidate's own gaps this practises.
+                    "Practises 1 of the skills you still need" without the
+                    name of the skill left the reader guessing, which is the
+                    whole point of the badge. */}
+                {matchedGaps.length > 0 && (
+                  <p className="flex items-start gap-1.5 rounded-lg bg-[var(--color-success-surface)] px-2.5 py-1.5 text-[11px] leading-relaxed text-[var(--color-success-strong)]">
+                    <Target className="mt-0.5 h-3 w-3 shrink-0" />
+                    <span>
+                      <span className="font-semibold">
+                        {t('Practises a skill you still need:')}
+                      </span>{' '}
+                      {matchedGaps.join(', ')}
+                    </span>
+                  </p>
+                )}
+
                 {opportunity.skillsGained.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       {t('Skills you will practise')}
-                    </span>
-                    {opportunity.skillsGained.slice(0, 6).map((skill) => (
+                    </span>                    {opportunity.skillsGained.slice(0, 6).map((skill) => (
                       <span
                         key={skill}
                         className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
@@ -717,7 +789,11 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
                         onClick={onRecordStint}
                         className="rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
                       >
-                        {t('I volunteered here')}
+                        {/* The action depends on what the opportunity is.
+                            "I volunteered here" on a fellowship told the
+                            candidate the wrong thing about what recording it
+                            would do. */}
+                        {t(opportunityCta(opportunity.kind).label)}
                       </button>
                     )}
                   </div>
@@ -749,8 +825,48 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
                 </div>
               </div>
             </article>
-          ))}
+          );
+          })}
         </div>
+      )}
+
+      {/* The organisation's careers page is not an opening. It is still worth
+          knowing about — and it is worth keeping apart from the list of
+          things the candidate can apply to. */}
+      {directoryListings.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">
+              {t('Organisation career pages')}
+            </h3>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {t(
+                'These are the organisations’ own careers pages, not live openings. Check back for new roles.'
+              )}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {directoryListings.map((opportunity) => (
+              <a
+                key={opportunity.id}
+                href={opportunity.applicationUrl || opportunity.sourceUrl || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-2.5 text-xs transition-colors hover:border-[var(--border-strong)]"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold text-[var(--text-primary)]">
+                    {opportunity.organization}
+                  </span>
+                  <span className="block truncate text-[var(--text-muted)]">
+                    {opportunity.title}
+                  </span>
+                </span>
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)] rtl:-rotate-90" />
+              </a>
+            ))}
+          </div>
+        </section>
       )}
 
       <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">

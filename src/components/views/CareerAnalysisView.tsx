@@ -12,7 +12,6 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { Reveal } from '../motion/Motion';
 import { useAIProcessing } from '../../lib/useAIProcessing';
-import { aiButtonLabel } from '../../lib/aiTokenCosts';
 
 interface CareerAnalysisViewProps {
   onNavigate: (view: string) => void;
@@ -23,6 +22,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
     analysis,
     targetRole,
     profile,
+    identity,
     careerIdentity,
     skills,
     refreshAiAnalysis,
@@ -75,7 +75,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
             <span>
               {isAnalyzing
                 ? t('Re-evaluating with AI...')
-                : aiButtonLabel(t('Run Deep AI Gap Analysis'), 'cv_ats_analysis', t)}
+                : t('Run Deep AI Gap Analysis')}
             </span>
           </button>
           <button
@@ -94,7 +94,7 @@ export const CareerAnalysisView: React.FC<CareerAnalysisViewProps> = ({ onNaviga
           {/* Current State Column */}
           <div className="md:col-span-5 space-y-2">
             <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">{t('Current State')}</div>
-            <div className="text-xl font-bold text-[var(--text-primary)]">{profile.name}</div>
+            <div className="text-xl font-bold text-[var(--text-primary)]">{identity.displayName}</div>
             <div className="text-xs text-[var(--text-secondary)]">
               {profile.currentTitle} · {t(careerIdentity.currentStatusLabel)}
             </div>

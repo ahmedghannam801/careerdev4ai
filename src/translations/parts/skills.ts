@@ -6,6 +6,37 @@
  */
 
 export const skillsAr: Record<string, string> = {
+  'Meaning': 'المعنى',
+  'Direct Assessment': 'اختبار مباشر',
+  'Diagnostic Knowledge Check — not a professional certification.':
+    'فحص معرفي تشخيصي — وليس اعتمادًا مهنيًا.',
+  'A multiple-choice knowledge check measures what you know, so it stops at 4/5 (Advanced Knowledge). Level 5 (Verified Mastery) needs practical proof: a verified project, a certificate, or work experience.':
+    'الفحص المعرفي متعدد الخيارات يقيس ما تعرفه، لذلك يتوقف عند 4/5 (معرفة متقدمة). المستوى 5 (إتقان موثّق) يحتاج إثباتًا عمليًا: مشروع موثّق أو شهادة أو خبرة عمل.',
+  '{level}/5 — {label}. A diagnostic check stops at {ceiling}/5; level {mastery} needs practical proof.':
+    '{level}/5 — {label}. الفحص التشخيصي يتوقف عند {ceiling}/5؛ والمستوى {mastery} يحتاج إثباتًا عمليًا.',
+  '{level}/5 — {label}. Your practical evidence unlocks the top level.':
+    '{level}/5 — {label}. أدلتك العملية تفتح أعلى مستوى.',
+  'Verified Mastery': 'إتقان موثّق',
+  'Advanced Knowledge': 'معرفة متقدمة',
+  'Working Knowledge': 'معرفة عملية',
+  'Developing Knowledge': 'معرفة قيد التطوير',
+  'Foundational Awareness': 'وعي أساسي',
+  'Practical proof required. A diagnostic check alone cannot reach this level — a verified project, certificate or work experience is needed.':
+    'الإثبات العملي مطلوب. لا يمكن للفحص التشخيصي وحده بلوغ هذا المستوى — يلزم مشروع موثّق أو شهادة أو خبرة عمل.',
+  'Strong conceptual and scenario understanding. This is the ceiling a multiple-choice diagnostic check can reach.':
+    'فهم قوي للنظريات السيناريوهات. هذا هو السقف الذي يمكن للفحص التشخيصي متعدد الخيارات بلوغه.',
+  'Solid grasp of the fundamentals, with gaps in the harder scenarios.':
+    'إتقان جيد للأساسيات مع فجوات في السيناريوهات الأصعب.',
+  'Some familiarity, with the core ideas still forming.':
+    'إلمام جزئي، مع الأفكار الأساسية قيد التكوين.',
+  'Early exposure. The starting point the learning plan builds on.':
+    'تعرّف مبكر. نقطة البداية التي يبني عليها خطة التعلم.',
+  'This check tests general fundamentals ({skill}). It sets the level of the general skill only — a role-specialised skill built on it needs practical proof of its own.':
+    'يفحص هذا الاختبار الأساسيات العامة ({skill}). وهو يحدّد مستوى المهارة العامة فقط — أما المهارة المتخصصة المبنية عليها فتحتاج إثباتًا عمليًا خاصًا بها.',
+  'This check tests a role-specialised skill ({skill}). It sets that skill’s level directly, and it is the check that unlocks the top level.':
+    'يفحص هذا الاختبار مهارة متخصصة في الدور ({skill}). وهو يحدّد مستوى تلك المهارة مباشرة، وهو الاختبار الذي يفتح أعلى مستوى.',
+  'A general fundamentals check sets the level of the general skill. A role-specialised skill (for example “Python for Data Analysis”) keeps its own level until practical evidence proves the specialised part — a check of the general skill never raises it on its own.':
+    'فحص الأساسيات العامة يحدّد مستوى المهارة العامة. أما المهارة المتخصصة (مثل «Python for Data Analysis») فتحتفظ بمستواها حتى يثبت الأدلة العملية الجزء المتخصص — وفحص المهارة العامة لا يرفعها منفرده.',
   'COMPETENCY TAXONOMY': 'تصنيف الكفايات',
   'Skills Center & Gap Analytics': 'مركز المهارات وتحليل الفجوات',
   'Add Custom Skill': 'أضف مهارة مخصصة',

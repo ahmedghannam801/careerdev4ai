@@ -68,19 +68,31 @@ describe('SaaS Subscription Architecture & Domain Tests', () => {
     assert.equal(isPlanEntitled('career_plus', 'cv.tailoring'), true);
   });
 
-  it('verifies AI credit action weights and positive integer costs', () => {
+  it('verifies AI credit action weights: four paid actions, everything else free', () => {
     for (const action of AI_CREDIT_ACTIONS) {
       const weight = CREDIT_WEIGHTS[action];
       assert.ok(typeof weight === 'number', `Weight for ${action} must be a number`);
-      assert.ok(weight >= 1, `Weight for ${action} must be at least 1 credit`);
+      assert.ok(weight >= 0, `Weight for ${action} must not be negative`);
       assert.ok(Number.isInteger(weight), `Weight for ${action} must be an integer`);
     }
 
-    assert.equal(CREDIT_WEIGHTS.job_description_analysis, 1);
-    assert.equal(CREDIT_WEIGHTS.cv_ats_analysis, 2);
-    assert.equal(CREDIT_WEIGHTS.cover_letter_generation, 2);
-    assert.equal(CREDIT_WEIGHTS.cv_tailoring, 4);
-    assert.equal(CREDIT_WEIGHTS.interview_mock_session, 5);
+    // The only paid actions. A paid action is a substantial artefact the
+    // candidate can keep and reuse.
+    assert.equal(CREDIT_WEIGHTS.cv_ats_analysis, 1);
+    assert.equal(CREDIT_WEIGHTS.cv_tailoring, 1);
+    assert.equal(CREDIT_WEIGHTS.project_analysis, 1);
+    assert.equal(CREDIT_WEIGHTS.premium_template_unlock, 5);
+
+    // Everything else is free. These are the flows a candidate with a zero
+    // balance can use without buying anything.
+    assert.equal(CREDIT_WEIGHTS.career_consultation_chat, 0);
+    assert.equal(CREDIT_WEIGHTS.interview_mock_session, 0);
+    assert.equal(CREDIT_WEIGHTS.job_description_analysis, 0);
+    assert.equal(CREDIT_WEIGHTS.cover_letter_generation, 0);
+    assert.equal(CREDIT_WEIGHTS.ai_assist_inline, 0);
+    assert.equal(CREDIT_WEIGHTS.learning_recommendation, 0);
+    assert.equal(CREDIT_WEIGHTS.roadmap_generation, 0);
+    assert.equal(CREDIT_WEIGHTS.cv_generation, 0);
   });
 
   it('verifies credit booster packs', () => {

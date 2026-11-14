@@ -3,7 +3,7 @@
  * ---------------------------------------------------------------------------
  * A token is a real unit of money for the candidate. This file is the guard
  * that says a token is only ever spent on work the candidate asked for and
- * actually received.
+ * actually received — and that the free flows stay free.
  *
  * WHY THIS FILE EXISTS
  * Candidates were losing their whole daily allowance without asking for
@@ -23,10 +23,17 @@
  *      unavailable, and the candidate was charged for a result they did not
  *      receive.
  *
+ * The product has since settled on a much smaller paid surface: the AI chat,
+ * the mock interview and every ordinary career flow are free, and only four
+ * actions cost tokens. This file guards BOTH directions:
+ *
+ *   - no free route may take a token, and
+ *   - every paid route must take exactly the token it advertises.
+ *
  * The tests below are mostly repository scans, because the fault is not a
  * single line of code but a property of the whole route table. A scan fails
- * the moment somebody prices a new passive route, or adds a deduction point
- * outside the one credit service.
+ * the moment somebody prices a free route, or adds a deduction point outside
+ * the one credit service.
  *
  * It is pure: no database, no API, no key.
  */
@@ -49,23 +56,33 @@ const CV_TEMPLATES_ROUTES_TS = join(REPO_ROOT, 'server', 'cvTemplates', 'routes.
 /**
  * The routes that are allowed to spend a token, and what each one costs.
  *
- * Every entry is a real AI action the candidate explicitly triggers. A route
- * that is not on this list may not take a credit, whatever it does.
+ * Every entry is a substantial artefact the candidate explicitly asks for.
+ * A route that is not on this list may not take a credit, whatever it does.
  */
 const ALLOWED_TOKEN_ROUTES: Record<string, AICreditAction> = {
-  '/api/copilot': 'career_consultation_chat',
-  '/api/analyze-career': 'cv_ats_analysis',
-  '/api/optimize-cv': 'cv_tailoring',
-  '/api/mock-interview': 'interview_mock_session',
-  '/api/suggest-summary': 'ai_assist_inline',
-  '/api/generate-cover-letter': 'cover_letter_generation',
-  '/api/cv/ai-assist': 'ai_assist_inline',
-  '/api/cv/job-description/analyze': 'job_description_analysis',
+  '/api/optimize-cv': 'cv_ats_analysis',
   '/api/cv/job-description/generate': 'cv_tailoring',
   '/api/projects/recommendations': 'project_analysis',
   '/api/projects/analyze': 'project_analysis',
-  '/api/learning/recommendations': 'learning_recommendation',
 };
+
+/**
+ * AI routes that are FREE.
+ *
+ * They run a model (or a deterministic engine) but take no token. A candidate
+ * with a balance of zero must be able to use every one of them, so they must
+ * carry no credit middleware and no plan-entitlement gate.
+ */
+const FREE_AI_ROUTES = [
+  '/api/copilot',
+  '/api/mock-interview',
+  '/api/analyze-career',
+  '/api/suggest-summary',
+  '/api/generate-cover-letter',
+  '/api/cv/ai-assist',
+  '/api/cv/job-description/analyze',
+  '/api/learning/recommendations',
+];
 
 /**
  * Routes that are NOT AI actions and must never cost a token.
@@ -184,6 +201,48 @@ describe('the token deduction contract', () => {
       );
     });
 
+    test('no route charges an action whose price is zero', () => {
+      // A zero-weight action is free by definition. Charging it would take a
+      // token for work the product promises costs nothing.
+      const offenders: string[] = [];
+
+      for (const [path, block] of blocks) {
+        const charge = block.match(/requireCredits\(\s*'([a-z_]+)'\s*\)/);
+        if (!charge) continue;
+        const action = charge[1] as AICreditAction;
+        const weight = CREDIT_WEIGHTS[action];
+        if (!(weight > 0)) {
+          offenders.push(`${path} charges '${action}', whose weight is ${weight}`);
+        }
+      }
+
+      assert.deepEqual(offenders, []);
+    });
+
+    test('every free AI route carries no credit or entitlement gate', () => {
+      const offenders: string[] = [];
+
+      for (const path of FREE_AI_ROUTES) {
+        const block = blocks.get(path);
+        if (!block) {
+          offenders.push(`${path} does not exist any more`);
+          continue;
+        }
+        if (/requireCredits\(/.test(block)) {
+          offenders.push(`${path} still runs a credit check`);
+        }
+        if (/requireEntitlement\(/.test(block)) {
+          offenders.push(`${path} still runs a plan-entitlement check`);
+        }
+      }
+
+      assert.deepEqual(
+        offenders,
+        [],
+        `these free AI routes still gate a zero-balance candidate:\n${offenders.join('\n')}`
+      );
+    });
+
     test('no non-AI route spends a token', () => {
       const offenders: string[] = [];
 
@@ -199,33 +258,6 @@ describe('the token deduction contract', () => {
         offenders,
         [],
         `these routes are not AI actions and must not cost a token: ${offenders.join(', ')}`
-      );
-    });
-
-    test('a route that skips the charge for a non-AI request says so explicitly', () => {
-      // The Learning Hub asks for its deterministic ranking on its own, with
-      // `ai: false`. That request never reaches a model, so it must never be
-      // charged. The guard has to be visible in the source, not implied.
-      const learningBlock = blocks.get('/api/learning/recommendations');
-      assert.ok(learningBlock, 'the Learning Hub route must exist');
-
-      assert.match(
-        learningBlock,
-        /body\.ai\s*===\s*false/,
-        'the Learning Hub route must skip the charge when the deterministic ranking is asked for'
-      );
-      assert.match(
-        learningBlock,
-        /requireCredits\('learning_recommendation'\)/,
-        'the Learning Hub route must still charge when the AI explanation IS asked for'
-      );
-
-      const assistBlock = blocks.get('/api/cv/ai-assist');
-      assert.ok(assistBlock, 'the CV assist route must exist');
-      assert.match(
-        assistBlock,
-        /body\.ai\s*===\s*false/,
-        'the CV assist route must skip the charge when no AI result is asked for'
       );
     });
   });
@@ -359,7 +391,7 @@ describe('the token deduction contract', () => {
       );
     });
 
-    test('every AI route in the route table confirms its result', () => {
+    test('every paid AI route in the route table confirms its result', () => {
       const appSource = readFileSync(APP_TS, 'utf8');
       const blocks = parseRouteBlocks(appSource);
 
@@ -430,26 +462,58 @@ describe('the token deduction contract', () => {
       }
     });
 
-    test('the label reads as a cost', () => {
+    test('a paid action reads as a cost, a free action reads as nothing', () => {
       const t = (key: string) => key;
-      assert.equal(aiTokenCostLabel('ai_assist_inline', t), '(1 Token)');
-      assert.equal(aiTokenCostLabel('cv_tailoring', t), '(4 Tokens)');
-      assert.equal(
-        aiButtonLabel('Run ATS Audit', 'cv_tailoring', t),
-        'Run ATS Audit (4 Tokens)'
-      );
-    });
 
-    test('every token-spending action has a price the interface can quote', () => {
-      for (const action of Object.keys(CREDIT_WEIGHTS) as AICreditAction[]) {
-        assert.ok(
-          CREDIT_WEIGHTS[action] > 0,
-          `the action '${action}' must have a price, or it must not spend tokens at all`
+      assert.equal(aiTokenCostLabel('cv_ats_analysis', t), '(1 Token)');
+      assert.equal(aiTokenCostLabel('cv_tailoring', t), '(1 Token)');
+      assert.equal(aiTokenCostLabel('project_analysis', t), '(1 Token)');
+      assert.equal(aiTokenCostLabel('premium_template_unlock', t), '(5 Tokens)');
+      assert.equal(
+        aiButtonLabel('Run ATS Audit', 'cv_ats_analysis', t),
+        'Run ATS Audit (1 Token)'
+      );
+
+      // The free flows must carry no token label at all.
+      for (const action of [
+        'career_consultation_chat',
+        'interview_mock_session',
+        'ai_assist_inline',
+        'learning_recommendation',
+        'job_description_analysis',
+        'cover_letter_generation',
+      ] as AICreditAction[]) {
+        assert.equal(aiTokenCostLabel(action, t), '', `${action} must have no price label`);
+        assert.equal(
+          aiButtonLabel('Send', action, t),
+          'Send',
+          `${action} must leave the button label untouched`
         );
       }
     });
 
-    test('every token-spending action shows its cost in the interface', () => {
+    test('every paid action has a positive price, and every free action is zero', () => {
+      const paid: AICreditAction[] = [
+        'cv_ats_analysis',
+        'cv_tailoring',
+        'project_analysis',
+        'premium_template_unlock',
+      ];
+
+      for (const action of Object.keys(CREDIT_WEIGHTS) as AICreditAction[]) {
+        if (paid.includes(action)) {
+          assert.ok(CREDIT_WEIGHTS[action] > 0, `the paid action '${action}' must cost tokens`);
+        } else {
+          assert.equal(
+            CREDIT_WEIGHTS[action],
+            0,
+            `the action '${action}' is free and must have a zero weight`
+          );
+        }
+      }
+    });
+
+    test('every paid action shows its cost in the interface', () => {
       // A token must never be spent without the candidate knowing what it
       // costs. Every action the server can charge therefore has to appear as
       // a cost label somewhere in the interface.
@@ -475,12 +539,11 @@ describe('the token deduction contract', () => {
         }
       }
 
-      const missing = [
-        ...new Set<AICreditAction>([
-          ...(Object.values(ALLOWED_TOKEN_ROUTES) as AICreditAction[]),
-          'premium_template_unlock',
-        ]),
-      ].filter((action) => !quoted.has(action));
+      const paidActions = (Object.keys(CREDIT_WEIGHTS) as AICreditAction[]).filter(
+        (action) => CREDIT_WEIGHTS[action] > 0
+      );
+
+      const missing = paidActions.filter((action) => !quoted.has(action));
 
       assert.deepEqual(
         missing,

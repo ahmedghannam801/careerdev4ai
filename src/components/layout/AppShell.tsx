@@ -70,7 +70,7 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, children }) => {
-  const { profile, targetRole, settings, updateSettings, visibleNotifications, currentUser, logout, t, copilotOpen, setCopilotOpen } = useCareer();
+  const { profile, targetRole, settings, updateSettings, visibleNotifications, currentUser, identity, avatarId, logout, t, copilotOpen, setCopilotOpen } = useCareer();
   // The feedback form is a permanent destination. Both the account menu and
   // the mobile drawer open the same address and report the same source, so
   // the entry point is never lost when the dashboard card is dismissed.
@@ -107,7 +107,15 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
   const unreadCount = visibleNotifications.filter(n => !n.read).length;
 
-  const displayName = currentUser?.name || profile.name || t('Signed in');
+  /**
+   * The candidate's name, from the one source of truth.
+   *
+   * It used to be `currentUser?.name || profile.name`, which meant the
+   * topbar showed the name on the auth account while the sidebar showed the
+   * name in the profile — two names for one person, until the page was
+   * reloaded. The identity is now resolved once, in the context.
+   */
+  const displayName = identity.displayName || t('Signed in');
 
   // Global Ctrl/Cmd + K keyboard shortcut
   useEffect(() => {
@@ -317,12 +325,12 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
           >
             <div className="flex items-center gap-2 min-w-0">
               <CareerPilotAvatar
-                avatarId={profile.avatarUrl}
+                avatarId={avatarId}
                 className="w-7 h-7 rounded-lg border border-[var(--border-subtle)]"
               />
               <div className="min-w-0">
                 <div className="text-xs font-bold text-[var(--text-primary)] truncate">
-                  {profile.name}
+                  {identity.displayName}
                 </div>
                 <div className="text-[10px] text-[var(--text-muted)] truncate">
                   @{profile.username || 'user'}
@@ -421,7 +429,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 title={t('View My Profile')}
               >
                 <CareerPilotAvatar
-                  avatarId={profile.avatarUrl}
+                  avatarId={avatarId}
                   className="w-7 h-7 rounded-full border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)] transition-colors"
                 />
                 <span className="hidden lg:inline text-xs font-medium text-[var(--text-primary)]">

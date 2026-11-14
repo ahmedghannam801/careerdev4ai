@@ -26,7 +26,7 @@
  *     the candidate's real record and not of a line on a draft.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -511,15 +511,30 @@ export const CvDataManager: React.FC = () => {
 const PersonalSection: React.FC<{
   onSave: (work: () => Promise<void> | void) => Promise<void>;
 }> = ({ onSave }) => {
-  const { profile, updateProfile, t } = useCareer();
+  const { profile, identity, updateProfile, t } = useCareer();
   const [draft, setDraft] = useState({
-    name: profile.name ?? '',
+    name: identity.displayName || profile.name || '',
     headline: profile.headline ?? '',
     email: profile.email ?? '',
     phone: profile.phone ?? '',
     location: profile.location ?? '',
     links: { ...(profile.links ?? {}) },
   });
+
+  /**
+   * The name follows the identity.
+   *
+   * The field is seeded once, so a name changed in Profile used to leave the
+   * CV Studio showing the old one — the two screens disagreed about who the
+   * candidate is. The draft is only overwritten when the candidate has NOT
+   * typed in it themselves, so a manual edit is never lost.
+   */
+  const [nameEdited, setNameEdited] = useState(false);
+  useEffect(() => {
+    if (nameEdited) return;
+    const next = identity.displayName || profile.name || '';
+    setDraft((previous) => (previous.name === next ? previous : { ...previous, name: next }));
+  }, [identity.displayName, profile.name, nameEdited]);
 
   const set = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) =>
     setDraft((previous) => ({ ...previous, [key]: value }));
@@ -542,7 +557,10 @@ const PersonalSection: React.FC<{
           <input
             className={inputClass}
             value={draft.name}
-            onChange={(event) => set('name', event.target.value)}
+            onChange={(event) => {
+              setNameEdited(true);
+              set('name', event.target.value);
+            }}
           />
         </Field>
         <Field label={t('Title')}>

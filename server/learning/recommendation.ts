@@ -35,6 +35,7 @@ import {
 } from '../../shared/skillMatching.ts';
 import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
 import { providerTier } from '../../shared/courseProviders.ts';
+import { accessTier, isFreeOnlyEligible } from '../../shared/learningAccess.ts';
 import type { LearningResourceType } from '../../shared/learningResources.ts';
 import {
   isSemanticCourseDuplicate,
@@ -274,20 +275,23 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+/**
+ * The honest access wording for a course.
+ *
+ * The old vocabulary said "Free" for a course whose certificate cost money
+ * and for a course whose first chapter was free. The learner read that as
+ * "this costs nothing" and found out otherwise at the checkout.
+ */
 function availabilityLabel(course: LearningCourse): string {
-  switch (course.availability) {
+  switch (accessTier(course.availability)) {
     case 'free':
-      return 'Free';
-    case 'free_with_limitations':
-      return 'Free with limitations';
-    case 'audit':
-      return 'Free to audit';
-    case 'free_course_paid_certificate':
-      return 'Free course, paid certificate';
+      return '100% free';
+    case 'free_audit':
+      return 'free to audit, certificate paid';
+    case 'free_trial':
+      return 'free trial only — the rest is paid';
     case 'paid':
-      return 'Paid';
-    case 'youtube_free':
-      return 'Free on YouTube';
+      return 'paid subscription';
   }
 }
 
@@ -380,25 +384,37 @@ function timeFit(course: LearningCourse, weeklyHours: number): number {
   return 0.3;
 }
 
+/**
+ * How well the resource fits the learner's budget.
+ *
+ * A resource whose content is behind a paywall is a poor fit for "free
+ * only" even when its first chapter is free, so it scores low rather than
+ * being dropped here: the filter below decides what is shown at all.
+ */
 function budgetFit(course: LearningCourse, budget: BudgetPreference): number {
-  switch (course.availability) {
-    case 'free':
-    case 'youtube_free':
-      return 1;
-    case 'audit':
-      return budget === 'free_only' ? 1 : 0.9;
-    case 'free_course_paid_certificate':
-      return budget === 'free_only' ? 1 : 0.85;
-    case 'free_with_limitations':
-      return budget === 'free_only' ? 0.9 : 0.75;
-    case 'paid':
-      return budget === 'any' ? 0.35 : 0;
+  const tier = accessTier(course.availability);
+  if (budget === 'any') {
+    return tier === 'free' ? 1 : tier === 'free_audit' ? 0.9 : tier === 'free_trial' ? 0.75 : 0.35;
   }
+  if (budget === 'low') {
+    return tier === 'free' ? 1 : tier === 'free_audit' ? 0.9 : tier === 'free_trial' ? 0.75 : 0.35;
+  }
+  // "Free only": the content must be reachable for nothing.
+  return tier === 'free' ? 1 : tier === 'free_audit' ? 0.9 : 0;
 }
 
+/**
+ * Whether the resource may be shown at all under this budget.
+ *
+ * "Free only" keeps the resources whose CORE learning content can be
+ * completed for nothing: a course that is free to audit still teaches
+ * everything, and a course whose certificate costs money still teaches
+ * everything. A course where only the first chapter is free does not, and a
+ * paid subscription does not.
+ */
 function isAllowedByBudget(course: LearningCourse, budget: BudgetPreference): boolean {
   if (budget !== 'free_only') return true;
-  return course.availability !== 'paid';
+  return isFreeOnlyEligible(course.availability);
 }
 
 function formatReason(

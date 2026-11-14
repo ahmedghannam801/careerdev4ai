@@ -186,6 +186,13 @@ export interface ProfileDTO {
   educationStatus: string | null;
   /** The year the candidate expects to graduate, when they stated one. */
   expectedGraduationYear: number | null;
+  /**
+   * The kind of opening the candidate is aiming at.
+   *
+   * internship | full_time_entry | both. NULL means the candidate has not
+   * chosen, and the platform reads that as "both" rather than guessing.
+   */
+  targetOpportunityType: string | null;
   onboardingCompleted: boolean;
   onboardingStatus: OnboardingStatus;
   onboardingStep: number;

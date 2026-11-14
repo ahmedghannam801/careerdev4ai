@@ -17,6 +17,10 @@ import {
   groupMilestonesByYear,
   type TimelineMilestone,
 } from '../../../shared/progressMomentum';
+import {
+  computeInterviewReadiness,
+  portfolioTarget,
+} from '../../../shared/interviewReadiness';
 
 export const ProgressView: React.FC = () => {
   const {
@@ -40,6 +44,34 @@ export const ProgressView: React.FC = () => {
   const inProgressSkills = skills.filter(s => s.gap > 0);
   const completedProjects = projects.filter(p => p.status === 'completed' || p.status === 'published');
   const activeApplications = applications.filter(a => !['rejected', 'withdrawn'].includes(a.stage));
+
+  /**
+   * The portfolio target for this role.
+   *
+   * The card used to read "Shipped Projects: 0/0", which told the candidate
+   * nothing: a denominator of zero is not a goal. It now reads the number of
+   * projects completed against the number the role expects, and the target is
+   * at least two — the smallest portfolio a hiring manager reads as evidence.
+   */
+  const portfolioGoal = portfolioTarget(targetRole?.typicalProjects);
+
+  /**
+   * The four interview measures, kept independent of one another.
+   *
+   * Readiness is measured from the mock interviews alone. It is not reduced
+   * by having no job applications: a candidate who has not applied yet has
+   * not failed to interview.
+   */
+  const interviewMetrics = useMemo(
+    () =>
+      computeInterviewReadiness(
+        interviewSessions.map((session) => ({
+          score: session.aiFeedback?.score ?? null,
+          roleTitle: session.roleTitle ?? null,
+        }))
+      ),
+    [interviewSessions]
+  );
 
   // The streak comes from the user's own recorded activity, so it reflects
   // what they actually did rather than what the plan hoped they would do.
@@ -114,26 +146,60 @@ export const ProgressView: React.FC = () => {
         <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <FolderGit2 className="w-4 h-4 text-[var(--color-info)]" />
-            <span>{t('Shipped Projects')}</span>
+            <span>{t('Completed Projects')}</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
-            {completedProjects.length} <span className="text-sm font-normal text-[var(--text-muted)]">/ {projects.length}</span>
+            {completedProjects.length}
+            <span className="text-sm font-normal text-[var(--text-muted)]"> / {portfolioGoal}</span>
           </div>
           <div className="text-xs text-[var(--text-muted)]">
-            {evidenceItems.length} {t('verified artifacts')}
+            {t('Target for role')} · {evidenceItems.length} {t('verified artifacts')}
           </div>
         </StaggerItem>
 
         <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
           <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
             <Briefcase className="w-4 h-4 text-[var(--color-warning)]" />
-            <span>{t('Active Pipeline')}</span>
+            <span>{t('Active Applications')}</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
             {activeApplications.length}
           </div>
           <div className="text-xs text-[var(--text-muted)]">
-            {interviewSessions.length} {t('mock sessions recorded')}
+            {interviewMetrics.mockInterviewsCompleted} {t('mock interviews completed')}
+          </div>
+        </StaggerItem>
+
+        <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
+          <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-[var(--color-primary-text)]" />
+            <span>{t('Interview Readiness')}</span>
+          </div>
+          <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
+            {interviewMetrics.readinessPct === null ? '—' : `${interviewMetrics.readinessPct}%`}
+          </div>
+          <div className="text-xs text-[var(--text-muted)]">
+            {interviewMetrics.isUnmeasured
+              ? t('Not measured yet — practise a mock interview')
+              : t('from mock interview rubrics')}
+          </div>
+        </StaggerItem>
+
+        <StaggerItem className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-2 shadow-xs">
+          <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
+            <Star className="w-4 h-4 text-[var(--color-success-strong)]" />
+            <span>{t('Average Interview Performance')}</span>
+          </div>
+          <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
+            {interviewMetrics.averagePerformance === null
+              ? '—'
+              : `${interviewMetrics.averagePerformance.toFixed(1)}`}
+            {interviewMetrics.averagePerformance !== null ? (
+              <span className="text-sm font-normal text-[var(--text-muted)]"> / 10</span>
+            ) : null}
+          </div>
+          <div className="text-xs text-[var(--text-muted)]">
+            {interviewMetrics.scoredInterviews} {t('scored sessions')}
           </div>
         </StaggerItem>
       </Stagger>

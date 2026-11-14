@@ -62,6 +62,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     updateVolunteerExperience,
     deleteVolunteerExperience,
     careerIdentity,
+    identity,
     t
   } = useCareer();
 
@@ -717,7 +718,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
-                  {profile.name}
+                  {identity.displayName}
                 </h1>
                 {profile.preferredName && profile.preferredName !== profile.name && (
                   <span className="text-sm text-[var(--text-muted)] font-medium">
@@ -2209,7 +2210,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                 />
                 <div className="space-y-1">
                   <h1 className="text-xl font-bold text-[var(--text-primary)]">
-                    {profile.name}
+                    {identity.displayName}
                   </h1>
                   <p className="text-xs font-semibold text-[var(--color-primary-text)]">
                     {profile.headline || profile.currentTitle}

@@ -212,6 +212,38 @@ export const ProjectAiPanel: React.FC = () => {
           </p>
         </div>
 
+        {/* The two actions do different things, and the panel used to leave
+            the candidate to work out which was which from the button
+            labels alone. Each one now says what it does. */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+            <div className="flex items-center gap-1.5">
+              <Lightbulb className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
+              <span className="text-xs font-semibold text-[var(--text-primary)]">
+                {t('Recommend projects for me')}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+              {t(
+                'Generates tailored project ideas based on your skill gaps, your target role and your roadmap. It does not look at the projects you already have.'
+              )}
+            </p>
+          </div>
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+            <div className="flex items-center gap-1.5">
+              <Wrench className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
+              <span className="text-xs font-semibold text-[var(--text-primary)]">
+                {t('Check my existing projects')}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+              {t(
+                'Evaluates and scores a project you have already added: how strong it is, which skills it proves, and what is still missing. It does not suggest new projects.'
+              )}
+            </p>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleRecommend}
@@ -246,13 +278,15 @@ export const ProjectAiPanel: React.FC = () => {
                 : aiButtonLabel(t('Check my existing projects'), 'project_analysis', t)}
             </span>
           </button>
-
-          {projects.length === 0 && (
-            <span className="text-[11px] text-[var(--text-muted)]">
-              {t('Add a project first and it can be checked.')}
-            </span>
-          )}
         </div>
+
+        {/* The review button stays disabled until there is something to
+            review, and the candidate is told exactly what unblocks it. */}
+        {projects.length === 0 && (
+          <p className="text-[11px] text-[var(--text-muted)]">
+            {t('Add at least 1 project below to enable AI project review')}
+          </p>
+        )}
       </div>
 
       {error && (

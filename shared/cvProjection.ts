@@ -42,7 +42,21 @@ import {
   formatCvPeriod,
   type CvSourceData,
 } from './cvDocument.ts';
-import { isSkillSectionHeader, normalizeSkillKey } from './cvDedupe.ts';
+import {
+  dedupeCertifications,
+  dedupeExperience,
+  dedupeProjects,
+  isSkillSectionHeader,
+  sameCertification,
+  sameProject,
+} from './cvDedupe.ts';
+import {
+  canonicalizeSkills,
+  dedupeSummaryParagraphs,
+  dropEmptyExperience,
+  mergeEducationRecords,
+} from './cvCanonical.ts';
+import { skillsMatch } from './skillMatching.ts';
 /**
  * Whether an id belongs to a record the platform stores.
  *
@@ -58,17 +72,52 @@ export function isCanonicalRecordId(id: string | null | undefined): boolean {
   );
 }
 
-/** The parts of a record that identify it to a reader of a CV. */
-function experienceKey(role: string, company: string): string {
-  return `${role.trim().toLowerCase()}|${company.trim().toLowerCase()}`;
+/**
+ * Finds the document entry that belongs to an experience record.
+ *
+ * The id is tried first. When it does not match — which is what happens
+ * right after an imported CV is written into the profile, because the
+ * imported entries carry the parser's ids and the records carry the
+ * database's — the entry is found by what it says instead.
+ *
+ * The period is checked too, because the same role at the same company in
+ * two different years is two jobs. Without it, a second stint would swallow
+ * the first one's entry and one of the jobs would vanish from the CV.
+ */
+function findPreviousExperience(
+  source: {
+    id: string;
+    role: string;
+    company: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    isCurrent?: boolean;
+  },
+  previous: CVProfile['experiences'],
+  consumed: Set<string>
+): CVProfile['experiences'][number] | undefined {
+  const byId = previous.find((entry) => entry.id === source.id);
+  if (byId) return byId;
+
+  const sameJob = previous.filter(
+    (entry) =>
+      !consumed.has(entry.id) &&
+      entry.role.trim().toLowerCase() === source.role.trim().toLowerCase() &&
+      entry.company.trim().toLowerCase() === source.company.trim().toLowerCase()
+  );
+  if (sameJob.length === 0) return undefined;
+
+  const period = formatCvPeriod(source.startDate, source.endDate, source.isCurrent);
+  if (period) {
+    const byPeriod = sameJob.find((entry) => entry.period.trim() === period.trim());
+    if (byPeriod) return byPeriod;
+  }
+
+  return sameJob[0];
 }
 
 function educationKey(institution: string, degree: string): string {
   return `${institution.trim().toLowerCase()}|${degree.trim().toLowerCase()}`;
-}
-
-function projectKey(title: string): string {
-  return title.trim().toLowerCase();
 }
 
 function volunteeringKey(organization: string, role: string): string {
@@ -77,10 +126,6 @@ function volunteeringKey(organization: string, role: string): string {
 
 function courseKey(title: string, provider: string): string {
   return `${title.trim().toLowerCase()}|${provider.trim().toLowerCase()}`;
-}
-
-function certificationKey(name: string): string {
-  return name.trim().toLowerCase();
 }
 
 /**
@@ -135,17 +180,23 @@ export function mergeCanonicalCvDocument(
   const location = profile.location?.trim() || previous.location?.trim() || '';
   const title = profile.title?.trim() || previous.title?.trim() || '';
   // The summary is the candidate's wording for this CV, so the document wins.
-  const summary = previous.summary?.trim() || profile.summary?.trim() || '';
+  // A paragraph that repeats an earlier one is folded away either way: the
+  // candidate pasted it twice, and a CV that says the same thing twice reads
+  // as noise.
+  const summary = dedupeSummaryParagraphs(
+    previous.summary?.trim() || profile.summary?.trim() || ''
+  );
 
   /* -- experience -------------------------------------------------------- */
   const consumedExperiences = new Set<string>();
-  const experiences: CVProfile['experiences'] = (source.experiences ?? []).map((entry) => {
-    const previousEntry = findPrevious(
-      entry,
-      previousExperiences,
-      (candidate) => experienceKey(candidate.role, candidate.company),
-      experienceKey(entry.role, entry.company)
-    );
+  // A record with neither a role nor a company says nothing, so it is not
+  // carried into the CV. Duplicate rows for the same job are folded into one:
+  // the same title at the same organisation with the same dates is one job,
+  // and its location, employment type and bullets are merged rather than
+  // shown twice.
+  const sourceExperiences = dedupeExperience(dropEmptyExperience(source.experiences ?? []));
+  const experiences: CVProfile['experiences'] = sourceExperiences.map((entry) => {
+    const previousEntry = findPreviousExperience(entry, previousExperiences, consumedExperiences);
     if (previousEntry) consumedExperiences.add(previousEntry.id);
     return {
       id: entry.id,
@@ -174,7 +225,10 @@ export function mergeCanonicalCvDocument(
 
   /* -- education --------------------------------------------------------- */
   const consumedEducation = new Set<string>();
-  const education: CVProfile['education'] = (source.education ?? []).map((entry) => {
+  // Two rows for the same degree at the same university are one row. The
+  // profile shows the count the candidate expects, and so does the CV.
+  const sourceEducation = mergeEducationRecords(source.education ?? []);
+  const education: CVProfile['education'] = sourceEducation.map((entry) => {
     const previousEntry = findPrevious(
       entry,
       previousEducation,
@@ -202,13 +256,15 @@ export function mergeCanonicalCvDocument(
 
   /* -- projects ---------------------------------------------------------- */
   const consumedProjects = new Set<string>();
-  const projects: CVProfile['projects'] = (source.projects ?? []).map((entry) => {
-    const previousEntry = findPrevious(
-      entry,
-      previousProjects,
-      (candidate) => projectKey(candidate.title),
-      projectKey(entry.title)
-    );
+  const sourceProjects = dedupeProjects(source.projects ?? []);
+  const projects: CVProfile['projects'] = sourceProjects.map((entry) => {
+    const previousEntry =
+      previousProjects.find(
+        (candidate) => !consumedProjects.has(candidate.id) && candidate.id === entry.id
+      ) ??
+      previousProjects.find(
+        (candidate) => !consumedProjects.has(candidate.id) && sameProject(candidate, entry)
+      );
     if (previousEntry) consumedProjects.add(previousEntry.id);
     return {
       id: entry.id,
@@ -293,12 +349,11 @@ export function mergeCanonicalCvDocument(
   // becomes one entry rather than two.
   const consumedCertificates = new Set<number>();
   const certificationDetails: NonNullable<CVProfile['certificationDetails']> = [];
-  for (const entry of source.certifications ?? []) {
+  for (const entry of dedupeCertifications(source.certifications ?? [])) {
     const previousIndex = previousCertifications.findIndex(
       (candidate, index) =>
         !consumedCertificates.has(index) &&
-        (candidate.id === entry.id ||
-          certificationKey(candidate.name) === certificationKey(entry.name))
+        (candidate.id === entry.id || sameCertification(candidate, entry))
     );
     const previousEntry = previousIndex === -1 ? undefined : previousCertifications[previousIndex];
     if (previousEntry) consumedCertificates.add(previousIndex);
@@ -329,22 +384,38 @@ export function mergeCanonicalCvDocument(
   /* -- skills ------------------------------------------------------------ */
   // The skills on a CV are the skills the candidate owns. A target-role
   // requirement or a skill gap is never shown as if it were theirs.
-  const ownedNames = (source.skills ?? []).map((skill) => skill.name);
-  const hiddenSkills = new Set(previous.hiddenSkills ?? []);
-  const documentSkillNames = previous.skillsList ?? [];
+  // The skills on a CV are the skills the candidate owns. A target-role
+  // requirement or a skill gap is never shown as if it were theirs.
+  //
+  // The list is folded before it is written: "SQL" and "SQL Fundamentals"
+  // are one skill, and a CV that lists both reads as two skills the
+  // candidate has when they have one.
+  const hiddenSkillNames = previous.hiddenSkills ?? [];
+  const isHiddenSkill = (name: string) =>
+    hiddenSkillNames.some(
+      (hidden) => hidden.trim() === name || skillsMatch(hidden, name)
+    );
+
+  const documentSkillNames = (previous.skillsList ?? []).filter(
+    (name) => name.trim() && !isSkillSectionHeader(name.trim())
+  );
+
+  // The records can carry a legacy section heading ("TECHNICAL SKILLS") from an
+  // old import. It is a label, not a skill, and must not reach the document.
+  const sourceSkills = (source.skills ?? []).filter(
+    (skill) => (skill.name ?? '').trim() && !isSkillSectionHeader((skill.name ?? '').trim())
+  );
+
+  const canonicalSkills = canonicalizeSkills([
+    ...documentSkillNames.map((name) => ({ name })),
+    ...sourceSkills,
+  ]);
+
   const skillsList: string[] = [];
-  const seenSkillKeys = new Set<string>();
-  const appendSkill = (raw: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed || isSkillSectionHeader(trimmed)) return;
-    if (hiddenSkills.has(trimmed)) return;
-    const normalized = normalizeSkillKey(trimmed);
-    if (!normalized || seenSkillKeys.has(normalized)) return;
-    seenSkillKeys.add(normalized);
-    skillsList.push(trimmed);
-  };
-  for (const name of documentSkillNames) appendSkill(name);
-  for (const name of ownedNames) appendSkill(name);
+  for (const skill of canonicalSkills) {
+    if (isHiddenSkill(skill.name)) continue;
+    skillsList.push(skill.name);
+  }
 
   /* -- links ------------------------------------------------------------- */
   // The order and the enabled flag belong to this CV; the URL and the label

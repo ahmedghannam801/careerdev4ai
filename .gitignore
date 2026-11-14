@@ -34,3 +34,4 @@ dist-jobs/
 
 # Local Supabase CLI state (project ref, pooler URL — machine specific)
 supabase/.temp/
+.dyad/

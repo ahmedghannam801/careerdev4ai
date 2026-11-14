@@ -5,8 +5,15 @@
  * product. Nothing in the app hard-codes a timing value, so the whole interface
  * moves with the same rhythm.
  *
- * Built on the `motion` package (Framer Motion's successor), which is already a
- * project dependency — no additional animation library is introduced.
+ * Built on the `motion` package (Framer Motion's successor). Product UI
+ * transitions — buttons, panels, modals, list reveals — stay on `motion` so
+ * there is one timing system for everything the user touches.
+ *
+ * GSAP (+ @gsap/react), Lenis and React Bits components are installed for
+ * showcase work: landing-page hero choreography, scroll-linked sequences and
+ * long-page smooth scrolling. They are deliberately not used for in-product
+ * UI state changes, and any GSAP/Lenis code must still honour
+ * `prefers-reduced-motion` the same way the variants below do.
  *
  * Design rules encoded here:
  *   * UI interactions (hover, press, small state changes) run 150–250ms.

@@ -523,3 +523,111 @@ describe('the projection never invents anything', () => {
     assert.deepEqual(document.skillsList, []);
   });
 });
+
+describe('the projection folds the records together', () => {
+  it('writes one line for a skill the candidate described twice', () => {
+    const document = mergeCanonicalCvDocument(
+      source({
+        skills: [
+          { name: 'SQL', level: 3 },
+          { name: 'SQL Fundamentals', level: 3 },
+        ],
+      }),
+      emptyDocument()
+    );
+    assert.deepEqual(document.skillsList, ['SQL'], 'one skill, one line');
+  });
+
+  it('keeps the specialisation of a skill the candidate described twice', () => {
+    const document = mergeCanonicalCvDocument(
+      source({
+        skills: [
+          { name: 'Python', level: 3 },
+          { name: 'Python for Data Analysis', level: 3 },
+        ],
+      }),
+      emptyDocument()
+    );
+    assert.equal(document.skillsList.length, 1, 'one skill');
+    assert.match(document.skillsList[0], /^Python/, 'the broad name leads');
+  });
+
+  it('folds a skill the CV already carries into the owned one', () => {
+    const document = mergeCanonicalCvDocument(
+      source({ skills: [{ name: 'SQL Fundamentals', level: 3 }] }),
+      { ...emptyDocument(), skillsList: ['SQL'] }
+    );
+    assert.deepEqual(document.skillsList, ['SQL'], 'the CV does not list it twice');
+  });
+
+  it('keeps one row for a degree the candidate entered twice', () => {
+    const document = mergeCanonicalCvDocument(
+      source({
+        education: [
+          {
+            id: UUID_A,
+            institution: 'Cairo University',
+            degree: 'Bachelor of Science',
+            startDate: '2018-09-01',
+          },
+          {
+            id: UUID_B,
+            institution: 'Cairo University',
+            degree: 'Bachelor of Science',
+            startDate: '2018-09-01',
+          },
+        ],
+      }),
+      emptyDocument()
+    );
+    assert.equal(document.education.length, 1, 'one row for one degree');
+    assert.equal(document.education[0].institution, 'Cairo University');
+  });
+
+  it('keeps two stints at the same company as two entries', () => {
+    const document = mergeCanonicalCvDocument(
+      source({
+        experiences: [
+          {
+            id: UUID_A,
+            role: 'Engineer',
+            company: 'Nile Software',
+            startDate: '2019-10-01',
+            endDate: '2021-06-30',
+          },
+          {
+            id: UUID_B,
+            role: 'Engineer',
+            company: 'Nile Software',
+            startDate: '2023-01-01',
+          },
+        ],
+      }),
+      emptyDocument()
+    );
+    assert.equal(document.experiences.length, 2, 'two jobs are two entries');
+  });
+
+  it('drops a summary paragraph that repeats an earlier one', () => {
+    const document = mergeCanonicalCvDocument(
+      source({
+        profile: {
+          fullName: 'Amal Said',
+          summary: 'Frontend engineer.\n\nFrontend engineer.',
+        },
+      }),
+      emptyDocument()
+    );
+    assert.equal(document.summary, 'Frontend engineer.', 'the repeat is folded away');
+  });
+
+  it('leaves an experience record that says nothing off the CV', () => {
+    const document = mergeCanonicalCvDocument(
+      source({
+        experiences: [{ id: UUID_A, role: '', company: '' }],
+      }),
+      emptyDocument()
+    );
+    assert.deepEqual(document.experiences, [], 'a blank row is not on the CV');
+  });
+});

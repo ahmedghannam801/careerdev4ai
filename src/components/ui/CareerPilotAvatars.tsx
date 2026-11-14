@@ -8,18 +8,18 @@ export interface AvatarOption {
 }
 
 export const CAREERPILOT_AVATARS: AvatarOption[] = [
-  { id: 'avatar-01', name: 'Nour', description: 'Modern minimal crew style' },
-  { id: 'avatar-02', name: 'Maya', description: 'Classic professional waves' },
-  { id: 'avatar-03', name: 'Liam', description: 'Curated architectural glasses' },
-  { id: 'avatar-04', name: 'Sophia', description: 'Sleek contemporary bob' },
-  { id: 'avatar-05', name: 'Tariq', description: 'Sharp collared professional' },
-  { id: 'avatar-06', name: 'Elena', description: 'Dynamic textured curls' },
-  { id: 'avatar-07', name: 'Marcus', description: 'Clean executive profile' },
-  { id: 'avatar-08', name: 'Chloe', description: 'Modern creative pixie' },
-  { id: 'avatar-09', name: 'Jin', description: 'Refined layered tailored' },
-  { id: 'avatar-10', name: 'Zara', description: 'Elegant tailored drape' },
-  { id: 'avatar-11', name: 'David', description: 'Relaxed technical lead' },
-  { id: 'avatar-12', name: 'Amara', description: 'Sophisticated braided updo' },
+  { id: 'avatar-01', name: 'Classic Crew', description: 'Modern minimal crew style' },
+  { id: 'avatar-02', name: 'Soft Waves', description: 'Classic professional waves' },
+  { id: 'avatar-03', name: 'Modern Glasses', description: 'Curated architectural glasses' },
+  { id: 'avatar-04', name: 'Sharp Bob', description: 'Sleek contemporary bob' },
+  { id: 'avatar-05', name: 'Beard & Fade', description: 'Sharp collared professional' },
+  { id: 'avatar-06', name: 'Textured Curls', description: 'Dynamic textured curls' },
+  { id: 'avatar-07', name: 'Clean Buzz', description: 'Clean executive profile' },
+  { id: 'avatar-08', name: 'Creative Pixie', description: 'Modern creative pixie' },
+  { id: 'avatar-09', name: 'Layered Cut', description: 'Refined layered tailored' },
+  { id: 'avatar-10', name: 'Draped Elegance', description: 'Elegant tailored drape' },
+  { id: 'avatar-11', name: 'Relaxed Lead', description: 'Relaxed technical lead' },
+  { id: 'avatar-12', name: 'Braided Updo', description: 'Sophisticated braided updo' },
 ];
 
 export const DEFAULT_AVATAR_ID = 'avatar-01';
@@ -49,7 +49,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
   switch (normalizedId) {
     case 'avatar-01':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Nour Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#EBDDCF" />
           {/* Shoulders */}
@@ -73,7 +73,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-02':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Maya Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#DDE6D5" />
           {/* Back Hair */}
@@ -100,7 +100,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-03':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Liam Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#E1DDD5" />
           {/* Body */}
@@ -124,7 +124,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-04':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Sophia Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#D9A49A" fillOpacity="0.4" />
           {/* Bob hair back */}
@@ -148,7 +148,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-05':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Tariq Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#E1DDD5" />
           {/* Body */}
@@ -174,7 +174,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-06':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Elena Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#DDE6D5" />
           {/* Ponytail puff */}
@@ -198,7 +198,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-07':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Marcus Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#EBDDCF" />
           {/* Body */}
@@ -222,7 +222,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-08':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Chloe Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#DDE6D5" />
           {/* Body */}
@@ -247,7 +247,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-09':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Jin Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#E1DDD5" />
           {/* Body */}
@@ -269,7 +269,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-10':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Zara Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#DDE6D5" />
           {/* Body */}
@@ -292,7 +292,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-11':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="David Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#EBDDCF" />
           {/* Body */}
@@ -315,7 +315,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     case 'avatar-12':
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Amara Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#DDE6D5" />
           {/* High braided bun */}
@@ -339,7 +339,7 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
 
     default:
       return (
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Default Avatar">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={sizeStyle} role="img" aria-label="Professional avatar">
           <rect width="100" height="100" rx="20" fill="#F5F0E8" />
           <circle cx="50" cy="50" r="42" fill="#EBDDCF" />
           <path d="M22 88C22 73 34 68 50 68C66 68 78 73 78 88" fill="#B94736" />

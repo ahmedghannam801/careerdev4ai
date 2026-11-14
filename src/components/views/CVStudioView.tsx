@@ -359,7 +359,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               <span>
                 {isOptimizingCV
                   ? t('Analyzing ATS Keywords...')
-                  : aiButtonLabel(t('Run ATS Audit'), 'cv_tailoring', t)}
+                  : aiButtonLabel(t('Run ATS Audit'), 'cv_ats_analysis', t)}
               </span>
             </button>
           )}
@@ -606,7 +606,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                   >
                     {isOptimizingCV
                       ? t('Analyzing…')
-                      : aiButtonLabel(`${t('Audit for')} ${targetRole?.title ?? ''}`, 'cv_tailoring', t)}
+                      : aiButtonLabel(`${t('Audit for')} ${targetRole?.title ?? ''}`, 'cv_ats_analysis', t)}
                   </button>
                 </div>
               )}
@@ -736,7 +736,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               >
                 {isOptimizingCV
                   ? t('Analyzing…')
-                  : aiButtonLabel(t('Run ATS Audit'), 'cv_tailoring', t)}
+                  : aiButtonLabel(t('Run ATS Audit'), 'cv_ats_analysis', t)}
               </button>
               {!aiWritingEnabled && (
                 <p className="text-[11px] text-[var(--color-warning)]">

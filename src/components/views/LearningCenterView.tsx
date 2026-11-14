@@ -33,11 +33,14 @@ import { LEARNING_TABS } from '../../lib/routing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { useRouteParam } from '../../lib/useRouteParams';
 import {
-  availabilityBucket,
-  availabilityLabel,
   providerTier,
-  type AvailabilityBucket,
 } from '../../../shared/courseProviders';
+import {
+  accessTier,
+  accessTierLabel,
+  dedupeAcrossShelves,
+  type LearningAccessTier,
+} from '../../../shared/learningAccess';
 import {
   RESOURCE_TYPES,
   RESOURCE_TYPE_LABELS,
@@ -48,7 +51,7 @@ import {
 type HubTab = 'recommended' | 'saved' | 'in_progress' | 'completed' | 'catalog';
 
 type DurationFilter = 'all' | 'short' | 'medium' | 'long';
-type AvailabilityFilter = 'all' | AvailabilityBucket;
+type AvailabilityFilter = 'all' | LearningAccessTier;
 
 const FORMAT_OPTIONS: Array<{ value: CourseFormat | 'all'; label: string }> = [
   { value: 'all', label: 'All course types' },
@@ -76,9 +79,10 @@ const DURATION_OPTIONS: Array<{ value: DurationFilter; label: string }> = [
 
 const AVAILABILITY_OPTIONS: Array<{ value: AvailabilityFilter; label: string }> = [
   { value: 'all', label: 'Any availability' },
-  { value: 'free', label: 'FREE' },
-  { value: 'free_audit', label: 'FREE AUDIT' },
-  { value: 'paid', label: 'PAID' },
+  { value: 'free', label: '100% Free' },
+  { value: 'free_audit', label: 'Free Audit (Certificate Paid)' },
+  { value: 'free_trial', label: 'Free Trial / Limited' },
+  { value: 'paid', label: 'Paid Subscription' },
 ];
 
 function matchesDuration(course: LearningCourse, duration: DurationFilter): boolean {
@@ -235,7 +239,7 @@ export const LearningCenterView: React.FC = () => {
     if (providerFilter !== 'all' && course.provider !== providerFilter) return false;
     if (
       availabilityFilter !== 'all' &&
-      availabilityBucket(course.availability) !== availabilityFilter
+      accessTier(course.availability) !== availabilityFilter
     ) {
       return false;
     }
@@ -356,14 +360,8 @@ export const LearningCenterView: React.FC = () => {
       (course) => isVideoResource(course.resourceType ?? 'course'),
       6
     );
-    const freeCourses = pick(
-      (course) => availabilityBucket(course.availability) === 'free',
-      6
-    );
-    const auditCourses = pick(
-      (course) => availabilityBucket(course.availability) === 'free_audit',
-      6
-    );
+    const freeCourses = pick((course) => accessTier(course.availability) === 'free', 6);
+    const auditCourses = pick((course) => accessTier(course.availability) === 'free_audit', 6);
     const certificateCourses = pick((course) => Boolean(course.hasCertificate), 6);
     const newCourses = learningCatalog
       .filter((course) => Boolean(course.createdAt))
@@ -388,6 +386,45 @@ export const LearningCenterView: React.FC = () => {
       popularCourses,
     };
   }, [learningCatalog, learningRecommendations, targetRole?.id, targetRole?.title ?? '']);
+
+  /**
+   * Every course belongs to exactly one shelf.
+   *
+   * The shelves are different lenses on one catalogue, so a course that
+   * answers to several of them used to appear several times on the same
+   * page. The learner met the same course three times and started to doubt
+   * that the hub knew anything they did not.
+   *
+   * The order below is the priority order: the first shelf that wants a
+   * course keeps it, and the later shelves show what is left.
+   */
+  const shelves = useMemo(() => {
+    const ordered = dedupeAcrossShelves(
+      [
+        { id: 'skillCourses', courses: rails.skillCourses },
+        { id: 'targetRoleCourses', courses: rails.targetRoleCourses },
+        { id: 'certificateCourses', courses: rails.certificateCourses },
+        { id: 'videoCourses', courses: rails.videoCourses },
+        { id: 'freeCourses', courses: rails.freeCourses },
+        { id: 'auditCourses', courses: rails.auditCourses },
+        { id: 'newCourses', courses: rails.newCourses },
+        { id: 'popularCourses', courses: rails.popularCourses },
+      ],
+      (course) => course.id
+    );
+
+    const byId = new Map(ordered.map((shelf) => [shelf.id, shelf.courses]));
+    return {
+      targetRoleCourses: byId.get('targetRoleCourses') ?? [],
+      skillCourses: byId.get('skillCourses') ?? [],
+      videoCourses: byId.get('videoCourses') ?? [],
+      freeCourses: byId.get('freeCourses') ?? [],
+      auditCourses: byId.get('auditCourses') ?? [],
+      certificateCourses: byId.get('certificateCourses') ?? [],
+      newCourses: byId.get('newCourses') ?? [],
+      popularCourses: byId.get('popularCourses') ?? [],
+    };
+  }, [rails]);
 
   const renderRail = (
     id: string,
@@ -477,6 +514,7 @@ export const LearningCenterView: React.FC = () => {
     course,
     recommendation,
     item: itemByCourse.get(course.id),
+    weeklyHours,
     onSave: saveLearningCourse,
     onStart: startLearningCourse,
     onComplete: completeLearningCourse,
@@ -745,7 +783,7 @@ export const LearningCenterView: React.FC = () => {
             'target-role',
             'For Your Target Role',
             `${roleLabel} · ${t('catalogue resources mapped to this role')}`,
-            rails.targetRoleCourses,
+            shelves.targetRoleCourses,
             { onExplore: () => exploreSection() }
           )}
 
@@ -753,7 +791,7 @@ export const LearningCenterView: React.FC = () => {
             'skills',
             'Build the Skills You Need',
             t('Resources that address the gaps in your skill profile.'),
-            rails.skillCourses,
+            shelves.skillCourses,
             { onExplore: () => exploreSection() }
           )}
 
@@ -761,7 +799,7 @@ export const LearningCenterView: React.FC = () => {
             'video',
             'Video Courses First',
             t('Watch a practitioner teach the skill, then practise it.'),
-            rails.videoCourses,
+            shelves.videoCourses,
             { onExplore: () => exploreSection('video_course') }
           )}
 
@@ -769,7 +807,7 @@ export const LearningCenterView: React.FC = () => {
             'free',
             'Free to Learn',
             t('No payment required to complete the learning.'),
-            rails.freeCourses,
+            shelves.freeCourses,
             { onExplore: () => exploreSection() }
           )}
 
@@ -777,7 +815,7 @@ export const LearningCenterView: React.FC = () => {
             'audit',
             'Free Audit',
             t('Audit the course without paying; the certificate is not included.'),
-            rails.auditCourses,
+            shelves.auditCourses,
             { onExplore: () => exploreSection() }
           )}
 
@@ -785,7 +823,7 @@ export const LearningCenterView: React.FC = () => {
             'certificate',
             'With a Certificate',
             t('The catalogue records a certificate for these resources.'),
-            rails.certificateCourses,
+            shelves.certificateCourses,
             { onExplore: () => exploreSection() }
           )}
 
@@ -793,14 +831,14 @@ export const LearningCenterView: React.FC = () => {
             'new',
             'New in the Catalogue',
             t('The most recently added resources.'),
-            rails.newCourses
+            shelves.newCourses
           )}
 
           {renderRail(
             'popular',
             'Popular with Learners',
             t('Ranked by the provider-published learner count.'),
-            rails.popularCourses
+            shelves.popularCourses
           )}
 
           <section data-tour="learning-search-filters" className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
@@ -920,7 +958,7 @@ export const LearningCenterView: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-[var(--text-primary)]">{course.title}</div>
                   <div className="text-xs text-[var(--text-secondary)]">
-                    {course.provider} · {availabilityLabel(course.availability)} ·{' '}
+                    {course.provider} · {accessTierLabel(course.availability)} ·{' '}
                     {t('completed')}{' '}
                     {item.completedAt ? new Date(item.completedAt).toLocaleDateString() : ''}
                   </div>

@@ -229,8 +229,8 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
             <EmptyState
               icon={FileText}
               title={t('No documents in this view yet')}
-              description={t('Create a CV snapshot in CV Studio, generate a cover letter, or add a certificate or portfolio project to collect your career assets here.')}
-              actionLabel={t('Open CV Studio')}
+              description={t('Create a CV snapshot in CV Studio, generate a cover letter, or add a certificate or portfolio project to collect your career assets here. A saved CV version is the record that proves the work you have done, and it is what raises your Role Readiness.')}
+              actionLabel={t('Open CV Studio to Save a Snapshot')}
               onAction={() => onNavigate('cv-studio')}
             />
           ) : (

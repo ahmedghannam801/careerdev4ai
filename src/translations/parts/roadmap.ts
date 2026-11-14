@@ -152,4 +152,15 @@ export const roadmapAr: Record<string, string> = {
   'In Portfolio': 'في معرض الأعمال',
   'Starting…': 'جارٍ البدء…',
   'Start This Project': 'ابدأ هذا المشروع',
+
+  // ---- The plan's honest status (BUG-04) -------------------------------
+  'What this plan still needs from you': 'ما الذي لا تزال هذه الخطة تحتاجه منك',
+  'Your skills do not yet cover the core requirements. The biggest gap is':
+    'مهاراتك لا تغطي المتطلبات الأساسية بعد. أكبر فجوة هي',
+  'Your skills cover the core requirements for this role.':
+    'مهاراتك تغطي المتطلبات الأساسية لهذا الدور.',
+  'Blocking your progress': 'تعيق تقدمك',
+  'Close this gap': 'أغلق هذه الفجوة',
+  'Closes your gap in': 'تُغلق فجوتك في',
+  'Plan complete — skills still short': 'اكتملت الخطة — ما زالت المهارات ناقصة',
 };

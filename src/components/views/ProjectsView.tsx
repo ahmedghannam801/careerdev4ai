@@ -391,10 +391,10 @@ export const ProjectsView: React.FC = () => {
           }
           description={
             projects.length === 0
-              ? t('A project is the strongest proof of a skill. Add one you have built, or ask the advisor for one that closes a gap in your target role.')
+              ? t('A project is the strongest proof of a skill. Add one you have built, or ask the advisor for one that closes a gap in your target role. Every project you link to a skill moves your Role Readiness up.')
               : t('Try another status or category filter, or add a project in this state.')
           }
-          actionLabel={projects.length === 0 ? t('Add your first project') : undefined}
+          actionLabel={projects.length === 0 ? t('+ Add Your First Project') : undefined}
           onAction={projects.length === 0 ? openAddModal : undefined}
         />
       ) : (

@@ -188,18 +188,23 @@ describe('SaaS Subscription Remediation & Verification Suite', () => {
   // 7: AI Endpoint Credit Weights Matrix (BLK-05)
   // -------------------------------------------------------------------------
   describe('BLK-05: AI Endpoint Credit Weights and Plan Entitlements Matrix', () => {
-    it('verifies the authoritative credit weights across all 11 AI actions', () => {
-      assert.equal(CREDIT_WEIGHTS.job_description_analysis, 1);
-      assert.equal(CREDIT_WEIGHTS.cv_ats_analysis, 2);
-      assert.equal(CREDIT_WEIGHTS.cover_letter_generation, 2);
-      assert.equal(CREDIT_WEIGHTS.cv_generation, 4);
-      assert.equal(CREDIT_WEIGHTS.cv_tailoring, 4);
-      assert.equal(CREDIT_WEIGHTS.roadmap_generation, 4);
-      assert.equal(CREDIT_WEIGHTS.interview_mock_session, 5);
-      assert.equal(CREDIT_WEIGHTS.career_consultation_chat, 2);
-      assert.equal(CREDIT_WEIGHTS.ai_assist_inline, 1);
-      assert.equal(CREDIT_WEIGHTS.learning_recommendation, 1);
+    it('verifies the authoritative credit weights across all AI actions', () => {
+      // Four paid actions.
+      assert.equal(CREDIT_WEIGHTS.cv_ats_analysis, 1);
+      assert.equal(CREDIT_WEIGHTS.cv_tailoring, 1);
       assert.equal(CREDIT_WEIGHTS.project_analysis, 1);
+      assert.equal(CREDIT_WEIGHTS.premium_template_unlock, 5);
+
+      // Everything else is free at the token layer, including the chat and
+      // the mock interview, so a zero-balance candidate can use them.
+      assert.equal(CREDIT_WEIGHTS.job_description_analysis, 0);
+      assert.equal(CREDIT_WEIGHTS.cover_letter_generation, 0);
+      assert.equal(CREDIT_WEIGHTS.cv_generation, 0);
+      assert.equal(CREDIT_WEIGHTS.roadmap_generation, 0);
+      assert.equal(CREDIT_WEIGHTS.interview_mock_session, 0);
+      assert.equal(CREDIT_WEIGHTS.career_consultation_chat, 0);
+      assert.equal(CREDIT_WEIGHTS.ai_assist_inline, 0);
+      assert.equal(CREDIT_WEIGHTS.learning_recommendation, 0);
     });
 
     it('verifies that Pro & Career Plus exclusively unlock the AI career mentor', () => {

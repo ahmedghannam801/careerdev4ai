@@ -32,7 +32,6 @@ export const ApplicationsView: React.FC = () => {
     cvVersions,
     coverLetters,
     saveCoverLetter,
-    logActivity,
     t,
   } = useCareer();
   const { showToast } = useToast();
@@ -108,12 +107,8 @@ export const ApplicationsView: React.FC = () => {
       notes: notes.trim()
     });
 
-    await logActivity({
-      actionType: 'applied_job',
-      title: 'Created Application',
-      subtitle: `${role} at ${company}`,
-      linkView: 'applications'
-    });
+    // `addApplication` records the activity itself. Logging it here as well
+    // put two entries in Recent Activity for one application.
 
     setCompany('');
     setRole('');

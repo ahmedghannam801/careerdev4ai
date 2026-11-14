@@ -87,6 +87,82 @@ export const EDUCATION_STATUS_LABELS: Record<EducationStatus, string> = {
   not_set: 'Not set',
 };
 
+/**
+ * The kind of opening the candidate is aiming at.
+ *
+ * This is a separate axis from the career goal and from the target role,
+ * because a candidate can be aiming at "Data Analyst" as a role and still
+ * want an internship rather than a full-time entry-level job. The platform
+ * used to guess, and the CV summary then contradicted the profile.
+ */
+export const TARGET_OPPORTUNITY_TYPES = ['internship', 'full_time_entry', 'both'] as const;
+
+export type TargetOpportunityType = (typeof TARGET_OPPORTUNITY_TYPES)[number];
+
+export const TARGET_OPPORTUNITY_TYPE_LABELS: Record<TargetOpportunityType, string> = {
+  internship: 'Internship',
+  full_time_entry: 'Full-Time Entry-Level',
+  both: 'Both',
+};
+
+/**
+ * The type a candidate gets when they have not chosen one.
+ *
+ * "Both" is the honest default: it never narrows the search, and it never
+ * claims a preference the candidate did not state.
+ */
+export const DEFAULT_TARGET_OPPORTUNITY_TYPE: TargetOpportunityType = 'both';
+
+export function normalizeTargetOpportunityType(
+  value: string | null | undefined
+): TargetOpportunityType | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  // The label the candidate reads is "Full-Time Entry-Level"; the stored
+  // value is "full_time_entry".
+  const withoutSuffix =
+    normalized === 'full_time_entry_level' ? 'full_time_entry' : normalized;
+  return (TARGET_OPPORTUNITY_TYPES as readonly string[]).includes(withoutSuffix)
+    ? (withoutSuffix as TargetOpportunityType)
+    : null;
+}
+
+/**
+ * True when the candidate wants internships.
+ *
+ * A search for internships must not be narrowed to full-time roles, so
+ * "both" counts as wanting internships.
+ */
+export function includesInternship(type: TargetOpportunityType | null | undefined): boolean {
+  return type === 'internship' || type === 'both';
+}
+
+/**
+ * True when the candidate wants full-time entry-level roles.
+ */
+export function includesFullTimeEntry(
+  type: TargetOpportunityType | null | undefined
+): boolean {
+  return type === 'full_time_entry' || type === 'both';
+}
+
+/**
+ * The phrase that names the openings the candidate is aiming at.
+ *
+ * Used in the CV summary and in the live-jobs and opportunities headings, so
+ * all three say the same thing.
+ */
+export function targetOpportunityPhrase(type: TargetOpportunityType): string {
+  switch (type) {
+    case 'internship':
+      return 'an internship';
+    case 'full_time_entry':
+      return 'a full-time entry-level role';
+    case 'both':
+      return 'an internship or a full-time entry-level role';
+  }
+}
+
 export interface CareerIdentityEducation {
   institution?: string | null;
   degree?: string | null;
@@ -114,6 +190,10 @@ export interface CareerIdentityInput {
   expectedGraduationYear?: number | null;
   /** An explicit value saved by the candidate, checked against the years. */
   educationStatusOverride?: EducationStatus | null;
+  /** The kind of opening the candidate is aiming at. */
+  targetOpportunityType?: string | null;
+  /** The headline the candidate wrote for themselves. */
+  professionalHeadline?: string | null;
   /** The current year, injected so the function stays pure and testable. */
   currentYear?: number;
 }
@@ -137,9 +217,31 @@ export interface CareerIdentity {
   experienceLevel: ExperienceLevel | null;
   experienceLevelLabel: string;
   isStudent: boolean;
+  /** The kind of opening the candidate is aiming at. */
+  targetOpportunityType: TargetOpportunityType;
+  targetOpportunityTypeLabel: string;
+  /** The phrase that names the openings the candidate is aiming at. */
+  targetOpportunityPhrase: string;
+  /**
+   * The line the candidate puts at the top of a document.
+   *
+   * It is their own words. When they have not written one, the platform
+   * offers the obvious one — "Aspiring Data Analyst" — rather than leaving
+   * the field blank and letting the current job title stand in for it.
+   */
+  professionalHeadline: string | null;
+  /** True when the headline was offered rather than written. */
+  professionalHeadlineIsSuggested: boolean;
   /** Fields the candidate still has to fill in before the identity is complete. */
   missingFields: Array<{
-    id: 'currentStatus' | 'targetRole' | 'careerGoal' | 'experienceLevel' | 'education';
+    id:
+      | 'currentStatus'
+      | 'targetRole'
+      | 'careerGoal'
+      | 'experienceLevel'
+      | 'education'
+      | 'headline'
+      | 'graduationYear';
     label: string;
     targetView: 'profile' | 'settings';
   }>;
@@ -328,10 +430,42 @@ export function deriveCareerIdentity(input: CareerIdentityInput): CareerIdentity
   if (education.status === 'not_set') {
     missingFields.push({ id: 'education', label: 'Add your education status', targetView: 'profile' });
   }
+  // A student who has not said when they graduate cannot be given a dated
+  // plan, and the platform must not make one up.
+  if (isStudent && education.expectedGraduationYear === null) {
+    missingFields.push({
+      id: 'graduationYear',
+      label: 'Add your expected graduation year',
+      targetView: 'profile',
+    });
+  }
 
   const statusLabel = currentStatus ? CAREER_STATUS_LABELS[currentStatus] : 'Not set';
   const goalLabel = careerGoal ? CAREER_GOAL_LABELS[careerGoal] : 'Not set';
   const levelLabel = experienceLevel ? EXPERIENCE_LEVEL_LABELS[experienceLevel].en : 'Not set';
+
+  // The kind of opening the candidate is aiming at. When they have not
+  // chosen, the platform does not guess a preference that would narrow
+  // their search: it keeps both.
+  const targetOpportunityType =
+    normalizeTargetOpportunityType(input.targetOpportunityType) ??
+    DEFAULT_TARGET_OPPORTUNITY_TYPE;
+
+  // The headline is separate from the current job title. A student has no
+  // job title, and filling that field with "Aspiring Data Analyst" made the
+  // platform claim they were employed.
+  const writtenHeadline = input.professionalHeadline?.trim() || null;
+  const suggestedHeadline = targetRoleTitle ? `Aspiring ${targetRoleTitle}` : null;
+  const professionalHeadline = writtenHeadline ?? suggestedHeadline;
+  const professionalHeadlineIsSuggested = !writtenHeadline && suggestedHeadline !== null;
+
+  if (!writtenHeadline) {
+    missingFields.push({
+      id: 'headline',
+      label: 'Write your professional headline',
+      targetView: 'profile',
+    });
+  }
 
   const summaryLine = [
     statusLabel,
@@ -366,6 +500,11 @@ export function deriveCareerIdentity(input: CareerIdentityInput): CareerIdentity
     experienceLevel,
     experienceLevelLabel: levelLabel,
     isStudent,
+    targetOpportunityType,
+    targetOpportunityTypeLabel: TARGET_OPPORTUNITY_TYPE_LABELS[targetOpportunityType],
+    targetOpportunityPhrase: targetOpportunityPhrase(targetOpportunityType),
+    professionalHeadline,
+    professionalHeadlineIsSuggested,
     missingFields,
     summaryLine,
   };
@@ -387,6 +526,8 @@ export interface CareerIdentityPatch {
   experienceLevel?: ExperienceLevel | null;
   expectedGraduationYear?: number | null;
   educationStatus?: EducationStatus;
+  targetOpportunityType?: TargetOpportunityType;
+  professionalHeadline?: string | null;
 }
 
 export function identityPatchToProfilePatch(patch: CareerIdentityPatch): Record<string, unknown> {
@@ -401,5 +542,11 @@ export function identityPatchToProfilePatch(patch: CareerIdentityPatch): Record<
     out.expectedGraduationYear = patch.expectedGraduationYear;
   }
   if (patch.educationStatus !== undefined) out.educationStatus = patch.educationStatus;
+  if (patch.targetOpportunityType !== undefined) {
+    out.targetOpportunityType = patch.targetOpportunityType;
+  }
+  if (patch.professionalHeadline !== undefined) {
+    out.professionalHeadline = patch.professionalHeadline ?? '';
+  }
   return out;
 }

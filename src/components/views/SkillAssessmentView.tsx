@@ -19,7 +19,18 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { useToast } from '../toast/ToastProvider';
 import { CareerImage } from '../ui/CareerImage';
+import { getSpecificIndustryVisual } from '../../lib/imageAssets';
 import { hasPracticalEvidence } from '../../../shared/skillEvidence';
+import {
+  ASSESSMENT_MAPPING_RULE,
+  ASSESSMENT_RUBRIC,
+  ASSESSMENT_RUBRIC_HEADLINE,
+  ASSESSMENT_RUBRIC_RULE,
+  assessmentLevelExplanationValues,
+  assessmentScopeSentence,
+  explainAssessmentLevel,
+  levelForAssessmentScore,
+} from '../../../shared/assessment';
 
 export interface AssessmentQuestion {
   id: string;
@@ -37,6 +48,15 @@ export interface AssessmentCategory {
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   timeMinutes: number;
   skillName: string;
+  /**
+   * The visual that genuinely belongs to this check.
+   *
+   * The four checks used to share one generic photograph, which told the
+   * candidate that Excel, Communication, English and SQL were the same
+   * subject. A check with no visual of its own renders its own badge
+   * instead, so no two cards look alike by accident.
+   */
+  visual?: string | null;
   questions: AssessmentQuestion[];
 }
 
@@ -60,6 +80,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     level: 'Intermediate',
     timeMinutes: 8,
     skillName: 'SQL',
+    visual: 'data-analysis',
     questions: [
       {
         id: 'sql-1',
@@ -141,6 +162,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     level: 'Intermediate',
     timeMinutes: 8,
     skillName: 'Python',
+    visual: 'software-engineering',
     questions: [
       {
         id: 'py-1',
@@ -222,6 +244,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     level: 'Beginner',
     timeMinutes: 6,
     skillName: 'Microsoft Excel',
+    // No photograph of its own: this card renders its own badge, so it never
+    // wears the same picture as the SQL check.
+    visual: null,
     questions: [
       {
         id: 'xl-1',
@@ -300,6 +325,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     level: 'Intermediate',
     timeMinutes: 6,
     skillName: 'Communication',
+    visual: null,
     questions: [
       {
         id: 'comm-1',
@@ -371,6 +397,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     level: 'Intermediate',
     timeMinutes: 6,
     skillName: 'English',
+    visual: null,
     questions: [
       {
         id: 'eng-1',
@@ -512,9 +539,8 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
   /**
    * Turns a score into a level (1-5).
    *
-   * Diagnostic checks measure conceptual & scenario knowledge and are capped at
-   * 4/5 unless the candidate already holds verified practical evidence
-   * (a project, certificate, or completed course) that unlocks 5/5.
+   * The rule itself lives in `shared/assessment.ts`, so the browser, the
+   * server and the tests cannot disagree about what a score means.
    */
   const isSkillPracticallyBacked = (skillName: string): boolean => {
     const rec = skillEvidence[skillName.toLowerCase()];
@@ -522,13 +548,8 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
     return hasPracticalEvidence(rec);
   };
 
-  const levelForScore = (percentage: number, practicalBacked = false): number => {
-    if (practicalBacked && percentage >= 90) return 5;
-    if (percentage >= 80) return 4;
-    if (percentage >= 60) return 3;
-    if (percentage >= 40) return 2;
-    return 1;
-  };
+  const levelForScore = (percentage: number, practicalBacked = false): number =>
+    levelForAssessmentScore(percentage, practicalBacked);
 
   /**
    * Stores the result the moment the check is finished.
@@ -724,14 +745,63 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
           </div>
         </div>
 
-        {/* Diagnostic disclaimer */}
-        <div className="flex items-center gap-2.5 rounded-xl border border-[var(--color-ai-border)]/40 bg-[var(--color-ai-surface)]/20 p-3 text-xs text-[var(--text-secondary)]">
-          <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--color-ai-text)]" />
-          <span>
-            {t(
-              'Diagnostic Knowledge Check: five practical questions that place your current level on the 1-5 scale. Calibrated for roadmap and readiness tailoring. Not an accredited third-party certification.',
+        {/* The rubric, before the first question.
+            The candidate is told what the check is, what the numbers mean,
+            and which skill it actually tests — before they spend the time,
+            not after. */}
+        <div className="space-y-3 rounded-xl border border-[var(--color-ai-border)]/40 bg-[var(--color-ai-surface)]/20 p-4 text-xs text-[var(--text-secondary)]">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--color-ai-text)]" />
+            <span className="font-semibold text-[var(--text-primary)]">
+              {t(ASSESSMENT_RUBRIC_HEADLINE)}
+            </span>
+          </div>
+
+          <p>{t(ASSESSMENT_RUBRIC_RULE)}</p>
+
+          {/* What this check tests, and how it maps onto the skill. */}
+          <p className="rounded-lg bg-[var(--color-surface)]/70 p-2.5 leading-relaxed">
+            {t(assessmentScopeSentence(selectedCategory.skillName)).replace(
+              '{skill}',
+              selectedCategory.skillName
             )}
-          </span>
+          </p>
+
+          {/* The bands, in full. */}
+          <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
+            <table className="w-full text-left text-[11px]">
+              <thead>
+                <tr className="bg-[var(--color-surface-secondary)]">
+                  <th className="px-2.5 py-1.5 font-semibold text-[var(--text-primary)]">
+                    {t('Score')}
+                  </th>
+                  <th className="px-2.5 py-1.5 font-semibold text-[var(--text-primary)]">
+                    {t('Level')}
+                  </th>
+                  <th className="px-2.5 py-1.5 font-semibold text-[var(--text-primary)]">
+                    {t('Meaning')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {ASSESSMENT_RUBRIC.map((band) => (
+                  <tr key={band.level} className="border-t border-[var(--color-border)]">
+                    <td className="whitespace-nowrap px-2.5 py-1.5 font-mono">
+                      {band.from}%+
+                    </td>
+                    <td className="whitespace-nowrap px-2.5 py-1.5 font-semibold text-[var(--text-primary)]">
+                      {band.level}/5 {t(band.label)}
+                    </td>
+                    <td className="px-2.5 py-1.5 leading-relaxed">{t(band.description)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="leading-relaxed text-[var(--text-muted)]">
+            {t(ASSESSMENT_MAPPING_RULE)}
+          </p>
         </div>
 
         {!isFinished ? (
@@ -817,6 +887,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                 {(() => {
                   const practicalBacked = isSkillPracticallyBacked(selectedCategory.skillName);
                   const computedLevel = levelForScore(scorePct, practicalBacked);
+                  const levelValues = assessmentLevelExplanationValues(scorePct, practicalBacked);
                   const beforePct = readinessBefore ?? analysis.matchPercentage;
                   const afterPct = analysis.matchPercentage;
                   const deltaPct = afterPct - beforePct;
@@ -824,6 +895,15 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                     <>
                       <p className="mt-1 text-xs text-[var(--text-secondary)]">
                         {selectedCategory.title} · {new Date().toLocaleDateString()}
+                      </p>
+
+                      {/* Why this level and not another one. */}
+                      <p className="mx-auto mt-2 max-w-xl text-xs leading-relaxed text-[var(--text-secondary)]">
+                        {t(explainAssessmentLevel(scorePct, practicalBacked))
+                          .replace('{level}', levelValues.level)
+                          .replace('{label}', t(levelValues.label))
+                          .replace('{ceiling}', levelValues.ceiling)
+                          .replace('{mastery}', levelValues.mastery)}
                       </p>
 
                       <div className="my-6 flex items-baseline gap-2">
@@ -845,6 +925,12 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                             : scorePct >= 60
                               ? t('Knowledge Verified')
                               : t('Foundational')}
+                        </span>
+                        {/* Where this level came from, so the same number
+                            cannot read as a different thing on another
+                            screen. */}
+                        <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+                          {t('Direct Assessment')}
                         </span>
                         {/* The status of the automatic save. */}
                         {syncState === 'saving' && (
@@ -1043,6 +1129,12 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
         {ASSESSMENT_CATEGORIES.map((cat) => {
           const Icon = cat.icon;
           const attempt = pastAttempts.find((a) => a.categoryId === cat.id);
+          // The visual that genuinely belongs to this check. A check that
+          // names no visual of its own renders its own badge, so it never
+          // wears a picture that belongs to another subject.
+          const specificVisual = getSpecificIndustryVisual(
+            'visual' in cat ? cat.visual : cat.skillName
+          );
 
           return (
             <div
@@ -1050,34 +1142,56 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
               className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xs transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md"
             >
               <div className="relative h-28 w-full overflow-hidden border-b border-[var(--color-border)]">
-                <CareerImage
-                  category={cat.skillName}
-                  size="sm"
-                  aspectRatio="16/9"
-                  rounded="rounded-none"
-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
-                  <div className="absolute top-2.5 end-2.5">
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold shadow-xs ${
-                        cat.level === 'Advanced'
-                          ? 'bg-purple-600 text-white'
-                          : cat.level === 'Intermediate'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-emerald-600 text-white'
-                      }`}
-                    >
-                      {cat.level}
+                {/* The card shows a picture of ITS OWN subject, or no picture
+                    at all. The four cards used to wear the same generic
+                    software-engineering photograph, which told the candidate
+                    that Excel, Communication, English and SQL were the same
+                    subject. */}
+                {specificVisual ? (
+                  <CareerImage
+                    src={specificVisual.srcSm ?? specificVisual.src}
+                    alt={specificVisual.altEn}
+                    size="sm"
+                    aspectRatio="16/9"
+                    rounded="rounded-none"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+                    <div className="absolute top-2.5 end-2.5">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold shadow-xs ${
+                          cat.level === 'Advanced'
+                            ? 'bg-purple-600 text-white'
+                            : cat.level === 'Intermediate'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-emerald-600 text-white'
+                        }`}
+                      >
+                        {cat.level}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-2.5 start-3 flex items-center gap-2 text-white">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-[var(--color-primary-text)] backdrop-blur-xs">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="text-xs font-bold drop-shadow-sm">{cat.skillName}</span>
+                    </div>
+                  </CareerImage>
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center gap-3 bg-gradient-to-br from-[var(--accent-primary)]/20 via-[var(--color-surface-secondary)] to-[var(--accent-secondary)]/15">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--surface-main)] text-[var(--color-primary-text)] shadow-xs">
+                      <Icon className="h-6 w-6" />
                     </span>
+                    <div className="text-start">
+                      <div className="text-sm font-bold text-[var(--text-primary)]">
+                        {cat.skillName}
+                      </div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        {cat.level}
+                      </div>
+                    </div>
                   </div>
-                  <div className="absolute bottom-2.5 start-3 flex items-center gap-2 text-white">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-[var(--color-primary-text)] backdrop-blur-xs">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="text-xs font-bold drop-shadow-sm">{cat.skillName}</span>
-                  </div>
-                </CareerImage>
+                )}
               </div>
 
               <div className="flex flex-1 flex-col justify-between p-5">

@@ -70,6 +70,8 @@ export interface StoredSkillDTO {
   evidenceSources: string[];
   effectiveLevel: number;
   evidenceLevel: number | null;
+  /** The strongest signal behind the record (verified evidence, assessment, claim, estimate). */
+  source?: 'verified_evidence' | 'assessment' | 'self_reported' | 'ai_estimated';
 }
 
 /**

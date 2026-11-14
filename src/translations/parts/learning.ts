@@ -7,6 +7,12 @@
 
 export const learningAr: Record<string, string> = {
   'Why this now': 'لماذا الآن',
+  'Closes your gap:': 'يغلق فجوتك:',
+  'Includes Certificate': 'يشمل شهادة',
+  'Certificate Costs Extra': 'الشادة بتكلفة إضافية',
+  'Learning Content Only (No Certificate)': 'محتوى تعليمي فقط (بدون شهادة)',
+  'Why recommended: this course closes a skill gap you still have, and shows the exact level you are moving from and to.': 'لماذا هذا موصى به: هذه الدورة تغلق فجوة مهارة ما زالت لديك، وتعرض المستوى بدقة الذي تنتقل منه وإليه.',
+  'The estimated time to finish, at the number of hours a week you chose.': 'الوقت التقديري للإنهاء، حسب عدد الساعات الأسبوعية الذي اخترته.',
   'Skill gap:': 'فجوة المهارة:',
   'Roadmap link:': 'رابط خارطة الطريق:',
   'Complete': 'مكتمل',

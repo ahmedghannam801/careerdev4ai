@@ -5,7 +5,7 @@ import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 import { AiResponse } from './AiResponse';
 import { EvidencePanel } from './EvidencePanel';
-import { aiButtonLabel, aiTokenCostLabel } from '../../lib/aiTokenCosts';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 
 interface CopilotDrawerProps {
   isOpen: boolean;
@@ -14,7 +14,7 @@ interface CopilotDrawerProps {
 }
 
 export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
-  const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, profile, settings, t} = useCareer();
+  const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, settings, identity, t} = useCareer();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion() ?? false;
@@ -66,7 +66,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       {/* Career Context Summary Pill */}
       <div className="px-4 py-2.5 bg-[var(--surface-secondary)]/60 border-b border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
         <div className="flex items-center gap-1.5 truncate">
-          <span className="font-medium text-[var(--text-primary)]">{profile.name}</span>
+          <span className="font-medium text-[var(--text-primary)]">{identity.displayName}</span>
           <span>·</span>
           <span>{analysis.matchPercentage}% {t('Readiness')}</span>
         </div>
@@ -128,10 +128,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
                       disabled={isCopilotTyping}
                       className="block w-full text-start text-xs text-[var(--color-primary-text)] hover:bg-[var(--accent-surface)] p-1.5 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span>→ {sug}</span>{' '}
-                      <span className="text-[var(--text-muted)]">
-                        {aiTokenCostLabel('career_consultation_chat', t)}
-                      </span>
+                      <span>→ {sug}</span>
                     </button>
                   ))}
                 </div>

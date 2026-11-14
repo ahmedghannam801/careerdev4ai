@@ -131,6 +131,12 @@ export const projectsAr: Record<string, string> = {
   'Checking your projects…': 'جارٍ فحص مشاريعك…',
   'Check my existing projects': 'افحص مشاريعي الحالية',
   'Add a project first and it can be checked.': 'أضف مشروعًا أولًا ليتم فحصه.',
+  'Add at least 1 project below to enable AI project review':
+    'أضف مشروعًا واحدًا على الأقل أدناه لتفعيل مراجعة المشروع بالذكاء الاصطناعي',
+  'Generates tailored project ideas based on your skill gaps, your target role and your roadmap. It does not look at the projects you already have.':
+    'يقترح أفكار مشاريع مخصصة بناءً على فجوات مهاراتك ودورك المستهدف وخارطة طريقك. ولا ينظر إلى المشاريع التي لديك بالفعل.',
+  'Evaluates and scores a project you have already added: how strong it is, which skills it proves, and what is still missing. It does not suggest new projects.':
+    'يقيّم مشروعًا أضفته بالفعل ويمنحه درجة: مدى قوته، والمهارات التي يثبتها، وما ينقصه بعد. ولا يقترح مشاريع جديدة.',
   'Recommended Projects For You': 'مشاريع مقترحة لك',
   'No project could be recommended from your records yet. Set your target role and rate your skills to get recommendations.':
     'لم يُقترح أي مشروع من سجلاتك بعد. حدّد دورك المستهدف وقيّم مهاراتك للحصول على توصيات.',
@@ -158,10 +164,16 @@ export const projectsAr: Record<string, string> = {
   'Try another status, or add a project in this state.':
     'جرّب حالة أخرى، أو أضف مشروعًا بهذه الحالة.',
   'Add your first project': 'أضف مشروعك الأول',
+  '+ Add Your First Project': '+ أضف مشروعك الأول',
+  '+ Submit Skill Evidence': '+ أرسل دليل مهارة',
+  'A project is the strongest proof of a skill. Add one you have built, or ask the advisor for one that closes a gap in your target role. Every project you link to a skill moves your Role Readiness up.':
+    'المشروع هو أقوى دليل على مهارة. أضف مشروعًا أنجزته، أو اطلب من المستشار واحدًا يسدّ فجوة في دورك المستهدف. وكل مشروع تربطه بمهارة يرفع جاهزيتك المهنية.',
   'No evidence yet': 'لا يوجد دليل بعد',
   'No evidence of this type': 'لا يوجد دليل من هذا النوع',
   'Evidence is what turns a claim into proof. Add a repository, a live demo, a certificate or an assessment, and the skills it covers count towards your gaps.':
     'الدليل هو ما يحوّل الادّعاء إلى إثبات. أضف مستودعًا أو عرضًا مباشرًا أو شهادة أو تقييمًا، والمهارات التي يغطيها تُحتسب ضمن فجوات مهاراتك.',
+  'Evidence is what turns a claim into proof. Add a repository, a live demo, a certificate or an assessment, and the skills it covers count towards your gaps. Once it is validated, the linked skill’s practical level rises and your Role Readiness goes up by the exact amount.':
+    'الدليل هو ما يحوّل الادّعاء إلى إثبات. أضف مستودعًا أو عرضًا مباشرًا أو شهادة أو تقييمًا، والمهارات التي يغطيها تُحتسب ضمن فجوات مهاراتك. وبعد التحقق منه يرتفع المستوى العملي للمهارة المرتبطة، وترتفع جاهزيتك المهنية بالمقدار نفسه بالضبط.',
   'Try another type, or add evidence of this kind.':
     'جرّب نوعًا آخر، أو أضف دليلًا من هذا النوع.',
   'Add your first evidence': 'أضف أول دليل لك',

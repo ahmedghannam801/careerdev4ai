@@ -22,6 +22,17 @@ export const careerTargetAr: Record<string, string> = {
   'Your target role, career track and experience level. Your roadmap, skill gaps, learning plan and job matches are all measured against this — change it here and the whole platform follows.':
     'دورك المستهدف ومجال مسارك المهني ومستوى خبرتك. تُقاس خارطة طريقك وفجوات مهاراتك وخطة التعلم ومطابقاتك الوظيفية جميعًا مقابل هذا — غيّره هنا وتتابع المنصة بأكملها التغيير فورًا.',
   'Career goal': 'الهدف المهني',
+  'Target opportunity type': 'نوع الفرصة المستهدفة',
+  'Your CV summary, live jobs and opportunities all use this exact choice.':
+    'يستخدم ملخص سيرتك الذاتية والوظائف الحية والفرص هذا الاختيار نفسه بالضبط.',
+  'Professional headline': 'العنوان المهني',
+  'e.g. Aspiring Data Analyst': 'مثال: aspiring محلّل بيانات',
+  'Your own line about yourself. It sits at the top of your CV, separately from your job title.':
+    'سطرك الخاص عن نفسك. يظهر في أعلى سيرتك الذاتية، منفصلًا عن مسمّاك الوظيفي.',
+  'Practises a skill you still need:': 'يتمرّن على مهارة ما زالت تحتاجها:',
+  'Organisation career pages': 'صفحات الوظائف لدى المؤسسات',
+  'These are the organisations’ own careers pages, not live openings. Check back for new roles.':
+    'هذه هي صفحات الوظائف لدى المؤسسات نفسها، وليست وظائف مفتوحة حاليًا. تابعها لوظائف جديدة.',
   'Experience level': 'مستوى الخبرة',
   'The level you are aiming at. It tells the platform which rung to write for.':
     'المستوى الذي تستهدفه. يخبر المنصة أي مستوى من السُلّم تكتب له.',

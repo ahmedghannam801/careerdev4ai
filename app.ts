@@ -8,7 +8,7 @@
  * development, the test suite and the deployed runtime always execute identical
  * route code.
  */
-import express, { NextFunction, Request, Response } from 'express';
+import express, { Request, Response } from 'express';
 import multer from 'multer';
 // The *web* build of the SDK is imported deliberately. It is the build the
 // browser already receives, it uses `fetch` rather than `google-auth-library`
@@ -17,6 +17,7 @@ import multer from 'multer';
 // code that is useless here and cannot be bundled for Cloudflare.
 import { GoogleGenAI } from '@google/genai/web';
 import { verifySupabaseToken } from './server/auth/supabase-auth.ts';
+import { normalizeTargetOpportunityType } from './shared/careerIdentity.ts';
 import {
   assessDocumentQuality,
   extractDocument,
@@ -59,10 +60,8 @@ import { currentCvTemplateRecord } from './server/cvTemplates/service.ts';
 import { registerCreditMonitorRoutes } from './server/admin/creditMonitor.ts';
 import { registerReferralRoutes } from './server/referrals/routes.ts';
 import { registerStripeRoutes } from './server/stripe/routes.ts';
-import { requireEntitlement } from './server/subscriptions/entitlements.ts';
 import {
   requireCredits,
-  refundAiCreditReservation,
   markAiCreditCompleted,
 } from './server/credits/middleware.ts';
 import { boundedList } from './server/ai/boundedList.ts';
@@ -1523,11 +1522,15 @@ function respondAiFailure(
   res: Response,
   error: unknown,
   message: string,
-  userId?: string | null
+  userId?: string | null,
+  /** False for a route that never consumed the daily budget. */
+  refundBudget = true
 ): Response {
   console.error('AI request unavailable:', error);
   if (isQuotaError(error)) {
-    refundDailyAiBudget(userId);
+    // Only give the unit back when the route actually took one. A route that
+    // does not use the daily allowance must not refund somebody else's call.
+    if (refundBudget) refundDailyAiBudget(userId);
     const retryAfterSeconds = quotaRetryAfterSeconds(error);
     res.setHeader('Retry-After', String(retryAfterSeconds));
     return res.status(429).json({
@@ -2071,7 +2074,7 @@ app.post('/api/copilot', requireAuth, (req: Request, res: Response, next) => {
     return res.status(400).json({ error: 'userPrompt is required' });
   }
   next();
-}, aiRateLimit, requireEntitlement('ai_mentor.session'), requireCredits('career_consultation_chat'), async (req: Request, res: Response) => {
+}, aiRateLimit, async (req: Request, res: Response) => {
   try {
     // The prompt is validated before anything else: it must be a string, and
     // it must be short enough that one request cannot cost an unbounded
@@ -2097,8 +2100,8 @@ app.post('/api/copilot', requireAuth, (req: Request, res: Response, next) => {
     const activeView = str(req.body?.context?.activeView, 40) ?? 'dashboard';
 
     // No model on this server means no result can be produced. This is
-    // checked before the daily budget is touched, so a missing key is never
-    // reported as an exhausted quota.
+    // checked before anything else, so a missing key is never reported as an
+    // exhausted quota.
     if (!isAnyAiConfigured()) {
       return modelUnavailable(res);
     }
@@ -2135,9 +2138,11 @@ Answering rules:
           'Review the weak points in my CV',
         ];
 
-    const blocked = consumeAiBudget(res, req.authUser!.id);
-    if (blocked) return blocked;
-
+    // The chat itself is free and unlimited: there is no per-user daily AI
+    // budget on this route. Abuse is bounded by `aiRateLimit` (per-user
+    // requests per minute), and the provider chain (Gemini, then OpenRouter)
+    // already absorbs a provider-side quota failure. A token balance is never
+    // consulted here — chatting costs nothing.
     try {
       const response = await ai.models.generateContent({
         model: getGeminiModel(),
@@ -2199,13 +2204,15 @@ Answering rules:
 
       // A provider quota error is reported as 429 with a Retry-After header
       // rather than being flattened into a generic 503, so the client can
-      // tell "come back tomorrow" from "try again in a moment". The daily
-      // budget is refunded, because the provider never served this request.
+      // tell "come back tomorrow" from "try again in a moment". This route
+      // never consumed the daily budget, so it must not refund a unit another
+      // route spent.
       return respondAiFailure(
         res,
         aiErr,
         'The AI assistant is temporarily unavailable. Your message was not answered by the model; please try again shortly.',
-        req.authUser!.id
+        req.authUser!.id,
+        false
       );
     }
   } catch (error: any) {
@@ -2215,7 +2222,7 @@ Answering rules:
 });
 
 // AI Career Analysis Endpoint
-app.post('/api/analyze-career', requireAuth, aiRateLimit, requireEntitlement('ats.analysis'), requireCredits('cv_ats_analysis'), async (req: Request, res: Response) => {
+app.post('/api/analyze-career', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { targetRole, careerState } = req.body;
     // The role title falls back to the user's own target role, never to a
@@ -2300,7 +2307,8 @@ Return valid JSON schema:
 });
 
 // AI CV ATS & Content Optimization Endpoint
-app.post('/api/optimize-cv', requireAuth, aiRateLimit, requireEntitlement('cv.tailoring'), requireCredits('cv_tailoring'), async (req: Request, res: Response) => {
+// The deep ATS audit is one of the four paid actions: one token.
+app.post('/api/optimize-cv', requireAuth, aiRateLimit, requireCredits('cv_ats_analysis'), async (req: Request, res: Response) => {
   try {
     const { cvText, targetRoleTitle, targetRoleSkills } = req.body;
     const language = normalizeAiLanguage(req.body?.language);
@@ -2383,7 +2391,7 @@ Return JSON schema:
 });
 
 // AI Mock Interview Evaluation Endpoint
-app.post('/api/mock-interview', requireAuth, aiRateLimit, requireEntitlement('interview.mock_simulation'), requireCredits('interview_mock_session'), async (req: Request, res: Response) => {
+app.post('/api/mock-interview', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { roleTitle, interviewType, question, userAnswer } = req.body;
     // Every field that reaches the model is length-capped: a single request
@@ -2452,7 +2460,7 @@ Return JSON schema:
   }
 });
 // AI Professional Summary Suggestion
-app.post('/api/suggest-summary', requireAuth, aiRateLimit, requireEntitlement('cv.builder'), requireCredits('ai_assist_inline'), async (req: Request, res: Response) => {
+app.post('/api/suggest-summary', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { name, targetRoleTitle, careerState, yearsExperience, skills, keyAchievements } = req.body;
     // No hard-coded role: the summary is written for whatever role the user
@@ -2545,7 +2553,7 @@ ${groundingRules()}
 });
 
 // AI Cover Letter Generation Endpoint
-app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, requireEntitlement('cover_letter.generate'), requireCredits('cover_letter_generation'), async (req: Request, res: Response) => {
+app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const { company, jobTitle, jobDescription, candidateName, experiences, skills, projects, tone } = req.body;
     const language = normalizeAiLanguage(req.body?.language);
@@ -2800,15 +2808,12 @@ app.get('/api/cv/analyses', requireSession, async (req: Request, res: Response) 
 // the database for the verified user id, and the answer is checked back
 // against it before it is returned. The client cannot talk the model into a
 // career the candidate does not have.
-app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, requireEntitlement('cv.builder'), (req: Request, res: Response, next) => {
+app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, (req: Request, res: Response, next) => {
   const body = req.body ?? {};
   if (!isCvAssistField(body.field)) {
     return res.status(400).json({ error: 'A valid CV field is required' });
   }
-  if (body.ai === false) {
-    return next();
-  }
-  return requireCredits('ai_assist_inline')(req as any, res, next);
+  return next();
 }, async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
@@ -3000,7 +3005,7 @@ async function readOptionalJobDescription(
 }
 
 // Reads a job description and reports what it asks for.
-app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, requireEntitlement('job_description.analysis'), requireCredits('job_description_analysis'), async (req: Request, res: Response) => {
+app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
     const read = readJobDescription(body);
@@ -3061,7 +3066,8 @@ app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, requireEnt
 // write the CV — so it costs two units of the daily allowance. The candidate's
 // document is only touched by the client, after the content has been checked,
 // so a failure here leaves their CV exactly as it was.
-app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireEntitlement('cv.tailoring'), requireCredits('cv_tailoring'), async (req: Request, res: Response) => {
+// The job-description CV rewrite is one of the four paid actions: one token.
+app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireCredits('cv_tailoring'), async (req: Request, res: Response) => {
   try {
     const body = req.body ?? {};
     const read = readJobDescription(body);
@@ -3773,6 +3779,10 @@ app.post('/api/activities', requireAuth, async (req: Request, res: Response) => 
       subtitle: str(body.subtitle, 300) ?? undefined,
       relatedObject: str(body.relatedObject, 200) ?? undefined,
       linkView: str(body.linkView, 60) ?? undefined,
+      // Optional: a caller that wants its own idempotency scope (for example
+      // one activity per calendar day) supplies a key. Without one, the
+      // server derives the key from the action itself.
+      idempotencyKey: str(body.idempotencyKey, 120) ?? undefined,
     });
     return res.status(201).json({ success: true, activity });
   } catch (error) {
@@ -5787,6 +5797,32 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'expectedGraduationYear must be a four-digit year' });
     }
 
+    // A graduation year in the future is a statement that the candidate is
+    // still studying. The stored status follows, even when the same request
+    // also tried to mark them graduated: the two fields cannot disagree.
+    const currentYear = new Date().getFullYear();
+    if (typeof expectedGraduationYear === 'number' && expectedGraduationYear > currentYear) {
+      educationStatus = 'currently_studying';
+    }
+
+    // The kind of opening the candidate is aiming at. It is validated
+    // against the shared vocabulary rather than stored verbatim, so an
+    // unknown value can never reach the database.
+    let targetOpportunityType: string | undefined;
+    if (body.targetOpportunityType !== undefined) {
+      const normalized = normalizeTargetOpportunityType(
+        typeof body.targetOpportunityType === 'string'
+          ? body.targetOpportunityType
+          : ''
+      );
+      if (!normalized) {
+        return res.status(400).json({
+          error: 'targetOpportunityType must be internship, full_time_entry or both',
+        });
+      }
+      targetOpportunityType = normalized;
+    }
+
     const isAvatarId =
       typeof body.avatarUrl === 'string' && /^avatar-[0-9]{2}$/.test(body.avatarUrl.trim());
     const avatarUrl =
@@ -5901,6 +5937,7 @@ app.patch('/api/profile', requireAuth, async (req: Request, res: Response) => {
           : experienceLevelWrite.value ?? null,
       educationStatus,
       expectedGraduationYear,
+      targetOpportunityType,
       onboardingCompleted:
         typeof body.onboardingCompleted === 'boolean' ? body.onboardingCompleted : undefined,
       // The status is validated against the shared vocabulary rather than
@@ -6441,37 +6478,14 @@ app.delete('/api/learning/items/:courseId', requireAuth, async (req: Request, re
  * the authenticated user's persisted profile, skills, roadmap and learning
  * state, and the AI only sees the already-ranked candidates.
  */
-app.post('/api/learning/recommendations', requireAuth, aiRateLimit, (req: Request, res: Response, next: NextFunction) => {
-  const body = (req.body ?? {}) as Record<string, unknown>;
-  // A request that explicitly asks for the deterministic recommendations ONLY
-  // never runs a model, so it must not cost a token.
-  //
-  // This matters because the Learning Hub refreshes the deterministic ranking
-  // on its own: when the career graph is hydrated, when a course is saved,
-  // started, dismissed or completed, and when the page is opened. Those are
-  // ordinary product actions, not AI actions, and charging a token for them
-  // was the single largest source of unexpected token loss.
-  if (body.ai === false) {
-    return next();
-  }
-  return requireCredits('learning_recommendation')(req as AuthedRequest, res, next);
-}, async (req: Request, res: Response) => {
+app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: Request, res: Response) => {
   /**
-   * Refuses the request, giving the credit back first.
+   * Refuses the request.
    *
-   * The credit is spent on a RESULT. A request that is refused produced
-   * nothing, so the reservation is returned — and it is returned BEFORE the
-   * refusal is sent, so that a candidate who reads their balance straight
-   * afterwards sees the credits already back rather than waiting for the
-   * refund to land.
+   * The Learning Hub is free: this route takes no token, so there is no
+   * reservation to give back and no balance to report.
    */
-  const refuse = async (status: number, error: string) => {
-    await refundAiCreditReservation(
-      req as AuthedRequest,
-      `The Learning Hub request was refused with HTTP ${status}: ${error}`
-    );
-    return res.status(status).json({ error });
-  };
+  const refuse = (status: number, error: string) => res.status(status).json({ error });
 
   try {
     const body = req.body ?? {};
@@ -6529,9 +6543,9 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, (req: Reques
 
     const deterministic = rankCourses(built.courses, built.context, { limit: built.limit });
     let result;
-    // Whether a model was actually asked. The distinction matters for the
-    // credit: a request that never reached a model did not consume the AI
-    // service the credit pays for.
+    // Whether a model was actually asked. When the daily AI allowance is spent
+    // the deterministic ranking is still returned, and the route says so
+    // rather than pretending the model answered.
     let aiAttempted = false;
 
     if (body.ai === false) {
@@ -6555,41 +6569,11 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, (req: Reques
       });
     }
 
-    // The credit pays for a RESULT. When a model was asked and its answer was
-    // rejected — a timeout, a provider error, a payload that failed
-    // validation — the candidate got the deterministic ranking instead, and
-    // the reservation is given back. The refund is idempotent, so it cannot
-    // return the same credit twice.
-    //
-    // When the request asked for the deterministic ranking only, there is no
-    // reservation at all and no balance to report: the candidate was never
-    // charged, so the badge must not be told that it is now zero.
-    const reservation = req.aiCreditReservation;
-    let creditBalance = reservation?.remainingBalance;
-    if (aiAttempted && !result.aiUsed) {
-      const refund = await refundAiCreditReservation(
-        req as AuthedRequest,
-        `The Learning Hub AI answer was rejected: ${result.aiFallbackReason ?? 'unknown reason'}`
-      );
-      creditBalance = refund.newBalance;
-    } else if (aiAttempted && result.aiUsed) {
-      // A real AI explanation was produced, so the credit is earned.
-      markAiCreditCompleted(req as AuthedRequest);
-    } else if (reservation) {
-      // A reservation was taken but no model was ever asked — the server had
-      // no provider, or the daily allowance was spent. The reservation is
-      // given back BEFORE the answer is sent, so the balance the candidate
-      // reads is the balance the ledger holds.
-      const refund = await refundAiCreditReservation(
-        req as AuthedRequest,
-        'The Learning Hub request did not reach a model, so no token was spent.'
-      );
-      creditBalance = refund.newBalance;
-    }
-
+    // The AI explanation is free, like the rest of the Learning Hub. The
+    // deterministic ranking is always returned, and when the model answers it
+    // is an enhancement rather than a separate purchase.
     return res.json({
       ...result,
-      ...(typeof creditBalance === 'number' ? { creditBalance } : {}),
       context: {
         careerGoal: built.context.careerGoal,
         targetRoleSlug: built.context.targetRole?.slug ?? null,
@@ -6604,12 +6588,6 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, (req: Reques
     });
   } catch (error) {
     console.error('Failed to generate learning recommendations:', error);
-    // The request produced nothing, so the credit is given back before the
-    // failure is reported.
-    await refundAiCreditReservation(
-      req as AuthedRequest,
-      'The Learning Hub request failed before it produced a result'
-    );
     return res.status(500).json({ error: 'Failed to generate learning recommendations' });
   }
 });

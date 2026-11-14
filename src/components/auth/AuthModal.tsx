@@ -349,7 +349,7 @@ export const AuthModal: React.FC = () => {
                     required
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder={t('e.g. Alex Morgan')}
+                    placeholder={t('e.g. Your full name')}
                     className="w-full ps-9 pe-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>

@@ -28,19 +28,38 @@ export const AI_CREDIT_ACTIONS = [
 export type AICreditAction = (typeof AI_CREDIT_ACTIONS)[number];
 
 /**
- * Standard Operation Credit Weights (EGP equivalent value)
+ * Standard Operation Credit Weights.
+ *
+ * The product has exactly four paid AI actions. Everything else — the AI
+ * chat, the mock interview, the career analysis, the cover letter, inline CV
+ * writing, job-description reading, learning explanations and the standard CV
+ * studio — costs nothing. A zero means "no charge at all": those routes do not
+ * run a credit check, so a candidate with a balance of zero can use them.
+ *
+ * The four paid actions are the ones that produce a substantial, reusable
+ * artefact:
+ *
+ *   - `cv_ats_analysis` (1): the deep ATS audit of a CV.
+ *   - `cv_tailoring` (1): rewriting a CV for a specific job description.
+ *   - `project_analysis` (1): generating portfolio projects, or reviewing the
+ *     projects the candidate already has.
+ *   - `premium_template_unlock` (5): opening one premium CV template.
+ *
+ * Free actions are priced at zero rather than removed from the table, because
+ * the interface and the ledger both read this one table. Keeping the action
+ * names means an existing ledger row still resolves to a name.
  */
 export const CREDIT_WEIGHTS: Record<AICreditAction, number> = {
-  job_description_analysis: 1,
-  cv_ats_analysis: 2,
-  cover_letter_generation: 2,
-  cv_generation: 4,
-  cv_tailoring: 4,
-  roadmap_generation: 4,
-  interview_mock_session: 5,
-  career_consultation_chat: 2,
-  ai_assist_inline: 1,
-  learning_recommendation: 1,
+  job_description_analysis: 0,
+  cv_ats_analysis: 1,
+  cover_letter_generation: 0,
+  cv_generation: 0,
+  cv_tailoring: 1,
+  roadmap_generation: 0,
+  interview_mock_session: 0,
+  career_consultation_chat: 0,
+  ai_assist_inline: 0,
+  learning_recommendation: 0,
   project_analysis: 1,
   /**
    * Unlocking a premium CV template. The weight is the price of the template:
@@ -130,12 +149,12 @@ export interface CreditLedgerDTO {
  * tokens arrive. A day that is never claimed is a day with no free tokens,
  * which is what makes the button worth pressing.
  *
- * Two tokens buy two lightweight operations (`job_description_analysis`,
- * `ai_assist_inline`, `learning_recommendation`, `project_analysis` all cost
- * 1), or one heavier one — a CV ATS analysis costs 2, a CV generation or a
- * roadmap costs 4, a mock interview costs 5. The allowance is still far below
- * the cheapest paid plan (25 credits for 99 EGP) and it never unlocks a
- * paid-only entitlement.
+ * Most of the product costs nothing, so the allowance is not needed for day to
+ * day use. It is what pays for the four premium actions: two days of claiming
+ * buy two deep ATS audits or two job-description CV rewrites (1 token each), or
+ * the daily allowance builds towards a premium template (5 tokens). The
+ * allowance is still far below the cheapest paid plan (25 credits for 99 EGP)
+ * and it never unlocks a paid-only entitlement.
  */
 export const DAILY_CREDIT_ALLOWANCE = 2;
 

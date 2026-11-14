@@ -12,8 +12,11 @@ import {
 import {
   CAREER_STATUSES,
   CAREER_STATUS_LABELS,
+  TARGET_OPPORTUNITY_TYPES,
+  TARGET_OPPORTUNITY_TYPE_LABELS,
   type CareerStatus,
   type EducationStatus,
+  type TargetOpportunityType,
 } from '../../../shared/careerIdentity';
 import { TargetRolePicker } from './TargetRolePicker';
 import type { CareerGoal, TargetRole } from '../../types/career';
@@ -92,6 +95,8 @@ export const CareerGoalRolePanel: React.FC<CareerGoalRolePanelProps> = ({
   // The current role is typed before it is saved, so the field does not fight
   // the candidate's typing while the write is in flight.
   const [roleDraft, setRoleDraft] = useState<string | null>(null);
+  // The headline is typed before it is saved, for the same reason as the role.
+  const [headlineDraft, setHeadlineDraft] = useState<string | null>(null);
 
   const currentTrackId =
     trackOverride ?? (targetRole?.domainId as CareerDomainId | undefined) ?? null;
@@ -192,6 +197,8 @@ export const CareerGoalRolePanel: React.FC<CareerGoalRolePanelProps> = ({
     currentRole?: string | null;
     educationStatus?: EducationStatus | null;
     expectedGraduationYear?: number | null;
+    targetOpportunityType?: TargetOpportunityType | null;
+    professionalHeadline?: string | null;
   }) => {
     if (saving) return;
     setSaving(true);
@@ -235,6 +242,21 @@ export const CareerGoalRolePanel: React.FC<CareerGoalRolePanelProps> = ({
     const year = value.trim() === '' ? null : Number(value);
     if (year !== null && (!Number.isFinite(year) || year < 1900 || year > 2200)) return;
     await handleIdentityChange({ expectedGraduationYear: year });
+  };
+
+  const handleOpportunityTypeChange = async (value: string) => {
+    if (!TARGET_OPPORTUNITY_TYPES.includes(value as TargetOpportunityType)) return;
+    await handleIdentityChange({ targetOpportunityType: value as TargetOpportunityType });
+  };
+
+  const handleHeadlineBlur = async () => {
+    const draft = headlineDraft;
+    if (draft === null) return;
+    setHeadlineDraft(null);
+    const next = draft.trim();
+    const current = profile.headline?.trim() ?? '';
+    if (next === current) return;
+    await handleIdentityChange({ professionalHeadline: next });
   };
 
   const labelClass =
@@ -387,6 +409,65 @@ export const CareerGoalRolePanel: React.FC<CareerGoalRolePanelProps> = ({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* THE KIND OF OPENING */}
+        {/* This is not the goal and not the role. A candidate can be aiming at
+            "Data Analyst" as a role and still want an internship rather than a
+            full-time entry-level job, and the CV summary, the live jobs and
+            the opportunities all have to say the same thing about which one
+            it is. */}
+        <div>
+          <label className={labelClass} htmlFor="target-opportunity-type-select">
+            {t('Target opportunity type')}
+          </label>
+          <select
+            id="target-opportunity-type-select"
+            className={selectClass}
+            value={careerIdentity.targetOpportunityType}
+            onChange={(e) => void handleOpportunityTypeChange(e.target.value)}
+            disabled={saving}
+          >
+            {TARGET_OPPORTUNITY_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {t(TARGET_OPPORTUNITY_TYPE_LABELS[type])}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+            {t(
+              'Your CV summary, live jobs and opportunities all use this exact choice.',
+            )}
+          </p>
+        </div>
+
+        {/* THE HEADLINE */}
+        {/* The headline is what the candidate calls themselves. It is NOT the
+            current job title: a student has no job title, and putting
+            "Aspiring Data Analyst" in that field made the platform claim they
+            were employed. */}
+        <div>
+          <label className={labelClass} htmlFor="professional-headline-input">
+            {t('Professional headline')}
+          </label>
+          <input
+            id="professional-headline-input"
+            type="text"
+            className={selectClass}
+            value={headlineDraft ?? profile.headline ?? ''}
+            onChange={(e) => setHeadlineDraft(e.target.value)}
+            onBlur={() => void handleHeadlineBlur()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
+            placeholder={t('e.g. Aspiring Data Analyst')}
+            disabled={saving}
+          />
+          <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+            {t(
+              'Your own line about yourself. It sits at the top of your CV, separately from your job title.',
+            )}
+          </p>
         </div>
 
         {/* THE LEVEL */}

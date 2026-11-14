@@ -61,6 +61,7 @@ import {
   deriveCareerIdentity,
   type CareerIdentity,
   type EducationStatus,
+  type TargetOpportunityType,
 } from '../../shared/careerIdentity';
 import { computeProfileCompleteness } from '../../shared/profileCompleteness';
 import {
@@ -251,6 +252,10 @@ import {
 } from '../lib/referralApi';
 import { ProcessingProvider } from '../components/processing/ProcessingProvider';
 import { ToastProvider } from '../components/toast/ToastProvider';
+import {
+  resolveIdentity,
+  type CandidateIdentity,
+} from '../../shared/identity';
 
 export interface UserProfile {
   name: string;
@@ -296,6 +301,14 @@ export interface UserProfile {
   educationStatus?: EducationStatus | null;
   /** The year the candidate expects to graduate, when they stated one. */
   expectedGraduationYear?: number | null;
+  /**
+   * The kind of opening the candidate is aiming at.
+   *
+   * It is a separate choice from the career goal: a candidate can be aiming
+   * at "Data Analyst" as a role and still want an internship rather than a
+   * full-time entry-level job.
+   */
+  targetOpportunityType?: TargetOpportunityType | null;
   onboardingCompleted: boolean;
   onboardingStatus: 'not_started' | 'started' | 'completed' | 'skipped';
   onboardingStep: number;
@@ -340,6 +353,7 @@ const emptyProfile: UserProfile = {
   careerGoal: null,
   educationStatus: null,
   expectedGraduationYear: null,
+  targetOpportunityType: null,
   onboardingCompleted: false,
   onboardingStatus: 'not_started',
   onboardingStep: 0,
@@ -353,6 +367,22 @@ const emptyProfile: UserProfile = {
 interface CareerContextType {
   // Authentication
   currentUser: UserAccount | null;
+  /**
+   * The candidate's identity, resolved once.
+   *
+   * Every surface — the topbar, the sidebar, the Dashboard, the CV Studio —
+   * reads the name, the initials and the avatar from here. The platform used
+   * to derive them separately in each place, which is how the header and the
+   * sidebar ended up showing different names for the same person.
+   */
+  identity: CandidateIdentity;
+  /**
+   * The avatar identifier every avatar surface renders.
+   *
+   * It is part of the identity because an avatar is part of who somebody is:
+   * two pictures of the same candidate is the same defect as two names.
+   */
+  avatarId: string;
   authToken: string | null;
   /**
    * True once the session restore has finished — either a session was found
@@ -448,6 +478,8 @@ interface CareerContextType {
     experienceLevel?: ExperienceLevel | null;
     educationStatus?: EducationStatus | null;
     expectedGraduationYear?: number | null;
+    targetOpportunityType?: TargetOpportunityType | null;
+    professionalHeadline?: string | null;
   }) => Promise<boolean>;
   completeOnboarding: () => Promise<void>;
   suggestAiSummary: (signal?: AbortSignal) => Promise<string>;
@@ -521,7 +553,9 @@ interface CareerContextType {
 
   // Activity Center
   activities: UserActivityItem[];
-  logActivity: (activity: Omit<UserActivityItem, 'id' | 'timestamp'>) => void;
+  logActivity: (
+    activity: Omit<UserActivityItem, 'id' | 'timestamp'> & { idempotencyKey?: string }
+  ) => void;
 
   // Documents & Cover Letters
   documents: CareerDocument[];
@@ -1687,6 +1721,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             educationStatus:
               (profileRecord.educationStatus as UserProfile['educationStatus']) ?? null,
             expectedGraduationYear: profileRecord.expectedGraduationYear ?? null,
+            targetOpportunityType:
+              (profileRecord.targetOpportunityType as UserProfile['targetOpportunityType']) ??
+              null,
             yearsOfExperience: profileRecord.yearsOfExperience ?? prev.yearsOfExperience,
             onboardingCompleted: profileRecord.onboardingCompleted,
             onboardingStatus: profileRecord.onboardingStatus ?? (profileRecord.onboardingCompleted ? 'completed' : 'not_started'),
@@ -1950,6 +1987,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         experienceLevel: experienceLevel ?? null,
         educationStatusOverride: profile.educationStatus ?? null,
         expectedGraduationYear: profile.expectedGraduationYear ?? null,
+        targetOpportunityType: profile.targetOpportunityType ?? null,
+        // The professional headline is `profiles.headline`. It is the
+        // candidate's own line about themselves, kept apart from the current
+        // job title — a student has no job title.
+        professionalHeadline: profile.headline ?? null,
         education: profile.education.map((entry) => ({
           institution: entry.institution,
           degree: entry.degree,
@@ -1969,6 +2011,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       experienceLevel,
       profile.educationStatus,
       profile.expectedGraduationYear,
+      profile.targetOpportunityType,
+      profile.headline ?? null,
       profile.education,
       targetRole,
     ],
@@ -2310,7 +2354,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // human-readable string is derived here for display.
   const [activities, setActivities] = useState<UserActivityItem[]>([]);
 
-  const logActivity = async (item: Omit<UserActivityItem, 'id' | 'timestamp'>) => {
+  const logActivity = async (
+    item: Omit<UserActivityItem, 'id' | 'timestamp'> & { idempotencyKey?: string }
+  ) => {
     try {
       const dto = await postActivity({
         actionType: item.actionType,
@@ -2318,8 +2364,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         subtitle: item.subtitle,
         relatedObject: item.relatedObject,
         linkView: item.linkView,
+        idempotencyKey: item.idempotencyKey,
       });
-      setActivities(prev => [toActivity(dto), ...prev]);
+      // The server returns the row that already exists when the same action
+      // is logged again. Replace by id, never blind-prepend: a retry must not
+      // make the Recent Activity panel show the action twice.
+      const next = toActivity(dto);
+      setActivities(prev => [next, ...prev.filter(activity => activity.id !== next.id)]);
     } catch (error) {
       console.error('Failed to record activity:', error);
     }
@@ -4271,6 +4322,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     experienceLevel?: ExperienceLevel | null;
     educationStatus?: EducationStatus | null;
     expectedGraduationYear?: number | null;
+    targetOpportunityType?: TargetOpportunityType | null;
+    professionalHeadline?: string | null;
   }): Promise<boolean> => {
     try {
       const updates: Record<string, unknown> = {};
@@ -4294,6 +4347,21 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
       if (patch.expectedGraduationYear !== undefined) {
         updates.expectedGraduationYear = patch.expectedGraduationYear;
+        // A future graduation year means the candidate is still studying. The
+        // server enforces the same rule; applying it here keeps the screen in
+        // step even before the profile is read back.
+        if (
+          typeof patch.expectedGraduationYear === 'number' &&
+          patch.expectedGraduationYear > new Date().getFullYear()
+        ) {
+          updates.educationStatus = 'currently_studying';
+        }
+      }
+      if (patch.targetOpportunityType !== undefined) {
+        updates.targetOpportunityType = patch.targetOpportunityType;
+      }
+      if (patch.professionalHeadline !== undefined) {
+        updates.headline = patch.professionalHeadline ?? '';
       }
 
       if (Object.keys(updates).length === 0) return true;
@@ -4312,11 +4380,21 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             : prev.currentTitle,
         careerGoal: patch.careerGoal !== undefined ? patch.careerGoal : prev.careerGoal,
         educationStatus:
-          patch.educationStatus !== undefined ? patch.educationStatus : prev.educationStatus,
+          updates.educationStatus !== undefined
+            ? (updates.educationStatus as EducationStatus)
+            : prev.educationStatus,
         expectedGraduationYear:
           patch.expectedGraduationYear !== undefined
             ? patch.expectedGraduationYear
             : prev.expectedGraduationYear,
+        targetOpportunityType:
+          patch.targetOpportunityType !== undefined
+            ? patch.targetOpportunityType
+            : prev.targetOpportunityType,
+        professionalHeadline:
+          patch.professionalHeadline !== undefined
+            ? patch.professionalHeadline
+            : prev.headline,
       }));
 
       if (patch.experienceLevel !== undefined) {
@@ -5378,6 +5456,10 @@ Skills: ${activeCV.skillsList.join(', ')}
         actionType: 'applied_job',
         title: `Applied to ${application.company}`,
         subtitle: application.role,
+        // The id makes this one action for this one application. A retry
+        // lands on the same activity row; a second application to the same
+        // company is a different event.
+        relatedObject: dto.id,
         linkView: 'applications',
       });
       return true;
@@ -5409,7 +5491,9 @@ Skills: ${activeCV.skillsList.join(', ')}
         actionType: 'applied_job',
         title: `Application moved to ${stage}`,
         subtitle: `${application.role} at ${application.company}`,
-        relatedObject: application.company,
+        // Scoped to this application, so two applications at the same
+        // company can both reach the same stage.
+        relatedObject: application.id,
         linkView: 'applications',
       });
     } catch (error) {
@@ -5770,6 +5854,23 @@ Skills: ${activeCV.skillsList.join(', ')}
     window.location.reload();
   };
 
+  /**
+   * The candidate's identity, resolved once.
+   *
+   * It is recomputed whenever the profile's name, the preferred name or the
+   * auth account changes, which is what makes an edit in Profile show up in
+   * the topbar, the sidebar and the Dashboard immediately — without a reload.
+   */
+  const identity = useMemo(
+    () =>
+      resolveIdentity({
+        name: profile.name,
+        preferredName: profile.preferredName,
+        accountName: currentUser?.name ?? null,
+      }),
+    [profile.name, profile.preferredName, currentUser?.name]
+  );
+
   const careerContext: CareerContextSummary = useMemo(() => ({
     profile,
     careerGoal: profile.careerGoal,
@@ -5811,6 +5912,8 @@ Skills: ${activeCV.skillsList.join(', ')}
         careerContext,
         regeneratePersonalizedRoadmap,
         currentUser,
+        identity,
+        avatarId: profile.avatarUrl,
         authToken,
         isAuthReady,
         hydrationError,

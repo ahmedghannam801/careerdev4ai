@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useAIProcessing } from '../../lib/useAIProcessing';
-import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { getAccessToken } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import {
@@ -22,6 +21,7 @@ import {
 } from '../../data/interviewBank';
 import { Reveal } from '../motion/Motion';
 import { CareerImage } from '../ui/CareerImage';
+import { computeInterviewReadiness } from '../../../shared/interviewReadiness';
 
 interface InterviewFeedback {
   score?: number;
@@ -228,18 +228,30 @@ export const InterviewsView: React.FC = () => {
     ).toFixed(1);
   }, [answered]);
 
-  const scoredSessions = useMemo(
-    () => interviewSessions.filter((s) => typeof s.aiFeedback?.score === 'number'),
+  /**
+   * The readiness figure, from the shared module.
+   *
+   * It used to be computed here as "the average rubric score, times ten" —
+   * so a candidate who had practised one mock interview and scored 9/10 was
+   * told they were 90% ready, and a candidate who had never practised was
+   * told 0%. Readiness now weighs practice and performance together, and
+   * reports "not measured yet" rather than a zero it cannot justify.
+   *
+   * The Progress page reads the same module, so the two pages cannot
+   * disagree about the same number.
+   */
+  const readiness = useMemo(
+    () =>
+      computeInterviewReadiness(
+        interviewSessions.map((session) => ({
+          score: session.aiFeedback?.score ?? null,
+          roleTitle: session.roleTitle ?? null,
+        }))
+      ),
     [interviewSessions]
   );
 
-  const interviewReadinessPct = useMemo(() => {
-    if (scoredSessions.length === 0) return 0;
-    const avgOutOfTen =
-      scoredSessions.reduce((sum, s) => sum + (s.aiFeedback?.score ?? 0), 0) /
-      scoredSessions.length;
-    return Math.round(avgOutOfTen * 10);
-  }, [scoredSessions]);
+  const interviewReadinessPct = readiness.readinessPct ?? 0;
 
   const behavioralCount = plan?.filter((question) => question.stage === 'behavioral').length ?? 8;
   const technicalCount = plan?.filter((question) => question.stage === 'technical').length ?? 7;
@@ -539,7 +551,7 @@ export const InterviewsView: React.FC = () => {
                   />
                   {isEvaluating
                     ? t('Evaluating with AI...')
-                    : aiButtonLabel(t('Submit Answer'), 'interview_mock_session', t)}
+                    : t('Submit Answer')}
                 </button>
               </div>
             )}

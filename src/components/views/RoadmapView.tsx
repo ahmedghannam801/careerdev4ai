@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
@@ -27,6 +28,7 @@ import {
   journeyStageForPhase,
 } from '../../../shared/roadmapJourney';
 import { computeTimeBreakdown } from '../../../shared/roadmapTimeBreakdown';
+import { computeCareerMetrics } from '../../../shared/careerMetrics';
 import {
   RESOURCE_TYPE_LABELS,
   isVideoResource,
@@ -91,6 +93,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
     projects,
     addProject,
     targetRole,
+    skills,
     t,
   } = useCareer();
   const { showToast } = useToast();
@@ -128,7 +131,57 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   const completedTasks = allTasks.filter((task) => task.status === 'completed').length;
   const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   const totalHours = allTasks.reduce((sum, task) => sum + (task.estimatedHours || 0), 0);
-  const jobReady = totalTasks > 0 && completedTasks === totalTasks;
+
+  /**
+   * The plan's own opinion of what is still missing.
+   *
+   * The QA audit found the roadmap telling a candidate "Your skills cover the
+   * core requirements" while their SQL was still at 2 of 5. The plan is
+   * derived from the skill gaps, so the honest thing to show is the gaps
+   * themselves — and the same engine the Dashboard reads, so the two cannot
+   * disagree about what is missing.
+   */
+  const roadmapMetrics = useMemo(
+    () =>
+      computeCareerMetrics({
+        skills: skills.map((skill) => ({
+          name: skill.name,
+          currentLevel: skill.currentLevel,
+          targetLevel: skill.targetLevel,
+          importance: skill.gap > 0 ? 'high' : 'medium',
+          required: skill.gap > 0,
+        })),
+        roadmapTasks: allTasks.map((task) => ({
+          id: task.id,
+          status: task.status,
+          skillName: task.skillName ?? null,
+        })),
+        blockingSkillNames: allTasks
+          .filter((task) => task.status !== 'completed' && task.status !== 'skipped')
+          .map((task) => task.skillName)
+          .filter((name): name is string => Boolean(name)),
+        careerGoal: targetRole?.title ?? null,
+      }),
+    [skills, allTasks, targetRole]
+  );
+
+  // The gap the plan has not closed yet. It is the roadmap's first
+  // recommendation, because it is the biggest thing standing between the
+  // candidate and the role.
+  const topGap = roadmapMetrics.gaps[0] ?? null;
+
+  /**
+   * The roadmap is only "job ready" when the plan is finished AND the skills
+   * are actually at their target levels.
+   *
+   * A plan can be 100% complete while a core requirement is still short —
+   * the plan was built from an older picture of the candidate's skills. The
+   * old code said "Job Ready" on the plan alone, which is how a candidate
+   * ended up applying with a gap they had been told was closed.
+   */
+  const planComplete = totalTasks > 0 && completedTasks === totalTasks;
+  const skillsMet = roadmapMetrics.gaps.length === 0;
+  const jobReady = planComplete && skillsMet;
 
   // The plan's hours, split by the kind of work they are spent on. The parts
   // always add up to the total, so "48 hours" is never a number without an
@@ -232,9 +285,28 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   const nextTaskStage = nextTask
     ? stages.find((stage) => stage.tasks.some((task) => task.id === nextTask.id)) ?? null
     : null;
-  const nextTaskOptions = nextTask ? learningOptionsForTask(nextTask) : [];
-  const nextTaskResource =
-    nextTaskOptions.find((option) => isSafeExternalUrl(option.course.url)) ?? null;
+
+  /**
+   * The task that actually closes the biggest gap.
+   *
+   * The plan is ordered by the phase it belongs to, which is not always the
+   * order of urgency. The QA audit asked for the roadmap's first recommended
+   * action to be the one that closes the active gap, so a task that works on
+   * the top gap is preferred over whichever task happens to come first.
+   */
+  const gapClosingTask = useMemo(() => {
+    if (!topGap) return null;
+    const needle = topGap.name.toLowerCase();
+    return (
+      allTasks.find(
+        (task) =>
+          task.status !== 'completed' &&
+          task.status !== 'skipped' &&
+          (task.skillName ?? '').toLowerCase() === needle
+      ) ?? null
+    );
+  }, [allTasks, topGap]);
+
   const allProjectTitles = [...new Set(stages.flatMap((stage) => stage.projects))];
   // Projects are proof of work for the skills just practised, so they sit
   // between Practice and Job Preparation. Persisted roadmaps can have fewer
@@ -525,6 +597,100 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* THE PLAN'S HONEST STATUS
+          *
+          * The plan used to say "Your skills cover the core requirements"
+          * whenever the roadmap had been walked through, even when a core
+          * requirement was still short. It now reports the real gap, with the
+          * levels that prove it and the exact action that closes it.
+          *
+          * A plan can be finished while a core skill is still below target —
+          * the plan was generated from an older picture of the candidate. So
+          * the status is read from the skills, not from the plan. */}
+      <section
+        data-guide="roadmap-gap-status"
+        className={`rounded-2xl border p-4 ${
+          topGap
+            ? 'border-[var(--color-warning)]/40 bg-[var(--color-warning-surface)]/40'
+            : 'border-[var(--color-success-strong)]/40 bg-[var(--color-success-surface)]'
+        }`}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              {topGap ? (
+                <AlertTriangle className="h-3 w-3 text-[var(--color-warning)]" />
+              ) : (
+                <CheckCircle2 className="h-3 w-3 text-[var(--color-success-strong)]" />
+              )}
+              {t('What this plan still needs from you')}
+            </div>
+
+            {topGap ? (
+              <>
+                <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-primary)]">
+                  {t('Your skills do not yet cover the core requirements. The biggest gap is')}{' '}
+                  <span className="font-bold">
+                    {topGap.name} ({topGap.currentLevel}/5 → {topGap.targetLevel}/5)
+                  </span>
+                  .
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {topGap.reason}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-primary)]">
+                {t('Your skills cover the core requirements for this role.')}
+              </p>
+            )}
+          </div>
+
+          {topGap ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {topGap.blocker ? (
+                <span className="rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--color-danger)]">
+                  {t('Blocking your progress')}
+                </span>
+              ) : null}
+              {onNavigate && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('skills')}
+                  className="inline-flex min-h-[44px] items-center gap-1 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)]"
+                >
+                  {t('Close this gap')}
+                  <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+                </button>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Every gap, so the candidate can see the whole picture rather than
+            the single worst one. */}
+        {roadmapMetrics.gaps.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1.5 border-t border-[var(--border-subtle)] pt-3">
+            {roadmapMetrics.gaps.slice(0, 5).map((gap) => (
+              <span
+                key={gap.name}
+                title={gap.reason}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${
+                  gap.blocker
+                    ? 'border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 text-[var(--text-primary)]'
+                    : 'border-[var(--border-subtle)] bg-[var(--surface-secondary)]/60 text-[var(--text-primary)]'
+                }`}
+              >
+                <span>{gap.name}</span>
+                <span className="font-mono text-[var(--text-muted)]">
+                  {gap.currentLevel}/{gap.targetLevel}
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
       <AnimatedProgress
         value={progressPct}
         label={t('Roadmap completion')}
@@ -532,8 +698,24 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
         fillClassName="bg-[var(--color-primary)]"
       />
 
-      {/* START: the one action that matters right now, before the plan. */}
-      {nextTask && nextTaskStage && (
+      {/* START: the one action that matters right now, before the plan.
+          *
+          * It is the task that closes the biggest active gap when there is
+          * one, so the plan's first recommendation and the plan's status
+          * message always agree with each other. */}
+      {(() => {
+        const startTask = gapClosingTask ?? nextTask;
+        const startStage = startTask
+          ? (stages.find((stage) => stage.tasks.some((task) => task.id === startTask.id)) ??
+            nextTaskStage)
+          : null;
+        const startOptions = startTask ? learningOptionsForTask(startTask) : [];
+        const startResource =
+          startOptions.find((option) => isSafeExternalUrl(option.course.url)) ?? null;
+
+        if (!startTask || !startStage) return null;
+
+        return (
         <section
           id="roadmap-start"
           className="scroll-mt-24 rounded-2xl border border-[var(--accent-primary)]/40 bg-[var(--accent-surface)]/50 p-5"
@@ -544,43 +726,52 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
               {t('START HERE')}
             </div>
             <span className="rounded-full bg-[var(--surface-main)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
-              {nextTaskStage.label} · {nextTaskStage.done}/{nextTaskStage.total} {t('actions')}
+              {startStage.label} · {startStage.done}/{startStage.total} {t('actions')}
             </span>
           </div>
           <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
+              {/* The gap this step closes, with the levels that prove it. */}
+              {topGap && gapClosingTask ? (
+                <div className="mb-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-full border border-[var(--color-warning)]/40 bg-[var(--color-warning-surface)]/60 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]">
+                  <span>{t('Closes your gap in')}</span>
+                  <span className="font-mono">
+                    {topGap.name} ({topGap.currentLevel}/5 → {topGap.targetLevel}/5)
+                  </span>
+                </div>
+              ) : null}
               <h2 className="text-lg font-bold leading-snug text-[var(--text-primary)]">
-                {nextTask.title}
+                {startTask.title}
               </h2>
-              {nextTask.rationale && (
+              {startTask.rationale && (
                 <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
-                  {nextTask.rationale}
+                  {startTask.rationale}
                 </p>
               )}
-              {nextTaskResource && (
+              {startResource && (
                 <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
-                  {nextTaskResource.course.provider} · {nextTaskResource.course.title}
+                  {startResource.course.provider} · {startResource.course.title}
                 </p>
               )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {nextTaskResource ? (
+              {startResource ? (
                 <a
-                  href={nextTaskResource.course.url}
+                  href={startResource.course.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => {
                     void startLearningCourse(
-                      nextTaskResource.course.id,
-                      nextTaskResource.rec?.reason
+                      startResource.course.id,
+                      startResource.rec?.reason
                     );
-                    if (nextTask.status !== 'completed') {
-                      updateTaskStatus(nextTask.id, 'in_progress');
+                    if (startTask.status !== 'completed') {
+                      updateTaskStatus(startTask.id, 'in_progress');
                     }
                   }}
                   className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[var(--accent-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-xs transition-opacity hover:opacity-90"
                 >
-                  {nextTask.status === 'in_progress' ? t('Continue Learning') : t('Start Learning')}
+                  {startTask.status === 'in_progress' ? t('Continue Learning') : t('Start Learning')}
                   <ArrowUpRight className="h-4 w-4" />
                 </a>
               ) : (
@@ -590,7 +781,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
               )}
               <button
                 type="button"
-                onClick={() => scrollToStage(nextTaskStage.id)}
+                onClick={() => scrollToStage(startStage.id)}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
                 {t('View stage')}
@@ -598,7 +789,8 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
             </div>
           </div>
         </section>
-      )}
+        );
+      })()}
 
       {/* The stage stepper: a map of the whole plan, not another menu. */}
       <div className="-mx-1 overflow-x-auto px-1 pb-1">
@@ -614,10 +806,14 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                 {t('START')}
               </span>
               <span className="text-xs font-semibold text-[var(--text-primary)]">
-                {nextTask ? t('Your next action') : t('All steps complete')}
+                {gapClosingTask ?? nextTask ? t('Your next action') : t('All steps complete')}
               </span>
               <span className="text-[10px] text-[var(--text-muted)]">
-                {nextTaskStage ? nextTaskStage.label : t('Job Ready')}
+                {(gapClosingTask ?? nextTask)
+                  ? (stages.find((stage) =>
+                      stage.tasks.some((task) => task.id === (gapClosingTask ?? nextTask)!.id)
+                    )?.label ?? nextTaskStage?.label ?? '')
+                  : t('Job Ready')}
               </span>
             </button>
           </li>
@@ -690,7 +886,11 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
               </span>
               <span className="text-xs font-semibold text-[var(--text-primary)]">{t('Job Ready')}</span>
               <span className="text-[10px] text-[var(--text-muted)]">
-                {jobReady ? t('All steps complete') : `${100 - progressPct}% ${t('to go')}`}
+                {jobReady
+                  ? t('All steps complete')
+                  : planComplete && !skillsMet
+                    ? t('Plan complete — skills still short')
+                    : `${100 - progressPct}% ${t('to go')}`}
               </span>
             </div>
           </li>

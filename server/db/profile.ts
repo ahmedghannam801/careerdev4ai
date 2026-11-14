@@ -68,6 +68,12 @@ export interface ProfileDTO {
   educationStatus: string | null;
   /** The year the candidate expects to graduate, when they stated one. */
   expectedGraduationYear: number | null;
+  /**
+   * The kind of opening the candidate is aiming at.
+   *
+   * internship | full_time_entry | both. NULL means "not chosen".
+   */
+  targetOpportunityType: string | null;
   onboardingCompleted: boolean;
   /**
    * The authoritative first-time onboarding state.
@@ -118,6 +124,8 @@ export interface UpdateProfileInput {
   /** currently_studying | graduated | not_set. */
   educationStatus?: string | null;
   expectedGraduationYear?: number | null;
+  /** internship | full_time_entry | both. */
+  targetOpportunityType?: string | null;
   onboardingCompleted?: boolean;
   onboardingStatus?: OnboardingStatus;
   onboardingStep?: number;
@@ -152,6 +160,7 @@ interface ProfileRow {
   experience_level: string | null;
   education_status: string | null;
   expected_graduation_year: number | null;
+  target_opportunity_type: string | null;
   onboarding_completed: boolean;
   onboarding_status: OnboardingStatus | null;
   onboarding_step: number | null;
@@ -162,7 +171,7 @@ interface ProfileRow {
 }
 
 const SELECT_COLUMNS =
-  'id, full_name, preferred_name, username, avatar_url, phone, location, city, country, timezone, current_title, current_position, current_company, years_of_experience, headline, bio, professional_summary, career_goal, custom_goal_text, target_role, target_industry, user_type, experience_level, education_status, expected_graduation_year, onboarding_completed, onboarding_status, onboarding_step, onboarding_updated_at, is_public, created_at, updated_at';
+  'id, full_name, preferred_name, username, avatar_url, phone, location, city, country, timezone, current_title, current_position, current_company, years_of_experience, headline, bio, professional_summary, career_goal, custom_goal_text, target_role, target_industry, user_type, experience_level, education_status, expected_graduation_year, target_opportunity_type, onboarding_completed, onboarding_status, onboarding_step, onboarding_updated_at, is_public, created_at, updated_at';
 
 /** The profile row + its extension rows, as one typed DTO. */
 export async function getProfileDto(profileId: string): Promise<ProfileDTO | null> {
@@ -215,6 +224,7 @@ export async function getProfileDto(profileId: string): Promise<ProfileDTO | nul
     experienceLevel: row.experience_level,
     educationStatus: row.education_status,
     expectedGraduationYear: row.expected_graduation_year,
+    targetOpportunityType: row.target_opportunity_type ?? null,
     onboardingCompleted: row.onboarding_completed,
     onboardingStatus: row.onboarding_status ?? (row.onboarding_completed ? 'completed' : 'not_started'),
     onboardingStep: row.onboarding_step ?? 0,
@@ -260,6 +270,7 @@ export async function updateProfileDto(
     ['experienceLevel', 'experience_level'],
     ['educationStatus', 'education_status'],
     ['expectedGraduationYear', 'expected_graduation_year'],
+    ['targetOpportunityType', 'target_opportunity_type'],
   ];
   for (const [key, column] of map) {
     if (input[key] !== undefined) patch[column] = input[key] ?? null;

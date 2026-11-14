@@ -45,7 +45,11 @@ import {
   updateEvidence,
   type EvidenceDTO,
 } from '../db/evidence.ts';
-import { getEvidenceSkillLevels } from '../db/skillEvidence.ts';
+import {
+  getEvidenceSkillLevels,
+  getSkillEvidenceSignals,
+  type SkillEvidenceSignal,
+} from '../db/skillEvidence.ts';
 import { getProfileDto } from '../db/profile.ts';
 import {
   computeSkillGaps,
@@ -55,11 +59,17 @@ import {
 import {
   buildSkillRecord,
   effectiveSkillLevel,
+  evidenceSourcesForKinds,
   hasPracticalEvidence,
   rankSkillPriorities,
   type SkillPriority,
 } from '../../shared/skillEvidence.ts';
 import { isSkillSectionHeader, normalizeSkillKey } from '../../shared/cvDedupe.ts';
+import {
+  normalizeSkillName,
+  resolveSkillSource,
+  type SkillSource,
+} from '../../shared/skillNormalizer.ts';
 import { resolveRoleDefinition } from '../../shared/careerRoles.ts';
 import { generateAndPersistRoadmap, getSkillGapSummary } from '../roadmap/service.ts';
 
@@ -93,6 +103,11 @@ export interface StoredSkill {
   effectiveLevel: number;
   /** The level the records the candidate holds support. */
   evidenceLevel: number | null;
+  /**
+   * What backs this record: verified evidence, a completed assessment, the
+   * candidate's own claim, or a model estimate nobody has confirmed.
+   */
+  source: SkillSource;
 }
 
 /**
@@ -103,24 +118,34 @@ export interface StoredSkill {
  * item they filed. Those records raise the level of the skill they cover.
  */
 export async function listStoredSkills(profileId: string): Promise<StoredSkill[]> {
-  const [rows, evidenceLevels] = await Promise.all([
+  const [rows, evidenceSignals] = await Promise.all([
     getUserSkills(profileId),
-    getEvidenceSkillLevels(profileId).catch(() => new Map<string, number>()),
+    getSkillEvidenceSignals(profileId).catch(
+      () => new Map<string, SkillEvidenceSignal>()
+    ),
   ]);
 
   return rows
-    .filter((row) => Boolean(row.skill?.name))
+    .filter((row) => Boolean(normalizeSkillName(row.skill?.name)))
     .map((row) => {
-      const evidenceLevel = evidenceLevels.get(row.skill!.name.toLowerCase()) ?? null;
+      const signal = evidenceSignals.get(row.skill!.name.toLowerCase());
+      const evidenceLevel = signal?.level ?? null;
+      // The row records the assessments; the project, course, certificate and
+      // evidence reads record everything else. Both are needed, or a skill
+      // proven by a project would look like a bare self-report.
+      const evidenceSources = [
+        ...(Array.isArray(row.evidence_sources) ? row.evidence_sources : []),
+        ...evidenceSourcesForKinds(signal?.kinds ?? []),
+      ];
       const record = buildSkillRecord({
-        name: row.skill!.name,
+        name: normalizeSkillName(row.skill!.name) || row.skill!.name,
         category: row.skill!.category,
         selfReportedLevel: row.proficiency,
         assessedLevel: row.assessed_level,
         assessmentScore: row.assessment_score,
         assessmentAt: row.assessment_at,
         evidenceLevel,
-        evidenceSources: row.evidence_sources ?? [],
+        evidenceSources,
       });
 
       return {
@@ -134,6 +159,11 @@ export async function listStoredSkills(profileId: string): Promise<StoredSkill[]
         evidenceSources: record.evidenceSources,
         effectiveLevel: effectiveSkillLevel(record),
         evidenceLevel: record.evidenceLevel,
+        source: resolveSkillSource({
+          selfReportedLevel: record.selfReportedLevel,
+          assessedLevel: record.assessedLevel,
+          evidenceSources: record.evidenceSources,
+        }),
       };
     });
 }
@@ -382,6 +412,7 @@ async function readStoredSkill(
     evidenceSources: [],
     effectiveLevel: 0,
     evidenceLevel: null,
+    source: 'ai_estimated',
   };
   return {
     skill: found ?? fallback,

@@ -63,6 +63,9 @@ export default defineConfig(() => {
               if (id.includes('motion')) {
                 return 'vendor-motion';
               }
+              if (id.includes('node_modules/gsap') || id.includes('node_modules/lenis')) {
+                return 'vendor-animation';
+              }
               if (id.includes('@supabase/supabase-js')) {
                 return 'vendor-supabase';
               }

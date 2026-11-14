@@ -15,7 +15,7 @@ export const appShellAr: Record<string, string> = {
   'Close modal': 'إغلاق النافذة',
   'Secure career state sync': 'مزامنة آمنة لحالة المسار المهني',
   'Full Name': 'الاسم الكامل',
-  'e.g. Alex Morgan': 'مثال: alex morgan',
+  'e.g. Your full name': 'مثال: اسمك الكامل',
   'Email Address': 'البريد الإلكتروني',
   'Password': 'كلمة المرور',
   'Forgot password?': 'نسيت كلمة المرور؟',

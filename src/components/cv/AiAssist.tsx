@@ -27,7 +27,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Check, Loader2, Sparkles, X } from 'lucide-react';
 import { assistCvField } from '../../lib/cvAssistApi';
 import { useCareer } from '../../context/CareerContext';
-import { aiButtonLabel, aiTokenCostLabel } from '../../lib/aiTokenCosts';
+import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import {
   CV_ASSIST_LENGTHS,
   CV_ASSIST_TONES,
@@ -270,17 +270,16 @@ export const AiAssist: React.FC<AiAssistProps> = ({
           {/* What the candidate is asking for. */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
-              {t('AI Suggestions')} {aiTokenCostLabel('ai_assist_inline', t)}
+              {t('AI Suggestions')}
             </span>
             {actions.map((option) => (
               <button
                 key={option}
                 type="button"
-                // The chip starts a request that costs a token, so it is
-                // closed while one is in flight. A second click would
-                // otherwise replace the answer in flight with another
-                // request, and the candidate would be billed twice for one
-                // piece of work.
+                // A request is in flight while the chip is disabled: a second
+                // click would replace the answer being written with another
+                // request. Inline CV writing is free, so there is no charge to
+                // duplicate either way.
                 disabled={isWorking}
                 onClick={() => {
                   setAction(option);
