@@ -360,6 +360,9 @@ async function main() {
     // writer, skipping the onboarding writes no role, and the catalogue is
     // translated in both languages. Pure: no key and no database are needed.
     join(TESTS_DIR, 'career-target.test.ts'),
+    // The unified entry point for all seven career scores and their shared
+    // domain formulas. Pure: no key and no database are needed.
+    join(TESTS_DIR, 'career-scores.test.ts'),
     // The Checkout Studio parameters sent to Stripe, and the rule that picks
     // the hosted checkout's user-interface mode from the account's API
     // version. Pure: no key and no database are needed.

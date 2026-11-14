@@ -2630,10 +2630,9 @@ app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Req
 // beside it keep their own contract: they return the model's answer or an
 // explicit failure, and they never answer with something of their own.
 //
-// The session is required; the legal acceptance is not. The measurement is
-// counted on the platform from the candidate's own document, so nothing is sent
-// to a third party and nothing of theirs is used on their behalf.
-app.post('/api/cv/analysis', requireSession, async (req: Request, res: Response) => {
+// CV analysis processes and records private CV data, so it requires current
+// acceptance of the Terms & Conditions and Privacy Policy.
+app.post('/api/cv/analysis', requireAuth, async (req: Request, res: Response) => {
   try {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const request = await resolveAnalysisRequest(req.authUser!.id, body);
@@ -2693,7 +2692,7 @@ app.post('/api/cv/analysis', requireSession, async (req: Request, res: Response)
 // measurement really went through. The stream carries the same result the
 // plain route returns — the two read the same document and run the same
 // measurement.
-app.post('/api/cv/analysis/stream', requireSession, async (req: Request, res: Response) => {
+app.post('/api/cv/analysis/stream', requireAuth, async (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
 
   const send = (event: string, data: unknown) => {
@@ -2782,7 +2781,7 @@ app.post('/api/cv/analysis/stream', requireSession, async (req: Request, res: Re
 
 // The history of the measured analyses: the newest first, and never replacing
 // an earlier run.
-app.get('/api/cv/analyses', requireSession, async (req: Request, res: Response) => {
+app.get('/api/cv/analyses', requireAuth, async (req: Request, res: Response) => {
   try {
     const cvId = typeof req.query.cvId === 'string' ? req.query.cvId : undefined;
     const measurements = await listCvMeasurements(req.authUser!.id, {

@@ -14,6 +14,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { api, admin, createTestUser, deleteTestUser, type TestUser } from './helpers.ts';
+import { PRIVACY_VERSION, TERMS_VERSION } from '../shared/legal.ts';
 
 /** The raw text of a response, for the endpoints that stream. */
 async function apiText(
@@ -354,11 +355,10 @@ describe('the measured analysis of a stored CV', () => {
   });
 });
 
-describe('the measured analysis is not gated by the legal acceptance', () => {
+describe('CV analysis requires current legal acceptance', () => {
   let user: TestUser;
 
   before(async () => {
-    // A candidate who has not accepted the current terms.
     user = await createTestUser('cv-analysis-no-consent', { consent: false });
   });
 
@@ -366,16 +366,38 @@ describe('the measured analysis is not gated by the legal acceptance', () => {
     if (user) await deleteTestUser(user.id);
   });
 
-  test('a signed-in candidate can still measure their own CV', async () => {
+  test('analysis, streaming analysis, and history are denied before consent', async () => {
+    const plain = await api('POST', '/api/cv/analysis', {
+      token: user.token,
+      body: { cv: CV, targetRoleTitle: 'Full-Stack Engineer' },
+    });
+    const stream = await apiText('POST', '/api/cv/analysis/stream', {
+      token: user.token,
+      body: { cv: CV, targetRoleTitle: 'Full-Stack Engineer' },
+    });
+    const history = await api('GET', '/api/cv/analyses', { token: user.token });
+
+    for (const response of [plain, stream, history]) {
+      assert.equal(response.status, 403);
+      assert.equal(response.body?.code, 'CONSENT_REQUIRED');
+    }
+  });
+
+  test('analysis and history are available after consent', async () => {
+    const accepted = await api('POST', '/api/consent', {
+      token: user.token,
+      body: { accepted: true, termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION },
+    });
+    assert.equal(accepted.status, 200);
+
     const res = await api('POST', '/api/cv/analysis', {
       token: user.token,
       body: { cv: CV, targetRoleTitle: 'Full-Stack Engineer' },
     });
-
-    // The measurement is counted on the platform from the candidate's own
-    // document: no model is called and nothing leaves the account.
-    assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.equal(typeof res.body?.analysis?.overallScore, 'number');
+    const history = await api('GET', '/api/cv/analyses', { token: user.token });
+    assert.equal(res.status, 200);
+    assert.equal(history.status, 200);
+    assert.ok(history.body?.measurements?.length > 0);
   });
 
   test('the gate is still closed for an anonymous caller', async () => {
