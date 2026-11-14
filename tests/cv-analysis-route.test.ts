@@ -377,10 +377,12 @@ describe('CV analysis requires current legal acceptance', () => {
     });
     const history = await api('GET', '/api/cv/analyses', { token: user.token });
 
-    for (const response of [plain, stream, history]) {
-      assert.equal(response.status, 403);
-      assert.equal(response.body?.code, 'CONSENT_REQUIRED');
-    }
+    assert.equal(plain.status, 403);
+    assert.equal(plain.body?.code, 'CONSENT_REQUIRED');
+    assert.equal(stream.status, 403);
+    assert.equal(JSON.parse(stream.text).code, 'CONSENT_REQUIRED');
+    assert.equal(history.status, 403);
+    assert.equal(history.body?.code, 'CONSENT_REQUIRED');
   });
 
   test('analysis and history are available after consent', async () => {

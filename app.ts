@@ -87,7 +87,7 @@ declare global {
     }
   }
 }
-import { requireAuth, requireSession, type AuthedRequest } from './server/auth/require-auth.ts';
+import { requireAuth, type AuthedRequest } from './server/auth/require-auth.ts';
 import { findProfileByUsername } from './server/db/profiles.ts';
 import { changePassword, changeEmail, deleteAccount } from './server/db/account.ts';
 import { saveState, loadState, unmappedStateFields } from './server/db/state.ts';
