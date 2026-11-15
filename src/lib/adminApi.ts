@@ -7,6 +7,7 @@
 
 import { apiRequest as request } from './apiClient';
 import type { LearningCourse } from '../types/learning';
+import type { CareerExperience } from '../../shared/careerExperience';
 import type { VolunteerOpportunity } from './personalizationApi';
 import type {
   AnnouncementCategory,
@@ -388,6 +389,34 @@ export async function patchAdminCourse(
     { method: 'PATCH', body: JSON.stringify(patch) }
   );
   return data.course;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Career Experience catalogue review                                         */
+/* -------------------------------------------------------------------------- */
+
+export async function fetchAdminExperiences(): Promise<CareerExperience[]> {
+  const data = await request<{ experiences: CareerExperience[] }>(
+    '/api/admin/career-experiences'
+  );
+  return data.experiences ?? [];
+}
+
+export async function patchAdminExperience(
+  id: string,
+  patch: {
+    isActive?: boolean;
+    isFeatured?: boolean;
+    sortOrder?: number;
+    description?: string;
+    title?: string;
+  }
+): Promise<CareerExperience> {
+  const data = await request<{ experience: CareerExperience }>(
+    `/api/admin/career-experiences/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify(patch) }
+  );
+  return data.experience;
 }
 
 /* -------------------------------------------------------------------------- */

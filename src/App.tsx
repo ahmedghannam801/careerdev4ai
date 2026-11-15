@@ -43,6 +43,7 @@ const SkillsCenterView = lazy(() => import('./components/views/SkillsCenterView'
 const SkillAssessmentView = lazy(() => import('./components/views/SkillAssessmentView').then((m) => ({ default: m.SkillAssessmentView })));
 const RoadmapView = lazy(() => import('./components/views/RoadmapView').then((m) => ({ default: m.RoadmapView })));
 const LearningCenterView = lazy(() => import('./components/views/LearningCenterView').then((m) => ({ default: m.LearningCenterView })));
+const ExperienceHubView = lazy(() => import('./components/views/ExperienceHubView').then((m) => ({ default: m.ExperienceHubView })));
 const ProjectsView = lazy(() => import('./components/views/ProjectsView').then((m) => ({ default: m.ProjectsView })));
 const VolunteerView = lazy(() => import('./components/views/VolunteerView').then((m) => ({ default: m.VolunteerView })));
 const EvidenceView = lazy(() => import('./components/views/EvidenceView').then((m) => ({ default: m.EvidenceView })));
@@ -398,6 +399,8 @@ function AppRoutes() {
         return <SkillAssessmentView onNavigate={navigateTo} />;
       case 'learning':
         return <LearningCenterView />;
+      case 'experiences':
+        return <ExperienceHubView />;
       case 'projects':
         return <ProjectsView />;
       case 'volunteer':

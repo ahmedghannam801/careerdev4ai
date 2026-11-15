@@ -557,6 +557,10 @@ async function main() {
     // application, an interview session, a document snapshot, the settings
     // and the live job filters.
     join(TESTS_DIR, 'functional-flows.test.ts'),
+    // The Career Experience Hub: official provider links, certificate URL
+    // rules, and the deterministic match signals that explain a recommendation.
+    // Pure.
+    join(TESTS_DIR, 'experience-matching.test.ts'),
   ].filter((file) => existsSync(file));
 
   const selected = onlyNames.length

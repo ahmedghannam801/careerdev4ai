@@ -189,6 +189,23 @@ import {
   listCoursesForAdmin,
   updateCourseForAdmin,
 } from './server/db/learning.ts';
+import {
+  CertificateRequiresCompletionError,
+  deleteExperienceCertificate,
+  deleteExperienceProgress,
+  getCareerExperience,
+  listCareerExperiences,
+  listExperienceCertificates,
+  listExperienceProgress,
+  listExperiencesForAdmin,
+  updateExperienceForAdmin,
+  upsertExperienceCertificate,
+  upsertExperienceProgress,
+} from './server/db/careerExperiences.ts';
+import {
+  isExperienceProgressStatus,
+  type ExperienceProgressStatus,
+} from './shared/careerExperience.ts';
 import { rankCourses, selectNextStep, type LearningFormat, type LearningStatus } from './server/learning/recommendation.ts';
 import { enrichRecommendationsWithAi } from './server/learning/ai.ts';
 import { buildLearningContext } from './server/learning/context.ts';
@@ -6693,6 +6710,120 @@ app.post('/api/learning/recommendations', requireAuth, aiRateLimit, async (req: 
   }
 });
 
+/* -------------------------------------------------------------------------- */
+/* Career Experience Hub                                                      */
+/* -------------------------------------------------------------------------- */
+
+// The curated catalogue is public reference data: no user state, no secrets.
+app.get('/api/career-experiences/catalog', async (_req: Request, res: Response) => {
+  try {
+    const experiences = await listCareerExperiences();
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.json({ experiences, count: experiences.length });
+  } catch (error) {
+    console.error('Failed to load the experience catalogue:', error);
+    return res.status(500).json({ error: 'Failed to load the experience catalogue' });
+  }
+});
+
+// The caller's own progress and certificates. The owner is always the
+// verified auth user; a profile_id in the request is ignored.
+app.get('/api/career-experiences/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const [progress, certificates] = await Promise.all([
+      listExperienceProgress(req.authUser!.id),
+      listExperienceCertificates(req.authUser!.id),
+    ]);
+    return res.json({ success: true, progress, certificates });
+  } catch (error) {
+    console.error('Failed to load experience progress:', error);
+    return res.status(500).json({ error: 'Failed to load experience progress' });
+  }
+});
+
+app.put('/api/career-experiences/:id/progress', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const experienceId = str(req.params.id, 120);
+    if (!experienceId) return res.status(400).json({ error: 'Invalid experience id' });
+
+    const status = str(req.body?.status, 30) as ExperienceProgressStatus | null;
+    if (!status || !isExperienceProgressStatus(status)) {
+      return res.status(400).json({ error: 'Invalid experience status' });
+    }
+
+    const experience = await getCareerExperience(experienceId);
+    if (!experience || !experience.isActive) {
+      return res.status(404).json({ error: 'Experience not found' });
+    }
+
+    const saved =
+      typeof req.body?.saved === 'boolean' ? req.body.saved : undefined;
+    const progress = await upsertExperienceProgress(req.authUser!.id, experienceId, {
+      status,
+      saved,
+    });
+    return res.json({ success: true, progress });
+  } catch (error) {
+    console.error('Failed to save experience progress:', error);
+    return res.status(500).json({ error: 'Failed to save experience progress' });
+  }
+});
+
+app.delete('/api/career-experiences/:id/progress', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const experienceId = str(req.params.id, 120);
+    if (!experienceId) return res.status(400).json({ error: 'Invalid experience id' });
+    const deleted = await deleteExperienceProgress(req.authUser!.id, experienceId);
+    if (!deleted) return res.status(404).json({ error: 'Experience progress not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to remove experience progress:', error);
+    return res.status(500).json({ error: 'Failed to remove experience progress' });
+  }
+});
+
+app.put('/api/career-experiences/:id/certificate', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const experienceId = str(req.params.id, 120);
+    if (!experienceId) return res.status(400).json({ error: 'Invalid experience id' });
+
+    const experience = await getCareerExperience(experienceId);
+    if (!experience || !experience.isActive) {
+      return res.status(404).json({ error: 'Experience not found' });
+    }
+
+    const certificate = await upsertExperienceCertificate(
+      req.authUser!.id,
+      experienceId,
+      String(req.body?.certificateUrl ?? '')
+    );
+    return res.status(201).json({ success: true, certificate });
+  } catch (error) {
+    if (error instanceof CertificateRequiresCompletionError) {
+      return res.status(409).json({ error: error.message });
+    }
+    const message = error instanceof Error ? error.message : 'Failed to save the certificate';
+    if (message.includes('link') || message.includes('HTTPS')) {
+      return res.status(400).json({ error: message });
+    }
+    console.error('Failed to save the experience certificate:', error);
+    return res.status(500).json({ error: 'Failed to save the certificate' });
+  }
+});
+
+app.delete('/api/career-experiences/:id/certificate', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const experienceId = str(req.params.id, 120);
+    if (!experienceId) return res.status(400).json({ error: 'Invalid experience id' });
+    const deleted = await deleteExperienceCertificate(req.authUser!.id, experienceId);
+    if (!deleted) return res.status(404).json({ error: 'Certificate not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to remove the experience certificate:', error);
+    return res.status(500).json({ error: 'Failed to remove the certificate' });
+  }
+});
+
 /* ========================================================================== */
 /* Admin hierarchy and Admin Communication Center                             */
 /* ========================================================================== */
@@ -7495,6 +7626,83 @@ app.patch(
       // update: the catalogue change has already been saved.
       void submitIndexNow([coursePath(id), '/learning']);
       return res.json({ success: true, course });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* Career Experience catalogue review                                         */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  '/api/admin/career-experiences',
+  requireAuth,
+  requireAdmin,
+  requirePermission('learning.read'),
+  async (_req: Request, res: Response) => {
+    try {
+      return res.json({ success: true, experiences: await listExperiencesForAdmin() });
+    } catch (error) {
+      return adminFailure(res, error);
+    }
+  }
+);
+
+app.patch(
+  '/api/admin/career-experiences/:id',
+  requireAuth,
+  requireAdmin,
+  requirePermission('learning.write'),
+  async (req: Request, res: Response) => {
+    try {
+      const id = str(req.params.id, 120);
+      if (!id) return res.status(400).json({ error: 'Invalid experience id' });
+      const body = req.body ?? {};
+
+      const sortOrder =
+        body.sortOrder === undefined ? undefined : Number(body.sortOrder);
+      if (
+        sortOrder !== undefined &&
+        (!Number.isFinite(sortOrder) || sortOrder < 0 || sortOrder > 10000)
+      ) {
+        return res.status(400).json({ error: 'sortOrder must be between 0 and 10000' });
+      }
+
+      const description =
+        body.description === undefined ? undefined : str(body.description, 2000);
+      if (body.description !== undefined && !description) {
+        return res.status(400).json({ error: 'Invalid description' });
+      }
+
+      const title = body.title === undefined ? undefined : str(body.title, 200);
+      if (body.title !== undefined && !title) {
+        return res.status(400).json({ error: 'Invalid title' });
+      }
+
+      const experience = await updateExperienceForAdmin(id, {
+        isActive:
+          typeof body.isActive === 'boolean' ? body.isActive : undefined,
+        isFeatured:
+          typeof body.isFeatured === 'boolean' ? body.isFeatured : undefined,
+        sortOrder: sortOrder === undefined ? undefined : Math.round(sortOrder),
+        description: description ?? undefined,
+        title: title ?? undefined,
+      });
+      if (!experience) return res.status(404).json({ error: 'Experience not found' });
+
+      await logAdminAction(req.admin!, {
+        action: 'experience.updated',
+        entityType: 'career_experience',
+        entityId: id,
+        metadata: {
+          isActive: experience.isActive,
+          isFeatured: experience.isFeatured,
+          sortOrder: experience.sortOrder,
+        },
+      });
+      return res.json({ success: true, experience });
     } catch (error) {
       return adminFailure(res, error);
     }

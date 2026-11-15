@@ -28,6 +28,7 @@ export const APP_ROUTES = [
   'skills',
   'assessment',
   'learning',
+  'experiences',
   'projects',
   'volunteer',
   'evidence',
@@ -336,6 +337,35 @@ export const LEARNING_FORMATS = [
 
 /** The language filter of the learning hub. */
 export const LEARNING_LANGUAGES = ['all', 'Arabic', 'English'] as const;
+
+/** The tabs of the Career Experience Hub. */
+export const EXPERIENCE_TABS = [
+  'recommended',
+  'saved',
+  'in_progress',
+  'completed',
+  'catalog',
+] as const;
+export type ExperienceTab = (typeof EXPERIENCE_TABS)[number];
+
+/** The difficulty filter of the Career Experience Hub. */
+export const EXPERIENCE_DIFFICULTY_FILTERS = [
+  'all',
+  'introductory',
+  'intermediate',
+  'advanced',
+] as const;
+
+/** The progress filter of the Career Experience Hub. */
+export const EXPERIENCE_STATUS_FILTERS = [
+  'all',
+  'not_started',
+  'in_progress',
+  'completed',
+] as const;
+
+/** The duration filter of the Career Experience Hub. */
+export const EXPERIENCE_DURATION_FILTERS = ['all', 'short', 'medium', 'long'] as const;
 
 /** The status filter of the roadmap. */
 export const ROADMAP_STATUS_FILTERS = [

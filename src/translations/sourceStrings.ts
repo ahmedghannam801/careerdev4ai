@@ -32,6 +32,7 @@ import { cvTemplatesAr } from './parts/cvTemplates.ts';
 import { cvExtractionAr } from './parts/cvExtraction.ts';
 import { dashboardAr } from './parts/dashboard.ts';
 import { discoveryAr } from './parts/discovery.ts';
+import { experiencesAr } from './parts/experiences.ts';
 import { feedbackAr } from './parts/feedback.ts';
 import { interviewsAr } from './parts/interviews.ts';
 import { jobsAr } from './parts/jobs.ts';
@@ -72,6 +73,7 @@ export const AR_STRINGS: Record<string, string> = {
   ...roadmapJourneyAr,
   ...skillsAr,
   ...learningAr,
+  ...experiencesAr,
   ...momentumAr,
   ...interviewsAr,
   ...jobsAr,

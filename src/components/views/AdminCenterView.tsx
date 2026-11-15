@@ -38,6 +38,7 @@ import {
   DollarSign,
   LayoutTemplate,
   Coins,
+  Rocket,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useAdminAccess } from '../../lib/useAdminAccess';
@@ -54,11 +55,13 @@ import {
   deleteAdmin,
   fetchAdminAnalytics,
   fetchAdminAudit,
+  fetchAdminExperiences,
   fetchAdminLearning,
   fetchAdminOpportunities,
   fetchAdmins,
   patchAdmin,
   patchAdminCourse,
+  patchAdminExperience,
   patchAdminOpportunity,
   reportAdminIssue,
   type AdminAnalytics,
@@ -66,6 +69,7 @@ import {
   type AdminDTO,
 } from '../../lib/adminApi';
 import type { LearningCourse } from '../../types/learning';
+import type { CareerExperience } from '../../../shared/careerExperience';
 import type { VolunteerOpportunity } from '../../lib/personalizationApi';
 import { RESOURCE_TYPE_LABELS, type LearningResourceType } from '../../../shared/learningResources';
 import {
@@ -82,6 +86,7 @@ type AdminTab =
   | 'admins'
   | 'opportunities'
   | 'learning'
+  | 'experiences'
   | 'audit'
   | 'subscriptions'
   | 'payments'
@@ -870,6 +875,262 @@ function LearningPanel({ canWrite, canModerate }: { canWrite: boolean; canModera
 }
 
 /* -------------------------------------------------------------------------- */
+/* Career Experience catalogue                                                */
+/* -------------------------------------------------------------------------- */
+
+function ExperiencesPanel({ canWrite }: { canWrite: boolean }) {
+  const { t } = useCareer();
+  const [experiences, setExperiences] = useState<CareerExperience[]>([]);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setExperiences(await fetchAdminExperiences());
+      setError(null);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'The experience catalogue could not be loaded.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const update = async (
+    experience: CareerExperience,
+    patch: Parameters<typeof patchAdminExperience>[1]
+  ) => {
+    setBusy(experience.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const next = await patchAdminExperience(experience.id, patch);
+      setExperiences((current) =>
+        current.map((entry) => (entry.id === next.id ? next : entry))
+      );
+      setNotice(t('The listing was updated.'));
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : 'The listing could not be updated.'
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const editCopy = async (experience: CareerExperience) => {
+    const title = window.prompt(t('Update the simulation title'), experience.title);
+    if (title === null) return;
+    const description = window.prompt(
+      t('Update the simulation description'),
+      experience.description
+    );
+    if (description === null) return;
+    await update(experience, {
+      title: title.trim() || experience.title,
+      description: description.trim() || experience.description,
+    });
+  };
+
+  const visible = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    const filtered = term
+      ? experiences.filter(
+          (experience) =>
+            experience.title.toLowerCase().includes(term) ||
+            experience.provider.toLowerCase().includes(term) ||
+            experience.category.toLowerCase().includes(term)
+        )
+      : experiences;
+    return [...filtered].sort(
+      (a, b) =>
+        Number(b.isFeatured) - Number(a.isFeatured) ||
+        a.sortOrder - b.sortOrder ||
+        a.title.localeCompare(b.title)
+    );
+  }, [experiences, query]);
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="rounded-xl border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 p-3 text-xs text-[var(--color-danger)]">
+          {error}
+        </div>
+      )}
+      {notice && (
+        <div className="rounded-xl border border-[var(--color-success-strong)]/20 bg-[var(--color-success-surface)] p-3 text-xs text-[var(--color-success-strong)]">
+          {notice}
+        </div>
+      )}
+
+      <div className={`${CARD} flex flex-wrap items-center gap-2 p-3`}>
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute start-2.5 top-2.5 h-3.5 w-3.5 text-[var(--text-muted)]" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('Search simulations or providers')}
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] py-2 ps-8 pe-3 text-xs text-[var(--text-primary)]"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />{' '}
+          {t('Refresh')}
+        </button>
+        <span className="text-[11px] text-[var(--text-muted)]">
+          {experiences.length} {t('simulations')} · {t('showing')} {visible.length}
+        </span>
+      </div>
+
+      <p className="text-[11px] text-[var(--text-muted)]">
+        {t(
+          'The provider URL is fixed. Admins can adjust the title, description, visibility, featured placement and order.'
+        )}
+      </p>
+
+      {loading ? (
+        <div
+          className={`${CARD} flex items-center justify-center gap-2 p-8 text-xs text-[var(--text-secondary)]`}
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />{' '}
+          {t('Loading experience catalogue…')}
+        </div>
+      ) : visible.length === 0 ? (
+        <div className={`${CARD} p-8 text-center text-xs text-[var(--text-secondary)]`}>
+          {t('No simulations match this search.')}
+        </div>
+      ) : (
+        <div className={`${CARD} overflow-hidden`}>
+          <div className="max-h-[68vh] overflow-auto">
+            <table className={RESPONSIVE_TABLE}>
+              <thead className="sticky top-0 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                <tr>
+                  <th className="px-3 py-2">{t('Simulation')}</th>
+                  <th className="px-3 py-2">{t('Provider')}</th>
+                  <th className="px-3 py-2">{t('Active')}</th>
+                  <th className="px-3 py-2">{t('Order')}</th>
+                  <th className="px-3 py-2 text-end">{t('Featured')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((experience) => (
+                  <tr
+                    key={experience.id}
+                    className="border-b border-[var(--border-subtle)] last:border-b-0"
+                  >
+                    <td className="max-w-[340px] px-3 py-2.5">
+                      <div className="truncate font-medium text-[var(--text-primary)]">
+                        {experience.title}
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)]">
+                        {experience.category} · {experience.difficulty}
+                      </div>
+                      {canWrite && (
+                        <button
+                          type="button"
+                          onClick={() => void editCopy(experience)}
+                          disabled={busy === experience.id}
+                          className="mt-1 text-[10px] font-semibold text-[var(--color-accent-strong)] hover:underline disabled:opacity-50"
+                        >
+                          {t('Edit listing')}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-[10px] text-[var(--text-secondary)]">
+                      {experience.provider}
+                      {experience.durationLabel ? (
+                        <div className="text-[var(--text-muted)]">
+                          {experience.durationLabel}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <label className="inline-flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)]">
+                        <input
+                          type="checkbox"
+                          checked={experience.isActive}
+                          disabled={!canWrite || busy === experience.id}
+                          onChange={(event) =>
+                            void update(experience, {
+                              isActive: event.target.checked,
+                            })
+                          }
+                          className="h-3.5 w-3.5 accent-[var(--accent-primary)]"
+                        />
+                        {experience.isActive ? t('Published') : t('Hidden')}
+                      </label>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <input
+                        type="number"
+                        min={0}
+                        max={10000}
+                        defaultValue={experience.sortOrder}
+                        disabled={!canWrite || busy === experience.id}
+                        onBlur={(event) => {
+                          const next = Number(event.target.value);
+                          if (
+                            Number.isFinite(next) &&
+                            next !== experience.sortOrder
+                          ) {
+                            void update(experience, {
+                              sortOrder: Math.round(next),
+                            });
+                          }
+                        }}
+                        className="w-20 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2 py-1 text-[10px] text-[var(--text-primary)] disabled:opacity-50"
+                      />
+                    </td>
+                    <td className="px-3 py-2.5 text-end">
+                      <button
+                        type="button"
+                        disabled={!canWrite || busy === experience.id}
+                        onClick={() =>
+                          void update(experience, {
+                            isFeatured: !experience.isFeatured,
+                          })
+                        }
+                        className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-medium disabled:opacity-50 ${
+                          experience.isFeatured
+                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                            : 'border-[var(--border-subtle)] text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        <Star
+                          className={`h-3 w-3 ${experience.isFeatured ? 'fill-current' : ''}`}
+                        />
+                        {experience.isFeatured ? t('Featured') : t('Feature')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Audit                                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -989,6 +1250,11 @@ export const AdminCenterView: React.FC = () => {
     }
     if (permissions.has('learning.read')) {
       entries.push({ id: 'learning', label: t('Learning'), icon: BookOpen });
+      entries.push({
+        id: 'experiences',
+        label: t('Experience catalogue'),
+        icon: Rocket,
+      });
     }
     if (permissions.has('audit.read')) {
       entries.push({ id: 'audit', label: t('Audit log'), icon: Shield });
@@ -1146,6 +1412,9 @@ export const AdminCenterView: React.FC = () => {
       )}
       {tab === 'learning' && (
         <LearningPanel canWrite={permissions.has('learning.write')} canModerate={canModerate} />
+      )}
+      {tab === 'experiences' && (
+        <ExperiencesPanel canWrite={permissions.has('learning.write')} />
       )}
       {tab === 'audit' && <AuditPanel />}
       {tab === 'subscriptions' && <AdminSubscriptionsPanel />}

@@ -232,6 +232,20 @@ import {
   patchLearningItem as patchLearningItemApi,
   deleteLearningItem as deleteLearningItemApi,
 } from '../lib/learningApi';
+import {
+  fetchExperienceCatalog,
+  fetchExperienceState,
+  removeExperienceCertificate as removeExperienceCertificateApi,
+  removeExperienceProgress as removeExperienceProgressApi,
+  saveExperienceCertificate as saveExperienceCertificateApi,
+  saveExperienceProgress as saveExperienceProgressApi,
+} from '../lib/experiencesApi';
+import type {
+  CareerExperience,
+  ExperienceCertificate,
+  ExperienceProgress,
+  ExperienceProgressStatus,
+} from '../../shared/careerExperience';
 import type {
   LearningCourse,
   LearningItem,
@@ -663,6 +677,25 @@ interface CareerContextType {
   completeLearningCourse: (courseId: string) => Promise<void>;
   updateLearningProgress: (courseId: string, percent: number) => Promise<void>;
   removeLearningCourse: (courseId: string) => Promise<void>;
+
+  // Career Experience Hub
+  //
+  // The catalogue is public reference data. Progress and certificates are the
+  // candidate's own rows; a certificate is self-reported unless a trusted
+  // review has changed it.
+  experienceCatalog: CareerExperience[];
+  experienceProgress: ExperienceProgress[];
+  experienceCertificates: ExperienceCertificate[];
+  isExperiencesLoading: boolean;
+  experienceError: string | null;
+  getExperienceProgress: (experienceId: string) => ExperienceProgress | undefined;
+  getExperienceCertificate: (experienceId: string) => ExperienceCertificate | undefined;
+  saveExperience: (experienceId: string) => Promise<void>;
+  startExperience: (experienceId: string) => Promise<void>;
+  completeExperience: (experienceId: string) => Promise<void>;
+  resetExperience: (experienceId: string) => Promise<void>;
+  saveExperienceCertificate: (experienceId: string, certificateUrl: string) => Promise<void>;
+  removeExperienceCertificate: (experienceId: string) => Promise<void>;
 
   // Projects & Evidence
   projects: CareerProject[];
@@ -1661,6 +1694,8 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           learningRecommendationResult,
           profileLinkList,
           skillGapList,
+          experienceCatalogList,
+          experienceState,
         ] = await Promise.all([
           fetchRoadmap(),
           fetchProfile(),
@@ -1698,6 +1733,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           // The ranked skill gaps. A candidate with no target role has none,
           // which is a normal state rather than a failure.
           fetchSkillGaps().catch(() => null),
+          // The Career Experience catalogue is public; the progress and
+          // certificate rows are the caller's own. A failure here must not
+          // block the rest of the career graph.
+          fetchExperienceCatalog().catch(() => []),
+          fetchExperienceState().catch(() => ({ progress: [], certificates: [] })),
         ]);
         if (cancelled) return;
         // The roadmap tables and the profile tables are the source of truth for
@@ -1889,6 +1929,12 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           skillGapCount: learningRecommendationResult.context?.skillGapCount ?? 0,
           roadmapSkillCount: learningRecommendationResult.context?.roadmapSkillCount ?? 0,
         }));
+
+        // Career Experience Hub: the curated catalogue and the candidate's
+        // own progress and certificate rows.
+        setExperienceCatalog(experienceCatalogList);
+        setExperienceProgress(experienceState.progress);
+        setExperienceCertificates(experienceState.certificates);
 
         // The target role is persisted as its canonical title; the catalogue entry
         // supplies the skill requirements and the roadmap the UI derives.
@@ -2240,6 +2286,17 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isLearningLoading, setIsLearningLoading] = useState(false);
   const [learningError, setLearningError] = useState<string | null>(null);
   const [hydrationError, setHydrationError] = useState(false);
+
+  // Career Experience Hub
+  //
+  // The catalogue is public; progress and certificates are owner-scoped rows.
+  // There is no local-only fallback: a write that fails is reported and the
+  // state is not changed to look as if it succeeded.
+  const [experienceCatalog, setExperienceCatalog] = useState<CareerExperience[]>([]);
+  const [experienceProgress, setExperienceProgress] = useState<ExperienceProgress[]>([]);
+  const [experienceCertificates, setExperienceCertificates] = useState<ExperienceCertificate[]>([]);
+  const [isExperiencesLoading, setIsExperiencesLoading] = useState(false);
+  const [experienceError, setExperienceError] = useState<string | null>(null);
 
   // Projects & Evidence
   // Projects — PostgreSQL is the source of truth (B.3.7).
@@ -5128,6 +5185,125 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
+  /* ------------------------- Career Experience Hub ------------------------ */
+
+  const applyExperienceProgress = (row: ExperienceProgress) => {
+    setExperienceProgress((prev) => [
+      row,
+      ...prev.filter((entry) => entry.experienceId !== row.experienceId),
+    ]);
+  };
+
+  const applyExperienceCertificate = (row: ExperienceCertificate) => {
+    setExperienceCertificates((prev) => [
+      row,
+      ...prev.filter((entry) => entry.experienceId !== row.experienceId),
+    ]);
+  };
+
+  const getExperienceProgress = (experienceId: string) =>
+    experienceProgress.find((entry) => entry.experienceId === experienceId);
+
+  const getExperienceCertificate = (experienceId: string) =>
+    experienceCertificates.find((entry) => entry.experienceId === experienceId);
+
+  const persistExperienceStatus = async (
+    experienceId: string,
+    status: ExperienceProgressStatus
+  ) => {
+    setIsExperiencesLoading(true);
+    try {
+      const progress = await saveExperienceProgressApi(experienceId, status, true);
+      applyExperienceProgress(progress);
+      // The server removes a certificate when the completion it supported is
+      // taken back. The client mirrors that so the screen cannot keep showing
+      // a credential for an experience that is no longer complete.
+      if (status !== 'completed') {
+        setExperienceCertificates((prev) =>
+          prev.filter((entry) => entry.experienceId !== experienceId)
+        );
+      }
+      setExperienceError(null);
+    } catch (error) {
+      setExperienceError(
+        error instanceof Error ? error.message : 'Failed to save your progress'
+      );
+      throw error;
+    } finally {
+      setIsExperiencesLoading(false);
+    }
+  };
+
+  const saveExperience = (experienceId: string) =>
+    persistExperienceStatus(experienceId, 'not_started');
+
+  const startExperience = (experienceId: string) =>
+    persistExperienceStatus(experienceId, 'in_progress');
+
+  const completeExperience = (experienceId: string) =>
+    persistExperienceStatus(experienceId, 'completed');
+
+  const resetExperience = async (experienceId: string) => {
+    setIsExperiencesLoading(true);
+    try {
+      await removeExperienceProgressApi(experienceId);
+      setExperienceProgress((prev) =>
+        prev.filter((entry) => entry.experienceId !== experienceId)
+      );
+      setExperienceCertificates((prev) =>
+        prev.filter((entry) => entry.experienceId !== experienceId)
+      );
+      setExperienceError(null);
+    } catch (error) {
+      setExperienceError(
+        error instanceof Error ? error.message : 'Failed to reset this experience'
+      );
+      throw error;
+    } finally {
+      setIsExperiencesLoading(false);
+    }
+  };
+
+  const saveExperienceCertificate = async (
+    experienceId: string,
+    certificateUrl: string
+  ) => {
+    setIsExperiencesLoading(true);
+    try {
+      const certificate = await saveExperienceCertificateApi(
+        experienceId,
+        certificateUrl
+      );
+      applyExperienceCertificate(certificate);
+      setExperienceError(null);
+    } catch (error) {
+      setExperienceError(
+        error instanceof Error ? error.message : 'Failed to save the certificate'
+      );
+      throw error;
+    } finally {
+      setIsExperiencesLoading(false);
+    }
+  };
+
+  const removeExperienceCertificate = async (experienceId: string) => {
+    setIsExperiencesLoading(true);
+    try {
+      await removeExperienceCertificateApi(experienceId);
+      setExperienceCertificates((prev) =>
+        prev.filter((entry) => entry.experienceId !== experienceId)
+      );
+      setExperienceError(null);
+    } catch (error) {
+      setExperienceError(
+        error instanceof Error ? error.message : 'Failed to remove the certificate'
+      );
+      throw error;
+    } finally {
+      setIsExperiencesLoading(false);
+    }
+  };
+
   const addProject = async (project: Omit<CareerProject, 'id' | 'createdAt'>) => {
     try {
       const dto = await postProject({
@@ -6167,6 +6343,19 @@ Skills: ${activeCV.skillsList.join(', ')}
         completeLearningCourse,
         updateLearningProgress,
         removeLearningCourse,
+        experienceCatalog,
+        experienceProgress,
+        experienceCertificates,
+        isExperiencesLoading,
+        experienceError,
+        getExperienceProgress,
+        getExperienceCertificate,
+        saveExperience,
+        startExperience,
+        completeExperience,
+        resetExperience,
+        saveExperienceCertificate,
+        removeExperienceCertificate,
         projects,
         addProject,
         updateProject,

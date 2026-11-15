@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   ExternalLink,
   MessageSquare,
+  Rocket,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useFeedback } from '../../context/FeedbackContext';
@@ -157,6 +158,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       label: t('Learn & Practise'),
       items: [
         { id: 'learning', label: t('Learning Hub'), icon: BookOpen },
+        { id: 'experiences', label: t('Experience Hub'), icon: Rocket },
         { id: 'assessment', label: t('Assessments'), icon: ShieldCheck },
         { id: 'projects', label: t('navProjects'), icon: FolderGit2 },
         { id: 'volunteer', label: t('navOpportunities'), icon: HeartHandshake },
