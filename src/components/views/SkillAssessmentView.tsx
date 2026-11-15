@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckCircle2,
   XCircle,
@@ -15,6 +15,14 @@ import {
   Globe,
   MessageSquare,
   History,
+  BarChart3,
+  Layers,
+  Server,
+  Brain,
+  Briefcase,
+  Palette,
+  Megaphone,
+  ClipboardList,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useToast } from '../toast/ToastProvider';
@@ -31,6 +39,7 @@ import {
   explainAssessmentLevel,
   levelForAssessmentScore,
 } from '../../../shared/assessment';
+import { assessmentsForRole } from '../../../shared/roleAssessmentMatching';
 
 export interface AssessmentQuestion {
   id: string;
@@ -48,6 +57,7 @@ export interface AssessmentCategory {
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   timeMinutes: number;
   skillName: string;
+  aliases?: string[];
   /**
    * The visual that genuinely belongs to this check.
    *
@@ -80,6 +90,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     level: 'Intermediate',
     timeMinutes: 8,
     skillName: 'SQL',
+    aliases: ['SQL & Query Optimization', 'Querying', 'Relational Databases'],
     visual: 'data-analysis',
     questions: [
       {
@@ -162,6 +173,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     level: 'Intermediate',
     timeMinutes: 8,
     skillName: 'Python',
+    aliases: ['Python for Data Analysis', 'Pandas', 'Pandas & NumPy', 'NumPy'],
     visual: 'software-engineering',
     questions: [
       {
@@ -244,6 +256,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     level: 'Beginner',
     timeMinutes: 6,
     skillName: 'Microsoft Excel',
+    aliases: ['Excel', 'Excel & Spreadsheets', 'Spreadsheets', 'Spreadsheet Modeling'],
     // No photograph of its own: this card renders its own badge, so it never
     // wears the same picture as the SQL check.
     visual: null,
@@ -461,6 +474,186 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
     ],
   },
+  {
+    id: 'power-bi-tableau',
+    title: 'Power BI & Tableau',
+    description: 'Data modeling, dashboard design, metric selection and visualization choices.',
+    icon: BarChart3,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'Data Visualization',
+    aliases: ['Power BI', 'Tableau', 'Power BI & Tableau'],
+    visual: 'data-analysis',
+    questions: [
+      { id: 'bi-1', prompt: 'A report total changes unexpectedly when a dimension is added. What should you inspect first?', options: ['The chart title', 'Relationship cardinality and filter direction in the data model', 'The page background', 'The browser zoom'], correctIndex: 1, explanation: 'Model relationships and filter propagation determine how measures aggregate when dimensions are introduced.' },
+      { id: 'bi-2', prompt: 'Which visual is usually best for showing a trend over monthly time periods?', options: ['Pie chart', 'Line chart', 'Gauge', 'Packed bubbles'], correctIndex: 1, explanation: 'A line chart makes ordered time trends and changes over time easy to compare.' },
+      { id: 'bi-3', prompt: 'What is the strongest first step when a dashboard is slow?', options: ['Add more visuals', 'Check model size, query performance and unnecessary high-cardinality fields', 'Use more colors', 'Increase the title font'], correctIndex: 1, explanation: 'Performance tuning starts with the data model and query workload, not decorative changes.' },
+    ],
+  },
+  {
+    id: 'statistics-ab-testing',
+    title: 'Statistics & A/B Testing',
+    description: 'Experiment design, uncertainty, statistical significance and practical impact.',
+    icon: BarChart3,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'Statistics & A/B Testing',
+    aliases: ['Statistics', 'Experimentation', 'A/B Testing', 'Hypothesis Testing'],
+    questions: [
+      { id: 'stat-1', prompt: 'What is the main purpose of random assignment in an experiment?', options: ['Guarantee a positive result', 'Reduce systematic differences between treatment groups', 'Increase the sample mean', 'Remove the need for a control group'], correctIndex: 1, explanation: 'Random assignment helps balance confounders so outcome differences can be attributed more credibly to treatment.' },
+      { id: 'stat-2', prompt: 'A 95% confidence interval for a lift crosses zero. What is the safest conclusion?', options: ['The treatment definitely works', 'The data do not establish a non-zero effect at the corresponding two-sided 5% level', 'The control group is invalid', 'The effect is exactly zero'], correctIndex: 1, explanation: 'An interval crossing zero does not provide conventional evidence that the effect differs from zero; it does not prove no effect.' },
+      { id: 'stat-3', prompt: 'Why should an analyst define the primary metric before inspecting experiment results?', options: ['To prevent metric switching that inflates false-positive risk', 'To ensure every metric is significant', 'To avoid checking sample size', 'To make the treatment group larger'], correctIndex: 0, explanation: 'Pre-specifying a primary metric limits selective reporting and multiple-testing bias.' },
+    ],
+  },
+  {
+    id: 'typescript',
+    title: 'TypeScript',
+    description: 'Type narrowing, safe API boundaries, unions and maintainable type design.',
+    icon: Code2,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'TypeScript',
+    aliases: ['JavaScript', 'TypeScript Engineering'],
+    questions: [
+      { id: 'ts-1', prompt: 'A value from JSON.parse is untrusted. What is the safest type before validation?', options: ['any', 'unknown', 'never', 'object'], correctIndex: 1, explanation: 'unknown requires validation or narrowing before use, unlike any which permits unsafe access.' },
+      { id: 'ts-2', prompt: 'How should code handle a discriminated union safely?', options: ['Cast every branch to any', 'Switch on the shared literal discriminator and handle each variant', 'Use non-null assertions everywhere', 'Disable strict mode'], correctIndex: 1, explanation: 'Checking a discriminator lets TypeScript narrow the union to the correct variant.' },
+      { id: 'ts-3', prompt: 'What does `strictNullChecks` help prevent?', options: ['Null or undefined values being used without checking', 'All runtime exceptions', 'Slow compilation', 'Duplicate imports'], correctIndex: 0, explanation: 'Strict null checks require code to account for null and undefined explicitly.' },
+    ],
+  },
+  {
+    id: 'react',
+    title: 'React & Component Design',
+    description: 'State ownership, effects, rendering and reusable component boundaries.',
+    icon: Layers,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'React',
+    aliases: ['React.js', 'ReactJS', 'Frontend Engineering'],
+    questions: [
+      { id: 'react-1', prompt: 'When should a value usually be derived during render instead of mirrored in state?', options: ['Whenever it can be calculated from current props or state', 'Only inside a timeout', 'Never', 'Only after a network request'], correctIndex: 0, explanation: 'Derived values avoid redundant state and synchronization bugs.' },
+      { id: 'react-2', prompt: 'What should an effect do when it subscribes to an external event source?', options: ['Leave the subscription active forever', 'Return a cleanup function that unsubscribes', 'Set state in a tight loop', 'Disable dependency checks'], correctIndex: 1, explanation: 'Cleanup prevents duplicate subscriptions and updates after a component is removed.' },
+      { id: 'react-3', prompt: 'What is a stable list key used for?', options: ['Styling the row', 'Helping React preserve item identity across list updates', 'Encrypting item data', 'Sorting the list automatically'], correctIndex: 1, explanation: 'Stable keys let React associate rendered elements with the same data items across changes.' },
+    ],
+  },
+  {
+    id: 'css-architecture',
+    title: 'CSS & Frontend Architecture',
+    description: 'Responsive layout, accessibility, cascade control and component styling.',
+    icon: Layers,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'CSS & Frontend Architecture',
+    aliases: ['CSS', 'CSS Architecture', 'Frontend Architecture', 'Web Accessibility'],
+    questions: [
+      { id: 'css-1', prompt: 'Which approach best supports a responsive two-column layout that collapses on narrow screens?', options: ['Fixed pixel widths only', 'CSS Grid or Flexbox with a breakpoint or intrinsic sizing', 'Absolute positioning for every item', 'A table layout'], correctIndex: 1, explanation: 'Grid and Flexbox support adaptive layouts without hard-coding a single viewport size.' },
+      { id: 'css-2', prompt: 'What is the preferred way to indicate an input error accessibly?', options: ['Change its color only', 'Associate visible error text and expose invalid state to assistive technology', 'Add a red shadow only', 'Use placeholder text as the error'], correctIndex: 1, explanation: 'Color alone is insufficient; semantic state and an associated message communicate the error clearly.' },
+      { id: 'css-3', prompt: 'Why limit unnecessary selector specificity?', options: ['It makes later overrides and component styles easier to reason about', 'It improves image resolution', 'It guarantees perfect contrast', 'It changes document semantics'], correctIndex: 0, explanation: 'Lower, predictable specificity reduces cascade conflicts and makes styling maintainable.' },
+    ],
+  },
+  {
+    id: 'backend-api',
+    title: 'Backend APIs & Data Integrity',
+    description: 'Validation, authorization, transaction boundaries and reliable API behavior.',
+    icon: Server,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'Backend API Design',
+    aliases: ['API Design', 'Backend Engineering', 'REST APIs', 'Data Integrity'],
+    questions: [
+      { id: 'api-1', prompt: 'Where should authorization for a user-owned record be enforced?', options: ['Only by hiding the UI button', 'On the server, checking ownership for every request', 'Only in client-side routing', 'In a CSS class'], correctIndex: 1, explanation: 'Clients are untrusted; the server must authorize every protected operation.' },
+      { id: 'api-2', prompt: 'What is a transaction useful for when creating a parent and several child rows?', options: ['Ensuring all related writes commit or roll back together', 'Making validation optional', 'Caching a browser page', 'Increasing JSON size'], correctIndex: 0, explanation: 'Transactions prevent partially written relational structures when one step fails.' },
+      { id: 'api-3', prompt: 'What should an API do with malformed input?', options: ['Persist it and fix it later', 'Validate at the boundary and return a clear client error', 'Trust the TypeScript type from the browser', 'Silently ignore all fields'], correctIndex: 1, explanation: 'Runtime validation protects the database because TypeScript types do not validate network payloads.' },
+    ],
+  },
+  {
+    id: 'machine-learning',
+    title: 'Machine Learning & Evaluation',
+    description: 'Data leakage, validation strategy, metrics and responsible model evaluation.',
+    icon: Brain,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'Machine Learning',
+    aliases: ['AI/ML', 'AI/ML Engineer', 'Model Evaluation', 'Machine Learning Engineering'],
+    questions: [
+      { id: 'ml-1', prompt: 'Why must preprocessing be fit only on the training split?', options: ['To prevent information leakage from validation or test data', 'To increase the number of labels', 'To guarantee accuracy of 100%', 'To eliminate feature engineering'], correctIndex: 0, explanation: 'Fitting transformations on held-out data leaks information and creates an overly optimistic evaluation.' },
+      { id: 'ml-2', prompt: 'For a rare positive class, why can accuracy be misleading?', options: ['A model can predict only the majority class and still score highly', 'Accuracy cannot be calculated', 'The dataset has too many columns', 'It always equals recall'], correctIndex: 0, explanation: 'Class imbalance can make a trivial majority-class predictor appear accurate while missing the target class.' },
+      { id: 'ml-3', prompt: 'What is a useful purpose of a separate test set?', options: ['Repeatedly tune every model parameter', 'Estimate final generalization after choices are made on training/validation data', 'Balance labels automatically', 'Replace data quality checks'], correctIndex: 1, explanation: 'A held-out test set provides a less biased final evaluation when it is not repeatedly used for tuning.' },
+    ],
+  },
+  {
+    id: 'product-management',
+    title: 'Product Management',
+    description: 'Problem discovery, prioritization, outcome metrics and product experiments.',
+    icon: Briefcase,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'Product Management',
+    questions: [
+      { id: 'pm-1', prompt: 'What should a product team validate before committing to a large feature?', options: ['That the problem is meaningful to a defined user group', 'That the feature has the most settings', 'That a competitor has a longer roadmap', 'That engineering has spare capacity only'], correctIndex: 0, explanation: 'Strong product decisions start with evidence about user problems and desired outcomes.' },
+      { id: 'pm-2', prompt: 'Which is the strongest outcome metric for a new onboarding flow?', options: ['Number of buttons', 'Share of eligible users who successfully reach the activation event', 'Lines of code', 'Number of internal meetings'], correctIndex: 1, explanation: 'An outcome metric measures whether users achieve the intended value, rather than the amount of output.' },
+      { id: 'pm-3', prompt: 'When two requests compete for capacity, what is a sound prioritization step?', options: ['Compare user impact, confidence, effort and strategic fit', 'Choose the loudest requester automatically', 'Ship both without testing', 'Ignore dependencies'], correctIndex: 0, explanation: 'Transparent prioritization weighs impact and evidence against cost and dependencies.' },
+    ],
+  },
+  {
+    id: 'cybersecurity',
+    title: 'Cybersecurity Fundamentals',
+    description: 'Threat modeling, access control, secure input handling and incident response.',
+    icon: ShieldCheck,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'Cybersecurity',
+    aliases: ['Security', 'Cyber Security', 'Information Security'],
+    questions: [
+      { id: 'sec-1', prompt: 'What does least privilege mean?', options: ['Give each identity only the permissions needed for its task', 'Share one admin account', 'Disable audit logs', 'Grant broad access to avoid support requests'], correctIndex: 0, explanation: 'Least privilege limits the damage from mistakes or compromised credentials.' },
+      { id: 'sec-2', prompt: 'How should an application handle user-supplied SQL values?', options: ['Concatenate them into SQL strings', 'Use parameterized queries and validate the input', 'Trust hidden form fields', 'Escape only spaces'], correctIndex: 1, explanation: 'Parameterized queries separate data from SQL syntax and prevent injection attacks.' },
+      { id: 'sec-3', prompt: 'What is a sensible first response to a confirmed credential leak?', options: ['Rotate/revoke the credential and investigate scope and access logs', 'Delete the alert', 'Post the secret in a ticket', 'Wait until the next release'], correctIndex: 0, explanation: 'Containment starts with revocation, followed by scoped investigation and remediation.' },
+    ],
+  },
+  {
+    id: 'ux-design',
+    title: 'UX Research & Design',
+    description: 'Research methods, usability, accessibility and evidence-led design decisions.',
+    icon: Palette,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'UX Research & Design',
+    aliases: ['UI/UX Designer', 'UX Design', 'User Experience', 'UI Design'],
+    questions: [
+      { id: 'ux-1', prompt: 'What is the main value of observing representative users complete a task?', options: ['It reveals friction in the real workflow', 'It proves every user behaves identically', 'It replaces accessibility testing', 'It guarantees a visual style'], correctIndex: 0, explanation: 'Usability observation surfaces where users hesitate, misunderstand or fail to complete a task.' },
+      { id: 'ux-2', prompt: 'Which is the best way to evaluate an accessibility concern?', options: ['Rely on color preference', 'Combine automated checks with keyboard and assistive-technology testing', 'Ask only the design team', 'Hide the control'], correctIndex: 1, explanation: 'Automated tests catch only some issues; manual interaction and assistive-technology checks are also needed.' },
+      { id: 'ux-3', prompt: 'What makes a research question less leading?', options: ['It suggests the preferred answer', 'It invites participants to describe their experience without implying a judgment', 'It asks for praise', 'It combines unrelated questions'], correctIndex: 1, explanation: 'Neutral questions reduce bias and help participants report their own behavior and reasoning.' },
+    ],
+  },
+  {
+    id: 'digital-marketing',
+    title: 'Digital Marketing Analytics',
+    description: 'Attribution, funnel measurement, campaign testing and privacy-aware analytics.',
+    icon: Megaphone,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'Digital Marketing Analytics',
+    aliases: ['Digital Marketing', 'Marketing Analytics', 'SEO', 'Campaign Analytics'],
+    questions: [
+      { id: 'mkt-1', prompt: 'Why use consistent campaign UTM parameters?', options: ['To make campaign traffic identifiable in analytics', 'To increase organic rankings automatically', 'To bypass consent requirements', 'To guarantee a conversion'], correctIndex: 0, explanation: 'Consistent campaign parameters support reliable source and campaign reporting.' },
+      { id: 'mkt-2', prompt: 'What is a conversion rate?', options: ['Conversions divided by an explicitly defined eligible audience or visits', 'Total impressions multiplied by cost', 'The number of campaign names', 'Revenue minus all expenses'], correctIndex: 0, explanation: 'The denominator must be defined, since sessions, users and leads produce different rates.' },
+      { id: 'mkt-3', prompt: 'When comparing campaign performance, what should be checked before declaring a winner?', options: ['Comparable audience, attribution window, spend and statistical uncertainty', 'Only which one has more impressions', 'The ad color', 'Whether the campaign name is shorter'], correctIndex: 0, explanation: 'Fair comparisons require comparable measurement conditions and consideration of uncertainty.' },
+    ],
+  },
+  {
+    id: 'business-analysis',
+    title: 'Business Analysis',
+    description: 'Requirements discovery, process mapping, acceptance criteria and stakeholder alignment.',
+    icon: ClipboardList,
+    level: 'Intermediate',
+    timeMinutes: 6,
+    skillName: 'Business Analysis',
+    aliases: ['Business Analyst', 'Requirements Analysis', 'Business Process Modeling'],
+    questions: [
+      { id: 'ba-1', prompt: 'What makes an acceptance criterion useful?', options: ['It is observable and testable against the stated outcome', 'It describes a vague aspiration', 'It is hidden from stakeholders', 'It changes after every test'], correctIndex: 0, explanation: 'Testable criteria align delivery and validation around an observable result.' },
+      { id: 'ba-2', prompt: 'What should a process map help stakeholders identify?', options: ['Handoffs, decisions, delays and exception paths', 'Only the department names', 'The color palette', 'Individual performance rankings'], correctIndex: 0, explanation: 'Process maps expose how work flows and where bottlenecks or control gaps occur.' },
+      { id: 'ba-3', prompt: 'How should conflicting stakeholder requirements be handled?', options: ['Document the underlying needs, constraints and decision owner, then facilitate resolution', 'Implement both without clarification', 'Choose the newest email', 'Delete one requirement'], correctIndex: 0, explanation: 'Clarifying needs, constraints and decision rights supports an auditable resolution.' },
+    ],
+  },
 ];
 
 interface SkillAssessmentViewProps {
@@ -496,6 +689,32 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
    * re-sync button.
    */
   const [syncState, setSyncState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const visibleCategories = useMemo(() => {
+    if (!targetRole) return ASSESSMENT_CATEGORIES;
+    const roleSkillNames = [
+      targetRole.title,
+      targetRole.category,
+      ...(Array.isArray(targetRole.requiredSkills) ? targetRole.requiredSkills : []),
+      ...(Array.isArray(targetRole.preferredSkills) ? targetRole.preferredSkills : []),
+    ].map((skill) =>
+      typeof skill === 'string' ? skill : typeof skill?.name === 'string' ? skill.name : ''
+    ).filter((name) => name.length > 0);
+    return roleSkillNames.length > 0
+      ? assessmentsForRole(ASSESSMENT_CATEGORIES, roleSkillNames)
+      : [];
+  }, [targetRole]);
+
+  useEffect(() => {
+    if (selectedCategory && !visibleCategories.some((category) => category.id === selectedCategory.id)) {
+      setSelectedCategory(null);
+      setCurrentQuestionIndex(0);
+      setSelectedAnswers({});
+      setIsFinished(false);
+      setIsTimerActive(false);
+      setTimeLeft(0);
+      setSyncState('idle');
+    }
+  }, [selectedCategory, visibleCategories]);
 
   // Load past attempts from localStorage
   useEffect(() => {
@@ -1125,8 +1344,15 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
       </div>
 
       {/* Categories Grid */}
+      {visibleCategories.length === 0 ? (
+        <div data-tour="assessment-catalog" className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-sm text-[var(--text-secondary)]">
+          {targetRole
+            ? t('No role-specific checks are available for this target role yet.')
+            : t('Choose a target role to see matching assessments.')}
+        </div>
+      ) : (
       <div data-tour="assessment-catalog" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {ASSESSMENT_CATEGORIES.map((cat) => {
+        {visibleCategories.map((cat) => {
           const Icon = cat.icon;
           const attempt = pastAttempts.find((a) => a.categoryId === cat.id);
           // The visual that genuinely belongs to this check. A check that
@@ -1236,6 +1462,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
           );
         })}
       </div>
+      )}
 
       {/* Past attempts history */}
       {pastAttempts.length > 0 && (

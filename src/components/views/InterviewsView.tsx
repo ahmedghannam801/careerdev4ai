@@ -22,7 +22,7 @@ import {
 import { Reveal } from '../motion/Motion';
 import { CareerImage } from '../ui/CareerImage';
 import { computeInterviewReadiness } from '../../../shared/interviewReadiness';
-import { roleReadinessFromSkills } from '../../../shared/careerMetrics';
+import { cvReadinessFromVersions, roleReadinessFromSkills } from '../../../shared/careerMetrics';
 
 interface InterviewFeedback {
   score?: number;
@@ -49,6 +49,7 @@ export const InterviewsView: React.FC = () => {
     targetRole,
     profile,
     skills,
+    cvVersions,
     interviewSessions,
     saveInterviewSession,
     projects,
@@ -249,9 +250,9 @@ export const InterviewsView: React.FC = () => {
           score: session.aiFeedback?.score ?? null,
           roleTitle: session.roleTitle ?? null,
         })),
-        roleReadinessFromSkills(skills)
+        roleReadinessFromSkills(skills, cvReadinessFromVersions(cvVersions, targetRole?.title))
       ),
-    [interviewSessions, skills]
+    [interviewSessions, skills, cvVersions, targetRole?.title]
   );
 
   const interviewReadinessPct = readiness.readinessPct ?? 0;

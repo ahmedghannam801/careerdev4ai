@@ -14,6 +14,7 @@ import {
   CAREER_JOURNEY_STAGES,
   CAREER_JOURNEY_STAGE_WEIGHTS,
   computeCareerMetrics,
+  cvReadinessFromVersions,
   computeStageProgress,
   determineCurrentStage,
   explainMetric,
@@ -184,6 +185,37 @@ describe('the career metrics engine', () => {
       assert.equal(metrics.roleReadinessPct, 60);
     });
 
+    it('caps fully self-reported required skills at 65% even when the CV is ready', () => {
+      const metrics = computeCareerMetrics({
+        skills: Array.from({ length: 10 }, (_, index) => ({
+          name: `Skill ${index + 1}`,
+          currentLevel: 5,
+          targetLevel: 5,
+          importance: 'core' as const,
+          required: true,
+          proof: 'none' as const,
+        })),
+        cvReadinessPct: 100,
+      });
+
+      assert.equal(metrics.roleReadinessPct, 65);
+    });
+
+    it('requires both verified skill evidence and a role-matched ready CV for 100%', () => {
+      const skills: MetricSkill[] = [
+        { name: 'SQL', currentLevel: 5, targetLevel: 5, importance: 'core', required: true, proof: 'evidence' },
+      ];
+      assert.equal(computeCareerMetrics({ skills, cvReadinessPct: 100 }).roleReadinessPct, 100);
+      assert.equal(computeCareerMetrics({ skills, cvReadinessPct: 50 }).roleReadinessPct, 90);
+      assert.equal(
+        computeCareerMetrics({
+          skills: skills.map((skill) => ({ ...skill, proof: 'assessment' as const })),
+          cvReadinessPct: 100,
+        }).roleReadinessPct,
+        85
+      );
+    });
+
     it('does not count a preferred skill towards readiness', () => {
       const metrics = computeCareerMetrics({
         skills: [
@@ -193,6 +225,22 @@ describe('the career metrics engine', () => {
       });
 
       assert.equal(metrics.roleReadinessPct, 100);
+    });
+
+    it('uses only the ATS result belonging to the active role', () => {
+      assert.equal(
+        cvReadinessFromVersions([
+          { targetRoleTitle: 'Marketing Manager', atsAnalysis: { overallScore: 88 } },
+          { targetRoleTitle: 'Data Analyst', atsAnalysis: { overallScore: 74 } },
+        ], 'Data Analyst'),
+        74
+      );
+      assert.equal(
+        cvReadinessFromVersions([
+          { targetRoleTitle: 'Marketing Manager', atsAnalysis: { overallScore: 88 } },
+        ], 'Data Analyst'),
+        0
+      );
     });
 
     it('is zero when the role has no requirements to meet', () => {

@@ -264,6 +264,7 @@ export const careerAr: Record<string, string> = {
   'credentials': 'مؤهلات',
   'of': 'من',
   'mastered': 'مُتقنة',
+  'self-reported only': 'مُقيَّمة ذاتيًا فقط',
   'verified artifacts linked': 'أدلة موثَّقة مرتبطة',
   'completed portfolio items': 'عنصر مكتمل في ملف الأعمال',
   'ATS Match Score:': 'درجة تطابق ATS:',

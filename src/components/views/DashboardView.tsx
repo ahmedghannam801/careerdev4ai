@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
-import { computeCareerMetrics, skillProofFromSource, type CareerJourneyStage } from '../../../shared/careerMetrics';
+import { computeCareerMetrics, cvReadinessFromVersions, skillProofFromSource, type CareerJourneyStage } from '../../../shared/careerMetrics';
 import { EmptyState } from '../ui/EmptyState';
 import { CareerJourneyStepper } from '../career/CareerJourneyStepper';
 import { MetricCard } from '../career/MetricCard';
@@ -174,10 +174,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           .map((task) => task.skillName)
           .filter((name): name is string => Boolean(name)),
         careerGoal: targetRole?.title ?? null,
+        cvReadinessPct: cvReadinessFromVersions(cvVersions, targetRole?.title),
       }),
     [
       skills,
       allTasks,
+      cvVersions,
       profile?.name,
       targetRole,
       completedLearningCount,
@@ -471,7 +473,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             metricId="skillsMastered"
             label={t('Skills mastered')}
             value={<AnimatedCounter value={metrics.skillsMastered} format={(value) => `${Math.round(value)}/${metrics.skillsTotal}`} />}
-            hint={t('mastered')}
+            hint={`${metrics.skillsMastered} ${t('mastered')} · ${metrics.skillsClaimedOnly} ${t('self-reported only')}`}
             metrics={metrics}
             tone="success"
           />

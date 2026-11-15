@@ -7,6 +7,8 @@
 
 export const skillsAr: Record<string, string> = {
   'Meaning': 'المعنى',
+  'No role-specific checks are available for this target role yet.': 'لا تتوفر اختبارات خاصة بهذا الدور المستهدف حتى الآن.',
+  'Choose a target role to see matching assessments.': 'اختر دورًا مستهدفًا لعرض التقييمات المناسبة.',
   'Direct Assessment': 'اختبار مباشر',
   'Diagnostic Knowledge Check — not a professional certification.':
     'فحص معرفي تشخيصي — وليس اعتمادًا مهنيًا.',

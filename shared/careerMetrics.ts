@@ -32,6 +32,7 @@
  */
 
 import { normalizeSkillName, type SkillGap } from './skillGap.ts';
+import { isAtsAnalysisForRole } from './atsAnalysis.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Inputs                                                                       */
@@ -112,6 +113,26 @@ export interface MetricSkill {
  * `'none'` — the candidate only claims it.
  */
 export type SkillProof = 'none' | 'assessment' | 'evidence';
+
+export interface CvReadinessVersion {
+  targetRoleTitle?: string | null;
+  atsAnalysis?: { overallScore?: number | null } | null;
+}
+
+/** Returns the best available ATS score for the active role, or zero if none exists. */
+export function cvReadinessFromVersions(
+  versions: readonly CvReadinessVersion[] | null | undefined,
+  targetRoleTitle: string | null | undefined
+): number {
+  if (!Array.isArray(versions) || !targetRoleTitle?.trim()) return 0;
+  const matching = versions.find((version) =>
+    version?.atsAnalysis && isAtsAnalysisForRole(version.targetRoleTitle ?? '', targetRoleTitle)
+  );
+  const score = matching?.atsAnalysis?.overallScore;
+  return typeof score === 'number' && Number.isFinite(score)
+    ? Math.min(100, Math.max(0, score))
+    : 0;
+}
 
 /**
  * Whether a skill's level is backed by something the platform can check.
@@ -351,6 +372,8 @@ export function computeCareerMetrics(input: {
   blockingSkillNames?: string[];
   /** The candidate's primary career goal, used in the blocker reason. */
   careerGoal?: string | null;
+  /** Role-matched CV ATS/readiness score. Omitted for legacy callers. */
+  cvReadinessPct?: number;
 }): CareerMetrics {
   const skills = input.skills ?? [];
   const roadmapTasks = input.roadmapTasks ?? [];
@@ -449,11 +472,21 @@ export function computeCareerMetrics(input: {
     const importance = normalizeImportance(skill.importance);
     const required = Boolean(skill.required) || importance === 'core';
     if (!required) continue;
-    met += Math.min(currentLevel, targetLevel);
+    const proofWeight =
+      skill.proof === 'none' ? 0.65 :
+      skill.proof === 'assessment' ? 0.85 :
+      1;
+    met += Math.min(currentLevel, targetLevel) * proofWeight;
     possible += targetLevel;
     if (currentLevel >= targetLevel && targetLevel > 0) mastered += 1;
   }
-  const roleReadinessPct = possible > 0 ? Math.round((met / possible) * 100) : 0;
+  const cvReadiness = Number.isFinite(input.cvReadinessPct)
+    ? Math.min(100, Math.max(0, input.cvReadinessPct ?? 0))
+    : 100;
+  // The CV component contributes up to 20% of final readiness. Missing or
+  // role-mismatched ATS analysis cannot silently act as a perfect CV.
+  const cvWeight = 0.8 + (0.2 * cvReadiness) / 100;
+  const roleReadinessPct = possible > 0 ? Math.round((met / possible) * cvWeight * 100) : 0;
 
   // "Skills mastered" is counted across every target-role skill, because a
   // candidate is not "half ready" for a role — the mastered count is a
@@ -696,7 +729,8 @@ export function roleReadinessFromSkills(
     gap: number;
     required?: boolean;
     source?: string | null;
-  }[]
+  }[],
+  cvReadinessPct = 100
 ): number {
   return computeCareerMetrics({
     skills: skills.map((skill) => ({
@@ -707,6 +741,7 @@ export function roleReadinessFromSkills(
       required: skill.required === true,
       proof: skillProofFromSource(skill.source),
     })),
+    cvReadinessPct,
   }).roleReadinessPct;
 }
 

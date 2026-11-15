@@ -1048,24 +1048,24 @@ const emptyCVProfile: CVProfile = {
 // ---- DTO -> local roadmap shape (B.3.7.1) ----
 
 function toRoadmapPhases(dto: RoadmapDTO | null): RoadmapPhase[] {
-  if (!dto) return [];
-  return dto.phases.map((phase) => ({
-    id: phase.id,
-    phaseNumber: phase.phaseNumber,
-    title: phase.title,
+  if (!dto || !Array.isArray(dto.phases)) return [];
+  return dto.phases.filter(Boolean).map((phase) => ({
+    id: phase.id ?? '',
+    phaseNumber: Number.isFinite(phase.phaseNumber) ? phase.phaseNumber : 0,
+    title: phase.title ?? '',
     description: phase.description ?? '',
     goal: phase.goal ?? null,
-    isUnlocked: phase.isUnlocked,
-    milestones: phase.milestones.map((milestone) => ({
-      id: milestone.id,
-      title: milestone.title,
+    isUnlocked: phase.isUnlocked === true,
+    milestones: (Array.isArray(phase.milestones) ? phase.milestones : []).filter(Boolean).map((milestone) => ({
+      id: milestone.id ?? '',
+      title: milestone.title ?? '',
       description: milestone.description ?? '',
-      completedTasksCount: milestone.completedTasksCount,
-      tasks: milestone.tasks.map((task) => ({
-        id: task.id,
-        title: task.title,
+      completedTasksCount: Number.isFinite(milestone.completedTasksCount) ? milestone.completedTasksCount : 0,
+      tasks: (Array.isArray(milestone.tasks) ? milestone.tasks : []).filter(Boolean).map((task) => ({
+        id: task.id ?? '',
+        title: task.title ?? '',
         description: task.description ?? '',
-        status: task.status,
+        status: task.status ?? 'not_started',
         skillId: task.skillId ?? undefined,
         skillName: task.skillName ?? '',
         deadline: task.deadline ?? undefined,
@@ -1073,12 +1073,12 @@ function toRoadmapPhases(dto: RoadmapDTO | null): RoadmapPhase[] {
         resourceTitle: task.resourceTitle ?? undefined,
         evidenceId: task.evidenceId ?? undefined,
         estimatedHours: task.estimatedHours ?? 0,
-    workKind: (task.workKind as RoadmapTask['workKind']) ?? undefined,
+        workKind: (task.workKind as RoadmapTask['workKind']) ?? undefined,
         difficulty: task.difficulty ?? null,
-        prerequisites: task.prerequisites ?? [],
-        skillNames: task.skillNames ?? [],
-        projectTitles: task.projectTitles ?? [],
-        resources: task.resources ?? [],
+        prerequisites: Array.isArray(task.prerequisites) ? task.prerequisites : [],
+        skillNames: Array.isArray(task.skillNames) ? task.skillNames : [],
+        projectTitles: Array.isArray(task.projectTitles) ? task.projectTitles : [],
+        resources: Array.isArray(task.resources) ? task.resources : [],
         priority: task.priority ?? null,
         rationale: task.rationale ?? null,
       })),
@@ -2212,6 +2212,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // with no roadmap row saw six phases of somebody else's plan. It now
   // starts empty and is filled by the server's roadmap.
   const [roadmapPhases, setRoadmapPhases] = useState<RoadmapPhase[]>([]);
+  const roadmapRevisionRef = useRef(0);
+  const pendingRoadmapMutationsRef = useRef(0);
+  const roadmapTaskMutationRevisionRef = useRef<Record<string, number>>({});
+  const skillMutationRevisionRef = useRef<Record<string, number>>({});
   const [isEnrolledInRoadmap, setIsEnrolledInRoadmap] = useState(false);
 
   // Learning Hub (B.5)
@@ -3808,13 +3812,23 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
    * resolves.
    */
   const refreshRoadmap = async (): Promise<boolean> => {
+    const revisionAtRequest = roadmapRevisionRef.current;
+    const pendingAtRequest = pendingRoadmapMutationsRef.current;
     try {
       const roadmap = await fetchRoadmap();
-      if (roadmap) {
+      if (
+        roadmap &&
+        revisionAtRequest === roadmapRevisionRef.current &&
+        pendingAtRequest === 0 &&
+        pendingRoadmapMutationsRef.current === 0
+      ) {
         setRoadmapPhases(toRoadmapPhases(roadmap));
         setIsEnrolledInRoadmap(roadmap.isEnrolled);
         return true;
       }
+      // A newer local/server mutation began while this read was in flight.
+      // Ignore the potentially stale response rather than replacing that state.
+      if (roadmap) return true;
     } catch (error) {
       console.error('Failed to refresh the roadmap:', error);
     }
@@ -4493,6 +4507,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const skill = skills.find(s => s.id === skillId);
     if (!skill) return false;
     const key = skill.name.toLowerCase();
+    const mutationRevision = (skillMutationRevisionRef.current[key] ?? 0) + 1;
+    skillMutationRevisionRef.current[key] = mutationRevision;
+    roadmapRevisionRef.current += 1;
     const previous = skillEvidence[key];
     const optimistic = buildSkillRecord({
       name: skill.name,
@@ -4514,11 +4531,14 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         proficiency: currentLevel,
         category: skill.category,
       });
-      applyStoredSkill(stored);
-      applyRecalculation(recalculation);
+      if (skillMutationRevisionRef.current[key] === mutationRevision) {
+        applyStoredSkill(stored);
+        applyRecalculation(recalculation);
+      }
       return true;
     } catch (error) {
       console.error('Failed to persist skill level:', error);
+      if (skillMutationRevisionRef.current[key] !== mutationRevision) return false;
       setSkillEvidence((prev) => {
         if (prev[key]?.selfReportedLevel !== currentLevel) return prev;
         const next = { ...prev };
@@ -4554,6 +4574,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     score: number;
     category?: string;
   }): Promise<boolean> => {
+    const key = input.name.toLowerCase();
+    const mutationRevision = (skillMutationRevisionRef.current[key] ?? 0) + 1;
+    skillMutationRevisionRef.current[key] = mutationRevision;
+    roadmapRevisionRef.current += 1;
     try {
       const { skill: stored, recalculation, evidence } = await postSkillAssessment({
         name: input.name,
@@ -4561,9 +4585,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         score: input.score,
         category: input.category,
       });
-      applyStoredSkill(stored);
-      applyRecalculation(recalculation);
-      if (evidence) {
+      if (skillMutationRevisionRef.current[key] === mutationRevision) {
+        applyStoredSkill(stored);
+        applyRecalculation(recalculation);
+      }
+      if (evidence && skillMutationRevisionRef.current[key] === mutationRevision) {
         const mapped = toEvidenceItem(evidence);
         setEvidenceItems((prev) => [
           mapped,
@@ -4759,47 +4785,95 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  // Task status is the roadmap's progress mutation — it goes to the server first
-  // so progress is persisted, and the local state is replaced by the server's
-  // authoritative roadmap on success.
+  // Task status is reflected immediately, then reconciled with the server's
+  // authoritative roadmap. Locally generated tasks have no database UUID and
+  // therefore remain local instead of being sent to an endpoint that rejects
+  // them before persistence can be attempted.
   const updateTaskStatus = async (taskId: string, status: RoadmapTaskStatus) => {
-    try {
-      const roadmap = await patchRoadmapTaskStatus(taskId, status);
-      if (roadmap) {
-        setRoadmapPhases(toRoadmapPhases(roadmap));
-      } else {
-        // The task id is a local (non-persisted) id: fall back to the local
-        // update so the UI still responds for a task that has no server row.
-        setRoadmapPhases(prevPhases =>
-          prevPhases.map(phase => ({
-            ...phase,
-            milestones: phase.milestones.map(milestone => {
-              const updatedTasks = milestone.tasks.map(t =>
-                t.id === taskId ? { ...t, status } : t
-              );
-              return {
-                ...milestone,
-                tasks: updatedTasks,
-                completedTasksCount: updatedTasks.filter(t => t.status === 'completed').length,
-              };
-            }),
-          }))
-        );
-      }
+    const task = roadmapPhases
+      .flatMap((phase) => phase.milestones)
+      .flatMap((milestone) => milestone.tasks)
+      .find((candidate) => candidate.id === taskId);
+    if (!task) return;
+    const previousStatus = task.status;
+    const taskRevision = (roadmapTaskMutationRevisionRef.current[taskId] ?? 0) + 1;
+    roadmapTaskMutationRevisionRef.current[taskId] = taskRevision;
+    const roadmapRevision = ++roadmapRevisionRef.current;
+    const applyStatus = (nextStatus: RoadmapTaskStatus) => {
+      setRoadmapPhases((prevPhases) =>
+        prevPhases.map((phase) => ({
+          ...phase,
+          milestones: phase.milestones.map((milestone) => {
+            const updatedTasks = milestone.tasks.map((candidate) =>
+              candidate.id === taskId ? { ...candidate, status: nextStatus } : candidate
+            );
+            return {
+              ...milestone,
+              tasks: updatedTasks,
+              completedTasksCount: updatedTasks.filter((candidate) => candidate.status === 'completed').length,
+            };
+          }),
+        }))
+      );
+    };
+
+    applyStatus(status);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(taskId)) {
       if (status === 'completed') {
-        const task = roadmapPhases
-          .flatMap(p => p.milestones)
-          .flatMap(m => m.tasks)
-          .find(t => t.id === taskId);
         void logActivity({
           actionType: 'completed_task',
           title: 'Completed Roadmap Task',
-          subtitle: task?.title ?? 'Roadmap task',
+          subtitle: task.title,
+          linkView: 'roadmap',
+        });
+      }
+      return;
+    }
+
+    pendingRoadmapMutationsRef.current += 1;
+    try {
+      const roadmap = await patchRoadmapTaskStatus(taskId, status);
+      pendingRoadmapMutationsRef.current = Math.max(0, pendingRoadmapMutationsRef.current - 1);
+      if (roadmap && roadmapRevisionRef.current === roadmapRevision && pendingRoadmapMutationsRef.current === 0) {
+        setRoadmapPhases(toRoadmapPhases(roadmap));
+      } else if (roadmap && pendingRoadmapMutationsRef.current === 0) {
+        // Another task mutation started after this request. Fetch the final
+        // server tree once all writes have settled instead of applying a
+        // potentially incomplete response.
+        void refreshRoadmap();
+      }
+      if (status === 'completed') {
+        void logActivity({
+          actionType: 'completed_task',
+          title: 'Completed Roadmap Task',
+          subtitle: task.title,
           linkView: 'roadmap',
         });
       }
     } catch (error) {
+      pendingRoadmapMutationsRef.current = Math.max(0, pendingRoadmapMutationsRef.current - 1);
       console.error('Failed to update roadmap task:', error);
+      // Roll back only this task, and only if no newer action for this task has
+      // superseded the request. Other task updates made while it was in flight
+      // are left untouched.
+      if (roadmapTaskMutationRevisionRef.current[taskId] !== taskRevision) return;
+      setRoadmapPhases((prevPhases) =>
+        prevPhases.map((phase) => ({
+          ...phase,
+          milestones: phase.milestones.map((milestone) => {
+            const updatedTasks = milestone.tasks.map((candidate) =>
+              candidate.id === taskId && candidate.status === status
+                ? { ...candidate, status: previousStatus }
+                : candidate
+            );
+            return {
+              ...milestone,
+              tasks: updatedTasks,
+              completedTasksCount: updatedTasks.filter((candidate) => candidate.status === 'completed').length,
+            };
+          }),
+        }))
+      );
     }
   };
 

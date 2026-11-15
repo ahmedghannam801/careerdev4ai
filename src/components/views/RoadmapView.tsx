@@ -29,7 +29,7 @@ import {
 } from '../../../shared/roadmapJourney';
 import type { RoadmapTreeProgress } from '../../../shared/roadmapTree';
 import { computeTimeBreakdown } from '../../../shared/roadmapTimeBreakdown';
-import { computeCareerMetrics, skillProofFromSource } from '../../../shared/careerMetrics';
+import { computeCareerMetrics, cvReadinessFromVersions, skillProofFromSource } from '../../../shared/careerMetrics';
 import {
   RESOURCE_TYPE_LABELS,
   isVideoResource,
@@ -169,6 +169,7 @@ const RoadmapViewSwitcher: React.FC<{
 export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   const {
     roadmapPhases,
+    cvVersions,
     updateTaskStatus,
     isEnrolledInRoadmap,
     enrollInRoadmap,
@@ -263,8 +264,9 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           .map((task) => task.skillName)
           .filter((name): name is string => Boolean(name)),
         careerGoal: targetRole?.title ?? null,
+        cvReadinessPct: cvReadinessFromVersions(cvVersions, targetRole?.title),
       }),
-    [skills, allTasks, targetRole]
+    [skills, allTasks, targetRole, cvVersions]
   );
 
   // The gap the plan has not closed yet. It is the roadmap's first

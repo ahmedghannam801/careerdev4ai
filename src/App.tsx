@@ -15,6 +15,7 @@ import { PasswordRecoveryModal } from './components/auth/PasswordRecoveryModal';
 import { LandingView } from './components/views/LandingView';
 import { Logo } from './components/brand/Logo';
 import { Skeleton } from './components/ui/Skeleton';
+import { ViewErrorBoundary } from './components/ui/ViewErrorBoundary';
 import { GuidedTour, GUIDES, type GuideDefinition, type GuideKey } from './components/onboarding/GuidedTour';
 import { InteractiveTourModal } from './components/onboarding/InteractiveTourModal';
 import { fetchDismissedGuides } from './lib/personalizationApi';
@@ -462,7 +463,7 @@ function AppRoutes() {
           </div>
         )}
         <Suspense fallback={<ViewFallback />}>
-          {renderView()}
+          <ViewErrorBoundary resetKey={currentView}>{renderView()}</ViewErrorBoundary>
         </Suspense>
       </AppShell>
       {/* The first-use tour. It is mounted outside the shell so it can sit

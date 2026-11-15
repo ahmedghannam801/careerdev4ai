@@ -21,13 +21,15 @@ import {
   computeInterviewReadiness,
   portfolioTarget,
 } from '../../../shared/interviewReadiness';
-import { isSkillMastered, roleReadinessFromSkills } from '../../../shared/careerMetrics';
+import { cvReadinessFromVersions, roleReadinessFromSkills } from '../../../shared/careerMetrics';
+import { computeProgressSnapshot, isProgressSkillMastered } from '../../../shared/progressMetrics';
 
 export const ProgressView: React.FC = () => {
   const {
     targetRole,
     skills,
     roadmapPhases,
+    cvVersions,
     projects,
     evidenceItems,
     applications,
@@ -37,14 +39,31 @@ export const ProgressView: React.FC = () => {
     t,
   } = useCareer();
 
-  const totalTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks)).length;
-  const completedTasks = roadmapPhases.flatMap(p => p.milestones.flatMap(m => m.tasks.filter(t => t.status === 'completed'))).length;
-  const roadmapPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const safeSkills = Array.isArray(skills) ? skills : [];
+  const safeRoadmapPhases = Array.isArray(roadmapPhases) ? roadmapPhases : [];
+  const safeProjects = Array.isArray(projects) ? projects : [];
+  const safeEvidenceItems = Array.isArray(evidenceItems) ? evidenceItems : [];
+  const safeApplications = Array.isArray(applications) ? applications : [];
+  const safeInterviewSessions = Array.isArray(interviewSessions) ? interviewSessions : [];
+  const safeMilestones = Array.isArray(milestones) ? milestones : [];
+  const safeActivities = Array.isArray(activities) ? activities : [];
 
-  const masteredSkills = skills.filter(isSkillMastered);
-  const inProgressSkills = skills.filter(s => s.gap > 0);
-  const completedProjects = projects.filter(p => p.status === 'completed' || p.status === 'published');
-  const activeApplications = applications.filter(a => !['rejected', 'withdrawn'].includes(a.stage));
+  /**
+   * The page's own figures, computed by the shared calculator so a migrated
+   * account with legacy skill rows reads the same as a fresh one.
+   */
+  const snapshot = computeProgressSnapshot({ skills: safeSkills, roadmapPhases: safeRoadmapPhases });
+  const totalTasks = snapshot.totalTasks;
+  const completedTasks = snapshot.completedTasks;
+  const roadmapPct = snapshot.roadmapPct;
+
+  const masteredSkillList = safeSkills.filter(isProgressSkillMastered);
+  const masteredSkills = snapshot.masteredSkills;
+  const skillsAtTarget = snapshot.skillsAtTarget;
+  const unverifiedAtTarget = snapshot.unverifiedAtTarget;
+  const inProgressSkills = snapshot.inProgressSkills;
+  const completedProjects = safeProjects.filter((project) => project?.status === 'completed' || project?.status === 'published');
+  const activeApplications = safeApplications.filter((application) => !['rejected', 'withdrawn'].includes(application?.stage));
 
   /**
    * The portfolio target for this role.
@@ -66,20 +85,20 @@ export const ProgressView: React.FC = () => {
   const interviewMetrics = useMemo(
     () =>
       computeInterviewReadiness(
-        interviewSessions.map((session) => ({
-          score: session.aiFeedback?.score ?? null,
-          roleTitle: session.roleTitle ?? null,
+        safeInterviewSessions.map((session) => ({
+          score: session?.aiFeedback?.score ?? null,
+          roleTitle: session?.roleTitle ?? null,
         })),
-        roleReadinessFromSkills(skills)
+        roleReadinessFromSkills(safeSkills, cvReadinessFromVersions(cvVersions, targetRole?.title))
       ),
-    [interviewSessions, skills]
+    [safeInterviewSessions, safeSkills, cvVersions, targetRole?.title]
   );
 
   // The streak comes from the user's own recorded activity, so it reflects
   // what they actually did rather than what the plan hoped they would do.
   const streak = useMemo(
-    () => computeActivityStreak(activities.map((activity) => ({ timestamp: activity.timestamp }))),
-    [activities]
+    () => computeActivityStreak(safeActivities.map((activity) => ({ timestamp: activity?.timestamp }))),
+    [safeActivities]
   );
 
   // The milestones are the ones the user recorded. They are grouped by year
@@ -87,18 +106,18 @@ export const ProgressView: React.FC = () => {
   const timeline = useMemo(
     () =>
       groupMilestonesByYear(
-        milestones.map(
+        safeMilestones.map(
           (milestone): TimelineMilestone => ({
-            id: milestone.id,
-            title: milestone.title,
-            category: milestone.category,
-            dateAchieved: milestone.dateAchieved,
-            note: milestone.notes,
-            verified: milestone.verified,
+            id: milestone?.id ?? '',
+            title: milestone?.title ?? '',
+            category: milestone?.category ?? '',
+            dateAchieved: milestone?.dateAchieved ?? '',
+            note: milestone?.notes ?? undefined,
+            verified: milestone?.verified === true,
           })
         )
       ),
-    [milestones]
+    [safeMilestones]
   );
 
   return (
@@ -125,10 +144,13 @@ export const ProgressView: React.FC = () => {
             <span>{t('Mastered Skills')}</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums text-[var(--text-primary)]">
-            {masteredSkills.length} <span className="text-sm font-normal text-[var(--text-muted)]">/ {skills.length}</span>
+            {skillsAtTarget} <span className="text-sm font-normal text-[var(--text-muted)]">/ {snapshot.totalSkills}</span>
           </div>
           <div className="text-xs text-[var(--text-muted)]">
-            {inProgressSkills.length} {t('actively advancing')}
+            {masteredSkills} {t('assessed or verified')} · {unverifiedAtTarget} {t('at target without evidence')}
+          </div>
+          <div className="text-xs text-[var(--text-muted)]">
+            {inProgressSkills} {t('actively advancing')}
           </div>
         </StaggerItem>
 
@@ -155,7 +177,7 @@ export const ProgressView: React.FC = () => {
             <span className="text-sm font-normal text-[var(--text-muted)]"> / {portfolioGoal}</span>
           </div>
           <div className="text-xs text-[var(--text-muted)]">
-            {t('Target for role')} · {evidenceItems.length} {t('verified artifacts')}
+            {t('Target for role')} · {safeEvidenceItems.length} {t('verified artifacts')}
           </div>
         </StaggerItem>
 
@@ -273,13 +295,13 @@ export const ProgressView: React.FC = () => {
             <span>{t('Mastered Skills for')} {targetRole?.title ?? ''}</span>
           </h3>
 
-          {masteredSkills.length === 0 ? (
+          {masteredSkillList.length === 0 ? (
             <p className="rounded-lg border border-dashed border-[var(--border-subtle)] p-3 text-xs text-[var(--text-secondary)]">
               {t('No skill has reached the target level yet. Rate your skills to see what is already there.')}
             </p>
           ) : (
             <div className="space-y-2.5">
-              {masteredSkills.map((sk) => (
+              {masteredSkillList.map((sk) => (
                 <div key={sk.id} className="p-3 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] flex items-center justify-between text-xs">
                   <div>
                     <span className="font-semibold text-[var(--text-primary)]">{sk.name}</span>
@@ -301,20 +323,20 @@ export const ProgressView: React.FC = () => {
             <span>{t('Verifiable Evidence Artifacts')}</span>
           </h3>
 
-          {evidenceItems.length === 0 ? (
+          {safeEvidenceItems.length === 0 ? (
             <p className="rounded-lg border border-dashed border-[var(--border-subtle)] p-3 text-xs text-[var(--text-secondary)]">
               {t('No evidence attached yet. Add a project, certificate or document to prove a skill.')}
             </p>
           ) : (
             <div className="space-y-2.5">
-              {evidenceItems.map((ev) => (
+              {safeEvidenceItems.map((ev) => (
                 <div key={ev.id} className="p-3 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] flex items-center justify-between text-xs">
                   <div>
                     <span className="font-semibold text-[var(--text-primary)]">{ev.title}</span>
                     <span className="text-[var(--text-muted)]"> · {ev.type}</span>
                   </div>
                   <span className="text-[var(--color-primary-text)] font-medium">
-                    {ev.skillNames.length} {t('Skills Linked')}
+                    {(Array.isArray(ev?.skillNames) ? ev.skillNames.length : 0)} {t('Skills Linked')}
                   </span>
                 </div>
               ))}

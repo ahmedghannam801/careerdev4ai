@@ -40,6 +40,8 @@ export const momentumAr: Record<string, string> = {
   // ---- Empty states -------------------------------------------------------
   'No skill has reached the target level yet. Rate your skills to see what is already there.':
     'لم تصل أي مهارة إلى المستوى المستهدف بعد. قيّم مهاراتك لترى ما تحقق منها بالفعل.',
+  'assessed or verified': 'تم تقييمها أو التحقق منها',
+  'at target without evidence': 'عند المستوى المستهدف دون دليل',
   'No evidence attached yet. Add a project, certificate or document to prove a skill.':
     'لم تُرفَق أي أدلة بعد. أضف مشروعًا أو شهادة أو مستندًا لإثبات مهارة.',
 
