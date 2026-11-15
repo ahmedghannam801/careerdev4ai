@@ -16,9 +16,14 @@
   // A compatibility date of 2026-08-04 or later enables Node.js compatibility
   // (nodejs_compat and nodejs_compat_v2) by default. That is what provides the
   // real `node:http` server implementation used by the Express API in
-  // `dist/_worker.js`, so no explicit compatibility flag is needed here;
-  // adding one is redundant at this compatibility date.
+  // `dist/_worker.js`.
+  //
+  // The flag is still declared explicitly: the Pages Git build image bundles
+  // `_worker.js` with its own (older) Wrangler, which does not apply the
+  // date-based default and otherwise fails on the bare `node:module` and
+  // `node:crypto` imports with "Could not resolve" errors.
   "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
 
   // Preview URLs are a Pages dashboard setting, not a configuration-file key:
   // current Wrangler rejects `preview_urls` when validating a Pages config, so
