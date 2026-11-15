@@ -19,6 +19,115 @@
 import { createSkillLookup, skillNameVariants } from './skillMatching.ts';
 
 /* -------------------------------------------------------------------------- */
+/* The boards                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The boards the platform presents.
+ *
+ * THE PROVIDER IS GOOGLE JOBS
+ * ---------------------------
+ * The provider the platform buys is Google's job feed. Every posting it
+ * returns says which board the posting was found on, and every posting carries
+ * a Google Jobs link. So four of the five boards here are read straight out of
+ * the postings: a posting published by Indeed is an Indeed posting, one
+ * published by Handshake is a Handshake posting, one published by ZipRecruiter
+ * is a ZipRecruiter posting, and everything else — including the postings
+ * mirrored from LinkedIn, Bayt and Wuzzuf, and the postings on a company's own
+ * careers page — reached the platform through the Google Jobs feed.
+ *
+ * WONDERIN
+ * --------
+ * Wonderin.ai is the fifth board and the one that cannot be fetched.
+ *
+ * It publishes no job-feed API: it is an account-bound web application, and
+ * its job matching happens inside the candidate's own session. The platform
+ * therefore does not pretend to hold Wonderin postings it has not fetched. It
+ * offers Wonderin as a place the candidate searches directly, with the query
+ * they typed, and a posting that links to Wonderin is labelled as one.
+ */
+export const JOB_SOURCE_IDS = [
+  'google_jobs',
+  'indeed',
+  'ziprecruiter',
+  'handshake',
+  'wonderin',
+] as const;
+export type JobSourceId = (typeof JOB_SOURCE_IDS)[number];
+
+/** The names the boards are shown under, in the interface's own words. */
+export const JOB_SOURCE_LABELS: Record<JobSourceId, string> = {
+  google_jobs: 'Google Jobs',
+  indeed: 'Indeed',
+  ziprecruiter: 'ZipRecruiter',
+  handshake: 'Handshake',
+  wonderin: 'Wonderin.ai',
+};
+
+/**
+ * How a board name the provider writes is matched to a board the platform
+ * presents.
+ *
+ * The provider writes the board as free text and it is not always exact:
+ * "ZipRecruiter", "Zip Recruiter", "ziprecruiter" all mean the same board.
+ */
+const PUBLISHER_SOURCE_MATCHERS: ReadonlyArray<readonly [RegExp, JobSourceId]> = [
+  [/\bzip[\s-]?recruiter\b/i, 'ziprecruiter'],
+  [/\bindeed\b/i, 'indeed'],
+  [/\bhandshake\b/i, 'handshake'],
+  [/\bwonderin\b/i, 'wonderin'],
+];
+
+/**
+ * Which board a posting belongs to.
+ *
+ * A posting whose board the platform does not present came through the
+ * Google Jobs feed, so that is what it is called.
+ */
+export function resolveJobSource(publisher: string | null | undefined): JobSourceId {
+  const text = (publisher ?? '').trim();
+  if (!text) return 'google_jobs';
+  for (const [pattern, source] of PUBLISHER_SOURCE_MATCHERS) {
+    if (pattern.test(text)) return source;
+  }
+  return 'google_jobs';
+}
+
+/* -------------------------------------------------------------------------- */
+/* Employment type                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Whether an employment type means an internship.
+ *
+ * THE PROVIDER DOES NOT ANSWER WITH AN ENUM HERE
+ * ----------------------------------------------
+ * The provider takes an enum on the way IN — `employment_types=INTERN` — but on
+ * the way OUT it writes the type as free text, in the language of the posting:
+ * "Internship", "Full-time and Internship", "Part-time and Internship",
+ * "Full-time, Part-time, and Internship", and the Arabic "تدريب".
+ *
+ * The old code compared the text to the enum "INTERN", which never matched, so
+ * every internship was labelled with its raw English string and none of them
+ * was ever recognised as an internship at all. Both languages are read here,
+ * because the platform serves both.
+ */
+export function isInternshipEmploymentType(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const text = value.toLowerCase();
+  // "internship", "internships", and the enum "INTERN".
+  if (/\bintern/i.test(text)) return true;
+  // Arabic: تدريب (a training placement) and تدريبات (its plural).
+  if (text.includes('تدريب')) return true;
+  return false;
+}
+
+/** Whether a vacancy is an internship rather than a job. */
+export function isInternshipJob(job: LiveJob): boolean {
+  return job.isInternship;
+}
+
+/* -------------------------------------------------------------------------- */
 /* The shape of a vacancy                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -59,6 +168,21 @@ export interface LiveJob {
   applyUrl: string | null;
   /** The board the posting came from, for example "LinkedIn". */
   publisher: string | null;
+  /**
+   * Which of the platform's boards this posting belongs to.
+   *
+   * `publisher` is whatever the source wrote — "LinkedIn", "Bayt.com",
+   * "Capital One Careers". `source` is the platform's own answer to "which of
+   * the boards we present is this?", and it is one of a fixed set so the
+   * interface can group, filter and label them consistently.
+   */
+  source: JobSourceId;
+  /**
+   * True when the posting is an internship rather than a job.
+   *
+   * Read from the employment type the posting stated, not assumed.
+   */
+  isInternship: boolean;
   /** The skills the posting asked for. */
   requiredSkills: string[];
   /** Where `requiredSkills` came from, so the interface can be precise. */
@@ -175,6 +299,9 @@ export function normalizeLiveJob(raw: unknown, now: Date = new Date()): LiveJob 
 
   const publishedSkills = asStringList(record.job_required_skills);
 
+  const employmentType = asText(record.job_employment_type) ?? asText(record.employment_type);
+  const publisher = asText(record.job_publisher) ?? asText(record.publisher);
+
   return {
     id,
     title,
@@ -182,14 +309,16 @@ export function normalizeLiveJob(raw: unknown, now: Date = new Date()): LiveJob 
     location: readLocation(record),
     country: asText(record.job_country)?.toLowerCase() ?? null,
     isRemote: asBoolean(record.job_is_remote) ?? asBoolean(record.is_remote),
-    employmentType: asText(record.job_employment_type) ?? asText(record.employment_type),
+    employmentType,
     postedAt,
     expiresAt,
     expired: expiresAt ? new Date(expiresAt).getTime() < now.getTime() : false,
     description: asText(record.job_description) ?? asText(record.description),
     url: asText(record.job_url) ?? asText(record.job_offer_url) ?? asText(record.job_google_link),
     applyUrl: asText(record.job_apply_link) ?? asText(record.job_apply_url),
-    publisher: asText(record.job_publisher) ?? asText(record.publisher),
+    publisher,
+    source: resolveJobSource(publisher),
+    isInternship: isInternshipEmploymentType(employmentType),
     requiredSkills: publishedSkills,
     skillSource: publishedSkills.length ? 'publisher' : 'none',
     requiredExperience: asText(record.job_required_experience) ?? asText(record.required_experience),
@@ -337,6 +466,89 @@ export type JobRequirement = (typeof JOB_REQUIREMENTS)[number];
 export const JOB_COUNTRIES = ['eg', 'sa', 'ae', 'qa', 'kw', 'bh', 'om', 'jo', 'gb', 'de', 'us'] as const;
 export type JobCountry = (typeof JOB_COUNTRIES)[number];
 
+/* -------------------------------------------------------------------------- */
+/* Jobs and internships                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the candidate is looking at.
+ *
+ * The screen offers three: everything the feed returned, only the jobs, or
+ * only the internships. It is one filter and not two, because a candidate
+ * looking for an internship does not want a part-time contract, and a
+ * candidate looking for a job does not want a placement.
+ */
+export const JOB_KINDS = ['all', 'jobs', 'internships'] as const;
+export type JobKind = (typeof JOB_KINDS)[number];
+
+/** The label each kind is shown under, in the interface's own words. */
+export const JOB_KIND_LABELS: Record<JobKind, string> = {
+  all: 'All',
+  jobs: 'Full-Time / Part-Time Jobs',
+  internships: 'Internships',
+};
+
+/**
+ * The employment types the provider is asked for, for each kind.
+ *
+ * The provider understands an enum on the way in — `employment_types=INTERN`
+ * surfaces internship postings that a general query buries. So the kind is
+ * pushed into the upstream call instead of only being applied afterwards.
+ * The result is filtered again on the way back, because the provider's filter
+ * is a hint and not a promise: it answers with "Full-time" alongside the
+ * internships it was asked for.
+ */
+export function employmentTypesForKind(kind: JobKind): JobEmploymentType[] {
+  if (kind === 'internships') return ['INTERN'];
+  if (kind === 'jobs') return ['FULLTIME', 'PARTTIME'];
+  return [];
+}
+
+/**
+ * Keeps only the vacancies of the kind the candidate asked for.
+ *
+ * An internship is a posting whose own employment type says so. A posting that
+ * states no employment type at all is a job, not an internship: the platform
+ * does not turn silence into a placement.
+ */
+export function filterLiveJobsByKind(jobs: LiveJob[], kind: JobKind): LiveJob[] {
+  if (kind === 'jobs') return jobs.filter((job) => !job.isInternship);
+  if (kind === 'internships') return jobs.filter((job) => job.isInternship);
+  return jobs;
+}
+
+/**
+ * Keeps only the vacancies from the boards the candidate picked.
+ *
+ * An empty list keeps everything: "no board selected" means "every board", not
+ * "no board at all".
+ */
+export function filterLiveJobsBySource(jobs: LiveJob[], sources: JobSourceId[]): LiveJob[] {
+  if (!sources.length) return jobs;
+  const wanted = new Set(sources);
+  return jobs.filter((job) => wanted.has(job.source));
+}
+
+/** Reads the kind the caller asked for, falling back to everything. */
+export function readJobKind(value: unknown): JobKind {
+  const raw = String(value ?? '').trim().toLowerCase();
+  return (JOB_KINDS as readonly string[]).includes(raw) ? (raw as JobKind) : 'all';
+}
+
+/** Reads the boards the caller asked for, ignoring any board we do not present. */
+export function readJobSourceList(value: unknown): JobSourceId[] {
+  if (!value) return [];
+  const parts = (Array.isArray(value) ? value : String(value).split(','))
+    .map((entry) => String(entry).trim().toLowerCase())
+    .filter(Boolean);
+  const result: JobSourceId[] = [];
+  for (const part of parts) {
+    const match = JOB_SOURCE_IDS.find((entry) => entry === part);
+    if (match && !result.includes(match)) result.push(match);
+  }
+  return result;
+}
+
 /** The parameters one search accepts, after validation. */
 export interface JobSearchQuery {
   /** The free-form query. Never empty. */
@@ -351,6 +563,10 @@ export interface JobSearchQuery {
   datePosted: JobDatePosted;
   /** Only postings marked as remote. */
   remoteOnly: boolean;
+  /** What the candidate is looking at: everything, jobs, or internships. */
+  kind: JobKind;
+  /** The boards the candidate narrowed the search to. */
+  sources: JobSourceId[];
   /** The employment types, when the caller narrowed them. */
   employmentTypes: JobEmploymentType[];
   /** The experience requirements, when the caller narrowed them. */
@@ -396,6 +612,17 @@ export function buildJobSearchQuery(params: Record<string, unknown>): JobSearchQ
   const page = clampInt(params.page, 1, 1, 20);
   const numPages = clampInt(params.numPages, 1, 1, 2);
 
+  // The kind decides which employment types are asked for. When the caller
+  // also named employment types, the caller's choice is the narrower one and
+  // it wins — a candidate who asked for "Full-time" inside "Internships" has
+  // asked for something specific.
+  const kind = readJobKind(params.kind);
+  const requestedEmploymentTypes = readEnumList(params.employmentTypes, JOB_EMPLOYMENT_TYPES);
+  const kindEmploymentTypes = employmentTypesForKind(kind);
+  const employmentTypes = requestedEmploymentTypes.length
+    ? requestedEmploymentTypes
+    : kindEmploymentTypes;
+
   return {
     query: query || 'jobs in Egypt',
     location: location || null,
@@ -403,7 +630,9 @@ export function buildJobSearchQuery(params: Record<string, unknown>): JobSearchQ
     language,
     datePosted,
     remoteOnly: params.remoteOnly === true || params.remoteOnly === 'true',
-    employmentTypes: readEnumList(params.employmentTypes, JOB_EMPLOYMENT_TYPES),
+    kind,
+    sources: readJobSourceList(params.sources),
+    employmentTypes,
     requirements: readEnumList(params.requirements, JOB_REQUIREMENTS),
     page,
     numPages,

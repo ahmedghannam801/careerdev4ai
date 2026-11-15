@@ -10,7 +10,7 @@ gsap.registerPlugin(useGSAP, ScrollTrigger, GSAPSplitText);
 
 export function SmoothScrollProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
 
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
     let lenis: Lenis | null = null;

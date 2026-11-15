@@ -1,11 +1,13 @@
-import { useRef, type ReactNode } from 'react';
+import { Children, useRef, type ReactNode } from 'react';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 
 export function AnimatedList({ children, className = '' }: { children: ReactNode; className?: string }) {
   const list = useRef<HTMLDivElement>(null);
+  const childCount = Children.count(children);
 
   useGSAP(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const items = list.current?.children;
     if (!items?.length) return;
@@ -16,7 +18,7 @@ export function AnimatedList({ children, className = '' }: { children: ReactNode
       stagger: 0.05,
       ease: 'power2.out',
     });
-  }, { scope: list, dependencies: [children], revertOnUpdate: true });
+  }, { scope: list, dependencies: [childCount], revertOnUpdate: true });
 
   return <div ref={list} className={className}>{children}</div>;
 }

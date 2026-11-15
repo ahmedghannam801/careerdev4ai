@@ -465,4 +465,13 @@ export const cvAr: Record<string, string> = {
   'No CV versions saved yet': 'لا توجد نسخ محفوظة للسيرة الذاتية بعد',
   'Save snapshots in CV Studio to maintain role-specific versions and track ATS alignment over time.':
     'احفظ لقطات في استوديو السيرة للاحتفاظ بنسخ مخصصة لكل وظيفة ومتابعة توافق ATS بمرور الوقت.',
+  // The AI edit allowance. The studio is where the platform spends the most AI
+  // capacity per candidate, so the allowance is stated rather than discovered.
+  'Unlimited AI Edits ✨': 'تعديلات ذكاء اصطناعي غير محدودة ✨',
+  'AI edits today: {remaining}/{limit} remaining':
+    'تعديلات الذكاء الاصطناعي اليوم: {remaining}/{limit} متبقية',
+  'Resets in {time}': 'تتجدد خلال {time}',
+  'Upgrade to Pro for Unlimited Edits': 'اشترك في Pro للحصول على تعديلات غير محدودة',
+  'Your AI edits for today are used up. The timer in the studio header shows when they come back.':
+    'استنفدت تعديلات الذكاء الاصطناعي اليوم. المؤقت في أعلى الاستوديو يوضّح متى تعود.',
 };

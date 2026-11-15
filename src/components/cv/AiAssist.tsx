@@ -119,7 +119,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
   label,
   disabledReason,
 }) => {
-  const { t, aiPreferences, privacyPreferences, settings } = useCareer();
+  const { t, aiPreferences, privacyPreferences, settings, isCvAiEditLocked, refreshCvAiQuota } = useCareer();
   const enabled = aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -172,9 +172,17 @@ export const AiAssist: React.FC<AiAssistProps> = ({
         setDraft(response.text);
         setDraftBullets(response.bullets);
         setGroundingNote(response.groundingNote);
+        // The edit was written, so one of the day's AI edits was spent. The
+        // badge in the studio header says how many are left, and it can only
+        // say that if it is told.
+        void refreshCvAiQuota();
       } catch (requestError) {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') {
+          void refreshCvAiQuota();
+          return;
+        }
         if (attemptRunRef.current !== attempt) return;
+        void refreshCvAiQuota();
         // The server's own message is shown. Nothing is written, and the
         // candidate is not left with a blank field wondering what happened.
         setDraft('');
@@ -204,6 +212,7 @@ export const AiAssist: React.FC<AiAssistProps> = ({
       length,
       settings.resumeLanguage,
       t,
+      refreshCvAiQuota,
     ]
   );
 
@@ -246,6 +255,17 @@ export const AiAssist: React.FC<AiAssistProps> = ({
     return disabledReason ? (
       <p className="text-[11px] text-[var(--text-muted)]">{disabledReason}</p>
     ) : null;
+  }
+
+  // The AI edit allowance is spent. The button is disabled rather than
+  // refused, and the reason is said next to it — the studio's header shows
+  // the countdown to the moment the allowance comes back.
+  if (isCvAiEditLocked) {
+    return (
+      <p className="text-[11px] text-[var(--color-warning)]">
+        {t('Your AI edits for today are used up. The timer in the studio header shows when they come back.')}
+      </p>
+    );
   }
 
   return (

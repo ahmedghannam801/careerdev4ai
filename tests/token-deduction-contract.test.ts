@@ -260,6 +260,30 @@ describe('the token deduction contract', () => {
         `these routes are not AI actions and must not cost a token: ${offenders.join(', ')}`
       );
     });
+
+    test('headline suggestions check CV quota before daily tokens and refund unused reservations', () => {
+      const block = blocks.get('/api/cv/ai-assist');
+      assert.ok(block, 'the CV AI-assist route must exist');
+
+      const headlineStart = block.indexOf("if (field === 'headline' && body.suggestions === true)");
+      const headlineEnd = block.indexOf('// No model on this server', headlineStart);
+      assert.ok(headlineStart >= 0 && headlineEnd > headlineStart, 'the headline branch must exist');
+      const headline = block.slice(headlineStart, headlineEnd);
+      const claimIndex = headline.indexOf('claimCvAiEdit(');
+      const dailyBudgetIndex = headline.indexOf('tryConsumeAiBudget(');
+
+      assert.ok(claimIndex >= 0 && dailyBudgetIndex > claimIndex, 'CV quota must be checked before daily tokens');
+      assert.match(
+        headline.slice(claimIndex, dailyBudgetIndex),
+        /if\s*\(!headlineClaim\.allowed\)/,
+        'a locked CV quota must return before the shared daily budget is consumed'
+      );
+      assert.match(
+        headline.slice(dailyBudgetIndex, headline.indexOf('const outcome = await (async () =>', dailyBudgetIndex)),
+        /if\s*\(headlineClaim\.reserved\)\s*await refundCvAiEdit\(/,
+        'a daily-budget denial must release the reserved CV edit'
+      );
+    });
   });
 
   describe('the deduction points', () => {

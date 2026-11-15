@@ -166,4 +166,9 @@ export const skillsAr: Record<string, string> = {
     'تمت استعادة مستوى مهارتك السابق. يُرجى المحاولة مرة أخرى.',
   'Current Level vs General Target': 'المستوى الحالي مقابل الهدف العام',
   'Self': 'التقييم الذاتي',
+
+  // The level control: the level-up button and the slider it sits beside.
+  'Level up': 'ارتقِ بالمستوى',
+  'Maximum level reached': 'تم بلوغ أعلى مستوى',
+  'Skill level': 'مستوى المهارة',
 };

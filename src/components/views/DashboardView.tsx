@@ -29,6 +29,7 @@ import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
+import { AnimatedList } from '../react-bits/AnimatedList';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -457,7 +458,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           )}
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <AnimatedList className="mt-4 grid gap-3 sm:grid-cols-3">
           <MetricCard
             metricId="roleReadiness"
             label={t('Role readiness')}
@@ -482,7 +483,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             metrics={metrics}
             tone="warning"
           />
-        </div>
+        </AnimatedList>
 
         {/* The gaps, with the classification explained. Every badge says why
             it is critical or blocking. */}

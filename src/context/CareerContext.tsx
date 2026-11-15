@@ -81,6 +81,7 @@ import { translate } from '../translations/sourceStrings';
 import { getBrowserSupabase, getAccessToken, isSupabaseConfigured } from '../lib/supabase';
 import { trackEvent } from '../lib/analytics';
 import { apiUrl } from '../lib/native';
+import { fetchCvAiQuota } from '../lib/cvQuotaApi';
 import { mergeCanonicalCvDocument } from '../../shared/cvProjection';
 import { isSkillSectionHeader, normalizeSkillKey } from '../../shared/cvDedupe';
 import {
@@ -97,6 +98,7 @@ import {
   parseAtsAnalysisFailure,
   type AtsAnalysisFailure,
 } from '../../shared/atsAnalysis';
+import type { CvAiQuotaState } from '../../shared/cvAiQuota';
 import {
   PRIVACY_VERSION,
   TERMS_VERSION,
@@ -709,6 +711,24 @@ interface CareerContextType {
   isOptimizingCV: boolean;
   cvAnalysisError: AtsAnalysisFailure | null;
   dismissCvAnalysisError: () => void;
+  /**
+   * The CV Studio AI edit allowance.
+   *
+   * `null` means it is not known yet — the studio then leaves the AI buttons
+   * alone, because a candidate who cannot be measured must not be locked out
+   * of the studio.
+   */
+  cvAiQuota: CvAiQuotaState | null;
+  /** Re-reads the AI edit allowance. */
+  refreshCvAiQuota: () => Promise<CvAiQuotaState | null>;
+  /**
+   * True when the AI edit allowance is spent and the AI edit triggers in the
+   * studio are locked.
+   *
+   * Typing by hand and deleting items are never affected: only the AI writes
+   * are limited.
+   */
+  isCvAiEditLocked: boolean;
   /**
    * Puts a reviewed CV into the studio.
    *
@@ -2244,6 +2264,27 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [activeCvId, setActiveCvId] = useState<string>('');
   const [isOptimizingCV, setIsOptimizingCV] = useState(false);
   const [cvAnalysisError, setCvAnalysisError] = useState<AtsAnalysisFailure | null>(null);
+
+  // The CV Studio AI edit allowance.
+  //
+  // The studio is where the platform spends the most AI capacity per
+  // candidate, so the allowance is metered: three AI writes in a twenty-four
+  // hour window for a free account, and no limit at all for a paid plan. The
+  // server owns the counter; this is only what the studio shows.
+  //
+  // `null` means it has not been read yet, and the AI buttons are left alone
+  // until it has.
+  const [cvAiQuota, setCvAiQuota] = useState<CvAiQuotaState | null>(null);
+
+  const refreshCvAiQuota = useCallback(async (): Promise<CvAiQuotaState | null> => {
+    const quota = await fetchCvAiQuota();
+    setCvAiQuota(quota);
+    return quota;
+  }, []);
+
+  // The allowance is spent only when it is known to be spent. An unknown
+  // allowance never locks the studio.
+  const isCvAiEditLocked = cvAiQuota !== null && cvAiQuota.locked;
 
   const dismissCvAnalysisError = () => setCvAnalysisError(null);
 
@@ -6077,6 +6118,9 @@ Skills: ${activeCV.skillsList.join(', ')}
         isOptimizingCV,
         cvAnalysisError,
         dismissCvAnalysisError,
+        cvAiQuota,
+        refreshCvAiQuota,
+        isCvAiEditLocked,
         applyReviewedCv,
         jobs,
         bookmarkedJobIds,

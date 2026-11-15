@@ -258,6 +258,13 @@ import {
   type CvAssistRequest,
 } from './server/cv/aiAssist.ts';
 import {
+  claimCvAiEdit,
+  cvAiEditLimitResponse,
+  CvAiQuotaUnavailableError,
+  getCvAiQuotaState,
+  refundCvAiEdit,
+} from './server/cv/aiEditQuota.ts';
+import {
   isCvAssistAction,
   isCvAssistField,
   isCvAssistLength,
@@ -2787,6 +2794,39 @@ app.get('/api/cv/analyses', requireAuth, async (req: Request, res: Response) => 
   }
 });
 
+// The CV Studio AI edit allowance.
+//
+// The studio is where the platform spends the most AI capacity per candidate,
+// so the allowance is metered: three AI writes in a twenty-four hour window
+// for a free account, and no limit at all for a paid plan.
+//
+// This route reports the allowance so the studio can show how many edits are
+// left before the candidate reaches for one. It is a read: it never resets
+// the counter and never starts a window.
+app.get('/api/cv/ai-quota', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const state = await getCvAiQuotaState(req.authUser!.id);
+    return res.json({
+      success: true,
+      quota: {
+        limit: state.limit,
+        used: state.used,
+        remaining: state.remaining,
+        locked: state.locked,
+        unlimited: state.unlimited,
+        resetAt: state.resetAt,
+        planCode: state.planCode,
+      },
+    });
+  } catch (error) {
+    console.error('CV AI quota read error:', error);
+    return res.status(503).json({
+      error: 'The AI edit allowance could not be read right now.',
+      code: 'quota_read_failed',
+    });
+  }
+});
+
 // AI-assisted writing for one CV field.
 //
 // The model writes from the candidate's own record: the record is read from
@@ -2833,10 +2873,30 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, (req: Request, res: Resp
         return res.json({ success: true, ...outcome });
       }
 
+      // Reserve a CV edit before consuming the shared daily AI budget. A
+      // locked CV quota should return local suggestions without spending a
+      // token from the unrelated daily allowance.
+      const headlineClaim = await claimCvAiEdit(req.authUser!.id);
+      if (!headlineClaim.allowed) {
+        const outcome = await generateCvHeadlineSuggestions(
+          req.authUser!.id,
+          request,
+          null,
+          null
+        );
+        return res.json({
+          success: true,
+          ...outcome,
+          fallbackReason:
+            'Your AI edit allowance for today is used up, so locally generated headline options are shown.',
+        });
+      }
+
       // The model is optional here. When the daily allowance is spent the
-      // deterministic options are still returned, so the studio never shows
-      // a quota error where a useful answer exists.
+      // deterministic options are still returned. Release the CV reservation
+      // because no model-written edit will be produced on this path.
       if (!tryConsumeAiBudget(req.authUser!.id)) {
+        if (headlineClaim.reserved) await refundCvAiEdit(req.authUser!.id);
         const outcome = await generateCvHeadlineSuggestions(
           req.authUser!.id,
           request,
@@ -2851,16 +2911,27 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, (req: Request, res: Resp
         });
       }
 
-      const outcome = await generateCvHeadlineSuggestions(
-        req.authUser!.id,
-        request,
-        ai,
-        getGeminiModel()
-      );
+      const outcome = await (async () => {
+        try {
+          return await generateCvHeadlineSuggestions(
+            req.authUser!.id,
+            request,
+            ai,
+            getGeminiModel()
+          );
+        } catch (error) {
+          if (headlineClaim.reserved) await refundCvAiEdit(req.authUser!.id);
+          throw error;
+        }
+      })();
       // The headline options can be produced locally, with no model involved.
-      // Only a result the model actually wrote earns the credit.
+      // Only a result the model actually wrote earns the credit — and only a
+      // result the model actually wrote is an edit, so an edit that never
+      // happened is given back.
       if (outcome.aiUsed) {
         markAiCreditCompleted(req as AuthedRequest);
+      } else if (headlineClaim.reserved) {
+        await refundCvAiEdit(req.authUser!.id);
       }
       return res.json({ success: true, ...outcome });
     }
@@ -2888,8 +2959,22 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, (req: Request, res: Resp
         : 0,
     };
 
+    // The AI edit allowance. A free account may make three AI writes in the
+    // studio in a twenty-four hour window; every paid plan is unlimited. The
+    // edit is taken out of the allowance BEFORE the model is called, so two
+    // concurrent requests cannot both take the same last edit, and it is
+    // given back if the model then fails.
+    const claim = await claimCvAiEdit(req.authUser!.id);
+    if (!claim.allowed) {
+      return cvAiEditLimitResponse(res, claim.state);
+    }
+
     const blocked = consumeAiBudget(res, req.authUser!.id);
-    if (blocked) return blocked;
+    if (blocked) {
+      // The daily budget turned the request away, so no edit was spent either.
+      if (claim.reserved) await refundCvAiEdit(req.authUser!.id);
+      return blocked;
+    }
 
     try {
       const outcome = await generateCvAssistText(
@@ -2900,6 +2985,8 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, (req: Request, res: Resp
       );
 
       if (!outcome.ok) {
+        // Nothing was written, so nothing was spent.
+        if (claim.reserved) await refundCvAiEdit(req.authUser!.id);
         if (outcome.reason === 'source_not_found') {
           return res.status(404).json({
             error:
@@ -2923,7 +3010,9 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, (req: Request, res: Resp
       });
     } catch (error) {
       // Never substitute invented text for a failed model call. The candidate
-      // is told that nothing was written.
+      // is told that nothing was written — and the edit is given back, because
+      // a call that produced nothing was never an edit.
+      if (claim.reserved) await refundCvAiEdit(req.authUser!.id);
       return respondAiFailure(
         res,
         error,
@@ -2933,6 +3022,12 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, (req: Request, res: Resp
     }
   } catch (error) {
     console.error('CV assist error:', error);
+    if (error instanceof CvAiQuotaUnavailableError) {
+      return res.status(503).json({
+        error: 'The AI edit allowance is temporarily unavailable. Nothing was written; please try again shortly.',
+        code: 'quota_unavailable',
+      });
+    }
     return res.status(500).json({ error: 'Failed to write this CV section' });
   }
 });
@@ -3073,8 +3168,20 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireCr
       return modelUnavailable(res);
     }
 
+    // The tailoring writes a whole CV, so it is an AI edit like any other: a
+    // free account may make three in a twenty-four hour window. The edit is
+    // taken out of the allowance before the model is called and given back if
+    // the write fails.
+    const claim = await claimCvAiEdit(req.authUser!.id);
+    if (!claim.allowed) {
+      return cvAiEditLimitResponse(res, claim.state);
+    }
+
     const blocked = consumeAiBudget(res, req.authUser!.id, 2);
-    if (blocked) return blocked;
+    if (blocked) {
+      if (claim.reserved) await refundCvAiEdit(req.authUser!.id);
+      return blocked;
+    }
 
     try {
       const { analysis } = await analyzeJobDescription(read.text, {
@@ -3095,6 +3202,8 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireCr
       });
 
       if (!outcome.ok) {
+        // Nothing was written, so nothing was spent.
+        if (claim.reserved) await refundCvAiEdit(req.authUser!.id);
         return res.status(503).json({
           error:
             'The CV for this job description could not be written. Nothing was changed; please try again shortly.',
@@ -3112,7 +3221,8 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireCr
       });
     } catch (error) {
       // Nothing is written on a failed call, so the candidate's CV is
-      // untouched and the studio keeps working.
+      // untouched and the studio keeps working — and the edit is given back.
+      if (claim.reserved) await refundCvAiEdit(req.authUser!.id);
       return respondAiFailure(
         res,
         error,
@@ -3122,6 +3232,12 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireCr
     }
   } catch (error) {
     console.error('Job description CV error:', error);
+    if (error instanceof CvAiQuotaUnavailableError) {
+      return res.status(503).json({
+        error: 'The AI edit allowance is temporarily unavailable. Nothing was changed; please try again shortly.',
+        code: 'quota_unavailable',
+      });
+    }
     return res.status(500).json({ error: 'Failed to write the CV for this job description' });
   }
 });

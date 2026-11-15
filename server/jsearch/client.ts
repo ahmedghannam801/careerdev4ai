@@ -15,6 +15,8 @@
 import {
   buildJobSearchQuery,
   dedupeLiveJobs,
+  filterLiveJobsByKind,
+  filterLiveJobsBySource,
   normalizeLiveJob,
   type JobSearchQuery,
   type LiveJob,
@@ -147,6 +149,11 @@ function cacheKey(query: JobSearchQuery): string {
     query.language ?? '',
     query.datePosted,
     query.remoteOnly,
+    // The kind and the boards are part of the answer, not of the request, so
+    // they belong in the key: the "Internships" feed must never be served
+    // from the "All" entry.
+    query.kind,
+    [...query.sources].sort().join(','),
     [...query.employmentTypes].sort().join(','),
     [...query.requirements].sort().join(','),
     query.page,
@@ -427,10 +434,18 @@ export async function searchJobs(
   }
 
   const now = new Date();
-  const jobs = dedupeLiveJobs(
+  const normalized = dedupeLiveJobs(
     readJobs(payload)
       .map((entry) => normalizeLiveJob(entry, now))
       .filter((job): job is LiveJob => job !== null)
+  );
+
+  // The provider's own employment-type filter is a hint, not a promise: it
+  // answers with "Full-time" alongside the internships it was asked for. So the
+  // kind is applied again here, on the type each posting actually stated.
+  const jobs = filterLiveJobsBySource(
+    filterLiveJobsByKind(normalized, query.kind),
+    query.sources
   );
 
   const result: JobSearchResult = {

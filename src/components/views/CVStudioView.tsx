@@ -27,7 +27,8 @@ import { CvStudioWorkflow } from '../cv/CvStudioWorkflow';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
 import type { CvAnalysisReport } from '../../../shared/cvAnalysis';
 import { CV_STUDIO_TABS, cvStudioStepForTab, type CvStudioTab } from '../../lib/routing';
-import { useRouteParam } from '../../lib/useRouteParams';
+import { useRouteParam, refreshRoute } from '../../lib/useRouteParams';
+import { buildRouteHash } from '../../lib/routing';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
@@ -41,6 +42,7 @@ import {
 } from '../../lib/cvTemplatesApi';
 import { takeTailoredCv } from '../../lib/tailoredCvHandoff';
 import { fetchCvTemplateCatalog } from '../../lib/cvTemplatesApi';
+import { CvStudioAiQuotaBadge } from '../cv/CvStudioAiQuotaBadge';
 import type { CvTemplateDefinition } from '../../../shared/cvTemplates';
 
 export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = ({
@@ -162,7 +164,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
     packageId: null,
   });
 
-  // A vacancy handed over from the Live Jobs screen.
+  // A vacancy handed over from the Jobs & Internships screen.
   //
   // The posting arrives with its description and its employer, so the studio
   // opens ready to tailor rather than ready to be told what the job is. The
@@ -317,7 +319,17 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* The AI edit allowance is stated in the studio's own header, so a
+              candidate sees what is left before they reach for it rather than
+              meeting a refusal afterwards. */}
+          <CvStudioAiQuotaBadge
+            onUpgrade={() => {
+              onNavigate?.('pricing');
+              window.history.replaceState(null, '', buildRouteHash('pricing'));
+              refreshRoute();
+            }}
+          />
           {/* The template gallery is reachable from every step of the studio.
               It used to live only in the secondary navigation of the "My CV"
               step, which meant a candidate reading their ATS score had to go
@@ -504,7 +516,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       {/* TAB 1: THE JOB DESCRIPTION */}
       {activeTab === 'job' && (
         <div className="space-y-4">
-          {/* The posting that came from the Live Jobs screen. It says where
+          {/* The posting that came from the Jobs & Internships screen. It says where
               the description came from, because a description the candidate
               did not write themselves must look different from one they
               pasted. */}
@@ -516,7 +528,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent-primary)]" />
               <div className="min-w-0 text-xs">
                 <p className="font-semibold text-[var(--text-primary)]">
-                  {t('Brought over from Live Jobs')}
+                  {t('Brought over from Jobs & Internships')}
                 </p>
                 <p className="mt-0.5 text-[var(--text-secondary)]">
                   {t('{title} at {company}').replace('{title}', tailoredCvNotice.title).replace('{company}', tailoredCvNotice.company)}

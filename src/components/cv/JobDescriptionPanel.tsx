@@ -99,7 +99,7 @@ const ANALYSIS_SECTIONS: Array<{
 ];
 
 export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state, setState }) => {
-  const { t, aiPreferences, activeCV, updateCV, saveCVVersion, saveCoverLetter, generateAiCoverLetter, coverLetters } = useCareer();
+  const { t, aiPreferences, activeCV, updateCV, saveCVVersion, saveCoverLetter, generateAiCoverLetter, coverLetters, isCvAiEditLocked, refreshCvAiQuota } = useCareer();
   // The AI response language is a separate, explicit setting. It is not the
   // interface language: a candidate reading the app in Arabic may still want
   // an English job analysis.
@@ -339,7 +339,12 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
         error: persistenceWarning ? t('The tailored CV is ready, but its saved application package could not be completed.') : null,
       }));
       setProcessing({ operation: 'generate', status: 'success', error: null });
+      // The tailored CV was written, so one of the day's AI edits was spent.
+      // The badge in the studio header says how many are left, and it can
+      // only say that if it is told.
+      void refreshCvAiQuota();
     } catch (generateError) {
+      void refreshCvAiQuota();
       setState((previous) => ({
         ...previous,
         isGenerating: false,
@@ -692,7 +697,7 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
 
           <button
             onClick={handleGenerate}
-            disabled={!canAnalyze || isGenerating || isAnalyzing}
+            disabled={!canAnalyze || isGenerating || isAnalyzing || isCvAiEditLocked}
             className="px-3.5 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
             {isGenerating ? (
@@ -706,6 +711,15 @@ export const JobDescriptionPanel: React.FC<JobDescriptionPanelProps> = ({ state,
                 : aiButtonLabel(t('Write my CV for this job'), 'cv_tailoring', t)}
             </span>
           </button>
+
+          {/* The tailoring writes a whole CV, so it spends one of the day's
+              AI edits. When they are spent the button is disabled and the
+              reason is said here, rather than left to be found out. */}
+          {isCvAiEditLocked && (
+            <span className="text-[11px] text-[var(--color-warning)]">
+              {t('Your AI edits for today are used up. The timer in the studio header shows when they come back.')}
+            </span>
+          )}
 
           {!canAnalyze && (
             <span className="text-[11px] text-[var(--text-muted)]">

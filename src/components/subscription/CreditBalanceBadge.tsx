@@ -28,6 +28,7 @@ import React, { useState } from 'react';
 import { Sparkles, Plus, ChevronDown } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { DailyTokenClaim } from './DailyTokenClaim';
+import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 
 interface CreditBalanceBadgeProps {
   onOpenPricing?: () => void;
@@ -65,7 +66,7 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
             />
           ) : null}
         </span>
-        <span>{balance}</span>
+        <AnimatedCounter value={balance} duration={0.35} />
         <span className="hidden sm:inline font-normal text-[var(--text-muted)]">{t('Tokens')}</span>
         <ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />
       </button>
@@ -86,7 +87,11 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
                 <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />
                 {t('Tokens')}
               </span>
-              <span className="text-sm font-extrabold text-[var(--color-primary-text)]">{balance}</span>
+              <AnimatedCounter
+                value={balance}
+                duration={0.35}
+                className="text-sm font-extrabold text-[var(--color-primary-text)]"
+              />
             </div>
 
             <div className="space-y-1.5 text-xs text-[var(--text-muted)]">

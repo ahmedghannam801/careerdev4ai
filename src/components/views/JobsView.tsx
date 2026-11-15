@@ -1,17 +1,16 @@
 /**
- * Live Jobs.
+ * Jobs & Internships.
  *
  * Real vacancies, aggregated from public job boards by the job provider. The
  * provider credential stays on the server; this screen only calls the
  * application's own API.
  *
- * Three kinds of opportunity exist in the product, and this screen shows only
- * the first:
+ * Three kinds of opportunity exist in the product:
  *
- *   1. LIVE VACANCIES      — here, from the job provider.
- *   2. OPPORTUNITY CATALOGUE — volunteering, internships and youth programmes
- *                              the platform curates itself.
- *   3. LEARNING RESOURCES  — courses, certifications and tutorials.
+ *   1. JOBS & INTERNSHIPS — live vacancies from the job provider.
+ *   2. OPPORTUNITY CATALOGUE — volunteering and youth programmes curated by
+ *                              the platform.
+ *   3. LEARNING RESOURCES — courses, certifications and tutorials.
  *
  * A vacancy is never presented as a course and a course is never presented as
  * an opening. The links to the other two are offered explicitly.
@@ -32,6 +31,8 @@ import { useCareer } from '../../context/CareerContext';
 import { Reveal } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
 import { LiveJobCard } from '../jobs/LiveJobCard';
+import { AnimatedList } from '../react-bits/AnimatedList';
+import { MagnetButton } from '../react-bits/MagnetButton';
 import { fetchLiveJobs, type JobQuota, type JobSearchFilters, type MatchedJob } from '../../lib/jobsApi';
 import { ApiRequestError } from '../../lib/apiClient';
 import { buildRouteHash } from '../../lib/routing';
@@ -41,8 +42,11 @@ import {
   JOB_COUNTRIES,
   JOB_COUNTRY_LABELS,
   JOB_DATE_POSTED_OPTIONS,
-  JOB_EMPLOYMENT_TYPES,
+  JOB_KINDS,
+  JOB_KIND_LABELS,
   JOB_LOCATION_SUGGESTIONS,
+  JOB_SOURCE_LABELS,
+  type JobKind,
 } from '../../../shared/jobs';
 import { todayIsoDate } from '../../../shared/dateRange';
 
@@ -55,13 +59,6 @@ const DATE_POSTED_LABELS: Record<string, string> = {
   '3days': 'Last 3 days',
   week: 'Last 7 days',
   month: 'Last 30 days',
-};
-
-const EMPLOYMENT_LABELS: Record<string, string> = {
-  FULLTIME: 'Full-time',
-  PARTTIME: 'Part-time',
-  CONTRACTOR: 'Contract',
-  INTERN: 'Internship',
 };
 
 /**
@@ -112,7 +109,7 @@ const providerFailureMessage = (
     case 'bad_response':
       return t('The job provider sent an answer this server could not read. Try again in a few minutes.');
     default:
-      return t('Live jobs could not be loaded.');
+      return t('Jobs & Internships could not be loaded.');
   }
 };
 
@@ -132,6 +129,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
     country: 'eg',
     datePosted: 'week',
     remoteOnly: false,
+    kind: 'all',
+    sources: [],
     employmentTypes: [],
   });
   const [results, setResults] = useState<MatchedJob[]>([]);
@@ -152,14 +151,18 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
 
   /** The first search runs once, after the profile has loaded. */
   const startedRef = useRef(false);
+  /** Prevents a slower old response from replacing a newer search. */
+  const searchRequestIdRef = useRef(0);
   /** The pending trip to the studio, so it can be called off. */
   const tailorTimerRef = useRef<number | null>(null);
 
   const runSearch = useCallback(async (next: JobSearchFilters) => {
+    const requestId = ++searchRequestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const response = await fetchLiveJobs(next);
+      if (requestId !== searchRequestIdRef.current) return;
       setResults(response.jobs);
       setQuota(response.quota);
       setSource(response.source);
@@ -168,13 +171,14 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       // the same thing as one that was checked a minute ago.
       setLastCheckedAt(Date.now());
     } catch (caught) {
+      if (requestId !== searchRequestIdRef.current) return;
       // The failure code is kept; the server's English sentence is not shown
       // to the user, because the interface has its own sentence per code.
       const code = caught instanceof ApiRequestError ? caught.code : null;
       setResults([]);
       setError({ code });
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestIdRef.current) setLoading(false);
     }
   }, []);
 
@@ -200,13 +204,25 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
     void runSearch(filters);
   };
 
-  const toggleEmploymentType = (value: string) => {
-    setFilters((previous) => ({
-      ...previous,
-      employmentTypes: previous.employmentTypes.includes(value)
-        ? previous.employmentTypes.filter((entry) => entry !== value)
-        : [...previous.employmentTypes, value],
-    }));
+  /**
+   * Switches between everything, the jobs, and the internships.
+   *
+   * The kind is not a label on the results: it is sent to the server, which
+   * asks the provider for that feed instead of fetching everything and
+   * throwing most of it away here.
+   */
+  const selectKind = (kind: JobKind) => {
+    if (filters.kind === kind) return;
+    const next: JobSearchFilters = {
+      ...filters,
+      kind,
+      // The kind already decides the employment types the provider is asked
+      // for, so a type left over from the previous kind would quietly narrow
+      // the new one.
+      employmentTypes: [],
+    };
+    setFilters(next);
+    void runSearch(next);
   };
 
   /**
@@ -344,14 +360,14 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       <div data-tour="jobs-header-panel" className="flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 md:flex-row md:items-center">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-            {t('Live Jobs')}
+            {t('Jobs & Internships')}
           </div>
           <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
             {t('Real openings, from real job boards')}
           </h1>
           <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
             {t(
-              'Every vacancy below is a live posting taken from a public job board. The fit shown is calculated from the skills in your own profile.'
+              'Every vacancy below is a live posting taken from a public job board — a job or an internship, as the posting itself states. The fit shown is calculated from the skills in your own profile.'
             )}
           </p>
         </div>
@@ -381,13 +397,41 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
         <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
         <div className="space-y-1 text-xs text-[var(--text-secondary)]">
           <p className="font-semibold text-[var(--text-primary)]">
-            {t('These are live vacancies, not courses and not curated programmes.')}
+            {t('These are live openings, not courses and not curated programmes.')}
           </p>
           <p>
             {t(
               'The platform does not edit these postings, so the employer’s own page is where you read the full description and apply. Saving a vacancy here keeps it in your account, and tracking an application records it in your applications.'
             )}
           </p>
+        </div>
+      </div>
+
+      {/* The boards behind the postings.
+          Four of them are fetched by the provider, and every posting below
+          names the one it came from. The fifth, Wonderin.ai, matches roles
+          inside the candidate's own account and publishes no feed, so it is
+          offered as a place to search rather than pretended at. */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 shadow-xs">
+        <div>
+          <span className="text-xs font-bold text-[var(--text-primary)]">
+            {t('The boards behind these postings')}
+          </span>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+            {t(
+              'Every posting below was fetched from these boards by the job provider, and each card names the board it came from.'
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {(['google_jobs', 'indeed', 'ziprecruiter', 'handshake'] as const).map((source) => (
+            <span
+              key={source}
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] bg-[var(--surface-secondary)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--text-primary)]"
+            >
+              {JOB_SOURCE_LABELS[source]}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -401,7 +445,9 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-[var(--text-primary)]">LinkedIn Jobs</span>
+              <span className="text-xs font-bold text-[var(--text-primary)]">
+                {t('Search the boards directly')}
+              </span>
               <span className="rounded bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
                 {t('External Search')}
               </span>
@@ -411,15 +457,30 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             </p>
           </div>
         </div>
-        <a
-          href={linkedInSearchUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:border-[#0A66C2] hover:text-[#0A66C2]"
-        >
-          <span>{t('Search on LinkedIn')}</span>
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <a
+            href={linkedInSearchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--accent-primary)] hover:text-[var(--color-primary-text)]"
+          >
+            <span>{t('Search on LinkedIn')}</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+          {/* Wonderin.ai publishes no job feed: it matches roles inside the
+              candidate's own account. So it is a place to search, and it is
+              labelled as one rather than presented as a board the platform
+              fetched from. */}
+          <a
+            href="https://wonderin.ai/job-matches"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--accent-primary)] hover:text-[var(--color-primary-text)]"
+          >
+            <span>{t('Search on Wonderin.ai')}</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </div>
       </div>
 
       {/* Search */}
@@ -461,14 +522,14 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             </datalist>
           </div>
 
-          <button
+          <MagnetButton
             type="submit"
             disabled={loading}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)] disabled:opacity-50"
           >
             {loading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
             <span>{t('Search jobs')}</span>
-          </button>
+          </MagnetButton>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -512,22 +573,31 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             <span>{t('Remote only')}</span>
           </label>
 
-          <div className="flex flex-wrap gap-1.5">
-            {JOB_EMPLOYMENT_TYPES.map((type) => {
-              const active = filters.employmentTypes.includes(type);
+          {/* The one filter that matters most: jobs and internships are
+              different searches, and a candidate looking for a placement does
+              not want a part-time contract offered to them. The toggle is
+              three states rather than two checkboxes, because "everything" is
+              a real choice. */}
+          <div
+            role="group"
+            aria-label={t('Show')}
+            className="flex flex-wrap gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-1"
+          >
+            {JOB_KINDS.map((kind) => {
+              const active = filters.kind === kind;
               return (
                 <button
-                  key={type}
+                  key={kind}
                   type="button"
-                  onClick={() => toggleEmploymentType(type)}
+                  onClick={() => selectKind(kind)}
                   aria-pressed={active}
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  className={`rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
                     active
-                      ? 'border-[var(--accent-primary)] bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
-                      : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      ? 'border-[var(--accent-primary)] bg-[var(--surface-main)] text-[var(--color-primary-text)]'
+                      : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-main)] hover:text-[var(--text-primary)]'
                   }`}
                 >
-                  {t(EMPLOYMENT_LABELS[type] ?? type)}
+                  {t(JOB_KIND_LABELS[kind])}
                 </button>
               );
             })}
@@ -545,7 +615,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               the candidate the boards had nothing, which was never true. */}
           {!loading && !error && (
             <span>
-              {ordered.length} {t('live vacancies')}
+              {ordered.length} {t('openings')}
             </span>
           )}
           {!loading && !error && lastCheckedAt && (
@@ -619,7 +689,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-warning)]" />
           <div className="space-y-2.5 text-xs text-[var(--text-secondary)]">
             <p className="font-semibold text-[var(--text-primary)]">
-              {t('Live jobs could not be loaded.')}
+              {t('Jobs & Internships could not be loaded.')}
             </p>
             <p>{providerFailureMessage(error.code, t)}</p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -671,7 +741,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       {!loading && !error && ordered.length === 0 && (
         <EmptyState
           icon={Briefcase}
-          title={t('No live vacancies matched this search')}
+          title={t('No openings matched this search')}
           description={t(
             'Try a broader title, a nearby city, a longer date range, or another country. The provider only returns openings it can currently find.'
           )}
@@ -683,6 +753,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               country: 'eg',
               datePosted: 'month',
               remoteOnly: false,
+              kind: 'all',
+              sources: [],
               employmentTypes: [],
             };
             setFilters(next);
@@ -693,7 +765,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
 
       {/* Results */}
       {!loading && !error && ordered.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <AnimatedList className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {ordered.map((item) => (
             <LiveJobCard
               key={item.job.id}
@@ -707,7 +779,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               t={t}
             />
           ))}
-        </div>
+        </AnimatedList>
       )}
 
       {/* The outcome of the last tracked application. */}
@@ -716,8 +788,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           role="status"
           className={`rounded-xl border px-4 py-2.5 text-xs font-semibold ${
             trackNotice.ok
-              ? 'border-[var(--color-success)]/25 bg-[var(--color-success)]/10 text-[var(--color-success)]'
-              : 'border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
+              ? 'border-[var(--color-success-strong)]/30 bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
+              : 'border-[var(--color-warning)]/30 bg-[var(--surface-secondary)] text-[var(--color-warning)]'
           }`}
         >
           {trackNotice.text}
@@ -730,8 +802,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           role="status"
           className={`rounded-xl border px-4 py-2.5 text-xs font-semibold ${
             tailorNotice.ok
-              ? 'border-[var(--color-success)]/25 bg-[var(--color-success)]/10 text-[var(--color-success)]'
-              : 'border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
+              ? 'border-[var(--color-success-strong)]/30 bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
+              : 'border-[var(--color-warning)]/30 bg-[var(--surface-secondary)] text-[var(--color-warning)]'
           }`}
         >
           {tailorNotice.text}

@@ -3,9 +3,11 @@ import { Plus, CheckCircle2, X, Target } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { SKILL_CATEGORIES } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
-import { SkillCategory, SkillSource, SkillEvidenceSource } from '../../types/career';
+import { SkillCategory, SkillSource, SkillEvidenceSource, UserSkill } from '../../types/career';
 import { Reveal } from '../motion/Motion';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
+import { SpotlightCard } from '../react-bits/SpotlightCard';
+import { SkillLevelBar } from '../skills/SkillLevelBar';
 import {
   computeSkillGaps,
   explainGap,
@@ -92,6 +94,32 @@ export const SkillsCenterView: React.FC = () => {
     const byName = new Map(gaps.map((gap) => [normalizeSkillName(gap.name), gap]));
     return { byName, summary: summarizeSkillGaps(gaps, requirements) };
   }, [targetRole, skills]);
+
+  /**
+   * Applies a level the candidate chose.
+   *
+   * The context writes the new level into its own state before the request
+   * leaves, so the bar moves straight away instead of waiting for the server.
+   * If the request fails the context puts the old level back, and because the
+   * bar tweens from the width it is actually showing, it travels back with
+   * the rollback rather than snapping.
+   */
+  const handleLevelChange = (skill: UserSkill, level: number) => {
+    setPulsedSkillId(skill.id);
+    if (pulseTimer.current !== null) window.clearTimeout(pulseTimer.current);
+    pulseTimer.current = window.setTimeout(() => setPulsedSkillId(null), 420);
+    void updateSkillLevel(skill.id, level).then((saved) => {
+      showToast({
+        variant: saved ? 'success' : 'error',
+        title: saved ? t('Skill level saved.') : t('Failed to save skill'),
+        description: saved
+          ? t('{skill} is now rated {level}/5. Your roadmap was rebuilt from it.')
+            .replace('{skill}', skill.name)
+            .replace('{level}', String(level))
+          : t('Your previous skill level was restored. Please try again.'),
+      });
+    });
+  };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,7 +261,7 @@ export const SkillsCenterView: React.FC = () => {
             const evidenceRec = skillEvidence[skill.name.toLowerCase()];
 
             return (
-              <div
+              <SpotlightCard
                 key={skill.id}
                 className={`p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ease-out ${
                   pulsedSkillId === skill.id ? 'scale-[1.01] ring-2 ring-[var(--color-success-strong)]/30 shadow-lg' : ''
@@ -272,79 +300,32 @@ export const SkillsCenterView: React.FC = () => {
                   />
                 </div>
 
-                {/* Interactive Level Slider */}
+                {/* Interactive Level Control */}
                 <div data-tour="skill-rate-widget" className="md:w-1/3 space-y-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-                    <span className="text-[var(--text-primary)] font-semibold">
-                      {t('Current:')} <AnimatedCounter value={skill.currentLevel} duration={0.35} /> / 5
-                    </span>
-                    {evidenceRec && (
-                      <span className="text-[10px] text-[var(--text-muted)] font-sans">
-                        {evidenceRec.selfReportedLevel !== null && (
-                          <>{t('Self')}: L{evidenceRec.selfReportedLevel}</>
+                  <SkillLevelBar
+                    level={skill.currentLevel}
+                    targetLevel={skill.targetLevel}
+                    metTarget={skill.gap <= 0}
+                    onLevelChange={(level) => handleLevelChange(skill, level)}
+                    t={t}
+                    aside={
+                      <>
+                        {evidenceRec && (
+                          <span className="text-[10px] text-[var(--text-muted)] font-sans">
+                            {evidenceRec.selfReportedLevel !== null && (
+                              <>{t('Self')}: L{evidenceRec.selfReportedLevel}</>
+                            )}
+                            {evidenceRec.selfReportedLevel !== null && evidenceRec.assessedLevel !== null && ' · '}
+                            {evidenceRec.assessedLevel !== null && (
+                              <>{t('Assessed')}: L{evidenceRec.assessedLevel}</>
+                            )}
+                          </span>
                         )}
-                        {evidenceRec.selfReportedLevel !== null && evidenceRec.assessedLevel !== null && ' · '}
-                        {evidenceRec.assessedLevel !== null && (
-                          <>{t('Assessed')}: L{evidenceRec.assessedLevel}</>
-                        )}
-                      </span>
-                    )}
-                    <span className="text-[var(--text-muted)]">
-                      {t('Target:')} {skill.targetLevel} / 5
-                    </span>
-                  </div>
-
-                  {/* The bar, with the target marked on it.
-                      A slider alone says "you are here"; the bar says how far
-                      that is from what the role asks for. */}
-                  <div
-                    className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--color-progress-track)]"
-                    role="img"
-                    aria-label={t(
-                      'Current level {current} of 5. Target level {target} of 5.',
-                    )
-                      .replace('{current}', String(skill.currentLevel))
-                      .replace('{target}', String(skill.targetLevel))}
-                  >
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ease-out ${
-                        skill.gap > 0
-                          ? 'bg-[var(--color-primary)]'
-                          : 'bg-[var(--color-success-strong)]'
-                      }`}
-                      style={{ width: `${(skill.currentLevel / 5) * 100}%` }}
-                    />
-                    {/* The target marker. */}
-                    <div
-                      className="absolute top-0 h-full w-0.5 bg-[var(--text-primary)]"
-                      style={{ left: `${(skill.targetLevel / 5) * 100}%` }}
-                      aria-hidden="true"
-                    />
-                  </div>
-
-                  <input
-                    type="range"
-                    min="1"
-                    max="5"
-                    value={skill.currentLevel}
-                    onChange={(e) => {
-                      const level = parseInt(e.target.value, 10);
-                      setPulsedSkillId(skill.id);
-                      if (pulseTimer.current !== null) window.clearTimeout(pulseTimer.current);
-                      pulseTimer.current = window.setTimeout(() => setPulsedSkillId(null), 420);
-                      void updateSkillLevel(skill.id, level).then((saved) => {
-                        showToast({
-                          variant: saved ? 'success' : 'error',
-                          title: saved ? t('Skill level saved.') : t('Failed to save skill'),
-                          description: saved
-                            ? t('{skill} is now rated {level}/5. Your roadmap was rebuilt from it.')
-                                .replace('{skill}', skill.name)
-                                .replace('{level}', String(level))
-                            : t('Your previous skill level was restored. Please try again.'),
-                        });
-                      });
-                    }}
-                    className="w-full accent-[var(--accent-primary)] cursor-pointer"
+                        <span className="text-[var(--text-muted)]">
+                          {t('Target:')} {skill.targetLevel} / 5
+                        </span>
+                      </>
+                    }
                   />
 
                   {/* The evidence behind the level.
@@ -393,7 +374,7 @@ export const SkillsCenterView: React.FC = () => {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
+              </SpotlightCard>
             );
           })}
         </div>

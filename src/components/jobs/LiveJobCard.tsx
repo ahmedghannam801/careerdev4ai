@@ -22,10 +22,13 @@ import {
   Calendar,
   ExternalLink,
   FileText,
+  GraduationCap,
   MapPin,
   Sparkles,
 } from 'lucide-react';
 import type { MatchedJob } from '../../lib/jobsApi';
+import { JOB_SOURCE_LABELS } from '../../../shared/jobs';
+import { SpotlightCard } from '../react-bits/SpotlightCard';
 import { CareerImage } from '../ui/CareerImage';
 
 interface LiveJobCardProps {
@@ -57,16 +60,44 @@ function formatDate(iso: string): string {
   });
 }
 
-/** Turns the provider's employment type into a readable label. */
+/**
+ * Turns the provider's employment type into a readable label.
+ *
+ * THE PROVIDER USUALLY DOES NOT ANSWER WITH AN ENUM HERE
+ * ------------------------------------------------------
+ * It takes an enum on the way in — `employment_types=INTERN` — but on the way
+ * out it writes the type as free text, in the language of the posting:
+ * "Full-time", "Part-time", "Internship", "Full-time and Internship",
+ * "Full-time, Part-time, and Internship", and the Arabic "تدريب".
+ *
+ * A simple type is given the interface's own wording, in the interface's own
+ * language. A compound type is shown as the posting wrote it, because
+ * collapsing "Full-time, Part-time, and Internship" into one of its three
+ * parts would lose what the employer actually said.
+ */
 function employmentLabel(value: string | null, t: (key: string) => string): string | null {
   if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
   const map: Record<string, string> = {
     FULLTIME: t('Full-time'),
     PARTTIME: t('Part-time'),
     CONTRACTOR: t('Contract'),
     INTERN: t('Internship'),
   };
-  return map[value.toUpperCase()] ?? value;
+  const upper = trimmed.toUpperCase();
+  if (map[upper]) return map[upper];
+
+  // A compound type keeps the posting's own words.
+  if (/,| and |،| و /.test(trimmed)) return trimmed;
+
+  const text = trimmed.toLowerCase();
+  if (text.includes('intern')) return t('Internship');
+  if (text.includes('full-time') || text.includes('full time')) return t('Full-time');
+  if (text.includes('part-time') || text.includes('part time')) return t('Part-time');
+  if (text.includes('contract')) return t('Contract');
+  return trimmed;
 }
 
 export const LiveJobCard: React.FC<LiveJobCardProps> = ({
@@ -103,13 +134,18 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
     match.score === null
       ? 'text-[var(--text-muted)]'
       : match.score >= 70
-        ? 'text-[var(--color-success)]'
+        ? 'text-[var(--color-success-strong)]'
         : match.score >= 40
           ? 'text-[var(--color-warning)]'
           : 'text-[var(--text-secondary)]';
 
   return (
-    <article className="flex h-full flex-col gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs">
+    // The card IS the article, so the screen reader is told what this thing
+    // is without an extra element in between. The glow follows the pointer.
+    <SpotlightCard
+      as="article"
+      className="flex h-full flex-col gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs"
+    >
       {/* Header */}
       <header className="space-y-2">
         <div className="flex items-start gap-3">
@@ -147,15 +183,34 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
             </span>
           )}
           {employmentLabel(job.employmentType, t) && (
-            <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-0.5 font-medium text-[var(--text-primary)]">
               {employmentLabel(job.employmentType, t)}
             </span>
           )}
+          {/* A placement is not a job. The posting said so, and the badge says
+              so too, so the candidate never has to guess which they are
+              looking at. */}
+          {job.isInternship && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-ai-surface)] px-2 py-0.5 font-semibold text-[var(--color-ai)]">
+              <GraduationCap className="h-3 w-3" />
+              {t('Internship')}
+            </span>
+          )}
           {job.isRemote === true && (
-            <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-0.5 font-medium text-[var(--text-primary)]">
               {t('Remote')}
             </span>
           )}
+          {/* Which board the posting came from. The platform does not edit
+              these postings, so the board is named on every one of them. */}
+          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] bg-[var(--surface-main)] px-2 py-0.5 font-semibold text-[var(--text-primary)]">
+            {JOB_SOURCE_LABELS[job.source] ?? job.source}
+            {job.publisher && job.publisher !== JOB_SOURCE_LABELS[job.source] && (
+              <span className="font-normal text-[var(--text-secondary)]">
+                {t('via {publisher}').replace('{publisher}', job.publisher)}
+              </span>
+            )}
+          </span>
         </div>
       </header>
 
@@ -211,7 +266,7 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
                 {match.matched.map((skill) => (
                   <span
                     key={skill}
-                    className="rounded-full bg-[var(--color-success)]/12 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-success)]"
+                    className="rounded-full bg-[var(--color-success-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-success-strong)]"
                   >
                     {skill}
                   </span>
@@ -228,7 +283,7 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
                   {match.missing.slice(0, 8).map((skill) => (
                     <span
                       key={skill}
-                      className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
+                      className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-primary)]"
                     >
                       {skill}
                     </span>
@@ -349,7 +404,7 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
           <span>{t('Create Tailored CV')}</span>
         </button>
       </footer>
-    </article>
+    </SpotlightCard>
   );
 };
 

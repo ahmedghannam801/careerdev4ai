@@ -17,6 +17,7 @@ import { HelpCircle } from 'lucide-react';
 
 import { explainMetric, type CareerMetrics } from '../../../shared/careerMetrics';
 import { useCareer } from '../../context/CareerContext';
+import { SpotlightCard } from '../react-bits/SpotlightCard';
 
 export interface MetricCardProps {
   /** The metric's id, used to look up its explanation. */
@@ -75,7 +76,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   }, [open]);
 
   return (
-    <div ref={containerRef} className="relative">
+    // The glow is clipped to the card, except for the popover: the
+    // explanation opens BELOW the card, so the card must not clip it.
+    <SpotlightCard ref={containerRef} className="relative" overflow="visible">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -130,7 +133,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           </button>
         </div>
       ) : null}
-    </div>
+    </SpotlightCard>
   );
 };
 

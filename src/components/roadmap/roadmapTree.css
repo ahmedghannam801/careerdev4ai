@@ -1,0 +1,228 @@
+/*
+ * The roadmap node tree.
+ *
+ * The layout is a three column grid: the branches on the inline start side,
+ * the spine in the middle, the branches on the inline end side. Everything
+ * here is written with logical properties and a `dir` attribute rather than
+ * with left and right, so the whole tree mirrors in Arabic without a second
+ * set of rules.
+ *
+ * The colours are the product's own tokens, so the node states read the same
+ * in the warm cream light theme and in the near-black dark theme.
+ */
+
+.rdm-tree__stage {
+  position: relative;
+}
+
+.rdm-tree__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 17rem) minmax(0, 1fr);
+  align-items: start;
+}
+
+.rdm-tree__spine {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-block: 0.5rem;
+}
+
+/* The line that runs through the spine and connects the stages. */
+.rdm-tree__spine-line {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(50% - 1px);
+  width: 2px;
+  background: var(--border-subtle);
+  pointer-events: none;
+}
+
+.rdm-tree__side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rdm-branch {
+  display: grid;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+/* The gutter between a branch and the spine. Its order follows the reading
+   direction, so the node is always on the outside and the gutter always
+   touches the spine. */
+.rdm-branch[data-side='start'] {
+  grid-template-columns: minmax(0, 1fr) 3.5rem;
+}
+
+.rdm-branch[data-side='end'] {
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+}
+
+.rdm-branch__card {
+  align-self: center;
+  min-width: 0;
+}
+
+/*
+ * The connector.
+ *
+ * The rail is drawn taller than its row so the segments of consecutive
+ * branches overlap and read as one continuous line down the side of the
+ * spine. A required topic is drawn solid, an alternative path dashed.
+ */
+.rdm-connector {
+  display: block;
+  width: 100%;
+  height: calc(100% + 2rem);
+  margin-block: -1rem;
+  overflow: visible;
+}
+
+.rdm-connector path {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 2;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.rdm-connector--dashed path {
+  stroke: var(--text-muted);
+  stroke-dasharray: 7 6;
+}
+
+/*
+ * In Arabic the spine's neighbours swap sides, so the connector is mirrored:
+ * the rail has to sit on the edge that touches the spine in both directions.
+ */
+[dir='rtl'] .rdm-connector {
+  transform: scaleX(-1);
+}
+
+/* ---- The node states --------------------------------------------------- */
+
+.rdm-node {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: var(--surface-main);
+  text-align: start;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.rdm-node:hover {
+  border-color: var(--accent-primary);
+}
+
+.rdm-node:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Finished: a green check badge and a solid border. */
+.rdm-node--done {
+  border-color: var(--color-success-strong);
+  background: var(--color-success-surface);
+}
+
+/* The candidate's current topic: highlighted, with a slow accent pulse. */
+.rdm-node--in-progress {
+  border-color: var(--accent-primary);
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 3px var(--accent-surface);
+  animation: rdm-node-pulse 2.6s ease-in-out infinite;
+}
+
+/* The next thing to do: the loudest node on the canvas. */
+.rdm-node--recommended {
+  border-color: var(--accent-primary);
+  background: var(--surface-raised);
+}
+
+/* An alternative path: quiet, and visibly optional. */
+.rdm-node--optional {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: var(--surface-secondary);
+}
+
+@keyframes rdm-node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--accent-surface);
+  }
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  }
+}
+
+/* The pulse is decoration. A candidate who asked for less motion gets the
+   highlight without the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .rdm-node--in-progress {
+    animation: none;
+  }
+  .rdm-node {
+    transition: none;
+  }
+}
+
+/* ---- The drawer -------------------------------------------------------- */
+
+.rdm-drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(28rem, 100vw);
+  border-inline-start: 1px solid var(--border-subtle);
+  background: var(--surface-main);
+  box-shadow: -18px 0 40px rgb(0 0 0 / 0.18);
+}
+
+[dir='rtl'] .rdm-drawer {
+  box-shadow: 18px 0 40px rgb(0 0 0 / 0.18);
+}
+
+.rdm-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ---- Small screens ----------------------------------------------------- */
+
+/*
+ * Under a laptop the three columns stop being readable, so the tree becomes
+ * one column: the spine first, the branches underneath it. The connectors are
+ * hidden because there is no gutter to draw them in any more.
+ */
+@media (max-width: 900px) {
+  .rdm-tree__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rdm-tree__spine {
+    order: 1;
+  }
+
+  .rdm-tree__side {
+    order: 2;
+  }
+
+  .rdm-branch[data-side='start'],
+  .rdm-branch[data-side='end'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rdm-connector {
+    display: none;
+  }
+}

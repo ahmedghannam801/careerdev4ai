@@ -7,7 +7,6 @@
 
 export const jobsAr: Record<string, string> = {
   // Header
-  'Live Jobs': 'وظائف مباشرة',
   'Real openings, from real job boards':
     'وظائف حقيقية من لوحات توظيف حقيقية',
   'Every vacancy below is a live posting taken from a public job board. The fit shown is calculated from the skills in your own profile.':
@@ -16,8 +15,8 @@ export const jobsAr: Record<string, string> = {
   'Learning resources': 'موارد تعليمية',
 
   // Scope notice
-  'These are live vacancies, not courses and not curated programmes.':
-    'هذه وظائف مباشرة، وليست دورات ولا برامج منتقاة.',
+  'These are live openings, not courses and not curated programmes.':
+    'هذه فرص مباشرة، وليست دورات ولا برامج منتقاة.',
   'The platform does not edit these postings, so the employer’s own page is where you read the full description and apply. Saving a vacancy here keeps it in your account, and tracking an application records it in your applications.':
     'المنصة لا تحرّر هذه الإعلانات، لذلك فقراءة الوصف الكامل والتقديم تكونان في صفحة صاحب العمل نفسه. حفظ الوظيفة هنا يبقيها في حسابك، وتتبع الطلب يسجّله ضمن طلباتك.',
   'The platform does not edit these postings, and it is not a party to any application.':
@@ -45,7 +44,7 @@ export const jobsAr: Record<string, string> = {
   'Searching live job boards…': 'جارٍ البحث في لوحات التوظيف…',
 
   // Errors
-  'Live jobs could not be loaded.': 'تعذّر تحميل الوظائف المباشرة.',
+  'Jobs & Internships could not be loaded.': 'تعذّر تحميل الوظائف والتدريبات.',
   'The job provider is not configured on this server yet. The owner has to add the provider credential before live vacancies appear here.':
     'لم يتم إعداد مزوّد الوظائف على هذا الخادم بعد. على المالك إضافة بيانات المزوّد قبل ظهور الوظائف المباشرة هنا.',
   'The job provider rejected this server’s credential. The owner has to replace it before live vacancies appear here.':
@@ -60,8 +59,8 @@ export const jobsAr: Record<string, string> = {
     'أرسل مزوّد الوظائف إجابة تعذّر على هذا الخادم قراءتها. أعد المحاولة بعد بضع دقائق.',
 
   // Empty
-  'No live vacancies matched this search':
-    'لا توجد وظائف مباشرة مطابقة لهذا البحث',
+  'No openings matched this search':
+    'لا توجد فرص مطابقة لهذا البحث',
   'Try a broader title, a nearby city, a longer date range, or another country. The provider only returns openings it can currently find.':
     'جرّب مسمىً أعمّ أو مدينة قريبة أو نطاقًا زمنيًا أطول أو بلدًا آخر. لا يُرجع المزوّد إلا الوظائف التي يستطيع العثور عليها حاليًا.',
 
@@ -94,7 +93,7 @@ export const jobsAr: Record<string, string> = {
     'لا يذكر هذا الإعلان أي وصف، لذلك لا يوجد ما تُبنى عليه سيرة ذاتية مخصصة.',
   'Opening the CV Studio with this posting…':
     'جارٍ فتح استوديو السيرة الذاتية بهذا الإعلان…',
-  'Brought over from Live Jobs': 'مُنقول من الوظائف المباشرة',
+  'Brought over from Jobs & Internships': 'مُنقول من الوظائف والتدريبات',
   '{title} at {company}': '{title} لدى {company}',
   'The posting has been filled in for you. Edit it here if you want to change anything before the CV is tailored to it.':
     'تم ملء الإعلان نيابةً عنك. عدّله هنا إذا أردت تغيير أي شيء قبل تخصيص السيرة الذاتية له.',
@@ -130,4 +129,19 @@ export const jobsAr: Record<string, string> = {
     'ابحث عن شواغر موثقة مباشرةً على LinkedIn تطابق مسارك الوظيفي وكلماتك المفتاحية.',
   'Search on LinkedIn': 'ابحث عبر LinkedIn',
   'Search on': 'ابحث عبر',
+
+  // The screen covers jobs and internships together, so its name describes the
+  // candidate's need rather than treating a placement as a standard job.
+  'Jobs & Internships': 'الوظائف والتدريبات',
+  'Full-Time / Part-Time Jobs': 'وظائف بدوام كامل / جزئي',
+  'Internships': 'التدريبات',
+  'openings': 'فرصة',
+  'via {publisher}': 'عبر {publisher}',
+  'Every vacancy below is a live posting taken from a public job board — a job or an internship, as the posting itself states. The fit shown is calculated from the skills in your own profile.':
+    'كل فرصة أدناه إعلان حيّ مأخوذ من لوحة وظائف عامة — وظيفة أو تدريب، كما ذكر الإعلان نفسه. نسبة الملاءمة المعروضة محسوبة من المهارات الموجودة في ملفك.',
+  'The boards behind these postings': 'اللوحات التي جاءت منها هذه الإعلانات',
+  'Every posting below was fetched from these boards by the job provider, and each card names the board it came from.':
+    'جُلب كل إعلان أدناه من هذه اللوحات بواسطة مزوّد الوظائف، وكل بطاقة تذكر اللوحة التي جاء منها.',
+  'Search the boards directly': 'ابحث في اللوحات مباشرة',
+  'Search on Wonderin.ai': 'ابحث في Wonderin.ai',
 };

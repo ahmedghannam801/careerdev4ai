@@ -6,7 +6,7 @@
  */
 
 import { apiRequest } from './apiClient';
-import type { JobSkillMatch, LiveJob } from '../../shared/jobs';
+import type { JobKind, JobSkillMatch, JobSourceId, LiveJob } from '../../shared/jobs';
 
 /** One vacancy together with the candidate's fit against it. */
 export interface MatchedJob {
@@ -35,6 +35,16 @@ export interface JobSearchFilters {
   country: string;
   datePosted: string;
   remoteOnly: boolean;
+  /**
+   * What the candidate is looking at: everything, jobs, or internships.
+   *
+   * The kind is sent to the server rather than applied in the browser, so the
+   * provider is asked for the right feed instead of the browser throwing away
+   * most of what was fetched.
+   */
+  kind: JobKind;
+  /** The boards the candidate narrowed the search to. */
+  sources: JobSourceId[];
   employmentTypes: string[];
 }
 
@@ -46,6 +56,8 @@ function toQueryString(filters: JobSearchFilters): string {
   if (filters.country) params.set('country', filters.country);
   if (filters.datePosted) params.set('datePosted', filters.datePosted);
   if (filters.remoteOnly) params.set('remoteOnly', 'true');
+  if (filters.kind && filters.kind !== 'all') params.set('kind', filters.kind);
+  if (filters.sources.length) params.set('sources', filters.sources.join(','));
   if (filters.employmentTypes.length) {
     params.set('employmentTypes', filters.employmentTypes.join(','));
   }

@@ -49,6 +49,8 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
     learningCatalog,
     aiPreferences,
     privacyPreferences,
+    isCvAiEditLocked,
+    refreshCvAiQuota,
   } = useCareer();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -139,6 +141,7 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
         language: input.language,
         ai: aiAllowed,
       });
+      if (aiAllowed) void refreshCvAiQuota();
 
       if (response.suggestions.length > 0) {
         setSuggestions(response.suggestions);
@@ -150,6 +153,7 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
         );
       }
     } catch (requestError) {
+      if (aiAllowed) void refreshCvAiQuota();
       // A failed request is reported, and the local options still fill the
       // list. The control never ends in a spinner or an empty panel.
       setSuggestions(local);
@@ -164,7 +168,7 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [aiAllowed, input, t]);
+  }, [aiAllowed, input, refreshCvAiQuota, t]);
 
   const handleOpen = () => {
     setIsOpen(true);
@@ -183,7 +187,7 @@ export const HeadlineSuggestions: React.FC<HeadlineSuggestionsProps> = ({
       <button
         type="button"
         onClick={handleOpen}
-        disabled={isLoading}
+        disabled={isLoading || isCvAiEditLocked}
         className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-primary-text)] transition-colors hover:bg-[var(--accent-surface)] disabled:opacity-50"
       >
         {isLoading ? (

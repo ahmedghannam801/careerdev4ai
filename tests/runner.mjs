@@ -309,6 +309,7 @@ async function main() {
     // explanation says, how the provider's failures are answered, and that the
     // route is private and fails safely without a credential.
     join(TESTS_DIR, 'jobs.test.ts'),
+    join(TESTS_DIR, 'jobs-feed-contract.test.ts'),
     // The personalisation engine, the grounding validator and the
     // localisation catalogue. These are pure: they need no database, but
     // they run in the same process as the rest of the suite so a regression
@@ -381,6 +382,10 @@ async function main() {
     // The CV studio's writing assistant and the document it builds from the
     // platform's records. Pure, like the two above: no database needed.
     join(TESTS_DIR, 'cv-studio.test.ts'),
+    join(TESTS_DIR, 'cv-ai-quota.test.ts'),
+    join(TESTS_DIR, 'roadmapTree.test.ts'),
+    join(TESTS_DIR, 'skillsLevelAnimation.test.ts'),
+    join(TESTS_DIR, 'premium-motion-contract.test.ts'),
     join(TESTS_DIR, 'cv-studio-deletion.test.ts'),
     join(TESTS_DIR, 'cv-preview.test.ts'),
     // The studio's own data: the resume language and its separation from the

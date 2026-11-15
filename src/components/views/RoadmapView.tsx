@@ -27,6 +27,7 @@ import {
   ROADMAP_JOURNEY_STAGES,
   journeyStageForPhase,
 } from '../../../shared/roadmapJourney';
+import type { RoadmapTreeProgress } from '../../../shared/roadmapTree';
 import { computeTimeBreakdown } from '../../../shared/roadmapTimeBreakdown';
 import { computeCareerMetrics, skillProofFromSource } from '../../../shared/careerMetrics';
 import {
@@ -39,10 +40,49 @@ import { RoadmapTaskStatus } from '../../types/career';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
 import { CareerImage } from '../ui/CareerImage';
 import { TimeBreakdown } from '../ui/TimeBreakdown';
+import { RoadmapTreeView } from '../roadmap/RoadmapTreeView';
 import { useToast } from '../toast/ToastProvider';
 
 interface RoadmapViewProps {
   onNavigate?: (view: string) => void;
+}
+
+/**
+ * The two ways to read the same plan.
+ *
+ * The card journey is the plan as a sequence of stages; the tree is the same
+ * plan opened up into the topics each stage is made of. Neither is a better
+ * answer, they answer different questions, so the candidate picks — and the
+ * choice is remembered between visits.
+ */
+type RoadmapViewMode = 'tree' | 'guided';
+
+/** Where the chosen way of reading the plan is remembered. */
+const ROADMAP_VIEW_MODE_KEY = 'careerdev4ai.roadmap.view';
+
+/**
+ * Reads the chosen mode.
+ *
+ * The storage is wrapped because a browser in private mode or a test runner
+ * without a window can refuse it — and a page that cannot remember the mode
+ * still shows a working plan.
+ */
+function readStoredViewMode(): RoadmapViewMode {
+  if (typeof window === 'undefined') return 'guided';
+  try {
+    return window.localStorage.getItem(ROADMAP_VIEW_MODE_KEY) === 'tree' ? 'tree' : 'guided';
+  } catch {
+    return 'guided';
+  }
+}
+
+function storeViewMode(mode: RoadmapViewMode): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(ROADMAP_VIEW_MODE_KEY, mode);
+  } catch {
+    // A browser that refuses storage still gets a working page.
+  }
 }
 
 const SECTION_LABEL_CLASS =
@@ -63,6 +103,54 @@ const STATUS_OPTIONS: RoadmapTaskStatus[] = [
   'skipped',
   'blocked',
 ];
+
+/**
+ * The switcher between the two views of the plan.
+ *
+ * It is a tablist rather than a pair of loose buttons, because the two
+ * options show the same thing in two shapes: the tab that is picked is the
+ * one that is open.
+ */
+const RoadmapViewSwitcher: React.FC<{
+  mode: RoadmapViewMode;
+  onChange: (mode: RoadmapViewMode) => void;
+  t: (source: string) => string;
+}> = ({ mode, onChange, t }) => (
+  <div
+    role="tablist"
+    aria-label={t('View mode')}
+    className="inline-flex flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-1"
+  >
+    <button
+      type="button"
+      role="tab"
+      aria-selected={mode === 'tree'}
+      onClick={() => onChange('tree')}
+      className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+        mode === 'tree'
+          ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+      }`}
+    >
+      <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
+      {t('Interactive Tree View (roadmap.sh Style)')}
+    </button>
+    <button
+      type="button"
+      role="tab"
+      aria-selected={mode === 'guided'}
+      onClick={() => onChange('guided')}
+      className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
+        mode === 'guided'
+          ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+      }`}
+    >
+      <Compass className="h-3.5 w-3.5" aria-hidden="true" />
+      {t('Guided Stages View (Classic Card Journey)')}
+    </button>
+  </div>
+);
 
 /**
  * The roadmap as a chronological stage timeline.
@@ -103,6 +191,15 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [showAll, setShowAll] = useState<string[]>([]);
+
+  // Which way the plan is read. It is restored on the first render, so the
+  // page does not flash the other view before it settles.
+  const [viewMode, setViewMode] = useState<RoadmapViewMode>(() => readStoredViewMode());
+
+  const chooseViewMode = (mode: RoadmapViewMode) => {
+    setViewMode(mode);
+    storeViewMode(mode);
+  };
 
   // The stage names come from the shared journey, so the roadmap, the
   // dashboard and the tests all call the stages the same thing.
@@ -283,6 +380,42 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   };
 
   const currentStage = stages.find((stage) => !stage.complete) ?? null;
+
+  /**
+   * The progress the tree reads.
+   *
+   * The tree never guesses a state: it reads the candidate's own skill
+   * ratings, the share of each stage the plan has finished, and the stage
+   * they are standing in. A phase that maps to the same journey stage as
+   * another one contributes to the same stage, so a stage with two phases
+   * is not half-finished in the tree.
+   */
+  const treeProgress: RoadmapTreeProgress = (() => {
+    const skillLevels: Record<string, { currentLevel: number; targetLevel: number }> = {};
+    for (const skill of skills) {
+      skillLevels[skill.name] = {
+        currentLevel: skill.currentLevel,
+        targetLevel: skill.targetLevel,
+      };
+    }
+
+    const stageProgress: Record<string, { pct: number; complete: boolean }> = {};
+    for (const stage of stages) {
+      const stageId = stage.journey.id;
+      const existing = stageProgress[stageId];
+      stageProgress[stageId] = {
+        pct: Math.max(existing?.pct ?? 0, stage.pct),
+        complete: (existing?.complete ?? true) && stage.complete,
+      };
+    }
+
+    return {
+      skillLevels,
+      stageProgress,
+      currentStageId: currentStage?.journey.id ?? null,
+    };
+  })();
+
   const nextTask =
     currentStage?.tasks.find((task) => task.status !== 'completed') ??
     allTasks.find((task) => task.status !== 'completed') ??
@@ -455,6 +588,21 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
             {t('Personal Career Roadmap')}
           </h1>
         </div>
+        {/* The switcher is here as well, so the tree is reachable even
+            before a plan exists. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            {t('View mode')}
+          </span>
+          <RoadmapViewSwitcher mode={viewMode} onChange={chooseViewMode} t={t} />
+        </div>
+        {viewMode === 'tree' ? (
+          <RoadmapTreeView
+            stages={ROADMAP_JOURNEY_STAGES}
+            progress={treeProgress}
+            onNavigate={onNavigate}
+          />
+        ) : (
         <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-10 text-center space-y-3">
           <Flag className="mx-auto h-6 w-6 text-[var(--text-muted)]" />
           <p className="text-sm font-semibold text-[var(--text-primary)]">{t('No roadmap yet')}</p>
@@ -472,6 +620,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
             </button>
           )}
         </div>
+        )}
       </div>
     );
   }
@@ -528,6 +677,22 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* The two ways to read the same plan. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+          {t('View mode')}
+        </span>
+        <RoadmapViewSwitcher mode={viewMode} onChange={chooseViewMode} t={t} />
+      </div>
+
+      {viewMode === 'tree' ? (
+        <RoadmapTreeView
+          stages={ROADMAP_JOURNEY_STAGES}
+          progress={treeProgress}
+          onNavigate={onNavigate}
+        />
+      ) : (
+      <>
       {/* Visual Roadmap Banner */}
       {(() => {
         const targetRoleTitle =
@@ -1551,6 +1716,8 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           </div>
         </section>
       </div>
+      </>
+      )}
     </div>
   );
 };
