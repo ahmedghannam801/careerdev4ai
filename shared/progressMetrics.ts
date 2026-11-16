@@ -12,6 +12,8 @@
  * null. The page reads these figures; the tests feed them migrated rows.
  */
 
+import { computeCareerMetrics, isSkillMastered, toMetricSkills } from './careerMetrics.ts';
+
 export interface ProgressSkill {
   id?: string | null;
   name?: string | null;
@@ -62,6 +64,17 @@ function level(value: number | null | undefined): number {
 }
 
 /**
+ * A level the row actually carries, or null when it carries none.
+ *
+ * The difference from `level()` matters for the gap: an unreadable level is
+ * not the same fact as a level of zero, and only a readable pair of levels can
+ * be trusted to describe the current shortfall.
+ */
+function readableLevel(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
  * Whether a skill counts as mastered.
  *
  * The rule is the platform's shared one: the level meets the target and the
@@ -70,36 +83,38 @@ function level(value: number | null | undefined): number {
  */
 export function isProgressSkillMastered(skill: ProgressSkill): boolean {
   const target = level(skill.targetLevel);
-  if (target <= 0) return false;
   const current = level(skill.currentLevel);
-  if (current < target) return false;
-  const source = (skill.source ?? '').trim().toLowerCase();
-  if (!source) return false;
-  if (source === 'assessment') return true;
-  return (
-    source === 'verified_evidence' ||
-    source === 'project_evidence' ||
-    source === 'verified_project' ||
-    source === 'experience' ||
-    source === 'work_experience' ||
-    source === 'certificate' ||
-    source === 'course_completed'
-  );
+  return isSkillMastered({
+    targetLevel: target,
+    gap: Math.max(0, target - current),
+    source: skill.source,
+  });
 }
 
 /**
- * The gap of a skill, worked out from the levels when the stored gap is
- * missing or stale. A migrated row may have a gap but no levels, or levels
- * but no gap; either way the page needs one number.
+ * The gap of a skill, worked out from the levels.
+ *
+ * The stored gap is a cache of `targetLevel - currentLevel` and it goes stale
+ * the moment either level changes: a row that was 3/5 yesterday and is 5/5
+ * today must not keep reporting a gap of two. So whenever the row carries both
+ * levels the gap is calculated from them and the stored value is ignored.
+ *
+ * A legacy row that predates the levels, or one whose level columns are null
+ * or unreadable, still has no pair to compare; for those the stored gap is the
+ * only fact available and it is used. A row with neither levels nor a usable
+ * gap reports zero rather than an invented shortfall.
  */
 export function progressSkillGap(skill: ProgressSkill): number {
-  const target = level(skill.targetLevel);
-  const current = level(skill.currentLevel);
-  const derived = Math.max(0, target - current);
-  if (typeof skill.gap === 'number' && Number.isFinite(skill.gap)) {
-    return Math.max(0, skill.gap);
+  const target = readableLevel(skill.targetLevel);
+  const current = readableLevel(skill.currentLevel);
+  if (target !== null && current !== null) {
+    return Math.max(0, target - current);
   }
-  return derived;
+
+  const stored = readableLevel(skill.gap);
+  if (stored !== null) return Math.max(0, stored);
+
+  return Math.max(0, (target ?? 0) - (current ?? 0));
 }
 
 /** Reads the task list of a phase, whatever shape it arrived in. */
@@ -127,19 +142,29 @@ export function computeProgressSnapshot(input: {
   const allTasks = phases.flatMap((phase) => progressPhaseTasks(phase));
   const totalTasks = allTasks.length;
   const completedTasks = allTasks.filter((task) => task?.status === 'completed').length;
+  const engine = computeCareerMetrics({
+    skills: toMetricSkills(skills.map((skill) => ({
+      name: skill.name ?? '',
+      currentLevel: level(skill.currentLevel),
+      targetLevel: level(skill.targetLevel),
+      gap: skill.gap ?? undefined,
+      required: skill.required ?? undefined,
+      source: skill.source ?? undefined,
+    }))),
+    roadmapTasks: allTasks.map((task) => ({ status: task.status })),
+  });
 
   const skillsAtTarget = skills.filter(
     (skill) => level(skill.targetLevel) > 0 && level(skill.currentLevel) >= level(skill.targetLevel)
   ).length;
-  const masteredSkills = skills.filter((skill) => isProgressSkillMastered(skill)).length;
 
   return {
     totalTasks,
     completedTasks,
-    roadmapPct: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+    roadmapPct: engine.roadmapCompletionPct,
     skillsAtTarget,
-    masteredSkills,
-    unverifiedAtTarget: Math.max(0, skillsAtTarget - masteredSkills),
+    masteredSkills: engine.skillsMastered,
+    unverifiedAtTarget: Math.max(0, skillsAtTarget - engine.skillsMastered),
     inProgressSkills: skills.filter((skill) => progressSkillGap(skill) > 0).length,
     totalSkills: skills.length,
   };

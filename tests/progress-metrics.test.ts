@@ -119,4 +119,42 @@ describe('the Progress page figures', () => {
     assert.equal(progressSkillGap({ currentLevel: 2, targetLevel: 5 }), 3);
     assert.equal(progressSkillGap({ currentLevel: 5, targetLevel: 5 }), 0);
   });
+
+  it('ignores a stale stored gap once the levels have changed', () => {
+    // The row was 3/5 when the gap was written; the candidate has since
+    // reached the target. The stored 2 must not keep the skill incomplete.
+    assert.equal(progressSkillGap({ currentLevel: 5, targetLevel: 5, gap: 2 }), 0);
+    // The reverse: a stored zero must not hide a real shortfall.
+    assert.equal(progressSkillGap({ currentLevel: 2, targetLevel: 5, gap: 0 }), 3);
+  });
+
+  it('never reports a gap when the candidate is above the target', () => {
+    assert.equal(progressSkillGap({ currentLevel: 5, targetLevel: 3, gap: 2 }), 0);
+  });
+
+  it('handles a missing or invalid level without inventing a gap', () => {
+    assert.equal(progressSkillGap({ currentLevel: null, targetLevel: 5, gap: 2 }), 2);
+    assert.equal(
+      progressSkillGap({ currentLevel: Number.NaN, targetLevel: Number.NaN, gap: null }),
+      0
+    );
+    assert.equal(progressSkillGap({}), 0);
+  });
+
+  it('keeps a legacy row that carries only a gap readable', () => {
+    assert.equal(progressSkillGap({ id: 'sql', name: 'SQL', gap: 2 }), 2);
+    assert.equal(progressSkillGap({ id: 'sql', name: 'SQL', gap: -1 }), 0);
+  });
+
+  it('does not count a skill whose stale gap said two as still in progress', () => {
+    const snapshot = computeProgressSnapshot({
+      skills: [
+        { id: 'sql', name: 'SQL', currentLevel: 5, targetLevel: 5, gap: 2, source: 'assessment' },
+      ],
+    });
+
+    assert.equal(snapshot.inProgressSkills, 0);
+    assert.equal(snapshot.skillsAtTarget, 1);
+    assert.equal(snapshot.masteredSkills, 1);
+  });
 });

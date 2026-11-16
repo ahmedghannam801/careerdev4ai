@@ -518,6 +518,21 @@ async function main() {
     // readiness, progress and the gaps between them, with the explanation
     // each number is shown with. Pure.
     join(TESTS_DIR, 'career-metrics.test.ts'),
+    // Progress reads mastery and roadmap completion from the shared metrics engine.
+    join(TESTS_DIR, 'progress-metrics.test.ts'),
+    // The role-specific assessment catalogue: an exact name, a declared alias
+    // and a controlled synonym match, while a shared generic word does not.
+    // Pure.
+    join(TESTS_DIR, 'role-assessment-matching.test.ts'),
+    // The Experience Hub writes each multi-row operation in one database
+    // function, and the server reaches it through one RPC. Pure (migration and
+    // source).
+    join(TESTS_DIR, 'experience-hub-atomicity.test.ts'),
+    // The database security corrections: the administrative credit view, the
+    // trigger functions and the six search paths. Pure (migration and source).
+    join(TESTS_DIR, 'supabase-security-hardening.test.ts'),
+    // Representative account states keep page-facing metrics aligned.
+    join(TESTS_DIR, 'career-metrics-cross-page.test.ts'),
     // The roadmap may never call a core skill covered while a gap for it is
     // open: the roadmap and the metrics engine have to read the same truth.
     // Pure.

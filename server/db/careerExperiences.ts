@@ -208,6 +208,18 @@ export async function listExperienceProgress(
   return ((data ?? []) as ProgressRow[]).map(toProgress);
 }
 
+/**
+ * Reads the single row a write function returns.
+ *
+ * PostgREST answers a function that returns one composite row with that row,
+ * and some client versions wrap it in a one-item array. Both shapes describe
+ * the same result, so the module reads either.
+ */
+function singleRow<T>(data: unknown): T | null {
+  const value = Array.isArray(data) ? data[0] : data;
+  return value && typeof value === 'object' ? (value as T) : null;
+}
+
 export interface UpsertProgressInput {
   status: ExperienceProgressStatus;
   saved?: boolean;
@@ -215,6 +227,10 @@ export interface UpsertProgressInput {
 
 /**
  * Creates or updates the candidate's progress for one experience.
+ *
+ * The row and the certificate it supports are written by one database
+ * function, so the operation is atomic: either the progress is stored and a
+ * completion it no longer supports is cleared, or nothing changes at all.
  *
  * Timestamps describe what happened, not what the caller claims: a start time
  * is written when the row first becomes in-progress, and a completion time
@@ -226,81 +242,37 @@ export async function upsertExperienceProgress(
   experienceId: string,
   input: UpsertProgressInput
 ): Promise<ExperienceProgress> {
-  const supabase = getSupabaseServer();
-  const { data: existingData, error: existingError } = await supabase
-    .from('user_experience_progress')
-    .select('*')
-    .eq('profile_id', profileId)
-    .eq('experience_id', experienceId)
-    .maybeSingle();
-  if (existingError) throw existingError;
-
-  const existing = existingData as ProgressRow | null;
-  const now = new Date().toISOString();
-
-  const startedAt =
-    input.status === 'not_started'
-      ? null
-      : existing?.started_at ?? now;
-  const completedAt =
-    input.status === 'completed' ? existing?.completed_at ?? now : null;
-
-  const { data, error } = await supabase
-    .from('user_experience_progress')
-    .upsert(
-      {
-        profile_id: profileId,
-        experience_id: experienceId,
-        status: input.status,
-        saved: input.saved ?? existing?.saved ?? true,
-        started_at: startedAt,
-        completed_at: completedAt,
-        updated_at: now,
-      },
-      { onConflict: 'profile_id,experience_id' }
-    )
-    .select('*')
-    .single();
+  const { data, error } = await getSupabaseServer().rpc('career_experience_progress_set', {
+    p_profile_id: profileId,
+    p_experience_id: experienceId,
+    p_status: input.status,
+    p_saved: input.saved ?? null,
+  });
   if (error) throw error;
 
-  // A certificate is evidence of a completion. When that completion is taken
-  // back, the certificate it supported goes with it rather than lingering as a
-  // claim the candidate no longer makes.
-  if (input.status !== 'completed') {
-    const { error: certificateError } = await supabase
-      .from('user_experience_certificates')
-      .delete()
-      .eq('profile_id', profileId)
-      .eq('experience_id', experienceId);
-    if (certificateError) throw certificateError;
-  }
-
-  return toProgress(data as ProgressRow);
+  const row = singleRow<ProgressRow>(data);
+  if (!row) throw new Error('The experience progress could not be saved.');
+  return toProgress(row);
 }
 
-/** Removes the candidate's own progress row. */
+/**
+ * Removes the candidate's own progress row.
+ *
+ * The certificate is evidence of this completion; removing the progress
+ * removes the claim with it. Both deletes run in one database function, so a
+ * failure cannot leave the certificate behind or remove it while the progress
+ * survives.
+ */
 export async function deleteExperienceProgress(
   profileId: string,
   experienceId: string
 ): Promise<boolean> {
-  const supabase = getSupabaseServer();
-  // The certificate is evidence of this completion; removing the progress
-  // removes the claim with it.
-  const { error: certificateError } = await supabase
-    .from('user_experience_certificates')
-    .delete()
-    .eq('profile_id', profileId)
-    .eq('experience_id', experienceId);
-  if (certificateError) throw certificateError;
-
-  const { data, error } = await supabase
-    .from('user_experience_progress')
-    .delete()
-    .eq('profile_id', profileId)
-    .eq('experience_id', experienceId)
-    .select('id');
+  const { data, error } = await getSupabaseServer().rpc('career_experience_progress_delete', {
+    p_profile_id: profileId,
+    p_experience_id: experienceId,
+  });
   if (error) throw error;
-  return (data?.length ?? 0) > 0;
+  return data === true;
 }
 
 /** The candidate's own certificate rows. */
@@ -326,6 +298,10 @@ export class CertificateRequiresCompletionError extends Error {
 /**
  * Submits or edits the candidate's certificate link.
  *
+ * The completion check, the reviewed-row guard and the write are one database
+ * function, so a concurrent status change cannot leave a certificate on an
+ * experience that is no longer completed.
+ *
  * The certificate is `self_reported` unless a trusted review changes it. A row
  * that has already been reviewed is returned unchanged: a candidate cannot
  * overwrite a verified credential with a new link.
@@ -340,48 +316,24 @@ export async function upsertExperienceCertificate(
     throw new Error(validation.error ?? 'Invalid certificate link.');
   }
 
-  const supabase = getSupabaseServer();
-  const { data: progressData, error: progressError } = await supabase
-    .from('user_experience_progress')
-    .select('status')
-    .eq('profile_id', profileId)
-    .eq('experience_id', experienceId)
-    .maybeSingle();
-  if (progressError) throw progressError;
-  if ((progressData as { status?: string } | null)?.status !== 'completed') {
-    throw new CertificateRequiresCompletionError();
+  const { data, error } = await getSupabaseServer().rpc(
+    'career_experience_certificate_set',
+    {
+      p_profile_id: profileId,
+      p_experience_id: experienceId,
+      p_certificate_url: validation.value,
+    }
+  );
+  if (error) {
+    if (error.message?.includes('certificate_requires_completion')) {
+      throw new CertificateRequiresCompletionError();
+    }
+    throw error;
   }
 
-  const { data: existingData, error: existingError } = await supabase
-    .from('user_experience_certificates')
-    .select('*')
-    .eq('profile_id', profileId)
-    .eq('experience_id', experienceId)
-    .maybeSingle();
-  if (existingError) throw existingError;
-
-  const existing = existingData as CertificateRow | null;
-  if (existing && existing.verification_status !== 'self_reported') {
-    return toCertificate(existing);
-  }
-
-  const { data, error } = await supabase
-    .from('user_experience_certificates')
-    .upsert(
-      {
-        profile_id: profileId,
-        experience_id: experienceId,
-        certificate_url: validation.value,
-        verification_status: 'self_reported',
-        verified_at: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'profile_id,experience_id' }
-    )
-    .select('*')
-    .single();
-  if (error) throw error;
-  return toCertificate(data as CertificateRow);
+  const row = singleRow<CertificateRow>(data);
+  if (!row) throw new Error('The certificate could not be saved.');
+  return toCertificate(row);
 }
 
 /** Removes the candidate's own certificate submission. */
