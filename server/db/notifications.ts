@@ -26,6 +26,7 @@ export const NOTIFICATION_TYPES = [
   'subscription_expired',
   'credits',
   'referral',
+  'opportunity',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

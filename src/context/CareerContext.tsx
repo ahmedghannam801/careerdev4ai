@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode, useMemo, useSyncExternalStore } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   CareerState,
@@ -258,10 +258,16 @@ import {
   fetchCurrentSubscription,
   type CurrentSubscriptionResponse,
 } from '../lib/subscriptionApi';
+import { claimDailyTokens as claimDailyTokensRequest } from '../lib/creditsApi';
 import {
-  fetchCreditBalance,
-  claimDailyTokens as claimDailyTokensRequest,
-} from '../lib/creditsApi';
+  getCreditsSnapshot,
+  patchCreditBalance,
+  refreshCredits as refreshCreditsFromStore,
+  resetCredits as resetCreditsStore,
+  setCreditIdentity,
+  subscribeCredits,
+} from '../lib/creditsStore';
+import { emitCreditActivity } from '../lib/creditActivity';
 import type { CreditBalanceDTO } from '../../shared/credits';
 import {
   captureReferralCodeFromUrl,
@@ -1176,7 +1182,8 @@ function toEvidenceItem(dto: EvidenceDTO): EvidenceItem {
     url: dto.url ?? undefined,
     skillNames: dto.skillNames,
     projectId: dto.projectId ?? undefined,
-    verified: dto.verified,
+    verified: dto.verificationStatus === 'verified',
+    verificationStatus: dto.verificationStatus,
     dateAdded: dto.dateAdded ?? new Date().toISOString().split('T')[0],
   };
 }
@@ -1248,6 +1255,8 @@ function toUserNotification(dto: NotificationDTO): UserNotification {
     priority: dto.priority ?? null,
     timestamp: dto.createdAt,
     linkAction: dto.linkView ?? undefined,
+    titleKey: dto.titleKey ?? null,
+    params: dto.params ?? {},
   };
 }
 
@@ -1433,7 +1442,23 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Subscriptions & Tokens
   const [subscription, setSubscription] = useState<CurrentSubscriptionResponse | null>(null);
-  const [creditBalance, setCreditBalance] = useState<CreditBalanceDTO | null>(null);
+  // The token balance is NOT a component state. It lives in one store
+  // (`src/lib/creditsStore.ts`) so the header, the dashboard, the studio, the
+  // learning hub and every AI surface read the same number, and so a spending
+  // operation in any of them moves all of them at once.
+  const creditsSnapshot = useSyncExternalStore(
+    subscribeCredits,
+    getCreditsSnapshot,
+    getCreditsSnapshot
+  );
+  const creditBalance = creditsSnapshot.balance;
+
+  // The token store follows the signed-in account. Signing out clears the
+  // balance and stops the background synchronisation; signing in starts it.
+  const creditIdentityId = currentUser?.id ?? null;
+  useEffect(() => {
+    setCreditIdentity(creditIdentityId);
+  }, [creditIdentityId]);
 
   const refreshSubscription = useCallback(async () => {
     try {
@@ -1444,13 +1469,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, []);
 
+  // Re-reads the authoritative balance. The store coalesces concurrent calls,
+  // so several surfaces asking at once produce one request.
   const refreshCredits = useCallback(async () => {
-    try {
-      const data = await fetchCreditBalance();
-      setCreditBalance(data);
-    } catch (err) {
-      console.warn('Could not refresh credit balance:', err);
-    }
+    await refreshCreditsFromStore('manual-refresh');
   }, []);
 
   // Claims the daily free-token reward.
@@ -1459,20 +1481,16 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // it out, so this is the single path that creates a claim. The server
   // treats the claim as idempotent per day, so a double press pays out once.
   //
-  // The answer carries the new balance and the new allowance state, and both
-  // are written into the context here. That is what lets the badge, the
-  // dashboard widget and the token hub agree without asking again.
+  // The answer carries the new balance and the new allowance state, so the
+  // store is updated straight away and every surface moves on the same tick —
+  // the badge in the header, the dashboard widget and the token hub included.
   const claimDailyTokens = useCallback(async (): Promise<number | null> => {
     try {
       const result = await claimDailyTokensRequest();
 
-      setCreditBalance((previous) => {
-        if (!previous) return previous;
-        return {
-          ...previous,
-          balance: result.balance,
-          ...(result.daily ? { daily: result.daily } : {}),
-        };
+      patchCreditBalance({
+        balance: result.balance,
+        ...(result.daily ? { daily: result.daily } : {}),
       });
 
       return result.granted;
@@ -3723,7 +3741,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setConsentState(null);
     setConsentError(null);
     setSubscription(null);
-    setCreditBalance(null);
+    resetCreditsStore();
     setIsHydrated(false);
     setPasswordRecovery(false);
   }
@@ -5040,9 +5058,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // the next visit. The request reads the balance again as a safety net
       // for a server that did not report one.
       if (typeof result.creditBalance === 'number') {
-        setCreditBalance((previous) =>
-          previous ? { ...previous, balance: result.creditBalance as number } : previous
-        );
+        patchCreditBalance({ balance: result.creditBalance });
       } else {
         void refreshCredits();
       }
@@ -5661,6 +5677,12 @@ Skills: ${activeCV.skillsList.join(', ')}
         signal: options?.signal,
       });
 
+      // The audit is a token-spending route and it does not go through the
+      // shared API client, so it announces itself here. The store re-reads the
+      // authoritative balance — including the refund the server issues when
+      // this request fails.
+      emitCreditActivity({ reason: 'ai-operation', path: '/api/optimize-cv' });
+
       if (!res.ok) {
         // Never attach an invented ATS result to the user's CV version, and
         // never leave the provider's reason (quota, outage) only in the
@@ -5749,6 +5771,9 @@ Skills: ${activeCV.skillsList.join(', ')}
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return;
       console.error('Failed to optimize CV:', e);
+      // A failed request may have held a reservation until the server refunded
+      // it. Reading the balance again is the only way to know.
+      emitCreditActivity({ reason: 'ai-operation', path: '/api/optimize-cv' });
       setCvAnalysisError({
         message:
           'We could not reach the ATS audit service. Check your connection and try again.',

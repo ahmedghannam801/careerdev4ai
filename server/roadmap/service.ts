@@ -27,6 +27,8 @@ import {
 } from '../../shared/roadmapGenerator.ts';
 import { resolveRoleDefinition } from '../../shared/careerRoles.ts';
 import { computeSkillGaps, summarizeSkillGaps, toRoleSkillRequirements } from '../../shared/skillGap.ts';
+import { cvReadinessFromVersions } from '../../shared/metricsDictionary.ts';
+import { listCvVersions } from '../db/cvVersions.ts';
 import { getProfileDto } from '../db/profile.ts';
 import { getUserSkills } from '../db/userSkills.ts';
 import { getEvidenceSkillLevels } from '../db/skillEvidence.ts';
@@ -101,27 +103,51 @@ export async function buildPersonalizedPlan(
     }))
     .filter((skill) => Boolean(skill.name));
 
-  // The catalogue is the source of truth for what a resource teaches. The
-  // course's own skill list is what links it to a gap.
-  const resourceCandidates: (RoadmapResourceRef & { skillNames?: string[] })[] = courses.map(
-    (course) => ({
-      id: course.id,
-      title: course.title,
-      provider: course.provider,
-      url: course.url,
-      durationHours: course.durationHours,
-      skillNames: course.skills.map((skill) => skill.name),
-    })
-  );
+  // The catalogue is the source of truth for what a resource teaches and who
+  // it is for. Both mappings are carried into the generator, because a
+  // resource that does not belong to the user's role must not reach their
+  // plan however well its skills line up.
+  const resourceCandidates: (RoadmapResourceRef & {
+    skillNames?: string[];
+    roleSlugs?: Array<{ slug: string; score: number }>;
+    category?: string | null;
+    level?: string | null;
+    format?: string | null;
+    isVerified?: boolean;
+    providerTier?: number | null;
+    rating?: number | null;
+  })[] = courses.map((course) => ({
+    id: course.id,
+    title: course.title,
+    provider: course.provider,
+    url: course.url,
+    durationHours: course.durationHours,
+    skillNames: course.skills.map((skill) => skill.name),
+    roleSlugs: course.roles.map((role) => ({
+      slug: role.roleSlug,
+      score: role.relevanceScore,
+    })),
+    category: course.category,
+    level: course.level,
+    format: course.format,
+    isVerified: course.isVerified,
+    providerTier: course.providerTier ?? null,
+    rating: course.rating ?? null,
+  }));
 
-  const projectCandidates: (RoadmapProjectRef & { skillNames?: string[] })[] = projects.map(
-    (project) => ({
-      title: project.title,
-      description: project.goal ?? project.description ?? 'Your own project.',
-      source: 'user' as const,
-      skillNames: [],
-    })
-  );
+  // A user's own work carries the skills it was tagged with. The role it was
+  // built for is recorded too, so work carried over from another career does
+  // not reappear in this one.
+  const projectCandidates: (RoadmapProjectRef & {
+    skillNames?: string[];
+    roleSlug?: string | null;
+  })[] = projects.map((project) => ({
+    title: project.title,
+    description: project.goal ?? project.description ?? 'Your own project.',
+    source: 'user' as const,
+    skillNames: project.skills,
+    roleSlug: project.role ?? null,
+  }));
 
   return generateRoadmapPlan({
     role,
@@ -170,6 +196,7 @@ export async function generateAndPersistRoadmap(
           provider: resource.provider,
           url: resource.url,
           durationHours: resource.durationHours,
+          reason: resource.reason,
         })),
         priority: task.priority,
         rationale: task.rationale,
@@ -300,6 +327,11 @@ export async function getSkillGapSummary(profileId: string): Promise<{
     .map((row) => ({
       name: row.skill?.name ?? '',
       level: Math.max(row.proficiency ?? 0, row.assessed_level ?? 0),
+      proof: (row.evidence_sources?.length ?? 0) > 0
+        ? 'evidence' as const
+        : row.assessed_level != null && row.assessed_level > 0
+          ? 'assessment' as const
+          : 'none' as const,
     }))
     .filter((skill) => Boolean(skill.name));
 
@@ -311,11 +343,22 @@ export async function getSkillGapSummary(profileId: string): Promise<{
 
   const requirements = toRoleSkillRequirements(role);
   const gaps = computeSkillGaps(requirements, ratedSkills, evidenceLevels);
+  const cvVersions = await listCvVersions(profileId).catch(() => []);
+  const cvReadinessPct = cvReadinessFromVersions(
+    cvVersions.map((version) => ({
+      targetRoleTitle: version.targetRoleTitle,
+      atsAnalysis:
+        version.atsAnalysis && typeof version.atsAnalysis === 'object'
+          ? version.atsAnalysis as { overallScore?: number | null }
+          : null,
+    })),
+    role.title
+  );
 
   return {
     roleId: role.id,
     roleTitle: role.title,
     gaps,
-    summary: summarizeSkillGaps(gaps, requirements),
+    summary: summarizeSkillGaps(gaps, requirements, { cvReadinessPct }),
   };
 }

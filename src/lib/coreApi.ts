@@ -82,6 +82,8 @@ export interface EvidenceDTO {
   description: string | null;
   url: string | null;
   verified: boolean;
+  verificationStatus: 'pending' | 'verified' | 'rejected';
+  verifiedAt: string | null;
   dateAdded: string | null;
   projectId: string | null;
   skillNames: string[];

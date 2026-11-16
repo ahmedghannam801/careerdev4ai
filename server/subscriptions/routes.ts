@@ -7,6 +7,7 @@
 import type { Express, Request, Response } from 'express';
 import multer from 'multer';
 import { requireAuth, type AuthedRequest } from '../auth/require-auth.ts';
+import { resolvePlanIdentityTier } from '../../shared/planIdentity.ts';
 import { requireAdmin, requirePermission, type AdminRequest } from '../admin/permissions.ts';
 import { logAdminAction } from '../db/admin.ts';
 import { getSupabaseServer } from '../db/supabase.ts';
@@ -74,7 +75,14 @@ export function registerSubscriptionRoutes(app: Express): void {
   app.get('/api/subscription/current', requireAuth, async (req: AuthedRequest, res: Response) => {
     try {
       const summary = await getUserSubscriptionSummary(req.authUser!.id);
-      return res.json({ success: true, ...summary });
+      // The tier is resolved here, on the server, from the plan the
+      // subscription actually resolves to. The browser draws the tier it is
+      // given: it never works out which plan the candidate is on.
+      return res.json({
+        success: true,
+        ...summary,
+        planTier: resolvePlanIdentityTier(summary.planCode),
+      });
     } catch (error) {
       console.error('Failed to fetch current user subscription:', error);
       return res.status(500).json({ error: 'Failed to retrieve current subscription status' });

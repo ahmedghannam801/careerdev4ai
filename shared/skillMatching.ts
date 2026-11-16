@@ -83,6 +83,7 @@ const NON_PLURAL_S_WORDS = new Set([
  * first so "business communication" wins over a bare "communication" rule.
  */
 const PHRASE_ALIASES: Array<[string, string]> = [
+  ['python for data analysis', 'python'],
   ['business communication', 'communication'],
   ['client communication', 'communication'],
   ['interpersonal communication', 'communication'],

@@ -64,6 +64,13 @@ export interface RoadmapResourceDTO {
   provider: string;
   url: string;
   durationHours: number | null;
+  /**
+   * Why this resource was recommended for this step.
+   *
+   * Optional because rows written before the relevance engine existed do not
+   * have one: the plan stays readable and the step simply shows no reason.
+   */
+  reason?: string;
 }
 
 export interface RoadmapMilestoneDTO {
@@ -237,6 +244,9 @@ function toResourceDTOs(value: unknown): RoadmapResourceDTO[] {
       url: typeof record.url === 'string' ? record.url : '',
       durationHours:
         typeof record.durationHours === 'number' ? record.durationHours : null,
+      ...(typeof record.reason === 'string' && record.reason
+        ? { reason: record.reason }
+        : {}),
     });
   }
   return out;

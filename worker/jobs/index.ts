@@ -38,6 +38,7 @@ import {
 import { getSupabaseServer } from '../../server/db/supabase.ts';
 import { writeConsumerHeartbeat } from '../../server/jobs/heartbeat.ts';
 import { runSubscriptionMaintenanceSweeps } from '../../server/jobs/maintenance.ts';
+import { runOpportunitySyncIfDue } from '../../server/jobs/tasks/syncOpportunities.ts';
 
 interface QueueBinding {
   send(body: unknown, options?: { delaySeconds?: number }): Promise<void>;
@@ -284,6 +285,35 @@ export default {
       sweep.dailyCreditsFailed = maintenance.dailyCreditsFailed;
     } catch (error) {
       console.error('The subscription maintenance sweep failed:', error);
+    }
+
+    // The heartbeat is written before the slow work rather than only after it.
+    //
+    // Reading the official sources means making outbound requests to somebody
+    // else's server, and that can take minutes. The API decides whether
+    // background work may be started by asking how long ago this worker said
+    // it was alive, so a heartbeat that is only written once the crawl is
+    // finished would let a slow crawl make a perfectly healthy worker look
+    // dead. The heartbeat is written again at the end of the sweep with the
+    // final numbers.
+    await writeHeartbeat(env, sweep);
+
+    try {
+      // The official opportunity sources are read on their own schedule.
+      //
+      // The tick above runs every few minutes, which is far more often than a
+      // ministry's announcement page changes, so the run decides for itself
+      // whether it is due. It is read from the registry rather than from a
+      // counter in memory, so the rule survives a restart.
+      const opportunities = await runOpportunitySyncIfDue();
+      sweep.opportunitiesSynced = opportunities ? 1 : 0;
+      if (opportunities) {
+        sweep.opportunitiesCreated = opportunities.created ?? 0;
+        sweep.opportunitiesUpdated = opportunities.updated ?? 0;
+      }
+    } catch (error) {
+      sweep.opportunitiesSynced = 0;
+      console.error('The opportunity synchronisation failed:', error);
     }
 
     await writeHeartbeat(env, sweep);

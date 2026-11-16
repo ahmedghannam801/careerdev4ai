@@ -35,6 +35,7 @@ import { app } from '../app.ts';
 import { indexNowKey, indexNowKeyPath } from '../server/seo/indexnow.ts';
 import { VERIFICATION_PATH } from '../server/seo/verification.ts';
 import { CloudflareQueueProducer, setJobQueueProducer } from '../server/jobs/queue.ts';
+import { withRuntimeEnv } from '../server/runtimeEnv.ts';
 
 /** Routing key for the Node HTTP server registered below (not a TCP port). */
 const NODE_PORT = 3000;
@@ -62,6 +63,8 @@ interface Env {
    * deployment. This binding is what the API hands a job to.
    */
   JOB_QUEUE?: QueueBinding;
+  RESEND_API_KEY?: string;
+  RESEND_TEST_RECIPIENT?: string;
   [key: string]: unknown;
 }
 
@@ -129,7 +132,12 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (env && typeof env === 'object') {
       for (const [key, value] of Object.entries(env)) {
-        if (typeof value === 'string' && process.env[key] !== value) {
+        if (
+          key !== 'RESEND_API_KEY' &&
+          key !== 'RESEND_TEST_RECIPIENT' &&
+          typeof value === 'string' &&
+          process.env[key] !== value
+        ) {
           process.env[key] = value;
         }
       }
@@ -158,7 +166,7 @@ export default {
     }
 
     if (isApiPath(url.pathname) || isSeoPath(url.pathname)) {
-      return handleAsNodeRequest(NODE_PORT, request);
+      return withRuntimeEnv(env, () => handleAsNodeRequest(NODE_PORT, request));
     }
 
     const response = await env.ASSETS.fetch(request);

@@ -39,6 +39,8 @@ import {
   LayoutTemplate,
   Coins,
   Rocket,
+  ShieldCheck,
+  Mail,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useAdminAccess } from '../../lib/useAdminAccess';
@@ -50,6 +52,8 @@ import { AdminPaymentsPanel } from '../admin/AdminPaymentsPanel';
 import { AdminRevenuePanel } from '../admin/AdminRevenuePanel';
 import { CvTemplatesPanel } from '../admin/CvTemplatesPanel';
 import { CreditMonitorPanel } from '../admin/CreditMonitorPanel';
+import { EvidenceReviewPanel } from '../admin/EvidenceReviewPanel';
+import { EmailDeliveryPanel } from '../admin/EmailDeliveryPanel';
 import {
   createAdmin,
   deleteAdmin,
@@ -87,6 +91,8 @@ type AdminTab =
   | 'opportunities'
   | 'learning'
   | 'experiences'
+  | 'evidence'
+  | 'email'
   | 'audit'
   | 'subscriptions'
   | 'payments'
@@ -1256,6 +1262,12 @@ export const AdminCenterView: React.FC = () => {
         icon: Rocket,
       });
     }
+    if (permissions.has('moderation.read')) {
+      entries.push({ id: 'evidence', label: t('Evidence review'), icon: ShieldCheck });
+    }
+    if (permissions.has('admin.manage')) {
+      entries.push({ id: 'email', label: t('Email delivery'), icon: Mail });
+    }
     if (permissions.has('audit.read')) {
       entries.push({ id: 'audit', label: t('Audit log'), icon: Shield });
     }
@@ -1416,6 +1428,8 @@ export const AdminCenterView: React.FC = () => {
       {tab === 'experiences' && (
         <ExperiencesPanel canWrite={permissions.has('learning.write')} />
       )}
+      {tab === 'evidence' && <EvidenceReviewPanel />}
+      {tab === 'email' && <EmailDeliveryPanel />}
       {tab === 'audit' && <AuditPanel />}
       {tab === 'subscriptions' && <AdminSubscriptionsPanel />}
       {tab === 'payments' && <AdminPaymentsPanel />}

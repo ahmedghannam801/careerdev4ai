@@ -63,6 +63,7 @@ import {
 } from '../../../../shared/cvTemplates';
 import { CvTemplatePreview } from './CvTemplatePreview';
 import { DailyTokenClaim } from '../../subscription/DailyTokenClaim';
+import { patchCreditBalance } from '../../../lib/creditsStore';
 
 interface CvTemplateLibraryProps {
   /** Opens the editor, so the candidate can see the new layout on their CV. */
@@ -789,6 +790,12 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
                 : previous
             );
             updateSettings({ cvTemplateId: templateId });
+            // The unlock answer already carries the balance the ledger holds,
+            // so the header moves on the same tick; the read afterwards is the
+            // safety net that keeps the monthly figures in step too.
+            if (remainingBalance !== null) {
+              patchCreditBalance({ balance: remainingBalance });
+            }
             await refreshCredits();
             setNotice(
               creditsCharged > 0

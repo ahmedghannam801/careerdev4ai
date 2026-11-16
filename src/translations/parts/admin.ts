@@ -243,4 +243,28 @@ export const adminAr: Record<string, string> = {
   'Amount': 'المبلغ',
   'Balance': 'الرصيد',
   'No ledger entries match the filters.': 'لا توجد قيود في السجل مطابقة للفلاتر.',
+
+  // Evidence review
+  'Evidence review': 'مراجعة الإثباتات',
+  'An artifact counts as proven only once an administrator has checked it. The oldest artifact is shown first.':
+    'لا يُعد الإثبات موثقًا إلا بعد مراجعته من أحد المشرفين. يُعرض الأقدم انتظارًا أولاً.',
+  'The review queue could not be loaded.': 'تعذّر تحميل قائمة المراجعة.',
+  'Loading the review queue…': 'جارٍ تحميل قائمة المراجعة…',
+  'Nothing is waiting for a review.': 'لا توجد عناصر بانتظار المراجعة.',
+  'Unknown candidate': 'مرشح غير معروف',
+  'A note for the candidate (optional)': 'ملاحظة للمرشح (اختياري)',
+  'The evidence was marked as verified.': 'تم توثيق الإثبات.',
+  'The evidence was rejected.': 'تم رفض الإثبات.',
+  'The decision could not be recorded.': 'تعذّر تسجيل القرار.',
+  'Verify': 'توثيق',
+  'Reject': 'رفض',
+
+  // Email delivery
+  'Email delivery': 'إرسال البريد الإلكتروني',
+  'Sends one test message to the recipient the owner configured for this deployment. Use it after changing the provider settings.':
+    'يرسل رسالة اختبار واحدة إلى المستلم الذي ضبطه المالك لهذه النسخة. استخدمه بعد تغيير إعدادات مزوّد الخدمة.',
+  'Send a test message': 'إرسال رسالة اختبار',
+  'The test message was sent.': 'تم إرسال رسالة الاختبار.',
+  'The test message was accepted by the provider.': 'قبل مزوّد الخدمة رسالة الاختبار.',
+  'The test message could not be sent.': 'تعذّر إرسال رسالة الاختبار.',
 };

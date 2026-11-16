@@ -39,6 +39,7 @@ export const BACKGROUND_JOB_KINDS = [
   'update-roadmap-progress',
   'process-ai-mentor-workflow',
   'validate-learning-resources',
+  'sync-opportunities',
 ] as const;
 
 export type BackgroundJobKind = (typeof BACKGROUND_JOB_KINDS)[number];
@@ -58,6 +59,7 @@ export const BACKGROUND_JOB_TASKS: Record<BackgroundJobKind, string> = {
   'update-roadmap-progress': 'update-roadmap-progress',
   'process-ai-mentor-workflow': 'process-ai-mentor-workflow',
   'validate-learning-resources': 'validate-learning-resources',
+  'sync-opportunities': 'sync-opportunities',
 };
 
 export interface BackgroundJob {

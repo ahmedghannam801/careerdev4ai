@@ -49,6 +49,26 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   const document = buildCvTemplateDocument(input.cv, input.language);
   const sections = orderCvSections(document.sections, input.template.structure.sectionOrder);
   const rtl = document.rtl;
+  const structure = input.template.structure;
+  const accent = input.template.accent.replace('#', '').toUpperCase();
+  const bodyFont =
+    input.template.typography === 'serif'
+      ? 'Georgia'
+      : input.template.typography === 'mono'
+        ? 'Courier New'
+        : rtl
+          ? 'Arial'
+          : 'Calibri';
+  const baseSpacing =
+    structure.density === 'compact' ? 80 : structure.density === 'spacious' ? 180 : 120;
+  const headerAlignment =
+    structure.header === 'centered' || structure.header === 'banner'
+      ? AlignmentType.CENTER
+      : structure.header === 'split' && !rtl
+        ? AlignmentType.RIGHT
+        : rtl
+          ? AlignmentType.RIGHT
+          : AlignmentType.LEFT;
   const alignment = rtl ? AlignmentType.RIGHT : AlignmentType.LEFT;
   const headingAlignment = rtl ? AlignmentType.RIGHT : AlignmentType.LEFT;
 
@@ -72,14 +92,15 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   headerBlocks.push(
     new Paragraph({
       heading: HeadingLevel.TITLE,
-      alignment,
+      alignment: headerAlignment,
       bidirectional: rtl,
       spacing: { after: 40 },
       children: [
         new TextRun({
           text: document.fullName || 'Curriculum Vitae',
           bold: true,
-          size: 40,
+          size: structure.header === 'compact' ? 34 : 40,
+          font: bodyFont,
           rightToLeft: rtl,
         }),
       ],
@@ -89,14 +110,14 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   if (document.title) {
     headerBlocks.push(
       new Paragraph({
-        alignment,
+        alignment: headerAlignment,
         bidirectional: rtl,
         spacing: { after: 80 },
         children: [
           new TextRun({
             text: document.title,
             size: 24,
-            color: input.template.accent.replace('#', ''),
+            color: accent,
             rightToLeft: rtl,
           }),
         ],
@@ -107,7 +128,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   if (document.contact.length > 0) {
     headerBlocks.push(
       new Paragraph({
-        alignment,
+        alignment: headerAlignment,
         bidirectional: rtl,
         spacing: { after: 160 },
         border: {
@@ -140,21 +161,27 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       heading: HeadingLevel.HEADING_2,
       alignment: headingAlignment,
       bidirectional: rtl,
-      spacing: { before: 220, after: 80 },
-      border: {
-        bottom: {
-          color: input.template.accent.replace('#', ''),
-          size: 8,
-          style: BorderStyle.SINGLE,
-          space: 4,
-        },
-      },
+      spacing: { before: baseSpacing + 100, after: baseSpacing },
+      ...(structure.dividers !== 'none'
+        ? {
+            border: {
+              bottom: {
+                color: accent,
+                size: structure.dividers === 'double' ? 12 : 8,
+                style: structure.dividers === 'double' ? BorderStyle.DOUBLE : BorderStyle.SINGLE,
+                space: 4,
+              },
+            },
+          }
+        : {}),
       children: [
         new TextRun({
           text: `${prefix}${section.heading}`,
           bold: true,
-          size: 21,
-          allCaps: input.template.structure.headingStyle === 'uppercase',
+          size: structure.headingStyle === 'smallcaps' ? 19 : 21,
+          allCaps: structure.headingStyle === 'uppercase',
+          smallCaps: structure.headingStyle === 'smallcaps',
+          font: structure.headingStyle === 'serif' ? 'Georgia' : bodyFont,
           rightToLeft: rtl,
         }),
       ],
@@ -179,7 +206,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         new Paragraph({
           alignment,
           bidirectional: rtl,
-          spacing: { after: 100 },
+          spacing: { after: baseSpacing },
           children: [new TextRun({ text: section.text ?? '', size: 21, rightToLeft: rtl })],
         })
       );
@@ -191,7 +218,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         new Paragraph({
           alignment,
           bidirectional: rtl,
-          spacing: { after: 100 },
+          spacing: { after: baseSpacing },
           children: [
             new TextRun({ text: (section.inline ?? []).join('  ·  '), size: 21, rightToLeft: rtl }),
           ],
@@ -293,7 +320,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
                   new TextRun({
                     text: entry.url,
                     size: 18,
-                    color: input.template.accent.replace('#', ''),
+                    color: accent,
                     underline: {},
                     rightToLeft: rtl,
                   }),
@@ -384,8 +411,8 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     styles: {
       default: {
         document: {
-          run: { font: rtl ? 'Arial' : 'Calibri', size: 21 },
-          paragraph: { spacing: { line: 276 } },
+          run: { font: bodyFont, size: structure.density === 'compact' ? 19 : 21 },
+          paragraph: { spacing: { line: structure.density === 'spacious' ? 300 : 276 } },
         },
       },
     },
@@ -393,7 +420,12 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       {
         properties: {
           page: {
-            margin: { top: 720, right: 720, bottom: 720, left: 720 },
+            margin: {
+              top: structure.density === 'spacious' ? 900 : 720,
+              right: structure.density === 'compact' ? 600 : 720,
+              bottom: structure.density === 'spacious' ? 900 : 720,
+              left: structure.density === 'compact' ? 600 : 720,
+            },
           },
         },
         children,

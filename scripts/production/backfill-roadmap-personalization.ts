@@ -148,12 +148,20 @@ async function main(): Promise<void> {
   }
 
   // ---- one read for the course catalogue --------------------------------
+  // The role mappings matter as much as the skills: a course that belongs to
+  // another career must not be attached to this user's plan, so they are read
+  // in the same pass rather than joined afterwards.
   const courses = await query<any[]>(
-    `SELECT c.id, c.title, c.provider, c.url, c.duration_hours,
-            COALESCE(array_agg(cs.skill_name) FILTER (WHERE cs.skill_name IS NOT NULL), '{}') AS skill_names
+    `SELECT c.id, c.title, c.provider, c.url, c.duration_hours, c.category, c.level, c.format,
+            c.is_verified, c.provider_tier, c.rating,
+            COALESCE(array_agg(DISTINCT cs.skill_name) FILTER (WHERE cs.skill_name IS NOT NULL), '{}') AS skill_names,
+            COALESCE(json_agg(DISTINCT json_build_object('slug', cr.role_slug, 'score', cr.relevance_score))
+                     FILTER (WHERE cr.role_slug IS NOT NULL), '[]') AS role_slugs
        FROM public.courses c
        LEFT JOIN public.course_skills cs ON cs.course_id = c.id
-      GROUP BY c.id, c.title, c.provider, c.url, c.duration_hours`
+       LEFT JOIN public.course_roles cr ON cr.course_id = c.id
+      GROUP BY c.id, c.title, c.provider, c.url, c.duration_hours, c.category, c.level, c.format,
+               c.is_verified, c.provider_tier, c.rating`
   );
   const resourceCandidates = courses.map((course) => ({
     id: course.id,
@@ -162,16 +170,29 @@ async function main(): Promise<void> {
     url: course.url,
     durationHours: course.duration_hours,
     skillNames: course.skill_names as string[],
+    roleSlugs: course.role_slugs as Array<{ slug: string; score: number }>,
+    category: course.category as string,
+    level: course.level as string,
+    format: course.format as string,
+    isVerified: Boolean(course.is_verified),
+    providerTier: (course.provider_tier ?? null) as number | null,
+    rating: (course.rating ?? null) as number | null,
   }));
 
+  // Projects carry their skill links too, so a project can be matched to a
+  // gap on evidence rather than on a word in its title.
   const roleProjects = await query<any[]>(
-    `SELECT DISTINCT title FROM public.projects ORDER BY title`
+    `SELECT DISTINCT p.title,
+            COALESCE(array_agg(DISTINCT ps.skill_name) FILTER (WHERE ps.skill_name IS NOT NULL), '{}') AS skill_names
+       FROM public.projects p
+       LEFT JOIN public.project_skills ps ON ps.project_id = p.id
+      GROUP BY p.title`
   );
   const projectCandidates = roleProjects.map((project) => ({
     title: project.title,
     description: `A portfolio-scale piece of work that proves you can do this role. ${project.title}.`,
     source: 'role' as const,
-    skillNames: [] as string[],
+    skillNames: project.skill_names as string[],
   }));
 
   // ---- group the tree by roadmap ----------------------------------------
@@ -309,17 +330,22 @@ async function main(): Promise<void> {
               : [];
 
           const resources = gap
-            ? matchResources(gap, resourceCandidates).slice(0, 2).map((resource) => ({
-                id: resource.id,
-                title: resource.title,
-                provider: resource.provider,
-                url: resource.url,
-                durationHours: resource.durationHours,
-              }))
+            ? matchResources(gap, resourceCandidates, { role, stage })
+                .slice(0, 2)
+                .map((resource) => ({
+                  id: resource.id,
+                  title: resource.title,
+                  provider: resource.provider,
+                  url: resource.url,
+                  durationHours: resource.durationHours,
+                  reason: resource.reason,
+                }))
             : [];
 
           const projectTitles = gap
-            ? matchProjects(gap, projectCandidates).slice(0, 2).map((project) => project.title)
+            ? matchProjects(gap, projectCandidates, { role, stage })
+                .slice(0, 2)
+                .map((project) => project.title)
             : [];
 
           // The same chain the generator builds: inside a milestone each step

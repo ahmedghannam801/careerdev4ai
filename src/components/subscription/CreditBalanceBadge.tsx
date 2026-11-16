@@ -24,11 +24,13 @@
  * and in the dark theme.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { Sparkles, Plus, ChevronDown } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { DailyTokenClaim } from './DailyTokenClaim';
+import { PlanIdentityBadge } from './PlanIdentityBadge';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
+import { getCreditsSnapshot, subscribeCredits } from '../../lib/creditsStore';
 
 interface CreditBalanceBadgeProps {
   onOpenPricing?: () => void;
@@ -37,6 +39,14 @@ interface CreditBalanceBadgeProps {
 export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPricing }) => {
   const { creditBalance, subscription, t } = useCareer();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // The badge is the surface a candidate looks at right after spending, so it
+  // says when the authoritative number is being read again. It never shows a
+  // guessed number in the meantime.
+  const refreshing = useSyncExternalStore(
+    subscribeCredits,
+    () => getCreditsSnapshot().refreshing,
+    () => false
+  );
 
   const balance = creditBalance?.balance ?? 0;
   const isLow = balance <= 2;
@@ -50,12 +60,13 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
       <button
         type="button"
         onClick={() => setDropdownOpen((prev) => !prev)}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border transition-all sm:px-3 ${isLow
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border transition-all sm:px-3 ${refreshing ? 'opacity-80' : ''} ${isLow
             ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20'
             : 'bg-[var(--accent-surface)] border-[var(--accent-primary)]/25 text-[var(--color-primary-text)] hover:bg-[var(--accent-primary)]/10'
           }`}
         title={t('Tokens')}
         aria-expanded={dropdownOpen}
+        aria-busy={refreshing}
       >
         <span className="relative">
           <Sparkles className="w-3.5 h-3.5 shrink-0" />
@@ -107,11 +118,12 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
                   {creditBalance?.consumedThisMonth ?? 0}
                 </span>
               </div>
-              <div className="flex justify-between gap-2">
+              <div className="flex justify-between gap-2 items-center">
                 <span>{t('Plan')}:</span>
-                <span className="font-semibold text-[var(--color-primary-text)] capitalize">
-                  {subscription?.planCode ?? 'free'}
-                </span>
+                {/* The tier's own identity, drawn from the plan the server
+                    resolved. The plan code itself stays out of the way: a
+                    candidate reads "Ultra", not "career_plus". */}
+                <PlanIdentityBadge planCode={subscription?.planCode ?? 'free'} />
               </div>
             </div>
 

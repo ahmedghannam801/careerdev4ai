@@ -8,7 +8,9 @@
 import { apiRequest } from './apiClient';
 import type {
   OpportunityAudience,
+  OpportunityCostType,
   OpportunityKind,
+  OpportunityStatus,
   ParticipationMode,
 } from '../../shared/opportunities';
 
@@ -52,6 +54,8 @@ export interface RoadmapResource {
   provider: string;
   url: string;
   durationHours: number | null;
+  /** Why this resource was recommended for this step. */
+  reason?: string;
 }
 
 export interface RoadmapTask {
@@ -160,6 +164,20 @@ export interface VolunteerOpportunity {
   languages: string[];
   opportunityType: string;
   deadline: string | null;
+  /** The deadline exactly as the source worded it. */
+  deadlineText: string | null;
+  /** Whether the source named a day or only a month. */
+  deadlinePrecision: 'day' | 'month' | null;
+  /** Where the opportunity stands in its life. */
+  status: OpportunityStatus;
+  /** What it costs, when the source says. */
+  costType: OpportunityCostType;
+  /** The cost as the source worded it. */
+  costNote: string | null;
+  /** The cohort or intake, when the source names one. */
+  cohort: string | null;
+  /** When the source published it. */
+  publishedAt: string | null;
   kind: OpportunityKind;
   participationMode: ParticipationMode;
   audiences: OpportunityAudience[];

@@ -51,6 +51,7 @@ import { tourAr } from './parts/tour.ts';
 import { referralsAr } from './parts/referrals.ts';
 import { cvStudioDataAr } from './parts/cvStudioData.ts';
 import { subscriptionsAr } from './parts/subscriptions.ts';
+import { notificationsAr } from './parts/notifications.ts';
 
 /** The Arabic catalogue, keyed by the English source string. */
 export const AR_STRINGS: Record<string, string> = {
@@ -89,6 +90,7 @@ export const AR_STRINGS: Record<string, string> = {
   ...tourAr,
   ...cvStudioDataAr,
   ...subscriptionsAr,
+  ...notificationsAr,
 };
 
 /**

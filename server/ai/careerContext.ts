@@ -20,6 +20,7 @@ import { listEducations } from '../db/educations.ts';
 import { listProjects } from '../db/projects.ts';
 import { listVolunteerExperiences } from '../db/volunteer.ts';
 import { listCertifications } from '../db/profileExtensions.ts';
+import { listEvidence } from '../db/evidence.ts';
 import { listJobApplications } from '../db/jobApplications.ts';
 import { listLearningItems, listCourses } from '../db/learning.ts';
 import { listRoadmaps } from '../db/roadmap.ts';
@@ -77,12 +78,16 @@ export interface AiCareerContext {
   learningSummary: string[];
   applicationsCount: number;
   evidenceCount: number;
+  evidenceSummary: string[];
 }
 
 /** One of the user's own rated skills. */
 export interface AiCurrentSkill {
   name: string;
   level: number;
+  selfReportedLevel: number | null;
+  assessedLevel: number | null;
+  evidenceSources: string[];
 }
 
 /**
@@ -108,6 +113,7 @@ export async function loadAiCareerContext(
     learningItems,
     roadmaps,
     preferences,
+    evidence,
   ] = await Promise.all([
     getProfileDto(userId).catch(() => null),
     getUserSkills(userId).catch(() => []),
@@ -120,20 +126,26 @@ export async function loadAiCareerContext(
     listLearningItems(userId).catch(() => []),
     listRoadmaps(userId).catch(() => []),
     getPreferences(userId).catch(() => null),
+    listEvidence(userId).catch(() => []),
   ]);
 
   const targetRoleTitle = profile?.targetRole ?? null;
   const targetRole = resolveRole(targetRoleTitle) ?? null;
 
   // The user's own skill levels, keyed by normalised name.
-  const userLevels = new Map<string, { name: string; level: number }>();
+  const userLevels = new Map<string, AiCurrentSkill>();
   for (const row of skills) {
     const name = row.skill?.name ?? '';
     if (!name) continue;
-    const level = row.proficiency ?? 1;
+    const selfReportedLevel = row.proficiency ?? null;
+    const assessedLevel = row.assessed_level ?? null;
+    const evidenceSources = Array.isArray(row.evidence_sources) ? row.evidence_sources : [];
+    const level = Math.max(selfReportedLevel ?? 0, assessedLevel ?? 0);
     const key = normalizeSkillName(name);
     const existing = userLevels.get(key);
-    if (!existing || level > existing.level) userLevels.set(key, { name, level });
+    if (!existing || level > existing.level) {
+      userLevels.set(key, { name, level, selfReportedLevel, assessedLevel, evidenceSources });
+    }
   }
 
   // Gaps are computed against the target role's requirements, so the model is
@@ -143,7 +155,7 @@ export async function loadAiCareerContext(
   for (const required of targetRole?.requiredSkills ?? []) {
     const key = normalizeSkillName(required.name);
     const match = userLevels.get(key);
-    const current = match?.level ?? 1;
+    const current = match?.level ?? 0;
     if (current >= required.minLevel) {
       strengths.push(required.name);
     } else {
@@ -235,7 +247,6 @@ export async function loadAiCareerContext(
   // require. Previously only role-required skills were sent, so a skill the
   // user had that the role did not ask for was invisible to the model.
   const currentSkills: AiCurrentSkill[] = Array.from(userLevels.values())
-    .map((entry) => ({ name: entry.name, level: entry.level }))
     .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name))
     .slice(0, 20);
 
@@ -263,7 +274,12 @@ export async function loadAiCareerContext(
     roadmapSummary: roadmapSummary.slice(0, 14),
     learningSummary,
     applicationsCount: (applications ?? []).length,
-    evidenceCount: 0,
+    evidenceCount: evidence.length,
+    evidenceSummary: [
+      `${evidence.filter((item) => item.verificationStatus === 'verified').length} verified`,
+      `${evidence.filter((item) => item.verificationStatus === 'pending').length} pending review`,
+      `${evidence.filter((item) => item.verificationStatus === 'rejected').length} rejected`,
+    ],
   };
 }
 
@@ -355,7 +371,7 @@ export function buildAiContextBlock(context: AiCareerContext): string {
   }
   if (context.currentSkills.length) {
     lines.push(
-      `- Skills the user has rated, in full: ${context.currentSkills.map((s) => `${s.name} (${s.level}/5)`).join('; ')}`,
+      `- Skills and signal sources: ${context.currentSkills.map((s) => `${s.name} (${s.level}/5; self-reported=${s.selfReportedLevel ?? 'not rated'}, assessed=${s.assessedLevel ?? 'not assessed'}, evidence=${s.evidenceSources.join(', ') || 'none'})`).join('; ')}`,
     );
   }
   if (context.strengths.length) {
@@ -383,6 +399,7 @@ export function buildAiContextBlock(context: AiCareerContext): string {
     lines.push(`- Learning in progress: ${context.learningSummary.join('; ')}`);
   }
   lines.push(`- Job applications tracked: ${context.applicationsCount}`);
+  lines.push(`- Evidence records (${context.evidenceCount} total): ${context.evidenceSummary.join('; ')}`);
 
   // The user's explicit response language. Without this the model answers an
   // Arabic interface in English whenever the question is typed in English, and

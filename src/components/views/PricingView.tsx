@@ -19,6 +19,7 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { CheckoutModal } from '../subscription/CheckoutModal';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
+import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 import {
   CardNetworkMarks,
   InstaPayMark,
@@ -421,7 +422,11 @@ export const PricingView: React.FC = () => {
                   {t('Used this cycle')}: {creditBalance?.consumedThisMonth ?? 0}
                 </span>
                 <span>
-                  {t('Plan')}: {subscription?.planCode ?? 'free'}
+                  {t('Plan')}:{' '}
+                  <PlanIdentityBadge
+                    planCode={subscription?.planCode ?? 'free'}
+                    className="align-middle"
+                  />
                 </span>
               </div>
             </div>

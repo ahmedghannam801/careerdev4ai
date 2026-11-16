@@ -22,12 +22,20 @@
  */
 
 import type { RoleDefinition, SkillCategory } from './careerTypes.ts';
+import type { CoverageRole } from './learningCoverage.ts';
 import { skillMatchConfidence } from './skillMatching.ts';
+import {
+  evaluateProject,
+  evaluateProjectForRole,
+  evaluateResource,
+  explainRelevance,
+  isEligibleForRole,
+  type RoadmapRelevanceContext,
+} from './roadmapRelevance.ts';
 import {
   computeSkillGaps,
   describeGap,
   difficultyForLevel,
-  normalizeSkillName,
   openSkillGaps,
   summarizeSkillGaps,
   type RatedSkill,
@@ -52,11 +60,34 @@ export interface RoadmapResourceRef {
   provider: string;
   url: string;
   durationHours: number | null;
+  /** Why this resource was recommended for the step it is attached to. */
+  reason?: string;
 }
 
-/** A learning resource plus the skills it teaches, used for matching. */
+/**
+ * A learning resource plus the evidence the catalogue records about it.
+ *
+ * The extra fields are what makes a relevance decision possible without
+ * guessing from the title: the skills it teaches, the roles it is mapped to,
+ * its own difficulty and whether the source was verified.
+ */
 export interface RoadmapResourceCandidate extends RoadmapResourceRef {
+  /** The skills the catalogue says this resource teaches. */
   skillNames?: string[];
+  /** The roles the catalogue maps this resource to. */
+  roleSlugs?: Array<{ slug: string; score: number }>;
+  /** The catalogue category, used for the domain check. */
+  category?: string | null;
+  /** The resource's own difficulty. */
+  level?: string | null;
+  /** The resource's format, e.g. 'video' or 'article'. */
+  format?: string | null;
+  /** True when the source link was verified. */
+  isVerified?: boolean;
+  /** Curated provider priority: 1 (priority), 2 (reputable), 3 (other). */
+  providerTier?: number | null;
+  /** Provider-published rating, when one exists. Never invented. */
+  rating?: number | null;
 }
 
 /** A project the plan can point a task at. */
@@ -67,9 +98,12 @@ export interface RoadmapProjectRef {
   source: 'role' | 'user';
 }
 
-/** A project plus the skills it demonstrates, used for matching. */
+/** A project plus the evidence the catalogue records about it. */
 export interface RoadmapProjectCandidate extends RoadmapProjectRef {
+  /** The skills the catalogue says this project demonstrates. */
   skillNames?: string[];
+  /** The role this project was built for, when it is recorded. */
+  roleSlug?: string | null;
 }
 
 export interface RoadmapTaskPlan {
@@ -250,12 +284,23 @@ export function generateRoadmapPlan(input: RoadmapGenerationInput): RoadmapPlan 
 
   // Preferred skills are stretch goals and belong to the final phase.
   const stretchGaps = openPreferredGaps.filter((gap) => gap.gap >= 2);
+  const stageTitles = staged.map((stageGaps, index) => {
+    if (stageGaps.length > 0) return PHASE_TITLES[index];
+    return ['Practical Application', 'Capstone Portfolio Projects', 'Evidence Verification & Interview Prep'][index];
+  });
+  const finalPhaseTitle = openGaps.length === 0
+    ? 'Evidence Verification & Interview Prep'
+    : PHASE_TITLES[3];
 
+  // The role's own portfolio briefs come from the role definition, so they are
+  // for this role by construction. They are tagged as such so the matcher can
+  // tell them apart from work that merely shares a word with a skill.
   const roleProjects = (role.projects ?? []).map((title) => ({
     title,
     description: `A portfolio-scale piece of work that proves you can do this role. ${title}.`,
     source: 'role' as const,
     skillNames: [],
+    roleSlug: role.id,
   }));
 
   const userProjects = projects.map((project) => ({
@@ -263,6 +308,7 @@ export function generateRoadmapPlan(input: RoadmapGenerationInput): RoadmapPlan 
     description: project.description,
     source: 'user' as const,
     skillNames: project.skillNames ?? [],
+    roleSlug: project.roleSlug ?? null,
   }));
 
   const allProjects = [...userProjects, ...roleProjects];
@@ -283,12 +329,12 @@ export function generateRoadmapPlan(input: RoadmapGenerationInput): RoadmapPlan 
     // A phase with no gaps would look broken. Fall back to the role's own
     // named path so the phase still teaches something role-specific.
     if (milestones.length === 0) {
-      const fallback = buildFallbackMilestone(stage, role, resources, allProjects);
+      const fallback = buildFallbackMilestone(stage, role, resources, allProjects, stageTitles[stage]);
       if (fallback) milestones.push(fallback);
     }
 
     phases.push({
-      title: `${role.title} ${PHASE_TITLES[stage]}`,
+      title: `${role.title} ${stageTitles[stage]}`,
       description: PHASE_DESCRIPTIONS[stage],
       goal: roleGoal(stage, role),
       milestones,
@@ -297,7 +343,7 @@ export function generateRoadmapPlan(input: RoadmapGenerationInput): RoadmapPlan 
     });
   }
 
-  phases.push(buildMarketReadinessPhase(role, stretchGaps, resources, allProjects));
+  phases.push(buildMarketReadinessPhase(role, stretchGaps, resources, allProjects, finalPhaseTitle));
 
   linkPrerequisites(phases);
 
@@ -430,8 +476,8 @@ function buildGapTask(
   ];
   if (expectation) descriptionParts.push(expectation);
 
-  const matchedResources = matchResources(gap, resources).slice(0, 2);
-  const matchedProjects = matchProjects(gap, projects).slice(0, 2);
+  const matchedResources = matchResources(gap, resources, { role, stage }).slice(0, 2);
+  const matchedProjects = matchProjects(gap, projects, { role, stage }).slice(0, 2);
   if (matchedProjects.length > 0) {
     descriptionParts.push(
       `Prove it with: ${matchedProjects.map((project) => project.title).join('; ')}.`,
@@ -467,6 +513,7 @@ function buildFallbackMilestone(
   role: RoleDefinition,
   resources: RoadmapResourceCandidate[],
   projects: RoadmapProjectCandidate[],
+  phaseTitle: string,
 ): RoadmapMilestonePlan | null {
   const path =
     stage === 0
@@ -488,7 +535,7 @@ function buildFallbackMilestone(
     .join(' ');
 
   return {
-    title: `${role.title} ${PHASE_TITLES[stage]}`,
+    title: `${role.title} ${phaseTitle}`,
     description:
       'You already meet the role requirements recorded for this stage, so this step is about applying them in a real setting.',
     tasks: [
@@ -505,8 +552,14 @@ function buildFallbackMilestone(
         workKind: 'practice',
         difficulty: difficultyForLevel(stage + 2),
         status: 'not_started',
-        resources: matchResourcesByTopic(role, resources).slice(0, 2).map(stripResourceSkillNames),
-        projects: (projects.length ? projects.slice(0, 2) : []).map(stripProjectSkillNames),
+        resources: matchResourcesByTopic(role, resources, { role, stage }).slice(0, 2),
+        // The role's own portfolio briefs, and the user's own work that is
+        // tagged for this role or matches its core skills. The first two
+        // projects in the list are no longer attached blind: a project that
+        // says nothing about this role is worse than no project at all.
+        projects: matchProjectsForRole(role, projects, { role, stage })
+          .slice(0, 2)
+          .map(stripProjectSkillNames),
         sortOrder: 0,
         rationale:
           'Your recorded skills already cover the core requirement for this stage, so this step focuses on real-world application.',
@@ -527,6 +580,7 @@ function buildMarketReadinessPhase(
   stretchGaps: SkillGap[],
   resources: RoadmapResourceCandidate[],
   projects: RoadmapProjectCandidate[],
+  phaseTitle: string,
 ): RoadmapPhasePlan {
   const milestones: RoadmapMilestonePlan[] = [];
   let order = 0;
@@ -620,7 +674,7 @@ function buildMarketReadinessPhase(
   }
 
   return {
-    title: `${role.title} ${PHASE_TITLES[3]}`,
+    title: `${role.title} ${phaseTitle}`,
     description: PHASE_DESCRIPTIONS[3],
     goal: roleGoal(3, role),
     milestones,
@@ -660,99 +714,223 @@ function estimateHours(stage: number, gap: SkillGap): number {
 }
 
 /**
+ * The role and stage a match is made against.
+ *
+ * Relevance is never decided without it: a skill name on its own says
+ * nothing about whether the content belongs in *this* career's plan.
+ */
+export interface RoadmapMatchContext {
+  role: RoleDefinition;
+  /** The learning stage of the step being filled (0-based). */
+  stage: number;
+}
+
+/** Adapts the role catalogue entry to the shared coverage gate's shape. */
+function toCoverageRole(role: RoleDefinition): CoverageRole {
+  return {
+    id: role.id,
+    title: role.title,
+    domainId: role.domainId,
+    coreSkills: role.coreSkills ?? [],
+    preferredSkills: role.preferredSkills ?? [],
+    tools: role.tools ?? [],
+  };
+}
+
+/** The context the relevance engine scores against. */
+function relevanceContext(
+  context: RoadmapMatchContext,
+  targetLevel: number
+): RoadmapRelevanceContext {
+  return {
+    roleId: context.role.id,
+    roleTitle: context.role.title,
+    domainId: context.role.domainId,
+    targetLevel,
+    stage: context.stage,
+  };
+}
+
+/**
  * Picks the learning resources that address a gap.
  *
- * A resource has to actually teach the skill, and its level has to suit the
- * level the user is trying to reach.
+ * A resource has to actually teach the skill, and it has to belong to this
+ * career. The rules, in order:
  *
- * Matching uses the shared `skillMatchConfidence` rather than a loose token
- * overlap. Only a declared alternative (confidence 1) or a full token-subset
- * match (0.8) is accepted: sharing one word such as "data", "management" or
- * "documentation" is not evidence that a resource teaches the gap.
+ *   1. The catalogue must consider the resource relevant to the target role.
+ *      This is the shared gate the Learning Hub uses, so both surfaces agree
+ *      on what "relevant to this role" means.
+ *   2. The resource must declare the gap's skill. Matching uses the shared
+ *      `skillMatchConfidence` rather than a loose token overlap: only a
+ *      declared alternative (confidence 1) or a full token-subset match
+ *      (0.8) is accepted. Sharing one word such as "data", "management" or
+ *      "documentation" is not evidence that a resource teaches the gap.
+ *   3. Nothing else is consulted. A resource that fails any of the first two
+ *      is left out, and the step shows fewer resources rather than an
+ *      unrelated one.
+ *
+ * Every resource that survives carries the reason it was chosen, so the
+ * interface can explain the recommendation.
  */
 export function matchResources(
   gap: SkillGap,
   resources: RoadmapResourceCandidate[],
+  context: RoadmapMatchContext,
 ): RoadmapResourceRef[] {
-  const scored: { resource: RoadmapResourceCandidate; score: number }[] =
-    [];
+  const role = toCoverageRole(context.role);
+  const relevance = relevanceContext(context, gap.requiredLevel);
+  const scored: { resource: RoadmapResourceCandidate; score: number; reason: string }[] = [];
 
   for (const resource of resources) {
-    const names = resource.skillNames ?? [];
-    let best = 0;
-    for (const name of names) {
-      const confidence = skillMatchConfidence(name, gap.name);
-      if (confidence >= 1) {
-        best = Math.max(best, 100);
-      } else if (confidence >= 0.8) {
-        best = Math.max(best, 80);
-      }
-    }
-    if (best === 0) continue;
+    if (!isEligibleForRole(resource, role)) continue;
 
-    // Prefer a resource that is not far above what the user is aiming at.
-    const levelFit = levelFitScore(resource.title, resource.durationHours, gap.requiredLevel);
-    scored.push({ resource, score: best + levelFit });
+    const verdict = evaluateResource(resource, gap.name, relevance);
+    if (!verdict.eligible) continue;
+
+    scored.push({
+      resource,
+      score: verdict.score,
+      reason: explainRelevance(verdict.reasons),
+    });
   }
 
-  scored.sort((a, b) => b.score - a.score || (a.resource.durationHours ?? 999) - (b.resource.durationHours ?? 999));
-  return scored.map((entry) => entry.resource);
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      (a.resource.durationHours ?? 999) - (b.resource.durationHours ?? 999),
+  );
+
+  return scored.map((entry) => ({
+    id: entry.resource.id,
+    title: entry.resource.title,
+    provider: entry.resource.provider,
+    url: entry.resource.url,
+    durationHours: entry.resource.durationHours,
+    reason: entry.reason,
+  }));
 }
 
 /**
- * Resources matched against a role's learning topics (fallback path use).
+ * Resources matched against a role's learning topics.
  *
  * The same conservative matcher applies: a topic only selects a resource when
- * the resource explicitly teaches that topic. This path runs when the user has
- * no gaps left, so a weak match here would attach unrelated material to a
- * stage that is about applying existing skills.
+ * the resource explicitly teaches that topic and the catalogue considers the
+ * resource relevant to the role. This path runs when the user has no gaps
+ * left, so a weak match here would attach unrelated material to a stage that
+ * is about applying existing skills.
  */
 function matchResourcesByTopic(
   role: RoleDefinition,
   resources: RoadmapResourceCandidate[],
-): RoadmapResourceCandidate[] {
+  context: RoadmapMatchContext,
+): RoadmapResourceRef[] {
   const topics = (role.learningTopics ?? []).filter(Boolean);
   if (!topics.length) return [];
-  return resources.filter((resource) => {
+
+  const coverageRole = toCoverageRole(role);
+  const relevance = relevanceContext(context, 3);
+  const scored: { resource: RoadmapResourceCandidate; score: number; reason: string }[] = [];
+
+  for (const resource of resources) {
+    if (!isEligibleForRole(resource, coverageRole)) continue;
+
     const names = resource.skillNames ?? [];
-    return names.some((name) =>
-      topics.some((topic) => skillMatchConfidence(name, topic) >= 0.8)
+    const topic = topics.find(
+      (candidate) =>
+        names.some((name) => skillMatchConfidence(name, candidate) >= 0.8),
     );
-  });
-}
+    if (!topic) continue;
 
-/** Picks the projects that demonstrate a skill. */
-export function matchProjects(
-  gap: SkillGap,
-  projects: RoadmapProjectCandidate[],
-): RoadmapProjectRef[] {
-  const target = normalizeSkillName(gap.name);
-  const scored: { project: RoadmapProjectCandidate; score: number }[] = [];
+    // The resource teaches one of the role's own topics, so it is explained in
+    // those terms rather than in terms of a gap this stage does not have.
+    const verdict = evaluateResource(resource, topic, relevance);
+    if (!verdict.eligible) continue;
 
-  for (const project of projects) {
-    const names = project.skillNames ?? [];
-    let score = 0;
-    for (const name of names) {
-      const normalized = normalizeSkillName(name);
-      if (normalized === target) score = Math.max(score, 100);
-      else if (normalized.includes(target) || target.includes(normalized)) score = Math.max(score, 60);
-    }
-    if (score === 0) {
-      // Catalogue projects have no skill tags, so fall back to a keyword
-      // overlap against the project title.
-      const titleTokens = tokenize(project.title);
-      const gapTokens = tokenize(gap.name);
-      const overlap = titleTokens.filter((token) => gapTokens.includes(token)).length;
-      if (overlap > 0) score = 30 + overlap * 5;
-    }
-    if (score === 0) continue;
-    // A project the user already owns is more actionable than a suggestion.
-    if (project.source === 'user') score += 15;
-    scored.push({ project, score });
+    scored.push({
+      resource,
+      score: verdict.score,
+      reason: explainRelevance([
+        ...verdict.reasons.filter((reason) => reason.kind !== 'skill'),
+        { kind: 'skill', label: `Covers ${topic}`, detail: resource.skillNames?.join(', ') },
+      ]),
+    });
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.map((entry) => entry.project);
+
+  return scored.map((entry) => ({
+    id: entry.resource.id,
+    title: entry.resource.title,
+    provider: entry.resource.provider,
+    url: entry.resource.url,
+    durationHours: entry.resource.durationHours,
+    reason: entry.reason,
+  }));
+}
+
+/**
+ * Picks the projects that demonstrate a gap's skill.
+ *
+ * A project has to carry the same kind of evidence a resource does. The old
+ * behaviour — accepting a project whose *title* merely shared a word with the
+ * gap — is gone; it was the reason unrelated work appeared in plans. A
+ * project with no skill mapping is not evidence of anything, so it is left
+ * out rather than matched on its name.
+ */
+export function matchProjects(
+  gap: SkillGap,
+  projects: RoadmapProjectCandidate[],
+  context: RoadmapMatchContext,
+): RoadmapProjectRef[] {
+  const relevance = relevanceContext(context, gap.requiredLevel);
+  const scored: { project: RoadmapProjectCandidate; score: number }[] = [];
+
+  for (const project of projects) {
+    const verdict = evaluateProject(project, gap.name, relevance);
+    if (!verdict.eligible) continue;
+    scored.push({ project, score: verdict.score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((entry) => ({
+    title: entry.project.title,
+    description: entry.project.description,
+    source: entry.project.source,
+  }));
+}
+
+/**
+ * Picks the projects that belong on a role-catalogue step.
+ *
+ * These steps have no skill gap to close, so the evidence is the role itself:
+ * a project explicitly tagged for this role, or one whose skills match the
+ * role's core skills. The role's own portfolio briefs qualify on the first
+ * count, because they come from the role definition itself.
+ */
+export function matchProjectsForRole(
+  role: RoleDefinition,
+  projects: RoadmapProjectCandidate[],
+  context: RoadmapMatchContext,
+): RoadmapProjectRef[] {
+  const relevance = relevanceContext(context, 3);
+  const roleSkills = [
+    ...(role.coreSkills ?? []).map((skill) => skill.name),
+    ...(role.learningTopics ?? []),
+  ];
+  const scored: { project: RoadmapProjectCandidate; score: number }[] = [];
+
+  for (const project of projects) {
+    const verdict = evaluateProjectForRole(project, roleSkills, relevance);
+    if (!verdict.eligible) continue;
+    scored.push({ project, score: verdict.score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((entry) => ({
+    title: entry.project.title,
+    description: entry.project.description,
+    source: entry.project.source,
+  }));
 }
 
 /**
@@ -794,28 +972,6 @@ function linkPrerequisites(phases: RoadmapPhasePlan[]): void {
   }
 }
 
-/** Heuristic: how well a resource's difficulty suits the target level. */
-function levelFitScore(
-  _title: string,
-  durationHours: number | null,
-  targetLevel: number,
-): number {
-  // A long course is worth a small bonus when the target is high, and a
-  // small penalty when the target is low.
-  const hours = durationHours ?? 0;
-  if (targetLevel >= 4) return hours >= 8 ? 6 : 0;
-  if (targetLevel <= 2) return hours <= 12 ? 6 : 0;
-  return hours > 0 && hours <= 20 ? 5 : 0;
-}
-
-/** Splits a normalised name into comparable tokens. */
-function tokenize(value: string): string[] {
-  return value
-    .replace(/([a-z])([0-9])/g, '$1 $2')
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 3);
-}
-
 /** Removes the helper `skillNames` field before the resource leaves the generator. */
 function stripResourceSkillNames(
   value: RoadmapResourceCandidate,
@@ -826,6 +982,7 @@ function stripResourceSkillNames(
     provider: value.provider,
     url: value.url,
     durationHours: value.durationHours,
+    reason: value.reason,
   };
 }
 

@@ -420,6 +420,53 @@ export async function patchAdminExperience(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Evidence review                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** An artifact waiting for an administrator to look at it. */
+export interface AdminEvidenceQueueItem {
+  id: string;
+  title: string;
+  type: string | null;
+  description: string | null;
+  url: string | null;
+  verified: boolean;
+  verificationStatus: 'pending' | 'verified' | 'rejected';
+  verifiedAt: string | null;
+  dateAdded: string | null;
+  projectId: string | null;
+  skillNames: string[];
+  profileId: string;
+  ownerName: string | null;
+  ownerUsername: string | null;
+  ownerTargetRole: string | null;
+  createdAt: string | null;
+}
+
+/** Reads the evidence that is waiting for a review. */
+export async function fetchAdminEvidenceQueue(
+  limit = 50
+): Promise<AdminEvidenceQueueItem[]> {
+  const data = await request<{ items: AdminEvidenceQueueItem[] }>(
+    `/api/admin/evidence/queue?limit=${encodeURIComponent(String(limit))}`
+  );
+  return data.items ?? [];
+}
+
+/** Records a review decision about one artifact. */
+export async function reviewAdminEvidence(
+  id: string,
+  status: 'verified' | 'rejected',
+  note?: string
+): Promise<AdminEvidenceQueueItem> {
+  const data = await request<{ evidence: AdminEvidenceQueueItem }>(
+    `/api/admin/evidence/${encodeURIComponent(id)}/review`,
+    { method: 'PATCH', body: JSON.stringify({ status, note }) }
+  );
+  return data.evidence;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Subscriptions, Payments & Revenue Admin Endpoints                          */
 /* -------------------------------------------------------------------------- */
 
@@ -636,5 +683,18 @@ export async function grantAdminCredits(
   return request<{ success: boolean; grantedCredits: number }>('/api/admin/credits/grant', {
     method: 'POST',
     body: JSON.stringify({ profileId, amount, reason }),
+  });
+}
+
+/**
+ * Asks the server to send a test message to the owner-configured recipient.
+ *
+ * The recipient is not sent by the caller: the server owns it, so the endpoint
+ * can only be used to prove that delivery works.
+ */
+export async function sendAdminEmailTest(): Promise<{ success: boolean; messageId?: string }> {
+  return request<{ success: boolean; messageId?: string }>('/api/admin/email/test', {
+    method: 'POST',
+    body: JSON.stringify({}),
   });
 }

@@ -29,7 +29,7 @@ import {
 } from '../../../shared/roadmapJourney';
 import type { RoadmapTreeProgress } from '../../../shared/roadmapTree';
 import { computeTimeBreakdown } from '../../../shared/roadmapTimeBreakdown';
-import { computeCareerMetrics, cvReadinessFromVersions, skillProofFromSource } from '../../../shared/careerMetrics';
+import { computeCareerMetrics, cvReadinessFromVersions, toMetricSkills } from '../../../shared/careerMetrics';
 import {
   RESOURCE_TYPE_LABELS,
   isVideoResource,
@@ -242,18 +242,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   const roadmapMetrics = useMemo(
     () =>
       computeCareerMetrics({
-        skills: skills.map((skill) => ({
-          name: skill.name,
-          currentLevel: skill.currentLevel,
-          targetLevel: skill.targetLevel,
-          // A required skill of the role counts towards readiness whether the
-          // candidate has met it yet or not. A preferred (stretch) skill is
-          // shown with its gap, but it does not count.
-          importance: skill.required ? 'core' : skill.gap > 0 ? 'high' : 'medium',
-          required: skill.required === true,
-          // A level the candidate only claims does not make a skill mastered.
-          proof: skillProofFromSource(skill.source),
-        })),
+        skills: toMetricSkills(skills),
         roadmapTasks: allTasks.map((task) => ({
           id: task.id,
           status: task.status,
@@ -1589,6 +1578,14 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                                     {resource.provider}
                                     {catalogCourse?.level ? ` · ${t(catalogCourse.level)}` : ''}
                                   </span>
+                                  {/* Why the platform chose this resource for this
+                                      step. It is only shown when the plan was
+                                      written with the reason attached. */}
+                                  {resource.reason && (
+                                    <span className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-[var(--color-primary-text)]">
+                                      {t('Why this')}: {resource.reason}
+                                    </span>
+                                  )}
                                   {catalogCourse?.description && (
                                     <span className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-[var(--text-secondary)]">
                                       {catalogCourse.description}

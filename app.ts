@@ -249,6 +249,8 @@ import {
   requireAnyPermission,
   requirePermission,
 } from './server/admin/permissions.ts';
+import { sendTestEmail } from './server/email/resend.ts';
+import { runtimeSecret } from './server/runtimeEnv.ts';
 import {
   isAnnouncementAudience,
   isAnnouncementCategory,
@@ -372,6 +374,9 @@ import {
   getEvidence,
   createEvidence,
   updateEvidence,
+  listEvidenceForReview,
+  reviewEvidence,
+  EvidenceReviewUnavailableError,
   deleteEvidence,
   EVIDENCE_TYPES,
 } from './server/db/evidence.ts';
@@ -5033,6 +5038,63 @@ app.patch('/api/evidence/:id', requireAuth, async (req: Request, res: Response) 
   }
 });
 
+/**
+ * The evidence that is waiting for a review.
+ *
+ * The review itself is the administrator's job, and it is not tied to one
+ * candidate: the queue is read from the whole table so that the evidence that
+ * has been waiting longest is the first one an administrator sees.
+ */
+app.get('/api/admin/evidence/queue', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const limit = Number.parseInt(str(req.query?.limit, 4) ?? '50', 10);
+    const items = await listEvidenceForReview(Number.isFinite(limit) ? limit : 50);
+    return res.json({ success: true, items });
+  } catch (error) {
+    if (error instanceof EvidenceReviewUnavailableError) {
+      return res.status(503).json({
+        error: 'Evidence review is unavailable until the verification migration is applied',
+      });
+    }
+    console.error('Failed to load the evidence review queue:', error);
+    return res.status(500).json({ error: 'Failed to load the evidence review queue' });
+  }
+});
+
+app.patch('/api/admin/evidence/:id/review', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const status = req.body?.status;
+    if (status !== 'verified' && status !== 'rejected') {
+      return res.status(400).json({ error: 'status must be verified or rejected' });
+    }
+    const evidence = await reviewEvidence(
+      req.params.id,
+      req.authUser!.id,
+      status,
+      str(req.body?.note, 2000) ?? undefined
+    );
+    if (!evidence) return res.status(404).json({ error: 'Evidence not found' });
+    // The decision is recorded in the audit trail, so that a later reader can
+    // see who approved or rejected an artifact and when.
+    await logAdminAction(req.admin!, {
+      action: `evidence.${status}`,
+      entityType: 'evidence',
+      entityId: req.params.id,
+      metadata: { title: evidence.title, status },
+    });
+    return res.json({ success: true, evidence });
+  } catch (error) {
+    if (error instanceof EvidenceReviewUnavailableError) {
+      return res.status(503).json({
+        error: 'Evidence review is unavailable until the verification migration is applied',
+      });
+    }
+    console.error('Failed to review evidence:', error);
+    return res.status(500).json({ error: 'Failed to review evidence' });
+  }
+});
+
 app.delete('/api/evidence/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
@@ -6846,6 +6908,35 @@ app.get('/api/admin/me', requireAuth, async (req: Request, res: Response) => {
     return adminFailure(res, error);
   }
 });
+
+// Sends only to the owner-configured, Resend-verified test recipient. The
+// caller cannot supply an address or message content.
+app.post(
+  '/api/admin/email/test',
+  requireAuth,
+  requireAdmin,
+  requirePermission('admin.manage'),
+  rateLimit(1, 5 * 60_000, 'resend-test'),
+  async (req: Request, res: Response) => {
+    const recipient = runtimeSecret('RESEND_TEST_RECIPIENT');
+    if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 320) {
+      return res.status(503).json({ error: 'Email test recipient is not configured.' });
+    }
+    const idempotencyKey = `careerdev4ai-test/${req.authUser!.id}/${Math.floor(Date.now() / 300_000)}`;
+    const result = await sendTestEmail(recipient, idempotencyKey);
+    if (result.ok) return res.status(200).json({ success: true, messageId: result.id });
+    if (result.status === null) {
+      return res.status(503).json({ error: 'Email service is unavailable or not configured. Check the server secret and retry later.' });
+    }
+    if (result.status === 401 || result.status === 403) {
+      return res.status(503).json({ error: 'Email provider authentication failed. Check the server-side Resend API key.' });
+    }
+    if (result.status === 429) {
+      return res.status(429).json({ error: 'Email provider rate limit reached. Wait before retrying.' });
+    }
+    return res.status(502).json({ error: 'Email provider rejected the test message. Check the configured sender and recipient.' });
+  }
+);
 
 app.get(
   '/api/admin/analytics',

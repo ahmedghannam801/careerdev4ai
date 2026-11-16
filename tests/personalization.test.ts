@@ -99,7 +99,7 @@ describe('skill gap engine', () => {
     assert.equal(entry?.priority, 'sufficient');
   });
 
-  it('computes a readiness figure from the user ratings', () => {
+  it('caps unverified user ratings at 65% while proven skills can reach full readiness', () => {
     const role = resolveRoleDefinition('data-analyst');
     assert.ok(role);
     const requirements = toRoleSkillRequirements(role);
@@ -118,12 +118,27 @@ describe('skill gap engine', () => {
           level: skill.minLevel,
         }))
       ),
-      requirements
+      requirements,
+      { cvReadinessPct: 100 }
     );
-    assert.equal(maxed.readinessPct, 100);
+    assert.equal(maxed.readinessPct, 65);
     assert.equal(maxed.openRequired, 0);
     // The role's preferred (stretch) skills can still be open.
     assert.ok(maxed.openPreferred > 0);
+
+    const proven = summarizeSkillGaps(
+      computeSkillGaps(
+        requirements,
+        requirements.requiredSkills.map((skill) => ({
+          name: skill.name,
+          level: skill.minLevel,
+          proof: 'evidence' as const,
+        }))
+      ),
+      requirements,
+      { cvReadinessPct: 100 }
+    );
+    assert.equal(proven.readinessPct, 100);
   });
   it('explains a gap in plain language', () => {
     const role = resolveRoleDefinition('data-analyst');

@@ -6,6 +6,11 @@ export const translations = {
     brandName: 'CareerDev4AI',
     brandTagline: 'Personal Career Operating System',
 
+    // Notifications that the server writes with a key of their own. The key
+    // is a name from a catalogue rather than a wording, so it is listed here
+    // rather than in the source-string catalogue.
+    'notification.referralReward': 'Referral reward earned',
+
     // Nav items
     navHome: 'Home',
     navMyCareer: 'My Career',
@@ -163,6 +168,9 @@ export const translations = {
     // Brand
     brandName: 'CareerDev4AI',
     brandTagline: 'نظام تشغيل المسار المهني الذكي',
+
+    // Notifications that the server writes with a key of their own.
+    'notification.referralReward': 'مكافأة الإحالة',
 
     // Nav items
     navHome: 'الرئيسية',

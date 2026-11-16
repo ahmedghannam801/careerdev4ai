@@ -22,6 +22,11 @@ local_db/
 .wrangler/
 .tmp-qa/
 
+# The output of the Playwright end-to-end run (never shipped).
+test-results/
+playwright-report/
+blob-report/
+
 # The bundle of the background-job Worker (built by scripts/build-jobs-worker.mjs).
 dist-jobs/
 

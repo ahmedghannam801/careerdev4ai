@@ -123,6 +123,13 @@ export interface RoadmapResource {
   provider: string;
   url: string;
   durationHours: number | null;
+  /**
+   * Why this resource was recommended for this step.
+   *
+   * Optional because a plan written before the relevance engine existed does
+   * not carry one: the step still shows its resources, just without a reason.
+   */
+  reason?: string;
 }
 
 export interface RoadmapTask {
@@ -260,6 +267,7 @@ export interface EvidenceItem {
   skillNames: string[];
   projectId?: string;
   verified: boolean;
+  verificationStatus?: 'pending' | 'verified' | 'rejected';
   dateAdded: string;
 }
 
@@ -601,7 +609,21 @@ export interface UserNotification {
   message: string;
   // Mirrors server/db/notifications.ts NOTIFICATION_TYPES. The two lists must
   // stay identical or persisted rows are cast to a type the UI cannot render.
-  type: 'roadmap' | 'interview' | 'application' | 'achievement' | 'system' | 'announcement';
+  type:
+    | 'roadmap'
+    | 'interview'
+    | 'application'
+    | 'achievement'
+    | 'system'
+    | 'announcement'
+    | 'subscription'
+    | 'payment'
+    | 'payment_success'
+    | 'payment_failed'
+    | 'subscription_expired'
+    | 'credits'
+    | 'referral'
+    | 'opportunity';
   read: boolean;
   /** True once the user followed the notification's CTA. */
   clicked?: boolean;
@@ -609,6 +631,16 @@ export interface UserNotification {
   priority?: 'normal' | 'important' | 'critical' | null;
   timestamp: string;
   linkAction?: string;
+  /**
+   * The English source text of the title, when the notification carries one.
+   *
+   * The server writes the label rather than a translated string, so the
+   * notification is shown in the reader's own language. A notification without
+   * one keeps the literal title the server wrote.
+   */
+  titleKey?: string | null;
+  /** The values a translated title and message need. */
+  params?: Record<string, unknown>;
 }
 
 export interface UserSettings {

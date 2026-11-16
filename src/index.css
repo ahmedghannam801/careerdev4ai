@@ -128,6 +128,32 @@
     --color-ai-border: #D6CDE9;
 
     /* ------------------------------------------------------------------
+     * Subscription tier identities
+     * ------------------------------------------------------------------
+     * Each tier has a colour of its own, so a candidate can tell at a glance
+     * which plan they are on wherever the plan is shown. The colours are
+     * deliberately apart from the brand primary: the terracotta belongs to
+     * the platform, and these belong to the plans.
+     *
+     *   Free   neutral silver — the free experience is not a lesser version
+     *          of a paid one, it is a plain one.
+     *   Plus   orange — the first paid step.
+     *   Pro    royal blue — the working tier.
+     *   Ultra  black with gold — the top of the ladder.
+     *
+     * The code never names a colour. `shared/planIdentity.ts` knows the tier
+     * and the name of the property; the palette is here.
+     */
+    --plan-free-accent: #8A93A0;
+    --plan-free-surface: #EEF0F3;
+    --plan-plus-accent: #D2691E;
+    --plan-plus-surface: #FBEDE1;
+    --plan-pro-accent: #2F55D4;
+    --plan-pro-surface: #E7ECFB;
+    --plan-ultra-accent: #C9A227;
+    --plan-ultra-surface: #1A1C21;
+
+    /* ------------------------------------------------------------------
      * Elevation
      * ------------------------------------------------------------------
      * One scale, three steps, so a card, a raised panel and an overlay all
@@ -211,6 +237,21 @@
     --color-border: #3D433F;
     --color-border-strong: #545B55;
     --color-divider: #3D433F;
+
+    /* The tier identities, seen on a dark surface.
+     *
+     * The accents are lightened so they keep their contrast against the dark
+     * panels, and Ultra stays black with gold: on a dark interface its own
+     * surface is the darker one, which is what makes it read as the top of
+     * the ladder rather than another coloured badge. */
+    --plan-free-accent: #A8B0BB;
+    --plan-free-surface: #33373C;
+    --plan-plus-accent: #F09A56;
+    --plan-plus-surface: #3B2A1C;
+    --plan-pro-accent: #7D9BFF;
+    --plan-pro-surface: #20263A;
+    --plan-ultra-accent: #E0BC4A;
+    --plan-ultra-surface: #14161A;
 
     --color-warning: #F0B872;
     --color-danger: #F08C82;
@@ -472,7 +513,6 @@
     width: 794px !important;
     max-width: none !important;
     margin: 0 !important;
-    border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     background: #ffffff !important;

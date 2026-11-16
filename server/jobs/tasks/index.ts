@@ -16,6 +16,7 @@ import { matchJobsTask } from './matchJobs.ts';
 import { generateCareerRoadmapTask, updateRoadmapProgressTask } from './roadmap.ts';
 import { processAiMentorWorkflowTask } from './aiMentor.ts';
 import { validateLearningResourcesTask } from './validateLearningResources.ts';
+import { syncOpportunitiesTask } from './syncOpportunities.ts';
 import { healthCheckTask } from './healthCheck.ts';
 
 export type { JobPolicy } from './policies.ts';
@@ -30,6 +31,7 @@ export const JOB_TASKS: Record<BackgroundJobKind, JobTask> = {
   'update-roadmap-progress': updateRoadmapProgressTask,
   'process-ai-mentor-workflow': processAiMentorWorkflowTask,
   'validate-learning-resources': validateLearningResourcesTask,
+  'sync-opportunities': syncOpportunitiesTask,
 };
 
 /**

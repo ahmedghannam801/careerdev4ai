@@ -41,6 +41,7 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
 import { useAdminAccess } from '../../lib/useAdminAccess';
 import { CreditBalanceBadge } from '../subscription/CreditBalanceBadge';
+import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 
 const GlobalSearchModal = lazy(() =>
   import('./GlobalSearchModal').then((module) => ({ default: module.GlobalSearchModal }))
@@ -71,7 +72,7 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, children }) => {
-  const { profile, targetRole, settings, updateSettings, visibleNotifications, currentUser, identity, avatarId, logout, t, copilotOpen, setCopilotOpen } = useCareer();
+  const { profile, targetRole, settings, updateSettings, visibleNotifications, currentUser, identity, avatarId, logout, t, copilotOpen, setCopilotOpen, subscription } = useCareer();
   // The feedback form is a permanent destination. Both the account menu and
   // the mobile drawer open the same address and report the same source, so
   // the entry point is never lost when the dashboard card is dismissed.
@@ -408,6 +409,15 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
             {/* Notifications & Account Controls */}
             <div data-tour="notifications-account" className="flex items-center gap-1.5 sm:gap-2">
+              {/* The tier's identity, always visible in the header.
+                  It is drawn from the plan the server resolved, so it cannot
+                  say a plan the candidate does not hold. */}
+              <PlanIdentityBadge
+                planCode={subscription?.planCode ?? 'free'}
+                variant="outline"
+                markOnly
+                className="h-7 w-7 justify-center"
+              />
               <CreditBalanceBadge onOpenPricing={() => onNavigate('pricing')} />
 
               {/* Notifications */}

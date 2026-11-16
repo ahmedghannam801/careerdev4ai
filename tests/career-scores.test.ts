@@ -37,10 +37,10 @@ describe('unified career score entry point', () => {
       interviewSessions: [{ score: 8 }, { score: 6 }, { score: 8 }],
     });
 
-    assert.equal(scores.roleReadinessPct, 71);
-    assert.equal(scores.skillsMastered, 1);
+    assert.equal(scores.roleReadinessPct, 37, 'unbacked ratings use the 65% claim weight and missing CV data uses the 80% readiness multiplier');
+    assert.equal(scores.skillsMastered, 0, 'a met target without an explicit proof source is not mastered');
     assert.equal(scores.skillsTotal, 2);
-    assert.equal(scores.skillsBelowTarget, 1);
+    assert.equal(scores.skillsBelowTarget, 2, 'an at-target but unproven skill is not counted as mastered');
     assert.equal(scores.roadmapProgressPct, 50);
     assert.equal(scores.roadmapCompleted, 1);
     assert.equal(scores.roadmapTotal, 2);

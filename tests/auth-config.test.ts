@@ -27,8 +27,8 @@
  *      sources disagree, instead of quietly picking one.
  *   3. The interface still offers every sign-in method that existed before:
  *      Google, LinkedIn, GitHub, and email with a password.
- *   4. The Supabase project still has those providers enabled, and the sign-in
- *      and registration paths work against the real project.
+ *   4. The dedicated, non-production integration project has those providers
+ *      enabled, and synthetic sign-in/registration paths work there.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,7 +43,18 @@ import {
   resolvePublicBuildConfig,
   requirePublicBuildConfig,
 } from '../scripts/public-build-config.mjs';
-import { REPO_ROOT } from './env.mjs';
+import { loadTestEnv, REPO_ROOT } from './env.mjs';
+import { randomUUID } from 'node:crypto';
+import { runEmailPrefix } from './cleanup.mjs';
+
+function integrationProject() {
+  const env = loadTestEnv();
+  return {
+    url: env.SUPABASE_URL,
+    anonKey: env.SUPABASE_ANON_KEY,
+    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+  };
+}
 
 /** The public values the committed configuration declares. */
 function committedConfig() {
@@ -175,10 +186,8 @@ test('the OAuth callback path is served by the SPA fallback', () => {
   }
 });
 
-test('the Supabase project still has every provider enabled', async () => {
-  const { wranglerVars } = committedConfig();
-  const url = wranglerVars.VITE_SUPABASE_URL;
-  const key = wranglerVars.VITE_SUPABASE_PUBLISHABLE_KEY;
+test('the dedicated integration project has every required provider enabled', async () => {
+  const { url, anonKey: key } = integrationProject();
 
   const response = await fetch(`${url}/auth/v1/settings`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
@@ -197,74 +206,61 @@ test('the Supabase project still has every provider enabled', async () => {
   assert.equal(settings?.disable_signup, false, 'registration must not be disabled');
 });
 
-test('a real account can sign in, keep its session, and sign out', async () => {
-  const { wranglerVars } = committedConfig();
-  const url = wranglerVars.VITE_SUPABASE_URL;
-  const key = wranglerVars.VITE_SUPABASE_PUBLISHABLE_KEY;
-
+test('a synthetic account can sign in, retain its session, and sign out in the test project', async () => {
+  const { url, anonKey: key, serviceRoleKey } = integrationProject();
   const client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
+  const address = `${runEmailPrefix()}auth-${randomUUID()}@example.invalid`;
+  const password = `Cp-${randomUUID()}Aa1!`;
+  let createdUserId;
 
-  // A synthetic identity for this run. It is created here and removed again
-  // below; it is never a real person's account.
-  const address = `cp-auth-surface-${Date.now()}-${Math.random().toString(36).slice(2, 10)}@example.com`;
-  const password = `Cp-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+  try {
+    const registration = await client.auth.signUp({ email: address, password });
+    assert.equal(
+      registration.error,
+      null,
+      `registration must succeed: ${registration.error?.message ?? 'unknown error'}`,
+    );
+    createdUserId = registration.data.user?.id;
+    assert.ok(createdUserId, 'registration must return the synthetic user id');
 
-  const registration = await client.auth.signUp({ email: address, password });
-  assert.equal(
-    registration.error,
-    null,
-    `registration must succeed: ${registration.error?.message ?? 'unknown error'}`,
-  );
+    const signIn = await client.auth.signInWithPassword({ email: address, password });
+    assert.equal(
+      signIn.error,
+      null,
+      `sign-in must succeed: ${signIn.error?.message ?? 'unknown error'}`,
+    );
+    assert.ok(signIn.data.session?.access_token, 'a sign-in must return a session token');
 
-  const signIn = await client.auth.signInWithPassword({ email: address, password });
-  assert.equal(
-    signIn.error,
-    null,
-    `sign-in must succeed: ${signIn.error?.message ?? 'unknown error'}`,
-  );
-  assert.ok(signIn.data.session, 'a sign-in must return a session');
-  assert.ok(signIn.data.session.access_token, 'the session must carry an access token');
+    const restored = await client.auth.getSession();
+    assert.ok(restored.data.session, 'the session must survive a refresh');
 
-  // The session survives being read back, which is what a page refresh does.
-  const restored = await client.auth.getSession();
-  assert.ok(restored.data.session, 'the session must survive a refresh');
+    const wrong = await client.auth.signInWithPassword({ email: address, password: `${password}-wrong` });
+    assert.ok(wrong.error, 'a wrong password must be refused');
+    assert.match(wrong.error.message, /invalid login credentials/i);
 
-  // The wrong password is refused, and the message is the one the interface
-  // shows rather than a blank failure.
-  const wrong = await client.auth.signInWithPassword({
-    email: address,
-    password: `${password}-wrong`,
-  });
-  assert.ok(wrong.error, 'a wrong password must be refused');
-  assert.match(wrong.error.message, /invalid login credentials/i);
+    const signOut = await client.auth.signOut();
+    assert.equal(signOut.error, null, 'sign-out must succeed');
+    const afterSignOut = await client.auth.getSession();
+    assert.equal(afterSignOut.data.session, null, 'there must be no session after sign-out');
 
-  const signOut = await client.auth.signOut();
-  assert.equal(signOut.error, null, 'sign-out must succeed');
-  const afterSignOut = await client.auth.getSession();
-  assert.equal(afterSignOut.data.session, null, 'there must be no session after sign-out');
-
-  // The account survives the sign-out and can be used again from a fresh
-  // client — which is what "an existing account can still get in" means. The
-  // records in Supabase Auth are untouched by a change to the build.
-  const secondClient = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  const secondSignIn = await secondClient.auth.signInWithPassword({ email: address, password });
-  assert.equal(
-    secondSignIn.error,
-    null,
-    `an existing account must still be able to sign in: ${secondSignIn.error?.message ?? 'unknown error'}`,
-  );
-  assert.ok(secondSignIn.data.session, 'the account must get a session again');
-
-  // The identity is removed again, so the project is left as it was found.
-  const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    await admin.auth.admin.deleteUser(signIn.data.user.id);
+    const secondClient = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const secondSignIn = await secondClient.auth.signInWithPassword({ email: address, password });
+    assert.equal(secondSignIn.error, null, 'the synthetic account must be able to sign in again');
+    assert.ok(secondSignIn.data.session, 'the account must get a session again');
+  } finally {
+    if (createdUserId) {
+      const admin = createClient(url, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { error } = await admin.auth.admin.deleteUser(createdUserId);
+      if (error && !/not found/i.test(error.message)) {
+        throw new Error('Could not remove the synthetic integration-test identity.');
+      }
+    }
   }
 });
 
@@ -274,12 +270,11 @@ test('the OAuth providers answer with an authorization URL', async () => {
   // NOT exercised here: the redirect is where the provider configuration
   // lives, and a provider with no client id cannot produce an authorization
   // URL. That is reported as a failure rather than swallowed.
-  const { wranglerVars } = committedConfig();
-  const url = wranglerVars.VITE_SUPABASE_URL;
-  const key = wranglerVars.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const { url, anonKey: key } = integrationProject();
+  const testRedirect = 'http://localhost:4173';
 
   for (const provider of ['google', 'linkedin_oidc', 'github']) {
-    const response = await fetch(`${url}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent('https://careerdev4ai.pages.dev')}`, {
+    const response = await fetch(`${url}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(testRedirect)}`, {
       headers: { apikey: key },
       redirect: 'manual',
     });
@@ -299,7 +294,7 @@ test('the OAuth providers answer with an authorization URL', async () => {
   // project's redirect allow-list as well. A path that is not allowed does not
   // fail loudly: the provider sends the browser back with an error instead.
   const githubCallback = await fetch(
-    `${url}/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent('https://careerdev4ai.pages.dev/auth/callback')}`,
+    `${url}/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(`${testRedirect}/auth/callback`)}`,
     { headers: { apikey: key }, redirect: 'manual' },
   );
   assert.match(

@@ -119,4 +119,6 @@ export const volunteerAr: Record<string, string> = {
   'Any language': 'أي لغة',
   'No opportunities match these filters yet.': 'لا توجد فرص تطابق هذه المرشّحات بعد.',
   'Apply by': 'التقديم بحلول',
+  'by the end of the month': 'بحلول نهاية الشهر',
+  'Verified source': 'مصدر موثّق',
 };

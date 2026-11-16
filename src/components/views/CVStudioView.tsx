@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Sparkles,
   CheckCircle2,
@@ -42,6 +42,7 @@ import {
 } from '../../lib/cvTemplatesApi';
 import { takeTailoredCv } from '../../lib/tailoredCvHandoff';
 import { fetchCvTemplateCatalog } from '../../lib/cvTemplatesApi';
+import { printCvFromFrame } from '../../lib/cvPdfExport';
 import { CvStudioAiQuotaBadge } from '../cv/CvStudioAiQuotaBadge';
 import type { CvTemplateDefinition } from '../../../shared/cvTemplates';
 
@@ -237,19 +238,27 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   // claimed is not theirs to put on a CV.
   const ratedSkills = ownedSkills.map((skill) => skill.name);
   // Export state. A PDF is produced by the browser printing the real
-  // template, so the server is asked first; a DOCX is built by the server.
+  // template from an off-screen frame; a DOCX is built by the server.
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  // The paper itself, so the PDF frame receives the exact element that is on
+  // the screen rather than a re-render that could differ by a font or a
+  // breakpoint.
+  const paperFrameRef = useRef<HTMLDivElement | null>(null);
 
   /**
-   * Prints the CV.
+   * Downloads the CV as a PDF.
    *
-   * The paper is the browser's print of the real rendered template — that is
-   * what preserves Arabic shaping, the selected text and the exact layout. The
-   * server still decides whether this candidate may export the template, so
-   * the print starts only after the authorisation route says yes.
+   * The file is printed by the browser from the real template. The server
+   * still decides whether this candidate may export the template, so the
+   * frame opens only after the authorisation route says yes. The document is
+   * the one in the preview: same template, same fonts, same colours, same
+   * Arabic shaping, same page breaks.
    */
-  const handlePrint = async () => {
+  const handlePdfExport = async () => {
+    if (isExportingPdf) return;
+    setIsExportingPdf(true);
     setExportError(null);
     try {
       const result = await authorizeCvTemplateExport(settings.cvTemplateId);
@@ -257,13 +266,46 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         setExportError(t('This template is not available on your plan.'));
         return;
       }
-      window.print();
+
+      const paper = paperFrameRef.current?.querySelector<HTMLElement>('[data-cv-print]');
+      if (!paper) {
+        setExportError(t('Open the document editor to export the CV.'));
+        return;
+      }
+
+      const templateName =
+        studioTemplateCatalog.find((template) => template.id === settings.cvTemplateId)?.name ??
+        settings.cvTemplateId;
+      const name = activeCV.fullName?.trim() || 'CV';
+      await printCvFromFrame({
+        paperHtml: paper.outerHTML,
+        title: `${name} — ${templateName}`,
+        language: settings.resumeLanguage,
+        direction: settings.resumeLanguage === 'ar' ? 'rtl' : 'ltr',
+        styles: (() => {
+          const links: string[] = [];
+          const inline: string[] = [];
+          document
+            .querySelectorAll('link[rel="stylesheet"]')
+            .forEach((node) => {
+              const href = node.getAttribute('href');
+              if (href) links.push(href);
+            });
+          document.querySelectorAll('head style').forEach((node) => {
+            const css = node.textContent ?? '';
+            if (css.trim()) inline.push(css);
+          });
+          return { links, inline };
+        })(),
+      });
     } catch (error) {
       setExportError(
         error instanceof Error
           ? error.message
-          : t('The PDF export could not be authorised. Please try again.')
+          : t('The PDF export could not be completed. Please try again.')
       );
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -397,11 +439,17 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                 <span>{isExportingDocx ? t('Preparing Word file...') : t('Download Word (DOCX)')}</span>
               </button>
               <button
-                onClick={handlePrint}
-                className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+                onClick={() => void handlePdfExport()}
+                disabled={isExportingPdf}
+                title={t('Opens the browser print dialog. Choose "Save as PDF" as the destination.')}
+                className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
               >
-                <Printer className="w-3.5 h-3.5" />
-                <span>{t('Print / Export PDF')}</span>
+                {isExportingPdf ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Printer className="w-3.5 h-3.5" />
+                )}
+                <span>{isExportingPdf ? t('Preparing PDF...') : t('Download as PDF')}</span>
               </button>
             </>
           )}

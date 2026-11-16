@@ -1,8 +1,12 @@
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Bell, X, Check, CheckCheck, Calendar, AlertCircle, Award, Megaphone } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Calendar, AlertCircle, Award, Megaphone, Briefcase } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
+import {
+  resolveNotificationMessage,
+  resolveNotificationTitle,
+} from '../../lib/notificationText';
 
 interface NotificationsDrawerProps {
   isOpen: boolean;
@@ -119,7 +123,8 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                   {n.type === 'roadmap' && <AlertCircle className="w-3.5 h-3.5 text-[var(--color-warning)]" />}
                   {n.type === 'achievement' && <Award className="w-3.5 h-3.5 text-[var(--color-success-strong)]" />}
                   {n.type === 'announcement' && <Megaphone className="w-3.5 h-3.5 text-[var(--color-accent-strong)]" />}
-                  <span>{n.title}</span>
+                  {n.type === 'opportunity' && <Briefcase className="w-3.5 h-3.5 text-[var(--color-primary-text)]" />}
+                  <span>{resolveNotificationTitle(n, t)}</span>
                   {n.priority === 'critical' && (
                     <span className="rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-danger)]">
                       {t('Critical')}
@@ -136,7 +141,9 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ isOpen
                   </button>
                 )}
               </div>
-              <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed">{n.message}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+                {resolveNotificationMessage(n, t)}
+              </p>
               <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
                 <span>{n.timestamp}</span>
                 {n.linkAction && (

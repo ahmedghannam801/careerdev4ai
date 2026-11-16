@@ -15,12 +15,32 @@ export interface NotificationDTO {
   id: string;
   title: string;
   message: string | null;
-  type: 'interview' | 'roadmap' | 'application' | 'achievement' | 'system' | 'announcement';
+  // Mirrors server/db/notifications.ts NOTIFICATION_TYPES. The two lists must
+  // stay identical or persisted rows are cast to a type the UI cannot render.
+  type:
+    | 'interview'
+    | 'roadmap'
+    | 'application'
+    | 'achievement'
+    | 'system'
+    | 'announcement'
+    | 'subscription'
+    | 'payment'
+    | 'payment_success'
+    | 'payment_failed'
+    | 'subscription_expired'
+    | 'credits'
+    | 'referral'
+    | 'opportunity';
   read: boolean;
   clicked: boolean;
   linkView: string | null;
   announcementId?: string | null;
   priority?: 'normal' | 'important' | 'critical' | null;
+  /** The English source text of the title, when the notification has one. */
+  titleKey?: string | null;
+  /** The values a translated title and message need. */
+  params?: Record<string, unknown>;
   createdAt: string;
 }
 

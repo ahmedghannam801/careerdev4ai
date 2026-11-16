@@ -49,4 +49,9 @@ export const cvStudioDataAr: Record<string, string> = {
   'Suggest achievements': 'اقترح الإنجازات',
   'Suggest responsibilities': 'اقترح المسؤوليات',
   'Suggest relevant skills': 'اقترح مهارات ذات صلة',
+  'Open the document editor to export the CV.': 'افتح محرر المستندات لتصدير السيرة الذاتية.',
+  'The PDF export could not be completed. Please try again.': 'تعذّر تصدير ملف PDF. يرجى المحاولة مرة أخرى.',
+  'Opens the browser print dialog. Choose "Save as PDF" as the destination.': 'يفتح نافذة الطباعة في المتصفح. اختر «حفظ كملف PDF» وجهةً للطباعة.',
+  'Preparing PDF...': 'جارٍ إعداد ملف PDF...',
+  'Download as PDF': 'تنزيل بصيغة PDF',
 };

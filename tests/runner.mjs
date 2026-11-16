@@ -3,7 +3,7 @@
 // `npm test` runs this file. It owns the whole lifecycle of a test run:
 //
 //   1. load the test environment (and fail clearly if a credential is missing)
-//   2. clean up anything a previous, interrupted run left behind
+//   2. validate an explicitly designated, non-production test project (no startup sweep)
 //   3. start exactly ONE isolated API server and wait until it is healthy
 //   4. run every test file against that server
 //   5. stop the server
@@ -19,17 +19,10 @@
 //   * The restart test needs a port of its own; it is given a second, separate
 //     free port so restarting it never collides with the shared server.
 //
-// One run at a time, on every machine:
-//
-//   The suite runs against the shared Supabase project. Every identity this
-//   run creates carries this run's id, so two runs can never remove each
-//   other's identities — the failure that used to make an overlapping CI run
-//   fail for reasons that had nothing to do with the commit under test.
-//
-//   The tables the suite writes to — announcements, the delivery ledger, the
-//   scheduler and the rate limits — are still shared, so two runs can still
-//   disturb each other there. The workflow serialises its own runs, and a
-//   local run should wait for a CI run to finish before it starts.
+// The runner requires an explicitly designated, non-production test project.
+// The integration suite also touches shared test-project tables, so CI exposes
+// it only as an opt-in manual workflow run and serializes all CI refs globally.
+// An operator must keep this project exclusive from local/other test runners.
 //
 // This file is plain ESM JavaScript: it must be runnable before any TypeScript
 // tooling is known to be healthy, so that a loader problem is reported as a
@@ -38,19 +31,15 @@
 import { spawn } from 'child_process';
 import { readFileSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
-import { randomBytes } from 'crypto';
+import { randomUUID } from 'crypto';
 import { setTimeout as sleep } from 'timers/promises';
 import { loadTestEnv, REPO_ROOT } from './env.mjs';
 import { startServer, findFreePort, resolveTsxLoaderUrl } from './server-harness.mjs';
 import {
   createAdminClient,
   deleteAllTestIdentities,
-  deleteTestIdentities,
   listTestIdentities,
   listForeignTestIdentities,
-  listStaleTestIdentities,
-  deleteSkillsById,
-  listSkillIds,
   removeTestStorageFolders,
   listOrphanedStorageFolders,
 } from './cleanup.mjs';
@@ -195,7 +184,6 @@ async function main() {
   let exitCode = 0;
   let server = null;
   let admin = null;
-  let skillIdsBefore = new Set();
   const createdUserIds = [];
 
   // The state file must be byte-identical after the run.
@@ -212,34 +200,18 @@ async function main() {
 
   admin = createAdminClient(env);
 
-  // This run's namespace. Every identity the run creates carries it, so two
-  // runs against the same database cannot remove each other's data.
-  //
-  // The id is set before anything reads it, and it is inherited by the test
-  // files this run spawns, so the runner and the tests agree on the namespace.
-  if (!process.env.TEST_RUN_ID) {
-    process.env.TEST_RUN_ID = randomBytes(4).toString('hex');
-  }
+  // Always mint a fresh namespace. Never reuse an environment-provided run id:
+  // cleanup is restricted to this namespace, and reuse could make old fixtures
+  // appear owned by this process.
+  const ciRun = /^\d+$/.test(process.env.GITHUB_RUN_ID ?? '')
+    ? process.env.GITHUB_RUN_ID
+    : 'local';
+  process.env.TEST_RUN_ID = `${ciRun}-${randomUUID()}`;
   log(`run namespace ${process.env.TEST_RUN_ID}`);
 
-  // A previous run may have been interrupted and left identities behind. Only
-  // the ones that no live run can be using are swept: an identity that is
-  // younger than the maximum run length may belong to a run that is executing
-  // right now, and removing it would break that run.
-  try {
-    const stale = await listStaleTestIdentities(admin);
-    if (stale.length > 0) {
-      log(`sweeping ${stale.length} abandoned test identit${stale.length === 1 ? 'y' : 'ies'} from an interrupted run`);
-      const removedIds = await deleteTestIdentities(admin, stale);
-      createdUserIds.push(...removedIds);
-    }
-    skillIdsBefore = await listSkillIds(admin);
-    const removedIds = await deleteAllTestIdentities(admin);
-    createdUserIds.push(...removedIds);
-  } catch (error) {
-    fail(`Could not clean up before the run: ${error.message}`);
-    return 1;
-  }
+  // Deliberately do not sweep startup residue. A stale identity or global row
+  // may belong to another active/interrupted run; only this run's fixtures are
+  // eligible for cleanup.
 
   // Find the test files.
   //
@@ -305,6 +277,33 @@ async function main() {
     join(TESTS_DIR, 'progress-measurement.test.ts'),
     join(TESTS_DIR, 'target-role.test.ts'),
     join(TESTS_DIR, 'volunteer.test.ts'),
+    // The roadmap relevance rules: that a resource mapped to another career
+    // never enters the plan, that a title is never treated as evidence of a
+    // skill, that a project without skill links is left out rather than
+    // matched on a shared word, and that what does enter the plan says why.
+    // Pure.
+    join(TESTS_DIR, 'roadmap-relevance.test.ts'),
+    // The subscription tier identities: that each tier has a name and a
+    // colour of its own, that the catalogue's own plan codes map onto them,
+    // and that the palette lives in the stylesheet rather than in the code.
+    // Pure.
+    join(TESTS_DIR, 'plan-identity.test.ts'),
+    // The official opportunity sources: that a deadline is read only when the
+    // source published one, that a month is recorded as a month, that the
+    // careers a programme concerns are the ones the page names, and that the
+    // parsers cope with the markup the sources really publish. Pure.
+    join(TESTS_DIR, 'opportunity-ingestion.test.ts'),
+    // What the opportunity pipeline writes: that an announcement named twice
+    // is read once, that a later run keeps the identity of a row the
+    // catalogue already refers to, that a body longer than a catalogue entry
+    // is bounded, and that the bound is read the same way on every run so a
+    // row is not rewritten for ever. Pure.
+    join(TESTS_DIR, 'opportunity-writes.test.ts'),
+    // The words a notification is shown in: that a title with a source text
+    // is shown in the reader's language, that a key the translator does not
+    // know falls back to the literal title rather than showing the key, and
+    // that a message is translated before its values are filled in. Pure.
+    join(TESTS_DIR, 'notification-text.test.ts'),
     // Live job vacancies: what the provider record becomes, what the fit
     // explanation says, how the provider's failures are answered, and that the
     // route is private and fails safely without a credential.
@@ -652,19 +651,11 @@ async function main() {
 
   // ---- Cleanup ------------------------------------------------------------
   //
-  // Everything the run created is removed here, whether the tests passed or
-  // failed. The skill catalogue is swept by comparing against the snapshot
-  // taken before the run: only rows that are new are removed, so a skill that
-  // already existed for a real user is never touched.
-  log('cleaning up the data this run created');
+  // Only this run's uniquely-namespaced identities and their owned resources
+  // are eligible for cleanup. Global catalogue rows are not swept by snapshot
+  // difference: another run may have created them after that snapshot.
+  log('cleaning up this run’s test identities and owned resources');
   try {
-    const skillIdsAfter = await listSkillIds(admin);
-    const newSkillIds = [...skillIdsAfter].filter((id) => !skillIdsBefore.has(id));
-    if (newSkillIds.length > 0) {
-      await deleteSkillsById(admin, newSkillIds);
-      log(`removed ${newSkillIds.length} catalogue skill row(s) created by this run`);
-    }
-
     const removedIds = await deleteAllTestIdentities(admin);
     createdUserIds.push(...removedIds);
 
@@ -708,9 +699,8 @@ async function main() {
       log('no test identities remain');
     }
 
-    // Identities from another run are reported, never deleted. An abandoned
-    // one is swept at the start of a later run; a live one belongs to a run
-    // that is executing right now.
+    // Identities from other runs are read-only diagnostics and are never
+    // deleted, whether they are active or abandoned.
     const foreign = await listForeignTestIdentities(admin);
     if (foreign.length > 0) {
       log(

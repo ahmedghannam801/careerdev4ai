@@ -20,6 +20,8 @@ export interface RoadmapResourceDTO {
   provider: string;
   url: string;
   durationHours: number | null;
+  /** Why this resource was recommended for this step. */
+  reason?: string;
 }
 
 export interface RoadmapTaskDTO {

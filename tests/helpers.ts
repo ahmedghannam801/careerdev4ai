@@ -274,17 +274,12 @@ export async function createTestUser(
  * not — Storage has no cascade — so they are removed explicitly.
  */
 export async function deleteTestUser(user: TestUser): Promise<void> {
-  try {
-    await deleteTestIdentity(admin, user.id);
-  } catch {
-    // best effort — the runner's final sweep is the backstop
-  }
+  await deleteTestIdentity(admin, user.id);
 }
 
 /**
- * Removes every test identity the suite may have left behind. The suite only
- * ever creates identities whose email starts with 'cp-test-', so this is
- * narrowly scoped and can never touch a real account.
+ * Removes only identities created in this process's unique run namespace.
+ * The default prefix is provided by `runEmailPrefix()` and never spans runs.
  */
 export async function deleteAllTestIdentities(): Promise<number> {
   const { deleteAllTestIdentities: sweep } = await import('./cleanup.mjs');

@@ -44,7 +44,7 @@ export const EvidenceView: React.FC = () => {
       description: description.trim(),
       url: url.trim() || undefined,
       skillNames: skillNamesStr.split(',').map(s => s.trim()).filter(Boolean),
-      verified: true
+      verified: false
     });
 
     setTitle('');
@@ -135,12 +135,16 @@ export const EvidenceView: React.FC = () => {
                   <h3 className="text-base font-bold text-[var(--text-primary)] mt-0.5">{item.title}</h3>
                 </div>
 
-                {item.verified && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--color-success-strong)] bg-[var(--color-success-surface)] px-2 py-0.5 rounded">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>{t('Verified')}</span>
-                  </span>
-                )}
+                <span className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded ${
+                  item.verificationStatus === 'verified'
+                    ? 'text-[var(--color-success-strong)] bg-[var(--color-success-surface)]'
+                    : item.verificationStatus === 'rejected'
+                      ? 'text-[var(--color-danger)] bg-[var(--surface-secondary)]'
+                      : 'text-[var(--text-secondary)] bg-[var(--surface-secondary)]'
+                }`}>
+                  {item.verificationStatus === 'verified' && <ShieldCheck className="w-3.5 h-3.5" />}
+                  <span>{t(item.verificationStatus === 'verified' ? 'Verified' : item.verificationStatus === 'rejected' ? 'Rejected' : 'Pending')}</span>
+                </span>
               </div>
 
               <p className="text-xs text-[var(--text-secondary)] leading-relaxed">

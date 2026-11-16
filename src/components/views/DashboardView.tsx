@@ -21,13 +21,14 @@ import {
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
-import { computeCareerMetrics, cvReadinessFromVersions, skillProofFromSource, type CareerJourneyStage } from '../../../shared/careerMetrics';
+import { computeCareerMetrics, cvReadinessFromVersions, toMetricSkills, type CareerJourneyStage } from '../../../shared/careerMetrics';
 import { EmptyState } from '../ui/EmptyState';
 import { CareerJourneyStepper } from '../career/CareerJourneyStepper';
 import { MetricCard } from '../career/MetricCard';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
+import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 import { AnimatedList } from '../react-bits/AnimatedList';
 
@@ -93,6 +94,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     markNotificationRead,
     recordNotificationClick,
     identity,
+    subscription,
     t,
   } = useCareer();
 
@@ -138,18 +140,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   const metrics = useMemo(
     () =>
       computeCareerMetrics({
-        skills: skills.map((skill) => ({
-          name: skill.name,
-          currentLevel: skill.currentLevel,
-          targetLevel: skill.targetLevel,
-          // A required skill of the role counts towards readiness whether the
-          // candidate has met it yet or not. A preferred (stretch) skill is
-          // shown with its gap, but it does not count.
-          importance: skill.required ? 'core' : skill.gap > 0 ? 'high' : 'medium',
-          required: skill.required === true,
-          // A level the candidate only claims does not make a skill mastered.
-          proof: skillProofFromSource(skill.source),
-        })),
+        skills: toMetricSkills(skills),
         roadmapTasks: allTasks.map((task) => ({
           id: task.id,
           status: task.status,
@@ -388,6 +379,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {/* The tier's identity, so a candidate can see which plan they are
+              on without going to the pricing page. It is drawn from the plan
+              the server resolved. */}
+          <PlanIdentityBadge planCode={subscription?.planCode ?? 'free'} size="md" />
           {/* The daily reward sits beside the balance the topbar shows. It is
               the same widget as the one inside that badge, so the platform
               never states two different opinions about today's tokens. */}

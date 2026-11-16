@@ -1,0 +1,70 @@
+rules:
+  - id: typescript-no-dynamic-code-execution
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Avoid eval, Function constructors, and string-based timers; use explicit parsing or safe dispatch.
+    metadata:
+      category: security
+      cwe: CWE-95
+      confidence: HIGH
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: $GLOBAL.eval(...)
+      - pattern: new Function(...)
+      - pattern: setTimeout("...", ...)
+      - pattern: setInterval("...", ...)
+
+  - id: hardcoded-token-shaped-credential
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: A credential-like literal appears assigned to a sensitive field; move it to a secret manager and rotate it if valid.
+    metadata:
+      category: security
+      cwe: CWE-798
+      confidence: HIGH
+    pattern-regex: (?i)(?:api[_-]?key|client[_-]?secret|service[_-]?role(?:[_-]?key)?|private[_-]?key|access[_-]?token|password)\s*[:=]\s*["'](?:sk_(?:live|test)_[A-Za-z0-9]{16,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|[A-Fa-f0-9]{40,})["']
+
+  - id: vite-client-secret-reference
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Vite-prefixed environment variables are exposed to the browser; never use them for service-role keys or private credentials.
+    metadata:
+      category: security
+      cwe: CWE-552
+      confidence: HIGH
+    pattern-regex: (?i)import\.meta\.env\.VITE_[A-Z0-9_]*(?:SERVICE[_-]?ROLE|CLIENT[_-]?SECRET|PRIVATE[_-]?KEY|ACCESS[_-]?TOKEN)[A-Z0-9_]*
+
+  - id: react-dangerous-html-injection
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: Review this dangerouslySetInnerHTML sink; prefer normal React text rendering or sanitize with a reviewed allow-list sanitizer.
+    metadata:
+      category: security
+      cwe: CWE-79
+      confidence: MEDIUM
+    pattern-regex: 'dangerouslySetInnerHTML\s*='
+
+  - id: javascript-unsafe-innerhtml-assignment
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Assigning untrusted data to innerHTML can cause XSS; use textContent or a reviewed sanitizer.
+    metadata:
+      category: security
+      cwe: CWE-79
+      owasp: A03:2021
+      confidence: MEDIUM
+    patterns:
+      - pattern: $EL.innerHTML = $VALUE
+      - pattern-not: $EL.innerHTML = "..."
+
+  - id: jwt-decode-is-not-authentication
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: Decoding a JWT does not verify its signature; do not use decoded claims alone for authorization decisions.
+    metadata:
+      category: security
+      cwe: CWE-287
+      confidence: LOW
+    pattern-either:
+      - pattern: jwt.decode(...)
+      - pattern: jwtDecode(...)

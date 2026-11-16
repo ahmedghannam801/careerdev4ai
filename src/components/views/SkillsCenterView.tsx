@@ -16,6 +16,7 @@ import {
   toRoleSkillRequirements,
 } from '../../../shared/skillGap';
 import { explainGapTranslated } from '../../lib/gapExplanation';
+import { cvReadinessFromVersions, skillProofFromSource } from '../../../shared/careerMetrics';
 import { WhyWeRecommend } from '../ui/WhyWeRecommend';
 import { useToast } from '../toast/ToastProvider';
 import { isSkillSectionHeader } from '../../../shared/cvDedupe';
@@ -46,7 +47,7 @@ const EVIDENCE_BADGE_LABELS: Record<SkillEvidenceSource, string> = {
 };
 
 export const SkillsCenterView: React.FC = () => {
-  const { skills, skillEvidence, updateSkillLevel, addCustomSkill, removeSkill, targetRole, t} = useCareer();
+  const { skills, skillEvidence, updateSkillLevel, addCustomSkill, removeSkill, targetRole, cvVersions, t} = useCareer();
   const { showToast } = useToast();
   const [skillError, setSkillError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useRouteParam<string>('category', SKILL_CATEGORIES, 'all');
@@ -83,17 +84,30 @@ export const SkillsCenterView: React.FC = () => {
   /**
    * The gap analysis, computed with the same engine the server and the AI
    * context use, so a skill's priority never disagrees with the roadmap.
+   *
+   * The readiness figure it reports comes from the shared metrics dictionary,
+   * so it is the same number the Dashboard and the Progress page show — and a
+   * level that only the candidate claims is weighed the same way everywhere.
    */
   const gapAnalysis = useMemo(() => {
     if (!targetRole) return null;
     const requirements = toRoleSkillRequirements(targetRole);
     const gaps = computeSkillGaps(
       requirements,
-      skills.map((skill) => ({ name: skill.name, level: skill.currentLevel })),
+      skills.map((skill) => ({
+        name: skill.name,
+        level: skill.currentLevel,
+        proof: skillProofFromSource(skill.source),
+      })),
     );
     const byName = new Map(gaps.map((gap) => [normalizeSkillName(gap.name), gap]));
-    return { byName, summary: summarizeSkillGaps(gaps, requirements) };
-  }, [targetRole, skills]);
+    return {
+      byName,
+      summary: summarizeSkillGaps(gaps, requirements, {
+        cvReadinessPct: cvReadinessFromVersions(cvVersions, targetRole.title),
+      }),
+    };
+  }, [targetRole, skills, cvVersions]);
 
   /**
    * Applies a level the candidate chose.

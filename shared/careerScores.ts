@@ -20,7 +20,8 @@ import {
 } from './interviewReadiness.ts';
 
 export const CAREER_SCORE_FORMULAS = {
-  roleReadiness: 'sum(min(current level, required level)) / sum(required levels) * 100',
+  roleReadiness:
+    'sum(min(current level, required level) * proof weight) / sum(required levels) * CV multiplier * 100; proof weights are claim 0.65, assessment 0.85, evidence 1',
   skillsMastered:
     'count(target-role skills at or above target AND backed by an assessment or verified evidence) / count(target-role skills)',
   roadmapProgress: 'completed roadmap steps / all roadmap steps * 100',

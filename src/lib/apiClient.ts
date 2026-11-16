@@ -11,6 +11,7 @@
 // non-2xx answer still throws with the server's own message.
 import { getAccessToken } from './supabase';
 import { apiUrl } from './native';
+import { creditActivityForPath, emitCreditActivity } from './creditActivity';
 
 /**
  * The error thrown when the API answers with a non-2xx status.
@@ -90,7 +91,28 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
         : `Request failed with status ${res.status}`;
     const code =
       payloadObject && typeof payloadObject.code === 'string' ? payloadObject.code : null;
+
+    // A refused token spend means the balance on the screen is known to be
+    // wrong. Announce it even though nothing was taken, so the store can
+    // correct itself instead of waiting for a reload. The announcement carries
+    // the reason only: the store re-reads the authoritative balance rather
+    // than guessing a new number from an error body.
+    const failedActivity = creditActivityForPath(path);
+    if (failedActivity && code === 'INSUFFICIENT_CREDITS') {
+      emitCreditActivity({ reason: failedActivity, path });
+    }
+
     throw new ApiRequestError(res.status, message, code);
   }
+
+  // A successful call to a route that spends a token may have moved the
+  // balance. The API client is the one place every request passes through, so
+  // it is the one place that can notice this without each feature having to
+  // remember. The store re-reads the server rather than subtracting locally.
+  const activity = creditActivityForPath(path);
+  if (activity) {
+    emitCreditActivity({ reason: activity, path });
+  }
+
   return payload as T;
 }

@@ -44,6 +44,7 @@ import {
   type BackgroundJobKind,
 } from '../server/jobs/jobs.ts';
 import { writeConsumerHeartbeat } from '../server/jobs/heartbeat.ts';
+import { testRunId } from './cleanup.mjs';
 
 /** The workflow the tests use when they need work that succeeds. */
 const HEALTH_CHECK = 'health-check' as BackgroundJobKind;
@@ -542,7 +543,7 @@ describe('the API, with a queue configured', () => {
   let baseUrl = '';
 
   /** The consumer the heartbeat below speaks for. */
-  const TEST_CONSUMER_ID = 'queue-test-consumer';
+  const TEST_CONSUMER_ID = `queue-test-consumer-${testRunId()}`;
 
   before(async () => {
     const port = await findFreePort();

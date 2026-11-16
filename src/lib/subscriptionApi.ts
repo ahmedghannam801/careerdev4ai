@@ -10,10 +10,18 @@ import type {
   SubscriptionPlanDTO,
   SubscriptionPlanCode,
 } from '../../shared/subscriptions';
+import type { PlanIdentityTier } from '../../shared/planIdentity';
 
 export interface CurrentSubscriptionResponse {
   success: boolean;
   planCode: SubscriptionPlanCode;
+  /**
+   * The tier the plan means, resolved on the server.
+   *
+   * The interface draws the tier it is given. It never decides which plan the
+   * candidate is on: that comes from the subscription the server read.
+   */
+  planTier?: PlanIdentityTier;
   planNameEn: string;
   planNameAr: string;
   status: 'active' | 'temporary_access' | 'free';

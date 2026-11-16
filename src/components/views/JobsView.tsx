@@ -49,6 +49,8 @@ import {
   type JobKind,
 } from '../../../shared/jobs';
 import { todayIsoDate } from '../../../shared/dateRange';
+import { CAREER_ROLES, CATALOG_SKILL_NAMES } from '../../../shared/careerRoles';
+import { deriveCandidateBand, educationLevelFromText, explainJobMatch, shouldFilterSeniorJob, type JobMatchCandidate } from '../../../shared/jobMatching';
 
 type SortOrder = 'match' | 'newest';
 
@@ -117,6 +119,10 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const {
     t,
     targetRole,
+    profile,
+    experienceLevel,
+    careerIdentity,
+    ownedSkills,
     isHydrated,
     bookmarkedJobIds,
     toggleBookmarkJob,
@@ -141,6 +147,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   /** When the vacancies were last read from the provider, in epoch millis. */
   const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null);
   const [sort, setSort] = useState<SortOrder>('match');
+  const [showSeniorRoles, setShowSeniorRoles] = useState<boolean | null>(null);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   /** The outcome of the last application the user tracked from this screen. */
   const [trackNotice, setTrackNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -231,16 +238,29 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
    * A vacancy whose fit could not be compared never sorts above one whose
    * fit could: an unknown is never treated as a good match.
    */
+  const candidate = useMemo<JobMatchCandidate>(() => {
+    const educationOrder = ['high_school', 'bachelor', 'master', 'doctorate'] as const;
+    const education = profile.education.map((entry) => educationLevelFromText(entry.degree)).filter((level) => level !== null);
+    const educationLevel = education.sort((a, b) => educationOrder.indexOf(b) - educationOrder.indexOf(a))[0] ?? null;
+    return {
+      skillNames: ownedSkills.filter((skill) => skill.level > 0).map((skill) => skill.name),
+      experienceLevel,
+      targetOpportunityType: careerIdentity.targetOpportunityType,
+      educationLevel,
+      country: profile.country ?? null,
+      city: profile.city ?? profile.location ?? null,
+    };
+  }, [profile.education, profile.country, profile.city, profile.location, ownedSkills, experienceLevel, careerIdentity.targetOpportunityType]);
+  const candidateBand = useMemo(() => deriveCandidateBand(candidate), [candidate]);
+  const hideSeniorByDefault = candidateBand === 'student' || candidateBand === 'intern' || candidateBand === 'entry';
+  const includeSenior = showSeniorRoles ?? !hideSeniorByDefault;
+  const scores = useMemo(() => new Map(results.map((item) => [item.job.id, explainJobMatch(item.job, candidate, CATALOG_SKILL_NAMES, CAREER_ROLES)])), [results, candidate]);
+
   const ordered = useMemo(() => {
-    const copy = [...results];
+    const copy = results.filter((item) => includeSenior || !shouldFilterSeniorJob(scores.get(item.job.id)?.jobSeniority ?? null, candidateBand));
     if (sort === 'match') {
       copy.sort((a, b) => {
-        const left = a.match.score;
-        const right = b.match.score;
-        if (left === null && right === null) return 0;
-        if (left === null) return 1;
-        if (right === null) return -1;
-        return right - left;
+        return (scores.get(b.job.id)?.score ?? 0) - (scores.get(a.job.id)?.score ?? 0);
       });
     } else {
       copy.sort((a, b) => {
@@ -253,7 +273,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       });
     }
     return copy;
-  }, [results, sort]);
+  }, [results, sort, scores, includeSenior, candidateBand]);
 
   const expiredCount = useMemo(() => ordered.filter((entry) => entry.job.expired).length, [ordered]);
 
@@ -605,6 +625,12 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
         </div>
       </form>
 
+      <label className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-4 py-3 text-xs text-[var(--text-secondary)]">
+        <input type="checkbox" checked={includeSenior} onChange={(event) => setShowSeniorRoles(event.target.checked)} className="h-3.5 w-3.5 accent-[var(--accent-primary)]" />
+        <span>{t('Show Senior and Lead roles')}</span>
+        <span>{t('Based on your profile: {level}').replace('{level}', candidateBand ?? t('Not set'))}</span>
+      </label>
+
       {/* Result count and ordering */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
@@ -766,19 +792,36 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       {/* Results */}
       {!loading && !error && ordered.length > 0 && (
         <AnimatedList className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {ordered.map((item) => (
-            <LiveJobCard
-              key={item.job.id}
-              item={item}
-              bookmarked={bookmarkedJobIds.includes(item.job.id)}
-              onToggleBookmark={toggleBookmarkJob}
-              onTrackApplication={(entry) => void handleTrackApplication(entry)}
-              onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
-              tracking={trackingId === item.job.id}
-              tailoring={tailoringId === item.job.id}
-              t={t}
-            />
-          ))}
+          {ordered.map((item) => {
+            const match = scores.get(item.job.id);
+            return (
+              <div key={item.job.id} className="space-y-3">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
+                  <p className="text-lg font-bold text-[var(--color-primary-text)]">{t('Fit Score')}: {match?.score ?? 0}%</p>
+                  <p className="mt-2 text-[11px] font-semibold">{t('Required skills')}: {match?.requiredSkills.matched.join(', ') || t('None')} · {t('Still needed')}: {match?.requiredSkills.missing.join(', ') || t('None')}</p>
+                  <p className="text-[11px] font-semibold">{t('Preferred skills')}: {match?.preferredSkills.matched.join(', ') || t('None')} · {t('Still needed')}: {match?.preferredSkills.missing.join(', ') || t('None')}</p>
+                  <details className="mt-3 text-[11px]">
+                    <summary className="cursor-pointer font-semibold">{t('Why this Match Score?')}</summary>
+                    {match?.factors.map((factor) => (
+                      <p key={factor.factor} className="mt-2 text-[var(--text-secondary)]">
+                        {t(factor.factor === 'requiredSkills' ? 'Required skills' : factor.factor === 'preferredSkills' ? 'Preferred skills' : factor.factor === 'experience' ? 'Experience / seniority' : factor.factor === 'education' ? 'Education' : 'Location / work type')}: {factor.score}% · {factor.weight}% · +{factor.contribution.toFixed(1)} — {factor.reason}
+                      </p>
+                    ))}
+                  </details>
+                </div>
+                <LiveJobCard
+                  item={item}
+                  bookmarked={bookmarkedJobIds.includes(item.job.id)}
+                  onToggleBookmark={toggleBookmarkJob}
+                  onTrackApplication={(entry) => void handleTrackApplication(entry)}
+                  onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
+                  tracking={trackingId === item.job.id}
+                  tailoring={tailoringId === item.job.id}
+                  t={t}
+                />
+              </div>
+            );
+          })}
         </AnimatedList>
       )}
 

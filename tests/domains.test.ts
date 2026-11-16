@@ -108,6 +108,21 @@ describe('domain CRUD', () => {
     const evidence = createdRes.body.evidence;
     track('evidence_items', evidence.id);
     assert.deepEqual(evidence.skillNames, ['TypeScript']);
+    assert.equal(evidence.verified, false, 'submitters cannot self-verify evidence');
+    assert.equal(evidence.verificationStatus, 'pending');
+
+    const selfReview = await api('PATCH', `/api/evidence/${evidence.id}`, {
+      token: userA.token,
+      body: { verified: true },
+    });
+    assert.equal(selfReview.status, 200);
+    assert.equal(selfReview.body.evidence.verified, false);
+
+    const unauthorizedReview = await api('PATCH', `/api/admin/evidence/${evidence.id}/review`, {
+      token: userA.token,
+      body: { status: 'verified' },
+    });
+    assert.equal(unauthorizedReview.status, 403, 'ordinary users cannot review evidence');
 
     const { data: links } = await admin
       .from('evidence_skills')

@@ -18,6 +18,7 @@ import {
   AlertCircle,
   ArrowUpRight,
   BadgeCheck,
+  BadgeDollarSign,
   Bookmark,
   BookmarkCheck,
   Building2,
@@ -35,6 +36,7 @@ import {
   Sparkles,
   Star,
   Target,
+  Users,
   X,
 } from 'lucide-react';
 import {
@@ -46,6 +48,7 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import {
   AUDIENCE_LABELS,
+  OPPORTUNITY_COST_LABELS,
   OPPORTUNITY_KINDS,
   OPPORTUNITY_LABELS,
   PARTICIPATION_LABELS,
@@ -684,9 +687,36 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
                   {opportunity.deadline && (
                     <span className="inline-flex items-center gap-1 font-mono">
                       <CalendarDays className="h-3 w-3" />
-                      {t('Apply by')} {opportunity.deadline}
+                      {t('Apply by')}{' '}
+                      {/* The deadline is shown the way the source worded it.
+                          A source that named only a month says so, rather than
+                          pretending to a day it never published. */}
+                      {opportunity.deadlineText ?? opportunity.deadline}
+                      {opportunity.deadlinePrecision === 'month'
+                        ? ` (${t('by the end of the month')})`
+                        : ''}
                     </span>
                   )}
+                  {/* What it costs, when the source says. */}
+                  {opportunity.costType !== 'unspecified' && (
+                    <span className="inline-flex items-center gap-1">
+                      <BadgeDollarSign className="h-3 w-3" />
+                      {t(OPPORTUNITY_COST_LABELS[opportunity.costType])}
+                      {opportunity.costNote ? ` — ${opportunity.costNote}` : ''}
+                    </span>
+                  )}
+                  {/* The cohort or intake, when the source names one. */}
+                  {opportunity.cohort && (
+                    <span className="inline-flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {opportunity.cohort}
+                    </span>
+                  )}
+                  {/* Where the record came from and when it was last checked. */}
+                  <span className="inline-flex items-center gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    {t('Verified source')}
+                  </span>
                 </div>
 
                 {opportunity.eligibility && (

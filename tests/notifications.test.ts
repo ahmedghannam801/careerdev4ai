@@ -171,6 +171,32 @@ describe('notifications', () => {
     assert.equal(res.status, 400);
   });
 
+  test('the database accepts the kind of notice about a new opportunity', async () => {
+    // The opportunity pipeline writes a notification of this kind. The table
+    // carries a check constraint on the kind, and a kind the constraint does
+    // not list is refused by the database — which took the whole opportunity
+    // run down at its last step.
+    const { data, error } = await admin
+      .from('notifications')
+      .insert({
+        profile_id: user.id,
+        title: 'Data Analyst Internship',
+        message: 'A new opportunity from the Ministry.',
+        type: 'opportunity',
+        title_key: 'New opportunity',
+        opportunity_id: 'test-opportunity-1',
+        params: { organization: 'Ministry', opportunityTitle: 'Data Analyst Internship' },
+      })
+      .select('id, type, title_key')
+      .single();
+
+    assert.equal(error, null, `the database refused the notice: ${error?.message}`);
+    assert.equal(data?.type, 'opportunity');
+    assert.equal(data?.title_key, 'New opportunity');
+
+    await admin.from('notifications').delete().eq('id', data!.id);
+  });
+
   test('deleting the account removes the notifications (the FK cascade)', async () => {
     const temp = await createTestUser('notificationscascade');
     try {

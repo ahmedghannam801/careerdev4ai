@@ -16,12 +16,9 @@
 //   public.user_preferences  keyed by user_id. The cascade already covers it,
 //                            but it is swept explicitly for the same reason.
 //   public.skills            a GLOBAL catalogue with no owner and no cascade.
-//                            A project with a skill inserts a catalogue row
-//                            that would survive forever. The runner snapshots
-//                            the catalogue before the run and removes only the
-//                            ids that are new afterwards — a skill that
-//                            already existed belongs to a real user and is
-//                            never touched.
+//                            The runner deliberately does not sweep it: without
+//                            a per-run owner tag, snapshot-difference deletion
+//                            could remove a row created by another run.
 //   storage.objects          Storage has no cascade at all: a file uploaded by
 //                            a test user outlives the user. The bucket is swept
 //                            per test-user folder.
@@ -30,20 +27,10 @@
 //                            after the run.
 
 import { createClient } from '@supabase/supabase-js';
-import { randomBytes } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 /** Prefix every test identity's email carries. Nothing else is ever removed. */
 export const TEST_EMAIL_PREFIX = 'cp-test-';
-
-/**
- * How long an identity may exist before it is treated as abandoned residue.
- *
- * A run that is still going on cannot have created an identity older than
- * this: the workflow gives a run twenty minutes, and a local run finishes in
- * about ten. So anything older belongs to a run that was interrupted, and an
- * identity younger than this may still belong to a run that is in progress.
- */
-export const STALE_IDENTITY_AGE_MS = 60 * 60 * 1000;
 
 /**
  * The namespace of the run that is executing right now.
@@ -61,7 +48,7 @@ export const STALE_IDENTITY_AGE_MS = 60 * 60 * 1000;
  */
 export function testRunId() {
   if (!process.env.TEST_RUN_ID) {
-    process.env.TEST_RUN_ID = randomBytes(4).toString('hex');
+    process.env.TEST_RUN_ID = `local-${randomUUID()}`;
   }
   return process.env.TEST_RUN_ID;
 }
@@ -163,24 +150,6 @@ export async function listForeignTestIdentities(admin) {
 }
 
 /**
- * Lists the identities that belong to no live run: they were left behind by
- * a run that was interrupted.
- *
- * An identity is only treated as abandoned when it is older than
- * `STALE_IDENTITY_AGE_MS`. Anything younger may belong to a run that is still
- * going on, and removing it would break that run.
- */
-export async function listStaleTestIdentities(admin, maxAgeMs = STALE_IDENTITY_AGE_MS) {
-  const cutoff = Date.now() - maxAgeMs;
-  const foreign = await listForeignTestIdentities(admin);
-  return foreign.filter((identity) => {
-    if (!identity.createdAt) return false;
-    const created = new Date(identity.createdAt).getTime();
-    return Number.isFinite(created) && created < cutoff;
-  });
-}
-
-/**
  * Deletes the test identities that carry a prefix, and everything they own.
  *
  * Order matters: the storage objects and the explicitly-keyed rows are removed
@@ -233,6 +202,14 @@ export async function deleteTestIdentities(admin, identities) {
  * Removes one test identity and everything it owns.
  */
 export async function deleteTestIdentity(admin, userId) {
+  if (typeof userId !== 'string' || !userId) {
+    throw new Error('Refusing test cleanup without an exact user id.');
+  }
+  const { data, error: lookupError } = await admin.auth.admin.getUserById(userId);
+  if (lookupError || !data?.user?.email?.startsWith(runEmailPrefix())) {
+    throw new Error(`Refusing to clean identity outside this test run: ${userId}`);
+  }
+
   await removeStorageFolder(admin, userId);
   await deleteProfileScopedRows(admin, userId);
   await admin.from('profiles').delete().eq('id', userId);
@@ -276,41 +253,22 @@ export async function deleteProfileScopedRows(admin, userId) {
   }
 }
 
-/**
- * Deletes the catalogue rows the suite created during this run.
- *
- * `public.skills` is a shared catalogue — it has no profile owner and no
- * cascade, so a row inserted by a test would otherwise survive forever. Only
- * ids that did not exist before the run are removed; a skill that was already
- * in the catalogue belongs to a real user and is never touched.
- */
-export async function deleteSkillsById(admin, skillIds) {
-  for (const id of skillIds) {
-    const { error } = await admin.from('skills').delete().eq('id', id);
-    if (error && !/not found/i.test(error.message)) {
-      throw new Error(`Could not clean skills row ${id}: ${error.message}`);
-    }
-  }
-}
-
-/** Returns the ids of every row in the shared skill catalogue. */
-export async function listSkillIds(admin) {
-  const { data, error } = await admin.from('skills').select('id');
-  if (error) return new Set();
-  return new Set((data ?? []).map((row) => row.id));
-}
-
 /** Removes every object in the CV bucket that belongs to the given user folder. */
 export async function removeStorageFolder(admin, userId) {
   const { data: objects, error } = await admin.storage
     .from(CV_BUCKET)
     .list(userId, { limit: 1000 });
-  if (error) return [];
+  if (error) {
+    throw new Error(`Could not list storage objects for test user ${userId}: ${error.message}`);
+  }
   const paths = (objects ?? [])
     .filter((entry) => entry && typeof entry.name === 'string')
     .map((entry) => `${userId}/${entry.name}`);
   if (paths.length === 0) return [];
-  await admin.storage.from(CV_BUCKET).remove(paths);
+  const { error: removeError } = await admin.storage.from(CV_BUCKET).remove(paths);
+  if (removeError) {
+    throw new Error(`Could not remove storage objects for test user ${userId}: ${removeError.message}`);
+  }
   return paths;
 }
 

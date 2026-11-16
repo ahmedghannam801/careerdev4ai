@@ -215,6 +215,7 @@ describe('FT-02 — the assessment integration', () => {
           currentLevel: after.assessedLevel ?? 0,
           targetLevel: after.targetLevel,
           required: true,
+          proof: 'assessment',
         },
       ],
       roadmapTasks: [],
@@ -223,8 +224,8 @@ describe('FT-02 — the assessment integration', () => {
     assert.equal(metrics.skillsTotal, 1, 'the skill is still one of the role’s skills');
     assert.equal(
       metrics.roleReadinessPct,
-      100,
-      'the assessed level of 4 against a target of 4 is a full match'
+      68,
+      'an assessment uses the shared 85% proof weight and the 80% multiplier when CV readiness is missing'
     );
 
     // Meeting the role's target is not the same as being mastered. The

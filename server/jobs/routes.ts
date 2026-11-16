@@ -138,6 +138,15 @@ const KIND_SPECS: Record<BackgroundJobKind, KindSpec> = {
     // A scheduled maintenance job. A candidate may not start it.
     userTriggerable: false,
   },
+  'sync-opportunities': {
+    taskId: BACKGROUND_JOB_TASKS['sync-opportunities'],
+    aiUnits: 0,
+    sourceType: null,
+    sourceRequired: false,
+    // A scheduled job that reads the official sources. A candidate may not
+    // start it: it is not their work, and it reads somebody else's server.
+    userTriggerable: false,
+  },
 };
 
 /** Reads a trimmed string out of an untrusted body. */
@@ -273,6 +282,10 @@ function buildTaskPayload(
         language: language(body.language),
       };
     case 'validate-learning-resources':
+      return { profileId };
+    case 'sync-opportunities':
+      // The synchronisation reads the registry for itself; a candidate has
+      // nothing to add to it.
       return { profileId };
   }
 }

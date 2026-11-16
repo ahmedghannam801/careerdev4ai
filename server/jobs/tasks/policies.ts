@@ -46,6 +46,10 @@ export const JOB_POLICIES: Record<string, JobPolicy> = {
   // A sweep should not stack up attempts. One pass, and the next run picks up
   // whatever was left.
   'validate-learning-resources': { maxAttempts: 1, baseBackoffSeconds: 30, maxBackoffSeconds: 60 },
+  // Reading a ministry's announcement page is an outbound request to someone
+  // else's server. A second attempt a minute later would be rude and would
+  // not help, so the wait is an hour and only one attempt is made.
+  'sync-opportunities': { maxAttempts: 1, baseBackoffSeconds: 3600, maxBackoffSeconds: 3600 },
 };
 
 /** The policy for a kind, or `null` when the kind is not one we know. */

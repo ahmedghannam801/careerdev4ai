@@ -37,6 +37,7 @@ import { saveBirthdayConsent, getActiveBirthdayReward } from '../server/birthday
 import { createCheckout } from '../server/payments/service.ts';
 import { validateCoupon } from '../server/coupons/service.ts';
 import { checkUserEntitlement } from '../server/subscriptions/entitlements.ts';
+import { createTestUser, deleteTestUser } from './helpers.ts';
 
 describe('SaaS Subscription Remediation & Verification Suite', () => {
 
@@ -45,36 +46,34 @@ describe('SaaS Subscription Remediation & Verification Suite', () => {
   // -------------------------------------------------------------------------
   describe('BLK-01: Payment Request RLS & Direct Insert Protection', () => {
     it('verifies that client direct checkout creation is routed through server-side validation', async () => {
-      // Direct client calls cannot bypass checkout logic. createCheckout guarantees:
-      // - Correct piaster calculations
-      // - No client-injected 'paid' or 'temporary_access' status
-      const testProfileId = '00000000-0000-0000-0000-000000000001';
-      
-      const checkout = await createCheckout({
-        profileId: testProfileId,
-        planCode: 'student',
-        billingCycle: 'monthly',
-        paymentMethod: 'vodafone_cash',
-      }).catch((err) => {
-        // In local unit test context where DB is mocked/offline, verify schema validation
-        return null;
-      });
+      // Use an identity created for this run; never target a fixed profile id.
+      const user = await createTestUser('checkout-safety');
+      try {
+        const checkout = await createCheckout({
+          profileId: user.id,
+          planCode: 'student',
+          billingCycle: 'monthly',
+          paymentMethod: 'vodafone_cash',
+        }).catch(() => null);
 
-      if (checkout) {
-        assert.equal(checkout.paymentRequest.status, 'pending');
-        assert.equal(checkout.paymentRequest.amountPiasters, 9900);
-        assert.equal(checkout.paymentRequest.temporaryAccessGrantedAt, null);
+        if (checkout) {
+          assert.equal(checkout.paymentRequest.status, 'pending');
+          assert.equal(checkout.paymentRequest.amountPiasters, 9900);
+          assert.equal(checkout.paymentRequest.temporaryAccessGrantedAt, null);
+        }
+      } finally {
+        await deleteTestUser(user);
       }
     });
 
     it('proves that provisional access cost restrictions block high-risk AI operations (cv.tailoring, mock interview)', async () => {
-      // In server/subscriptions/entitlements.ts, HIGH_RISK_TEMPORARY_RESTRICTIONS blocks expensive actions
-      const resultMock = await checkUserEntitlement(
-        'mock-provisional-user',
-        'interview.mock_simulation'
-      );
-      // For mock user without active sub, allowed is false
-      assert.equal(resultMock.allowed, false);
+      const user = await createTestUser('provisional-entitlement', { subscription: false });
+      try {
+        const result = await checkUserEntitlement(user.id, 'interview.mock_simulation');
+        assert.equal(result.allowed, false);
+      } finally {
+        await deleteTestUser(user);
+      }
     });
   });
 
@@ -100,19 +99,22 @@ describe('SaaS Subscription Remediation & Verification Suite', () => {
     });
 
     it('creates credit pack checkouts with itemType=credit_pack and exact credits to grant', async () => {
-      const checkout = await createCheckout({
-        profileId: '00000000-0000-0000-0000-000000000002',
-        planCode: 'pack_40',
-        billingCycle: 'monthly',
-        paymentMethod: 'instapay',
-      }).catch(() => null);
+      const user = await createTestUser('credit-pack-checkout', { subscription: false });
+      try {
+        const checkout = await createCheckout({
+          profileId: user.id,
+          planCode: 'pack_40',
+          billingCycle: 'monthly',
+          paymentMethod: 'instapay',
+        });
 
-      if (checkout) {
         assert.equal(checkout.paymentRequest.itemType, 'credit_pack');
         assert.equal(checkout.paymentRequest.creditPackId, 'pack_40');
         assert.equal(checkout.paymentRequest.creditsToGrant, 40);
         assert.equal(checkout.paymentRequest.amountPiasters, 9900);
         assert.equal(checkout.paymentRequest.planId, null);
+      } finally {
+        await deleteTestUser(user);
       }
     });
   });

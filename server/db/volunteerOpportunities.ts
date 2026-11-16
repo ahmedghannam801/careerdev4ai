@@ -35,12 +35,16 @@ import {
 import {
   isLiveOpportunity,
   isOpportunityAudience,
+  isOpportunityCostType,
   isOpportunityKind,
+  isOpportunityStatus,
   isOpportunityVerificationStatus,
   isParticipationMode,
   kindForCategory,
   type OpportunityAudience,
+  type OpportunityCostType,
   type OpportunityKind,
+  type OpportunityStatus,
   type ParticipationMode,
 } from '../../shared/opportunities.ts';
 
@@ -68,6 +72,20 @@ export interface VolunteerOpportunityDTO {
   opportunityType: string;
   /** An application deadline, when the organisation publishes one. */
   deadline: string | null;
+  /** The deadline exactly as the source worded it. */
+  deadlineText: string | null;
+  /** Whether the source named a day or only a month. */
+  deadlinePrecision: 'day' | 'month' | null;
+  /** Where the opportunity stands in its life. */
+  status: OpportunityStatus;
+  /** What it costs, when the source says. */
+  costType: OpportunityCostType;
+  /** The cost as the source worded it. */
+  costNote: string | null;
+  /** The cohort or intake, when the source names one. */
+  cohort: string | null;
+  /** When the source published it. */
+  publishedAt: string | null;
   /** The broader ecosystem category. */
   kind: OpportunityKind;
   /** How a participant takes part. */
@@ -114,6 +132,14 @@ interface OpportunityRow {
   languages: string[] | null;
   opportunity_type: string | null;
   deadline: string | null;
+  deadline_text: string | null;
+  deadline_precision: string | null;
+  status: string | null;
+  cost_type: string | null;
+  cost_note: string | null;
+  cohort: string | null;
+  published_at: string | null;
+  source_id: string | null;
   opportunity_kind: string | null;
   participation_mode: string | null;
   audience: string[] | null;
@@ -127,7 +153,7 @@ interface OpportunityRow {
 }
 
 const OPPORTUNITY_COLUMNS =
-  'id, title, organization, description, category, location, is_remote, commitment, application_url, skills_gained, required_skills, role_slugs, domain_ids, verification_status, verified_at, country, languages, opportunity_type, deadline, opportunity_kind, participation_mode, audience, eligibility, source_url, thumbnail_url, organization_type, tags, is_featured, is_active';
+  'id, title, organization, description, category, location, is_remote, commitment, application_url, skills_gained, required_skills, role_slugs, domain_ids, verification_status, verified_at, country, languages, opportunity_type, deadline, deadline_text, deadline_precision, status, cost_type, cost_note, cohort, published_at, source_id, opportunity_kind, participation_mode, audience, eligibility, source_url, thumbnail_url, organization_type, tags, is_featured, is_active';
 
 function toOpportunity(
   row: OpportunityRow,
@@ -169,6 +195,16 @@ function toOpportunity(
     languages: Array.from(new Set(row.languages ?? [])),
     opportunityType: row.opportunity_type ?? 'ongoing',
     deadline: row.deadline,
+    deadlineText: row.deadline_text ?? null,
+    deadlinePrecision:
+      row.deadline_precision === 'day' || row.deadline_precision === 'month'
+        ? row.deadline_precision
+        : null,
+    status: isOpportunityStatus(row.status) ? row.status : 'open',
+    costType: isOpportunityCostType(row.cost_type) ? row.cost_type : 'unspecified',
+    costNote: row.cost_note ?? null,
+    cohort: row.cohort ?? null,
+    publishedAt: row.published_at ?? null,
     kind,
     participationMode,
     audiences: Array.from(new Set((row.audience ?? []).filter(isOpportunityAudience))),
@@ -557,6 +593,10 @@ export async function listVolunteerOpportunities(
       .from('volunteer_opportunities')
       .select(OPPORTUNITY_COLUMNS)
       .eq('is_active', true)
+      // A record the source pipeline was not confident about waits for an
+      // administrator. It is kept in the table so that the review can happen,
+      // but it is not offered to candidates until it has been approved.
+      .eq('review_state', 'approved')
       // The catalogue is scoped to what this product offers: opportunities in
       // Egypt and opportunities that can be done online or hybrid from
       // anywhere. An on-site role in another country is not actionable here.
@@ -572,7 +612,12 @@ export async function listVolunteerOpportunities(
   if (opportunitiesResult.error) throw opportunitiesResult.error;
 
   const rows = ((opportunitiesResult.data ?? []) as OpportunityRow[]).filter((row) =>
-    isLiveOpportunity({ isActive: row.is_active, deadline: row.deadline })
+    isLiveOpportunity({ isActive: row.is_active, deadline: row.deadline }) &&
+    // Keep unmapped items available to administrators for review, but do not
+    // present them as public opportunities until the source supports a
+    // defensible role mapping. This avoids pretending generic programmes suit
+    // every career.
+    Array.isArray(row.role_slugs) && row.role_slugs.length > 0
   );
   const savedIds = new Set(
     ((savesResult.data ?? []) as Array<{ opportunity_id: string }>).map(
