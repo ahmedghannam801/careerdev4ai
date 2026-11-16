@@ -14,6 +14,7 @@
  */
 
 import type { RoleSkill, SkillCategory } from './careerTypes.ts';
+import { computeRoleReadiness, type SkillProof } from './metricsDictionary.ts';
 
 /** How urgent it is to close a gap. */
 export type SkillGapPriority = 'critical' | 'high' | 'medium' | 'low' | 'sufficient';
@@ -42,6 +43,14 @@ export const MAX_PROFICIENCY = 5;
 export interface RatedSkill {
   name: string;
   level: number;
+  /**
+   * What backs the level.
+   *
+   * The level alone cannot be weighed for readiness: a claim and a
+   * measurement are not worth the same. A caller that has no proof to offer
+   * leaves it out, and the level is then treated as unbacked.
+   */
+  proof?: SkillProof;
 }
 
 /** The role-relative skill requirements this engine works against. */
@@ -83,6 +92,12 @@ export interface SkillGap {
    * the rating was never updated.
    */
   verifiedLevel: number;
+  /**
+   * What backs the skill's level: a claim, a measurement or proof.
+   *
+   * The gap engine reports it so every page can weigh a level the same way.
+   */
+  proof: SkillProof;
 }
 
 export interface SkillGapSummary {
@@ -206,17 +221,22 @@ export function computeSkillGaps(
   userSkills: RatedSkill[],
   evidenceLevels?: EvidenceSkillLevels,
 ): SkillGap[] {
-  const levels = new Map<string, { name: string; level: number }>();
+  const levels = new Map<string, { name: string; level: number; proof: SkillProof }>();
   for (const skill of userSkills) {
     const key = normalizeSkillName(skill.name);
     if (!key) continue;
     const level = clampLevel(skill.level);
+    const proof: SkillProof = skill.proof ?? 'none';
     const existing = levels.get(key);
     // A skill can be recorded more than once (for example under two
     // catalogue entries). Keep the strongest rating so we never invent a gap
     // the user has already covered.
     if (!existing || level > existing.level) {
-      levels.set(key, { name: skill.name, level });
+      levels.set(key, { name: skill.name, level, proof });
+    } else if (existing.proof === 'none' && proof !== 'none') {
+      // The same level recorded twice: the better-backed copy is the one that
+      // counts, so a claim never overrules a proof of the same skill.
+      existing.proof = proof;
     }
   }
 
@@ -233,6 +253,10 @@ export function computeSkillGaps(
     const requiredLevel = clampLevel(skill.minLevel);
     const gap = Math.max(0, requiredLevel - currentLevel);
     const priority = priorityForGap(gap, required);
+    // A record that proves the skill outranks an assessment, which outranks
+    // the candidate's own claim.
+    const proof: SkillProof =
+      evidenceLevel > 0 ? 'evidence' : rated?.proof ?? 'none';
     gaps.push({
       name: skill.name,
       category: skill.category,
@@ -247,6 +271,7 @@ export function computeSkillGaps(
         (required ? 1 : 0),
       verified: evidenceLevel > 0,
       verifiedLevel: evidenceLevel > 0 ? evidenceLevel : claimedLevel,
+      proof,
     });
   };
 
@@ -267,6 +292,7 @@ export function computeSkillGaps(
 export function summarizeSkillGaps(
   gaps: SkillGap[],
   requirements?: RoleSkillRequirements,
+  options?: { cvReadinessPct?: number },
 ): SkillGapSummary {
   const summary: SkillGapSummary = {
     critical: 0,
@@ -298,17 +324,24 @@ export function summarizeSkillGaps(
       minLevel: gap.requiredLevel,
     }));
   if (core.length > 0) {
-    let met = 0;
-    let possible = 0;
-    for (const skill of core) {
-      const required = clampLevel(skill.minLevel);
-      const key = normalizeSkillName(skill.name);
-      const gapEntry = gaps.find((g) => normalizeSkillName(g.name) === key);
-      const current = gapEntry?.currentLevel ?? 0;
-      met += Math.min(current, required);
-      possible += required;
-    }
-    summary.readinessPct = possible > 0 ? Math.round((met / possible) * 100) : 0;
+    // The readiness figure comes from the shared metrics dictionary, so the
+    // Skills Centre reports the same number as the Dashboard and the Progress
+    // page — and weighs a claim the same way everywhere.
+    const readiness = computeRoleReadiness(
+      core.map((skill) => {
+        const key = normalizeSkillName(skill.name);
+        const gapEntry = gaps.find((g) => normalizeSkillName(g.name) === key);
+        return {
+          name: skill.name,
+          currentLevel: gapEntry?.currentLevel ?? 0,
+          targetLevel: clampLevel(skill.minLevel),
+          required: true,
+          proof: gapEntry?.proof,
+        };
+      }),
+      options?.cvReadinessPct
+    );
+    summary.readinessPct = readiness.pct;
   }
 
   return summary;

@@ -32,7 +32,13 @@
  */
 
 import { normalizeSkillName, type SkillGap } from './skillGap.ts';
-import { isAtsAnalysisForRole } from './atsAnalysis.ts';
+import {
+  computeRoleReadiness,
+  type SkillProof,
+} from './metricsDictionary.ts';
+
+export { cvReadinessFromVersions } from './metricsDictionary.ts';
+export type { SkillProof } from './metricsDictionary.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Inputs                                                                       */
@@ -97,51 +103,20 @@ export interface MetricSkill {
    * that is never counted as mastered, however high the claim is — that is
    * what stops "add it to your profile" from closing a gap.
    *
-   * When the caller has no proof information at all the field is left out, and
-   * the level is taken at face value. That keeps the engine usable by callers
-   * that only know the level, without weakening the rule where the proof is
-   * actually known.
+   * When the caller has no proof information, the skill remains unproven. Only
+   * an explicit assessment or evidence record can make it mastered.
    */
-  proof?: SkillProof;
-}
-
-/**
- * How a skill's level is backed.
- *
- * `'assessment'` — a diagnostic knowledge check measured it.
- * `'evidence'` — a project, a certificate or work experience proves it.
- * `'none'` — the candidate only claims it.
- */
-export type SkillProof = 'none' | 'assessment' | 'evidence';
-
-export interface CvReadinessVersion {
-  targetRoleTitle?: string | null;
-  atsAnalysis?: { overallScore?: number | null } | null;
-}
-
-/** Returns the best available ATS score for the active role, or zero if none exists. */
-export function cvReadinessFromVersions(
-  versions: readonly CvReadinessVersion[] | null | undefined,
-  targetRoleTitle: string | null | undefined
-): number {
-  if (!Array.isArray(versions) || !targetRoleTitle?.trim()) return 0;
-  const matching = versions.find((version) =>
-    version?.atsAnalysis && isAtsAnalysisForRole(version.targetRoleTitle ?? '', targetRoleTitle)
-  );
-  const score = matching?.atsAnalysis?.overallScore;
-  return typeof score === 'number' && Number.isFinite(score)
-    ? Math.min(100, Math.max(0, score))
-    : 0;
+  proof?: SkillProof | null;
 }
 
 /**
  * Whether a skill's level is backed by something the platform can check.
  *
- * A missing proof field means the caller had nothing to say, so the level is
- * taken at face value. Only an explicit `'none'` withholds the credit.
+ * Missing, null, unknown and explicit `'none'` values are not proof. Only a
+ * recognized assessment or evidence record can establish mastery.
  */
 export function isSkillProven(skill: Pick<MetricSkill, 'proof'>): boolean {
-  return skill.proof !== 'none';
+  return skill.proof === 'assessment' || skill.proof === 'evidence';
 }
 
 /**
@@ -171,6 +146,46 @@ export function skillProofFromSource(source: string | null | undefined): SkillPr
     return 'evidence';
   }
   return 'none';
+}
+
+/**
+ * A skill as the pages hold it, before the engine's own shape.
+ *
+ * Every page receives its skills from the same context in this shape, so the
+ * adapter below is the one place that decides what a skill means to the
+ * metrics. A page that built this mapping itself could weigh a claimed level
+ * differently from its neighbour; this function is why it cannot.
+ */
+export interface ContextSkill {
+  name: string;
+  currentLevel: number;
+  targetLevel: number;
+  /** How many levels are missing, when the page knows it. */
+  gap?: number;
+  /** True when the target role requires the skill. */
+  required?: boolean;
+  /** What backs the level, in the platform's source vocabulary. */
+  source?: string | null;
+}
+
+/**
+ * Converts the skills a page holds into the engine's shape.
+ *
+ * The importance follows the role catalogue: a required skill is core, a
+ * preferred skill with an open gap is high, and a preferred skill that is
+ * already met is medium. The proof is read from the skill's own source, so a
+ * level nobody can confirm is never treated as proved.
+ */
+export function toMetricSkills(skills: readonly ContextSkill[] | null | undefined): MetricSkill[] {
+  if (!Array.isArray(skills)) return [];
+  return skills.filter(Boolean).map((skill) => ({
+    name: skill.name,
+    currentLevel: skill.currentLevel,
+    targetLevel: skill.targetLevel,
+    importance: skill.required ? 'core' : (skill.gap ?? 0) > 0 ? 'high' : 'medium',
+    required: skill.required === true,
+    proof: skillProofFromSource(skill.source),
+  }));
 }
 
 /** One roadmap step, as the engine needs to see it. */
@@ -372,8 +387,8 @@ export function computeCareerMetrics(input: {
   blockingSkillNames?: string[];
   /** The candidate's primary career goal, used in the blocker reason. */
   careerGoal?: string | null;
-  /** Role-matched CV ATS/readiness score. Omitted for legacy callers. */
-  cvReadinessPct?: number;
+  /** Role-matched CV ATS/readiness score. Missing or invalid values are zero. */
+  cvReadinessPct?: number | null;
 }): CareerMetrics {
   const skills = input.skills ?? [];
   const roadmapTasks = input.roadmapTasks ?? [];
@@ -463,30 +478,33 @@ export function computeCareerMetrics(input: {
 
   /* 4. Role readiness ---------------------------------------------------- */
 
-  let met = 0;
-  let possible = 0;
   let mastered = 0;
+  let claimedOnly = 0;
   for (const skill of skills) {
     const targetLevel = clamp(skill.targetLevel);
     const currentLevel = clamp(skill.currentLevel);
     const importance = normalizeImportance(skill.importance);
     const required = Boolean(skill.required) || importance === 'core';
     if (!required) continue;
-    const proofWeight =
-      skill.proof === 'none' ? 0.65 :
-      skill.proof === 'assessment' ? 0.85 :
-      1;
-    met += Math.min(currentLevel, targetLevel) * proofWeight;
-    possible += targetLevel;
-    if (currentLevel >= targetLevel && targetLevel > 0) mastered += 1;
+    if (currentLevel >= targetLevel && targetLevel > 0) {
+      if (isSkillProven(skill)) mastered += 1;
+      else claimedOnly += 1;
+    }
   }
-  const cvReadiness = Number.isFinite(input.cvReadinessPct)
-    ? Math.min(100, Math.max(0, input.cvReadinessPct ?? 0))
-    : 100;
-  // The CV component contributes up to 20% of final readiness. Missing or
-  // role-mismatched ATS analysis cannot silently act as a perfect CV.
-  const cvWeight = 0.8 + (0.2 * cvReadiness) / 100;
-  const roleReadinessPct = possible > 0 ? Math.round((met / possible) * cvWeight * 100) : 0;
+  // The readiness figure and its factors come from the shared dictionary, so
+  // the Dashboard, the Roadmap, the Progress page and the Skills Centre can
+  // never report two different numbers for the same candidate.
+  const readiness = computeRoleReadiness(
+    skills.map((skill) => ({
+      name: skill.name,
+      currentLevel: clamp(skill.currentLevel),
+      targetLevel: clamp(skill.targetLevel),
+      required: Boolean(skill.required) || normalizeImportance(skill.importance) === 'core',
+      proof: skill.proof,
+    })),
+    input.cvReadinessPct
+  );
+  const roleReadinessPct = readiness.pct;
 
   // "Skills mastered" is counted across every target-role skill, because a
   // candidate is not "half ready" for a role — the mastered count is a
@@ -730,7 +748,7 @@ export function roleReadinessFromSkills(
     required?: boolean;
     source?: string | null;
   }[],
-  cvReadinessPct = 100
+  cvReadinessPct?: number | null
 ): number {
   return computeCareerMetrics({
     skills: skills.map((skill) => ({

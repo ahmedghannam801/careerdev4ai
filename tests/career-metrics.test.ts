@@ -24,6 +24,7 @@ import {
   isSkillMastered,
   METRIC_EXPLANATIONS,
   normalizeImportance,
+  roleReadinessFromSkills,
   skillProofFromSource,
   type CareerJourneyFacts,
   type MetricSkill,
@@ -181,8 +182,27 @@ describe('the career metrics engine', () => {
         ],
       });
 
-      // (5 + 1) / (5 + 5) = 60%
-      assert.equal(metrics.roleReadinessPct, 60);
+      // Both levels are claims, and a claim is worth 65% of its value:
+      // The skills contribute 39%; with no CV, the 80% floor yields 31%.
+      assert.equal(metrics.roleReadinessPct, 31);
+    });
+
+    it('weighs a proven level above a claimed one', () => {
+      const claimed = computeCareerMetrics({
+        skills: [
+          { name: 'SQL', currentLevel: 5, targetLevel: 5, importance: 'core', required: true, proof: 'none' },
+        ],
+        cvReadinessPct: 100,
+      });
+      const proven = computeCareerMetrics({
+        skills: [
+          { name: 'SQL', currentLevel: 5, targetLevel: 5, importance: 'core', required: true, proof: 'evidence' },
+        ],
+        cvReadinessPct: 100,
+      });
+
+      assert.equal(claimed.roleReadinessPct, 65);
+      assert.equal(proven.roleReadinessPct, 100);
     });
 
     it('caps fully self-reported required skills at 65% even when the CV is ready', () => {
@@ -224,7 +244,9 @@ describe('the career metrics engine', () => {
         ],
       });
 
-      assert.equal(metrics.roleReadinessPct, 100);
+      // The preference is ignored entirely: the figure is the required skill's
+      // claimed level (65%), not a share of both.
+      assert.equal(metrics.roleReadinessPct, 52);
     });
 
     it('uses only the ATS result belonging to the active role', () => {
@@ -248,6 +270,51 @@ describe('the career metrics engine', () => {
       assert.equal(metrics.roleReadinessPct, 0);
     });
 
+    it('gives no CV credit when a CV exists but has not been analysed', () => {
+      const skills: MetricSkill[] = [
+        { name: 'SQL', currentLevel: 5, targetLevel: 5, importance: 'core', required: true, proof: 'evidence' },
+      ];
+
+      // A version written for the active role with no ATS analysis yet: the CV
+      // factor is unavailable, so it contributes nothing rather than a perfect
+      // score. 100% skill factor x the 80% floor.
+      const cvReadinessPct = cvReadinessFromVersions(
+        [{ targetRoleTitle: 'Data Analyst', atsAnalysis: null }],
+        'Data Analyst'
+      );
+      assert.equal(cvReadinessPct, 0);
+      assert.equal(computeCareerMetrics({ skills, cvReadinessPct }).roleReadinessPct, 80);
+    });
+
+    it('does not let a missing or role-mismatched analysis reach a perfect readiness', () => {
+      const skills: MetricSkill[] = [
+        { name: 'SQL', currentLevel: 5, targetLevel: 5, importance: 'core', required: true, proof: 'evidence' },
+      ];
+
+      assert.equal(computeCareerMetrics({ skills }).roleReadinessPct, 80);
+      assert.equal(
+        computeCareerMetrics({
+          skills,
+          cvReadinessPct: cvReadinessFromVersions(
+            [{ targetRoleTitle: 'Marketing Manager', atsAnalysis: { overallScore: 100 } }],
+            'Data Analyst'
+          ),
+        }).roleReadinessPct,
+        80
+      );
+    });
+
+    it('keeps the per-page helper on the same neutral calculation as the engine', () => {
+      const skills = [
+        { currentLevel: 5, targetLevel: 5, gap: 0, required: true, source: 'verified_evidence' },
+      ];
+
+      // No CV argument at all: the helper must not assume a perfect CV.
+      assert.equal(roleReadinessFromSkills(skills), 80);
+      assert.equal(roleReadinessFromSkills(skills, 0), 80);
+      assert.equal(roleReadinessFromSkills(skills, 100), 100);
+    });
+
     it('counts the skills that meet their target', () => {
       const metrics = computeCareerMetrics({
         skills: [
@@ -256,7 +323,7 @@ describe('the career metrics engine', () => {
         ],
       });
 
-      assert.equal(metrics.skillsMastered, 1);
+      assert.equal(metrics.skillsMastered, 0, 'missing proof cannot establish mastery');
       assert.equal(metrics.skillsTotal, 2);
     });
   });
@@ -465,11 +532,11 @@ describe('the career metrics engine', () => {
       // denominator — otherwise meeting every requirement would report 0%.
       const metrics = computeCareerMetrics({
         skills: [
-          { name: 'SQL', currentLevel: 4, targetLevel: 4, importance: 'core', required: true },
+          { name: 'SQL', currentLevel: 4, targetLevel: 4, importance: 'core', required: true, proof: 'evidence' },
         ],
       });
 
-      assert.equal(metrics.roleReadinessPct, 100);
+      assert.equal(metrics.roleReadinessPct, 80, 'missing CV readiness is zero');
     });
   });
 
