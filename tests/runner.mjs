@@ -412,6 +412,25 @@ async function main() {
     // for the catalogue and the documents; the access rules run against the
     // API.
     join(TESTS_DIR, 'cv-templates.test.ts'),
+    // The CV template library, without a database: that no two templates are
+    // the same template (structurally and in the document they render), that
+    // every template carries the candidate's facts, that switching the
+    // template loses nothing, and that the access rule is what it says. Pure.
+    // It used to live behind the database harness, which meant it never ran
+    // unless a disposable Supabase project happened to be configured.
+    join(TESTS_DIR, 'cv-template-library.test.ts'),
+    // The upload path: a real PDF and a real Word file are read end to end,
+    // the extracted document reaches the editor, and the three layers that
+    // decide what a file is agree with each other. Pure.
+    join(TESTS_DIR, 'cv-upload-regression.test.ts'),
+    // The exports: that the PDF prints the document on the screen, that the
+    // Word file holds the document as it is now, that both keep the contact
+    // details, and that neither reaches back to an older version. Pure.
+    join(TESTS_DIR, 'cv-export-regression.test.ts'),
+    // The whole studio journey against the running API: upload, review, apply,
+    // edit, choose a template, export, and find it all still there after a
+    // refresh.
+    join(TESTS_DIR, 'cv-studio-workflow.test.ts'),
     // The document the CV studio shows is a projection of the platform's
     // records, so a change to a record reaches the CV on its own. Pure.
     join(TESTS_DIR, 'cv-projection.test.ts'),
