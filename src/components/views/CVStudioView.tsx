@@ -57,6 +57,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
     loadCVFromMyData,
     cvVersions,
     saveCVVersion,
+    saveActiveCvDocument,
     deleteCVVersion,
     runAiCvOptimization,
     isOptimizingCV,
@@ -262,6 +263,50 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const paperFrameRef = useRef<HTMLDivElement | null>(null);
 
   /**
+   * The layout the candidate chose, as a value.
+   *
+   * The editor writes it into the document immediately, so the preview is
+   * always current. This signature is only about durability: when it changes,
+   * the document is written back to the newest CV version so a reload keeps
+   * the order, the columns and the placement of the contact block.
+   */
+  const layoutSignature = useMemo(
+    () =>
+      JSON.stringify({
+        sectionOrder: activeCV.sectionOrder ?? [],
+        layout: activeCV.layout ?? {},
+        links: (activeCV.links ?? []).map((link) => [
+          link.id,
+          link.enabled,
+          link.placement ?? null,
+        ]),
+      }),
+    [activeCV.sectionOrder, activeCV.layout, activeCV.links]
+  );
+
+  const saveDocumentRef = useRef(saveActiveCvDocument);
+  useEffect(() => {
+    saveDocumentRef.current = saveActiveCvDocument;
+  }, [saveActiveCvDocument]);
+
+  const layoutSaveReady = useRef(false);
+  useEffect(() => {
+    // The first render is the document as it was loaded, not a change the
+    // candidate made. Writing it back would be a pointless round trip.
+    if (!layoutSaveReady.current) {
+      layoutSaveReady.current = true;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void saveDocumentRef.current().catch(() => {
+        // The error is already logged by the context. The document on screen
+        // is still the candidate's; the next change tries again.
+      });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [layoutSignature]);
+
+  /**
    * Downloads the CV as a PDF.
    *
    * The file is printed by the browser from the real template. The server
@@ -296,6 +341,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         title: `${name} — ${templateName}`,
         language: settings.resumeLanguage,
         direction: settings.resumeLanguage === 'ar' ? 'rtl' : 'ltr',
+        baseHref: typeof document !== 'undefined' ? document.baseURI : undefined,
         styles: (() => {
           const links: string[] = [];
           const inline: string[] = [];
@@ -649,12 +695,14 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               t={t}
               language={settings.resumeLanguage}
             />
-            <CvPreview
-              cv={activeCV}
-              language={settings.resumeLanguage}
-              templateId={settings.cvTemplateId}
-              catalog={studioTemplateCatalog}
-            />
+            <div ref={paperFrameRef}>
+              <CvPreview
+                cv={activeCV}
+                language={settings.resumeLanguage}
+                templateId={settings.cvTemplateId}
+                catalog={studioTemplateCatalog}
+              />
+            </div>
           </div>
         </div>
       )}

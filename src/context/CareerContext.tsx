@@ -739,6 +739,15 @@ interface CareerContextType {
   refreshProfileLinks: () => Promise<ProfileLinkDTO[]>;
   loadCVFromMyData: () => void;
   saveCVVersion: (name: string, profileSnapshot?: CVProfile) => Promise<CVVersion>;
+  /**
+   * Persists the document the editor is showing — including the layout the
+   * candidate chose — without creating a new snapshot.
+   *
+   * The studio calls this after a layout change so the order, the columns and
+   * the contact/link placement survive a reload. It patches the newest version
+   * of the active CV, which is what hydration reads.
+   */
+  saveActiveCvDocument: (profile?: CVProfile) => Promise<void>;
   duplicateCVVersion: (versionId: string) => void;
   renameCVVersion: (versionId: string, newName: string) => void;
   deleteCVVersion: (versionId: string) => void;
@@ -5614,6 +5623,55 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   /**
+   * Persists the document the studio is showing.
+   *
+   * A CV version is the durable copy of the document (the platform's record
+   * tables cannot hold a section order or a layout decision). Patching the
+   * newest version — rather than creating one — keeps the history meaningful:
+   * a drag is not a new milestone. Snapshotting still has its own button.
+   */
+  const saveActiveCvDocument = useCallback(
+    async (profile?: CVProfile): Promise<void> => {
+      const document = profile ?? activeCV;
+      const roleTitle = targetRole?.title ?? '';
+      try {
+        let cvId = activeCvId;
+        if (!cvId) {
+          const created = await postCv({ name: 'My CV', targetRoleTitle: roleTitle });
+          cvId = created.id;
+          setActiveCvId(created.id);
+        }
+
+        const latest = cvVersions.find((version) => version.cvId === cvId);
+        if (!latest) {
+          const dto = await postCvVersion({
+            cvId,
+            name: 'My CV',
+            targetRoleTitle: roleTitle,
+            profileJson: document,
+          });
+          const saved = toCVVersion(dto);
+          setCvVersions((previous) => [
+            saved,
+            ...previous.filter((version) => version.id !== saved.id),
+          ]);
+          return;
+        }
+
+        const dto = await patchCvVersion(latest.id, { profileJson: document });
+        const saved = toCVVersion(dto);
+        setCvVersions((previous) =>
+          previous.map((version) => (version.id === saved.id ? saved : version))
+        );
+      } catch (error) {
+        console.error('Failed to persist the CV document:', error);
+        throw error;
+      }
+    },
+    [activeCV, activeCvId, cvVersions, targetRole]
+  );
+
+  /**
    * Puts a reviewed CV into the studio.
    *
    * The document is set as the studio's document and shown as a version. The
@@ -6399,6 +6457,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         refreshProfileLinks,
         loadCVFromMyData,
         saveCVVersion,
+        saveActiveCvDocument,
         duplicateCVVersion,
         renameCVVersion,
         deleteCVVersion,

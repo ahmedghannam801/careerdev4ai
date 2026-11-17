@@ -704,15 +704,28 @@ export function cvAccentWord(accent: string): string {
  */
 function buildSpec(
   template: CvTemplateDefinition,
-  sectionOrder: readonly CvSectionKey[]
+  sectionOrder: readonly CvSectionKey[],
+  layout?: CVProfile['layout']
 ): CvLayoutSpec {
   const structure = template.structure;
   const metrics = CV_TEMPLATE_DENSITY[structure.density];
   const headingSizePx = Math.round(metrics.font * 0.92 * 10) / 10;
-  const sidebarSections = structure.sidebarSections ?? [];
-  const hasSidebar =
-    (structure.layout === 'sidebar-left' || structure.layout === 'sidebar-right') &&
-    sidebarSections.length > 0;
+  const supportsSidebar =
+    structure.layout === 'sidebar-left' || structure.layout === 'sidebar-right';
+  // The template proposes which sections live in the narrow column. The
+  // candidate may move a section to the other column, but only a template
+  // that HAS two columns can honour that move — a single-column template is
+  // not silently turned into a sidebar by a stale preference.
+  const sidebar = new Set<CvSectionKey>(structure.sidebarSections ?? []);
+  if (supportsSidebar && layout?.sectionColumns) {
+    for (const [key, column] of Object.entries(layout.sectionColumns)) {
+      if (!isCvSectionKey(key)) continue;
+      if (column === 'aside') sidebar.add(key);
+      else if (column === 'main') sidebar.delete(key);
+    }
+  }
+  const sidebarSections = [...sidebar];
+  const hasSidebar = supportsSidebar && sidebarSections.length > 0;
 
   return {
     layout: structure.layout,
@@ -773,7 +786,7 @@ export function buildCvLayoutPlan(options: {
 
   const candidateOrder = normalizeCandidateOrder(cv.sectionOrder);
   const sectionOrder = resolveCvSectionOrder(template.structure.sectionOrder, candidateOrder);
-  const spec = buildSpec(template, sectionOrder);
+  const spec = buildSpec(template, sectionOrder, cv.layout);
 
   const ordered = orderCvSections(document.sections, sectionOrder);
   const { main, aside } = splitCvSections(ordered, spec.sidebarSections);
@@ -825,6 +838,21 @@ export function cvOrderableSections(
       : 'main';
     return { key: section.key, heading: section.heading, column };
   });
+}
+
+/**
+ * Whether a template has two columns for the layout editor to move between.
+ *
+ * A split or editorial document reads across two text columns, but a section
+ * cannot be lifted from one into the other there: the text flows. Only a
+ * template with a real sidebar can hold a section in a column the candidate
+ * chose.
+ */
+export function cvTemplateSupportsSidebar(template: CvTemplateDefinition): boolean {
+  return (
+    template.structure.layout === 'sidebar-left' ||
+    template.structure.layout === 'sidebar-right'
+  );
 }
 
 /**

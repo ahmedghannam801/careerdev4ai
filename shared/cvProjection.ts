@@ -441,6 +441,7 @@ export function mergeCanonicalCvDocument(
       label: cvLinkLabel(canonical.kind, canonical.label),
       url: canonical.url,
       enabled: link.enabled,
+      placement: link.placement,
     });
   }
   for (const link of sourceLinks) {
@@ -484,6 +485,8 @@ export function mergeCanonicalCvDocument(
     research: previous.research ?? [],
     leadership: previous.leadership ?? [],
     hiddenSkills: previous.hiddenSkills,
+    sectionOrder: previous.sectionOrder,
+    layout: previous.layout,
     hiddenRecordIds: [...hiddenRecordIds],
     hiddenContactFields: [...hiddenContactFields] as CVProfile['hiddenContactFields'],
     hiddenSummary: previous.hiddenSummary,

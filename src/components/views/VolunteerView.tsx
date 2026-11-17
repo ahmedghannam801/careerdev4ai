@@ -211,13 +211,13 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <div className="text-xs text-[var(--text-secondary)]">{t('COMMUNITY IMPACT, ACTIVITIES & OPPORTUNITIES')}</div>
+          <div className="text-xs text-[var(--text-secondary)]">{t('VOLUNTEERING, TRAINING & COMMUNITY IMPACT')}</div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5 flex items-center gap-2">
             <HeartHandshake className="w-5 h-5 text-[var(--color-primary-text)]" />
-            {t('Opportunities & Activities')}
+            {t('Volunteer & Training Opportunities')}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1.5 max-w-2xl">
-            {t('Discover volunteering, student activities, youth programmes, competitions, fellowships and training programmes — then record what you took part in and the skills it gave you.')}
+            {t('Discover volunteering, training programmes, workshops, bootcamps, student activities, youth programmes and fellowships — then record what you took part in and the skills it gave you.')}
           </p>
         </div>
 

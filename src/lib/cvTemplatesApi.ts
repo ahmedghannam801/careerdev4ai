@@ -95,6 +95,26 @@ export async function authorizeCvTemplateExport(
 }
 
 /**
+ * The file name a `Content-Disposition` header asks for.
+ *
+ * Prefers RFC 5987's `filename*` (which can carry Arabic), then the plain
+ * `filename`. A missing or malformed header falls back to the caller's name.
+ */
+function fileNameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const extended = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (extended?.[1]) {
+    try {
+      return decodeURIComponent(extended[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      // A malformed encoding is not worth failing the download over.
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || null;
+}
+
+/**
  * Downloads the editable DOCX export.
  *
  * The response is a file, not JSON, so it is fetched directly with the same
@@ -134,11 +154,39 @@ export async function downloadCvTemplateDocx(input: {
     throw new ApiRequestError(res.status, message, code);
   }
 
+  // A successful answer must really be a Word file. Without this check a
+  // proxy's HTML error page or a JSON body would be saved as a .docx that no
+  // application can open, and the candidate would blame the CV.
+  const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+  const isWord =
+    contentType.includes('wordprocessingml') ||
+    contentType.includes('octet-stream') ||
+    contentType === '';
+  if (!isWord) {
+    throw new ApiRequestError(
+      res.status,
+      'The server returned something that is not a Word document. Please try again.',
+      'INVALID_EXPORT'
+    );
+  }
+
   const blob = await res.blob();
+  if (blob.size === 0) {
+    throw new ApiRequestError(
+      res.status,
+      'The exported Word file was empty. Please try again.',
+      'EMPTY_EXPORT'
+    );
+  }
+
+  const fileName =
+    fileNameFromDisposition(res.headers.get('content-disposition')) ||
+    input.fileName ||
+    'CV.docx';
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = input.fileName || 'CV.docx';
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   link.remove();

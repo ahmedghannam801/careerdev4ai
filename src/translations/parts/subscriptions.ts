@@ -188,6 +188,22 @@ export const subscriptionsAr: Record<string, string> = {
     'افتح السيرة الذاتية المخصصة، وتحليل ATS التفصيلي، وتدرّب المقابلات.',
   'Everything in your plan, with the credits that go with it.':
     'كل ما في باقتك، مع الرصيد الذي يرافقها.',
+
+  // Plan benefit labels (read from the shared entitlement matrix)
+  'CV builder': 'منشئ السيرة الذاتية',
+  'Tailored CVs': 'سير ذاتية مخصصة',
+  'Multiple CV versions': 'نسخ متعددة من السيرة',
+  'PDF export': 'تصدير PDF',
+  'ATS analysis': 'تحليل ATS',
+  'Detailed ATS breakdown': 'تحليل ATS تفصيلي',
+  'Job description analysis': 'تحليل الوصف الوظيفي',
+  'Cover letter generation': 'إنشاء خطاب التقديم',
+  'Career roadmap': 'خارطة الطريق المهنية',
+  'Full roadmap stages': 'جميع مراحل خارطة الطريق',
+  'Mock interviews': 'مقابلات تجريبية',
+  'AI mentor sessions': 'جلسات مع المرشد الذكي',
+  'Advanced portfolio': 'ملف أعمال متقدم',
+  'Career transition plan': 'خطة التحول المهني',
   'Test mode': 'وضع الاختبار',
   'Manage billing': 'إدارة الفواتير',
   'Failed to open the billing portal': 'تعذر فتح بوابة إدارة الفواتير',

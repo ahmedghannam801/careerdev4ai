@@ -289,6 +289,35 @@ export interface CVLink {
   url: string;
   /** Whether this link is shown on this CV. */
   enabled: boolean;
+  /**
+   * Where this particular link is drawn.
+   *
+   * A candidate may keep LinkedIn in the masthead and their portfolio among
+   * the sections. When this is unset the document-wide choice applies.
+   */
+  placement?: 'header' | 'section';
+}
+
+/** The two columns a section may be drawn in, when the template has two. */
+export type CvSectionColumn = 'main' | 'aside';
+
+/**
+ * The layout decisions the candidate made about their own document.
+ *
+ * The template still decides how a section is set — the type, the rules, the
+ * density. These preferences only say WHERE a part of the document goes, and
+ * they are stored on the CV itself so the preview, the PDF, the Word file and
+ * the next reload all follow the same decision.
+ */
+export interface CVLayoutPreferences {
+  /** Whether the contact details are printed in the masthead or as a section. */
+  contactPlacement?: 'header' | 'section';
+  /** Whether the professional links are printed in the masthead or as a section. */
+  linksPlacement?: 'header' | 'section';
+  /** A section the candidate moved into the wide or the narrow column. */
+  sectionColumns?: Partial<Record<CvSectionKey, CvSectionColumn>>;
+  /** The order of the entries inside a section, by entry id. */
+  entryOrder?: Partial<Record<CvSectionKey, string[]>>;
 }
 
 /** One volunteering stint, as it appears on a CV. */
@@ -422,6 +451,13 @@ export interface CVProfile {
    * A section that is not named here keeps the place the template gave it.
    */
   sectionOrder?: CvSectionKey[];
+  /**
+   * The layout the candidate chose for this document.
+   *
+   * Optional because a CV written before the layout editor existed has none;
+   * an empty value means "the template's own layout".
+   */
+  layout?: CVLayoutPreferences;
   experiences: {
     id: string;
     company: string;

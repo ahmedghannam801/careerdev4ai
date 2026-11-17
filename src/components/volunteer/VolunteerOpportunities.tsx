@@ -413,7 +413,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--text-primary)]">
-            {t('Opportunities & Activities')}
+            {t('Volunteer & Training Opportunities')}
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-2xl">
             {t(

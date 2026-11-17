@@ -136,6 +136,7 @@ export const RESUME_SECTION_HEADINGS: Record<ResumeLanguage, Record<string, stri
     publications: 'Publications',
     research: 'Research',
     leadership: 'Leadership',
+    contact: 'Contact',
   },
   ar: {
     summary: 'الملخص المهني',
@@ -153,6 +154,7 @@ export const RESUME_SECTION_HEADINGS: Record<ResumeLanguage, Record<string, stri
     publications: 'المنشورات',
     research: 'الأبحاث',
     leadership: 'القيادة',
+    contact: 'بيانات التواصل',
   },
 };
 

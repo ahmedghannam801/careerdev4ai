@@ -25,6 +25,8 @@ import {
 export interface CvDocumentLink {
   label: string;
   url: string;
+  /** Where this link is drawn; unset means the document-wide choice. */
+  placement?: 'header' | 'section';
 }
 
 export interface CvDocumentEntry {
@@ -53,7 +55,12 @@ export interface CvDocumentSection {
 export interface CvDocument {
   fullName: string;
   title: string;
+  /** Every contact value the document holds. */
   contact: string[];
+  /** The contact values printed in the masthead. */
+  headerContact: string[];
+  /** The professional links printed in the masthead. */
+  headerLinks: CvDocumentLink[];
   links: CvDocumentLink[];
   sections: CvDocumentSection[];
   language: ResumeLanguage;
@@ -107,7 +114,26 @@ export function buildCvTemplateDocument(
 
   const links: CvDocumentLink[] = (cv.links ?? [])
     .filter((link) => link.enabled && link.url.trim())
-    .map((link) => ({ label: link.label?.trim() || link.url.trim(), url: link.url.trim() }));
+    .map((link) => ({
+      label: link.label?.trim() || link.url.trim(),
+      url: link.url.trim(),
+      placement: link.placement,
+    }));
+
+  const layout = cv.layout ?? {};
+  const contactPlacement = layout.contactPlacement ?? 'header';
+  const linksPlacement = layout.linksPlacement ?? 'section';
+
+  const contact = [cv.email, cv.phone, cv.location]
+    .filter(hasText)
+    .map((value) => value.trim());
+  const headerContact = contactPlacement === 'header' ? contact : [];
+  const headerLinks = links.filter(
+    (link) => (link.placement ?? linksPlacement) === 'header'
+  );
+  const sectionLinks = links.filter(
+    (link) => (link.placement ?? linksPlacement) !== 'header'
+  );
 
   const sections: CvDocumentSection[] = [];
 
@@ -365,11 +391,11 @@ export function buildCvTemplateDocument(
     );
   }
 
-  if (links.length > 0) {
+  if (sectionLinks.length > 0) {
     sections.push(
       section('links', language, {
         kind: 'entries',
-        entries: links.map((link, index) => ({
+        entries: sectionLinks.map((link, index) => ({
           id: `link-${index}`,
           title: link.label,
           url: link.url,
@@ -380,16 +406,62 @@ export function buildCvTemplateDocument(
     );
   }
 
+  // Contact details are usually part of the masthead. A candidate who wants
+  // them set as a section of their own gets a real section, which the order
+  // control can then place like any other.
+  if (contactPlacement === 'section' && contact.length > 0) {
+    sections.push(
+      section('contact', language, {
+        kind: 'inline',
+        inline: contact,
+        entries: [],
+      })
+    );
+  }
+
+  applyEntryOrder(sections, layout.entryOrder);
+
   return {
     fullName: cv.fullName?.trim() ?? '',
     title: cv.title?.trim() ?? '',
-    contact: [cv.email, cv.phone, cv.location].filter(hasText).map((value) => value.trim()),
+    contact,
+    headerContact,
+    headerLinks,
     links,
     sections,
     language,
     direction: resumeDirection(language),
     rtl: isResumeRtl(language),
   };
+}
+
+/**
+ * Reorders the entries inside the sections the candidate reordered.
+ *
+ * An entry that is not named keeps its place after the ones that are, so a
+ * stored order that was written before an entry existed can never hide it.
+ */
+function applyEntryOrder(
+  sections: CvDocumentSection[],
+  entryOrder: Partial<Record<CvSectionKey, string[]>> | undefined
+): void {
+  if (!entryOrder) return;
+  for (const section of sections) {
+    const order = entryOrder[section.key];
+    if (!order || order.length === 0 || section.entries.length < 2) continue;
+    const byId = new Map(section.entries.map((entry) => [entry.id, entry]));
+    const ordered: CvDocumentEntry[] = [];
+    for (const id of order) {
+      const found = byId.get(id);
+      if (!found) continue;
+      ordered.push(found);
+      byId.delete(id);
+    }
+    for (const entry of section.entries) {
+      if (byId.has(entry.id)) ordered.push(entry);
+    }
+    section.entries = ordered;
+  }
 }
 
 /**

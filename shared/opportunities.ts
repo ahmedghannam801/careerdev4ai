@@ -224,7 +224,7 @@ export type OpportunityPillar = (typeof OPPORTUNITY_PILLARS)[number];
 
 export const OPPORTUNITY_PILLAR_LABELS: Record<OpportunityPillar, string> = {
   jobs: 'Live Jobs & Internship',
-  opportunities: 'Opportunities & Activities',
+  opportunities: 'Volunteer & Training Opportunities',
 };
 
 /**

@@ -437,11 +437,19 @@ export function registerCvTemplateRoutes(app: Express): void {
         // A stored CV can only be exported by its owner. The ownership check
         // happens before the document is read, so another candidate's id is
         // answered exactly like a missing one.
+        //
+        // The document the editor is showing is the FIRST thing considered.
+        // The studio sends `cv` with every export, so the file is built from
+        // the state on the screen and not from an older saved version. The
+        // stored ids remain for callers (and older clients) that export a
+        // snapshot without holding the document.
         let cv: CVProfile | null = null;
         const versionId = str(req.body?.versionId, 64);
         const cvId = str(req.body?.cvId, 64);
 
-        if (versionId) {
+        if (isCvProfile(req.body?.cv)) {
+          cv = req.body.cv;
+        } else if (versionId) {
           const version = await getCvVersion(req.authUser!.id, versionId);
           if (!version || !isCvProfile(version.profileJson)) {
             return res.status(404).json({ error: 'CV version not found' });
@@ -458,8 +466,6 @@ export function registerCvTemplateRoutes(app: Express): void {
             return res.status(404).json({ error: 'This CV has no saved document to export.' });
           }
           cv = latest.profileJson;
-        } else if (isCvProfile(req.body?.cv)) {
-          cv = req.body.cv;
         }
 
         if (!cv) {
@@ -489,7 +495,13 @@ export function registerCvTemplateRoutes(app: Express): void {
           'Content-Type',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         );
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        // RFC 5987 lets a non-Latin candidate name survive as the file name;
+        // the plain `filename` remains for clients that do not read it.
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`
+        );
+        res.setHeader('X-Content-Type-Options', 'nosniff');
         return res.send(buffer);
       } catch (error) {
         console.error('Failed to export the CV as DOCX:', error);

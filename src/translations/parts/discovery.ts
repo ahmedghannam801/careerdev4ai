@@ -35,10 +35,13 @@ export const discoveryAr: Record<string, string> = {
   'Portfolio project': 'مشروع في ملف الأعمال',
   'Task checklist': 'قائمة المهام',
 
-  // Opportunities & Activities
-  'COMMUNITY IMPACT, ACTIVITIES & OPPORTUNITIES':
-    'الأثر المجتمعي والأنشطة والفرص',
-  'Opportunities & Activities': 'الفرص والأنشطة',
+  // Volunteer & Training Opportunities
+  'VOLUNTEERING, TRAINING & COMMUNITY IMPACT':
+    'التطوع والتدريب والأثر المجتمعي',
+  'Volunteer & Training Opportunities': 'فرص التطوع والتدريب',
+  'Opportunities & Activities': 'فرص التطوع والتدريب',
+  'Discover volunteering, training programmes, workshops, bootcamps, student activities, youth programmes and fellowships — then record what you took part in and the skills it gave you.':
+    'اكتشف التطوع وبرامج التدريب وورش العمل والمعسكرات التدريبية والأنشطة الطلابية وبرامج الشباب والزمالات — ثم سجّل ما شاركت فيه والمهارات التي اكتسبتها.',
   'Discover volunteering, student activities, youth programmes, competitions, fellowships and training programmes — then record what you took part in and the skills it gave you.':
     'اكتشف التطوع والأنشطة الطلابية وبرامج الشباب والمسابقات والزمالات وبرامج التدريب — ثم سجّل ما شاركت فيه والمهارات التي اكتسبتها.',
   'My activities': 'أنشطتي',

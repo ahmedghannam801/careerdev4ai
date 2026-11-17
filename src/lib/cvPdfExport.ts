@@ -36,6 +36,8 @@ export interface CvPrintDocumentInput {
   language: string;
   direction: 'ltr' | 'rtl';
   styles: CvPrintStyles;
+  /** The application's base URL, so relative asset URLs resolve in the frame. */
+  baseHref?: string;
 }
 
 /** Escapes a string for use inside an HTML text node or attribute. */
@@ -64,6 +66,10 @@ body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !
 [data-cv-print] {
   width: 794px !important;
   max-width: none !important;
+  /* The preview reserves A4 as a minimum height. On paper that minimum would
+     print a second, empty sheet when the document is a fraction short of a
+     page, so it is removed for the export. */
+  min-height: 0 !important;
   margin: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -73,7 +79,6 @@ body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !
 [data-cv-print] .cv-section-heading { break-after: avoid; page-break-after: avoid; break-inside: avoid; }
 [data-cv-print] h3 { break-after: avoid; page-break-after: avoid; }
 [data-cv-print] li { break-inside: avoid; page-break-inside: avoid; }
-[data-cv-print] a { text-decoration: none !important; }
 `;
 
 /**
@@ -97,6 +102,7 @@ export function buildCvPrintHtml(input: CvPrintDocumentInput): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(input.title)}</title>
+${input.baseHref ? `<base href="${escapeHtml(input.baseHref)}">` : ''}
 ${links}
 ${inline}
 <style>${EXPORT_CSS}</style>
@@ -112,6 +118,38 @@ async function waitForFrameAssets(win: Window): Promise<void> {
     new Promise<void>((resolve) => {
       win.setTimeout(resolve, ms);
     });
+  const nextFrame = () =>
+    new Promise<void>((resolve) => {
+      const raf = (win as Window & { requestAnimationFrame?: (cb: () => void) => number })
+        .requestAnimationFrame;
+      if (raf) raf(() => resolve());
+      else win.setTimeout(resolve, 16);
+    });
+
+  // The stylesheets are part of the document. A frame whose `load` has fired
+  // has usually loaded them, but a slow network can still leave one pending;
+  // printing before it lands would print the template without its styles.
+  try {
+    const pending = Array.from(
+      doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
+    ).filter((link) => !link.sheet);
+    if (pending.length > 0) {
+      await Promise.race([
+        Promise.all(
+          pending.map(
+            (link) =>
+              new Promise<void>((resolve) => {
+                link.addEventListener('load', () => resolve(), { once: true });
+                link.addEventListener('error', () => resolve(), { once: true });
+              })
+          )
+        ),
+        timeout(4000),
+      ]);
+    }
+  } catch {
+    // A browser that cannot answer is still allowed to print.
+  }
 
   try {
     const fontSet = (doc as Document & { fonts?: { ready?: Promise<unknown> } }).fonts;
@@ -124,18 +162,21 @@ async function waitForFrameAssets(win: Window): Promise<void> {
 
   const images = Array.from(doc.images ?? []);
   await Promise.all(
-    images.map(
-      (image) =>
-        image.complete
-          ? Promise.resolve()
-          : new Promise<void>((resolve) => {
+    images.map((image) =>
+      image.complete
+        ? Promise.resolve()
+        : Promise.race([
+            new Promise<void>((resolve) => {
               image.addEventListener('load', () => resolve(), { once: true });
               image.addEventListener('error', () => resolve(), { once: true });
-            })
+            }),
+            timeout(4000),
+          ])
     )
   );
-  // One more tick lets the layout settle after the fonts swap in.
-  await timeout(50);
+  // Two frames let the layout settle after the fonts and images swap in.
+  await nextFrame();
+  await nextFrame();
 }
 
 function removeFrame(frame: HTMLIFrameElement): void {

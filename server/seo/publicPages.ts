@@ -1164,11 +1164,11 @@ ${cards}
 
   return {
     path,
-    title: `Opportunities & Activities — ${opportunities.length} | ${SITE_NAME}`,
+    title: `Volunteer & Training Opportunities — ${opportunities.length} | ${SITE_NAME}`,
     description,
     body,
     jsonLd: [
-      webPageSchema({ name: 'Opportunities & Activities', description, path, hasBreadcrumb: true }),
+      webPageSchema({ name: 'Volunteer & Training Opportunities', description, path, hasBreadcrumb: true }),
       breadcrumbSchema(
         [
           { name: 'Home', path: '/' },

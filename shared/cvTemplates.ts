@@ -48,6 +48,7 @@ export const CV_SECTION_KEYS = [
   'research',
   'leadership',
   'links',
+  'contact',
 ] as const;
 
 export type CvSectionKey = (typeof CV_SECTION_KEYS)[number];

@@ -21,7 +21,7 @@
  */
 
 import React from 'react';
-import { Crown, Sparkles, ArrowUpRight, ShieldCheck } from 'lucide-react';
+import { Crown, Sparkles, ArrowUpRight, ShieldCheck, Check } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import {
   nextTier,
@@ -29,6 +29,11 @@ import {
   resolvePlanIdentityTier,
   type PlanIdentity,
 } from '../../../shared/planIdentity';
+import {
+  PLAN_FEATURE_MATRIX,
+  type EntitlementFeature,
+  type SubscriptionPlanCode,
+} from '../../../shared/subscriptions';
 
 /** How much of the panel is shown. */
 export type MembershipPanelVariant = 'card' | 'row';
@@ -84,6 +89,43 @@ function formatDate(value: string | null | undefined, arabic: boolean): string |
   }
 }
 
+/**
+ * The short, human name of an entitlement.
+ *
+ * These are labels only: whether a feature is available still comes from the
+ * entitlement matrix the server uses, never from this table.
+ */
+const FEATURE_LABELS: Record<EntitlementFeature, string> = {
+  'cv.builder': 'CV builder',
+  'cv.tailoring': 'Tailored CVs',
+  'cv.multiple_versions': 'Multiple CV versions',
+  'cv.export_pdf': 'PDF export',
+  'ats.analysis': 'ATS analysis',
+  'ats.detailed_breakdown': 'Detailed ATS breakdown',
+  'job_description.analysis': 'Job description analysis',
+  'cover_letter.generate': 'Cover letter generation',
+  'roadmap.generate': 'Career roadmap',
+  'roadmap.full_stages': 'Full roadmap stages',
+  'interview.mock_simulation': 'Mock interviews',
+  'ai_mentor.session': 'AI mentor sessions',
+  'portfolio.advanced': 'Advanced portfolio',
+  'career.transition_plan': 'Career transition plan',
+};
+
+/**
+ * The three most distinctive features of a plan.
+ *
+ * For a paid plan, what sets it apart from the free tier is the useful thing
+ * to show; for the free tier, the basics it includes. Nothing is invented: the
+ * features are read straight from the shared matrix.
+ */
+function planHighlights(planCode: SubscriptionPlanCode): EntitlementFeature[] {
+  const features = PLAN_FEATURE_MATRIX[planCode] ?? [];
+  const freeFeatures = new Set<EntitlementFeature>(PLAN_FEATURE_MATRIX.free);
+  const distinctive = features.filter((feature) => !freeFeatures.has(feature));
+  return (distinctive.length > 0 ? distinctive : features).slice(0, 3);
+}
+
 export const MembershipPanel: React.FC<MembershipPanelProps> = ({
   onManagePlan,
   variant = 'card',
@@ -108,6 +150,7 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
 
   const accent = `var(${identity.accentVar})`;
   const surface = `var(${identity.surfaceVar})`;
+  const highlights = planHighlights(subscription?.planCode ?? 'free');
 
   const manageLabel = isFree
     ? upgradeIdentity
@@ -154,6 +197,10 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
       data-plan-tier={identity.tier}
       aria-label={t('Membership')}
     >
+      {/* The plan's own colour as a hairline across the top: a quiet
+          accent rather than a banner. */}
+      <div aria-hidden="true" className="h-1 w-full" style={{ backgroundColor: accent }} />
+
       <div className="flex items-start justify-between gap-3 p-4 sm:p-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -200,6 +247,24 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
           </button>
         )}
       </div>
+
+      {highlights.length > 0 && (
+        <ul className="grid gap-1 px-4 pb-3 sm:grid-cols-2 sm:px-5">
+          {highlights.map((feature) => (
+            <li
+              key={feature}
+              className="flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--text-secondary)]"
+            >
+              <Check
+                className="h-3 w-3 shrink-0"
+                style={{ color: accent }}
+                aria-hidden="true"
+              />
+              <span className="truncate">{t(FEATURE_LABELS[feature])}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="grid grid-cols-2 gap-px bg-[var(--border-subtle)] border-t border-[var(--border-subtle)]">
         <div className="bg-[var(--surface-main)] px-4 py-3">

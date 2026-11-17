@@ -35,6 +35,25 @@ function documentXml(buffer: Buffer): string {
   return new TextDecoder().decode(xml);
 }
 
+/**
+ * The destinations of the links in the file.
+ *
+ * Word keeps a hyperlink's target in the relationships part of the package and
+ * points at it from the body, so a link in the file is only really a link when
+ * the relationship carries the destination.
+ */
+function documentLinkTargets(buffer: Buffer): string[] {
+  const archive = unzipSync(new Uint8Array(buffer));
+  const rels = archive['word/_rels/document.xml.rels'];
+  if (!rels) return [];
+  const xml = new TextDecoder().decode(rels);
+  const targets: string[] = [];
+  const pattern = /Target="([^"]+)"/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(xml)) !== null) targets.push(match[1]);
+  return targets;
+}
+
 /** The text of the file, in the order the file reads. */
 function fileText(xml: string): string[] {
   const runs: string[] = [];
@@ -313,3 +332,208 @@ describe('the order of the sections', () => {
     );
   });
 });
+
+/**
+ * The language of the document.
+ *
+ * An Arabic CV is a different document, not an English one with Arabic words
+ * in it: it reads right to left, and the Word file has to read right to left
+ * too, or the file the candidate sends to an employer is set the wrong way.
+ */
+describe('an Arabic CV', () => {
+  it('is laid out right to left on the paper', () => {
+    const cv = cvTemplateSample('ar');
+    const template = CV_TEMPLATES[0];
+
+    const paper = renderToStaticMarkup(
+      React.createElement(CvTemplateRenderer, {
+        cv,
+        template,
+        language: 'ar',
+        printable: true,
+      })
+    );
+
+    assert.ok(paper.includes('dir="rtl"'), 'the Arabic paper is laid out right to left');
+    assert.ok(paper.includes('lang="ar"'), 'the Arabic paper says it is in Arabic');
+  });
+
+  it('is set right to left in the Word file', async () => {
+    const cv = cvTemplateSample('ar');
+    const template = CV_TEMPLATES[0];
+
+    const xml = documentXml(await buildCvDocx({ cv, language: 'ar', template }));
+
+    assert.ok(xml.includes('<w:bidi'), 'the Arabic Word file reads right to left');
+    assert.ok(xml.includes('<w:rtl'), 'the Arabic Word file sets its runs right to left');
+  });
+
+  it('carries the same sections in the same order as the paper', async () => {
+    const cv = cvTemplateSample('ar');
+    const template = CV_TEMPLATES[0];
+
+    const plan = buildCvLayoutPlan({ cv, template, language: 'ar' });
+    const expected = plan.spec.hasSidebar
+      ? plan.spec.asideFirst
+        ? [...plan.aside, ...plan.main]
+        : [...plan.main, ...plan.aside]
+      : plan.main;
+
+    const xml = documentXml(await buildCvDocx({ cv, language: 'ar', template }));
+    const found = fileSectionOrder(
+      xml,
+      expected.map((entry) => entry.section.heading)
+    );
+
+    for (const entry of found) {
+      assert.ok(
+        entry.index >= 0,
+        `the Arabic Word file keeps the section "${entry.heading}"`
+      );
+    }
+    for (let index = 1; index < found.length; index += 1) {
+      assert.ok(
+        found[index].index > found[index - 1].index,
+        `the Arabic Word file reads "${found[index - 1].heading}" before "${found[index].heading}", as the paper does`
+      );
+    }
+  });
+});
+
+/**
+ * The layout the candidate chose.
+ *
+ * A decision the candidate made about their own document has to reach BOTH
+ * renderings. A layout that only the preview knows about is a layout the
+ * exported file quietly ignores, which is the exact failure this whole
+ * mechanism exists to prevent.
+ */
+describe('the layout the candidate chose', () => {
+  it('keeps the contact details out of the masthead in both renderings', async () => {
+    const cv = cvTemplateSample('en');
+    const template = CV_TEMPLATES[0];
+    const moved = { ...cv, layout: { contactPlacement: 'section' as const } };
+
+    const plan = buildCvLayoutPlan({ cv: moved, template, language: 'en' });
+    assert.equal(plan.document.headerContact.length, 0, 'the masthead prints no contact details');
+    const contactSection = plan.sections.find((section) => section.key === 'contact');
+    assert.ok(contactSection, 'the contact details are a section of their own');
+
+    const paper = renderToStaticMarkup(
+      React.createElement(CvTemplateRenderer, {
+        cv: moved,
+        template,
+        language: 'en',
+        printable: true,
+      })
+    );
+    assert.ok(
+      paper.includes(contactSection.heading),
+      'the paper prints the contact section'
+    );
+
+    const xml = documentXml(await buildCvDocx({ cv: moved, language: 'en', template }));
+    assert.ok(
+      fileText(xml).some((run) => run.includes(cv.email)),
+      'the Word file prints the contact details'
+    );
+  });
+
+  it('moves the professional links into the masthead in both renderings', async () => {
+    const cv = cvTemplateSample('en');
+    const template = CV_TEMPLATES[0];
+    const moved = { ...cv, layout: { linksPlacement: 'header' as const } };
+
+    const plan = buildCvLayoutPlan({ cv: moved, template, language: 'en' });
+    assert.equal(plan.document.headerLinks.length, 3, 'the masthead prints the three links');
+    assert.ok(
+      !plan.sections.some((section) => section.key === 'links'),
+      'the links are no longer a section of their own'
+    );
+
+    const paper = renderToStaticMarkup(
+      React.createElement(CvTemplateRenderer, {
+        cv: moved,
+        template,
+        language: 'en',
+        printable: true,
+      })
+    );
+    for (const link of plan.document.headerLinks) {
+      assert.ok(
+        paper.includes(`href="${link.url}"`),
+        `the paper carries the link to ${link.url}`
+      );
+    }
+
+    const buffer = await buildCvDocx({ cv: moved, language: 'en', template });
+    const xml = documentXml(buffer);
+    const targets = documentLinkTargets(buffer);
+    for (const link of plan.document.headerLinks) {
+      assert.ok(
+        targets.includes(link.url),
+        `the Word file carries the link to ${link.url}`
+      );
+    }
+    assert.ok(
+      xml.includes('<w:hyperlink'),
+      'the links in the Word file are clickable hyperlinks'
+    );
+  });
+
+  it('moves one link on its own, leaving the others where they were', async () => {
+    const cv = cvTemplateSample('en');
+    const template = CV_TEMPLATES[0];
+    const moved = {
+      ...cv,
+      links: (cv.links ?? []).map((link) =>
+        link.id === 'link-2' ? { ...link, placement: 'header' as const } : link
+      ),
+    };
+
+    const plan = buildCvLayoutPlan({ cv: moved, template, language: 'en' });
+    assert.equal(plan.document.headerLinks.length, 1, 'only the chosen link is in the masthead');
+    assert.equal(
+      plan.document.headerLinks[0].url,
+      'https://github.com/example-layla',
+      'the chosen link is the one the candidate moved'
+    );
+
+    const linksSection = plan.sections.find((section) => section.key === 'links');
+    assert.ok(linksSection, 'the other links are still a section');
+    assert.equal(
+      linksSection.entries.length,
+      2,
+      'the other two links are in the section'
+    );
+  });
+
+  it('reorders the entries inside a section on the paper and in the file', async () => {
+    const cv = cvTemplateSample('en');
+    const template = CV_TEMPLATES[0];
+    const experiences = cv.experiences;
+    const reordered = {
+      ...cv,
+      layout: {
+        entryOrder: {
+          experience: [experiences[1].id, experiences[0].id],
+        },
+      },
+    };
+
+    const plan = buildCvLayoutPlan({ cv: reordered, template, language: 'en' });
+    const section = plan.sections.find((entry) => entry.key === 'experience');
+    assert.ok(section, 'the experience section is there');
+    assert.equal(
+      section.entries[0].id,
+      experiences[1].id,
+      'the paper reads the entries in the order the candidate chose'
+    );
+
+    const xml = documentXml(await buildCvDocx({ cv: reordered, language: 'en', template }));
+    const first = xml.indexOf(experiences[1].company);
+    const second = xml.indexOf(experiences[0].company);
+    assert.ok(first > 0 && second > first, 'the Word file reads the entries in the same order');
+  });
+});
+

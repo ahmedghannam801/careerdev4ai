@@ -166,11 +166,58 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
   const contactRun = (size: number, color: string) =>
     new TextRun({
-      text: document.contact.join(CV_INLINE_SEPARATOR_WORD),
+      text: document.headerContact.join(CV_INLINE_SEPARATOR_WORD),
       size,
       color,
       rightToLeft: rtl,
     });
+
+  /**
+   * The professional links of the masthead.
+   *
+   * Word needs an ExternalHyperlink per destination, so the line is built from
+   * runs and hyperlinks rather than one string: a link printed in the file is
+   * a link the reader can click.
+   */
+  const headerLinksParagraph = (
+    linkAlignment: typeof headerAlignment,
+    color: string
+  ) => {
+    if (document.headerLinks.length === 0) return null;
+    const children: Array<InstanceType<typeof TextRun> | InstanceType<typeof ExternalHyperlink>> = [];
+    document.headerLinks.forEach((link, index) => {
+      if (index > 0) {
+        children.push(
+          new TextRun({
+            text: CV_INLINE_SEPARATOR_WORD,
+            size: smallSize,
+            color,
+            rightToLeft: rtl,
+          })
+        );
+      }
+      children.push(
+        new ExternalHyperlink({
+          link: link.url,
+          children: [
+            new TextRun({
+              text: link.label || link.url,
+              size: smallSize,
+              color,
+              underline: {},
+              rightToLeft: rtl,
+            }),
+          ],
+        })
+      );
+    });
+    return new Paragraph({
+      alignment: linkAlignment,
+      bidirectional: rtl,
+      spacing: { after: 80 },
+      children,
+    });
+  };
 
   /** The rule that closes a masthead. */
   const ruleParagraph = (color: string, size: number, double = false) =>
@@ -248,7 +295,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
               }),
             ]
           : []),
-        ...(document.contact.length > 0
+        ...(document.headerContact.length > 0
           ? [
               new Paragraph({
                 alignment: headerAlignment,
@@ -304,7 +351,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       verticalAlign: VerticalAlign.BOTTOM,
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
       children:
-        document.contact.length > 0
+        document.headerContact.length > 0
           ? [
               new Paragraph({
                 alignment: rtl ? AlignmentType.LEFT : AlignmentType.RIGHT,
@@ -344,7 +391,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
             }),
           ]
         : []),
-      ...(document.contact.length > 0
+      ...(document.headerContact.length > 0
         ? [
             new Paragraph({
               alignment: headerAlignment,
@@ -420,7 +467,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       );
     }
 
-    if (document.contact.length > 0) {
+    if (document.headerContact.length > 0) {
       blocks.push(
         new Paragraph({
           alignment: headerAlignment,
@@ -441,6 +488,12 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
     headerBlocks.push(...blocks);
   }
+
+  // The links the candidate keeps in the masthead are written after the
+  // masthead itself, so every header shape carries them without each branch
+  // having to repeat the paragraph.
+  const headerLinkLine = headerLinksParagraph(headerAlignment, accent);
+  if (headerLinkLine) headerBlocks.push(headerLinkLine);
 
   /* ---------------------------------------------------------------------- */
   /* The sections                                                            */

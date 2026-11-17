@@ -673,6 +673,85 @@ function ContactLine({
   );
 }
 
+/**
+ * The professional links of the masthead.
+ *
+ * Each one is a real anchor, so the link is clickable in the printed PDF and
+ * carries its destination into the file. A long URL wraps instead of pushing
+ * the masthead wider than the sheet.
+ */
+function HeaderLinks({
+  links,
+  align,
+  color,
+  gap = 10,
+}: {
+  links: CvDocument['headerLinks'];
+  align: 'start' | 'center' | 'end';
+  color: string;
+  gap?: number;
+}) {
+  if (links.length === 0) return null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent:
+          align === 'center' ? 'center' : align === 'end' ? 'flex-end' : 'flex-start',
+        gap: `2px ${gap}px`,
+        color,
+        fontSize: '0.9em',
+        marginTop: 3,
+        maxWidth: '100%',
+      }}
+    >
+      {links.map((link, index) => (
+        <span
+          key={`${link.url}-${index}`}
+          style={{ display: 'inline-flex', gap: 6, minWidth: 0, maxWidth: '100%' }}
+        >
+          {index > 0 && <span aria-hidden="true">·</span>}
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            style={{
+              color,
+              textDecoration: 'underline',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              minWidth: 0,
+            }}
+          >
+            {link.label || link.url}
+          </a>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function HeaderDetails({
+  document,
+  align,
+  color,
+  gap,
+}: {
+  document: CvDocument;
+  align: 'start' | 'center' | 'end';
+  color: string;
+  gap?: number;
+}) {
+  if (document.headerContact.length === 0 && document.headerLinks.length === 0) return null;
+  return (
+    <>
+      <ContactLine contact={document.headerContact} align={align} color={color} gap={gap} />
+      <HeaderLinks links={document.headerLinks} align={align} color={color} gap={gap} />
+    </>
+  );
+}
+
 function Header({
   document,
   spec,
@@ -709,7 +788,7 @@ function Header({
           <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
           {document.title && <p style={titleStyle}>{document.title}</p>}
           <div style={{ marginTop: 6 }}>
-            <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} />
+            <HeaderDetails document={document} align="start" color={CV_INK.secondary} />
           </div>
           <div style={rule} />
         </header>
@@ -732,7 +811,7 @@ function Header({
             <p style={{ ...titleStyle, color: '#ffffffdd', marginTop: 4 }}>{document.title}</p>
           )}
           <div style={{ marginTop: 8 }}>
-            <ContactLine contact={document.contact} align="start" color="#ffffffdd" />
+            <HeaderDetails document={document} align="start" color="#ffffffdd" />
           </div>
         </header>
       );
@@ -753,7 +832,7 @@ function Header({
               {document.title && <p style={titleStyle}>{document.title}</p>}
             </div>
             <div style={{ textAlign: 'end', maxWidth: '48%' }}>
-              <ContactLine contact={document.contact} align="end" color={CV_INK.secondary} gap={7} />
+              <HeaderDetails document={document} align="end" color={CV_INK.secondary} gap={7} />
             </div>
           </div>
           <div style={{ ...rule, marginTop: 10 }} />
@@ -797,7 +876,7 @@ function Header({
             <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
             {document.title && <p style={{ ...titleStyle, marginTop: 1 }}>{document.title}</p>}
             <div style={{ marginTop: 4 }}>
-              <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} gap={8} />
+              <HeaderDetails document={document} align="start" color={CV_INK.secondary} gap={8} />
             </div>
           </div>
         </header>
@@ -810,7 +889,7 @@ function Header({
           <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
           {document.title && <p style={titleStyle}>{document.title}</p>}
           <div style={{ marginTop: 5 }}>
-            <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} />
+            <HeaderDetails document={document} align="start" color={CV_INK.secondary} />
           </div>
         </header>
       );
@@ -840,7 +919,7 @@ function Header({
             </p>
           )}
           <div style={{ marginTop: 7 }}>
-            <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} />
+            <HeaderDetails document={document} align="start" color={CV_INK.secondary} />
           </div>
           <div style={{ borderTop: `3px double ${accent}`, marginTop: 9 }} />
         </header>
@@ -865,7 +944,7 @@ function Header({
             )}
           </div>
           <div style={{ marginTop: 3 }}>
-            <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} gap={8} />
+            <HeaderDetails document={document} align="start" color={CV_INK.secondary} gap={8} />
           </div>
           <div style={{ height: 1, backgroundColor: CV_INK.hairline, marginTop: 6 }} />
         </header>
@@ -883,7 +962,7 @@ function Header({
           <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
           {document.title && <p style={titleStyle}>{document.title}</p>}
           <div style={{ marginTop: 5 }}>
-            <ContactLine contact={document.contact} align="center" color={CV_INK.secondary} />
+            <HeaderDetails document={document} align="center" color={CV_INK.secondary} />
           </div>
         </header>
       );

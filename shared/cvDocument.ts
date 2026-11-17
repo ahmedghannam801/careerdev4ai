@@ -285,6 +285,7 @@ export function buildCvDocument(source: CvSourceData, existing?: Partial<CVProfi
     enabled: previousLinkIds.has(link.id)
       ? previousLinks.find((entry) => entry.id === link.id)?.enabled ?? true
       : true,
+    placement: previousLinks.find((entry) => entry.id === link.id)?.placement,
   }));
 
   // What the candidate has already written, keyed by the record it belongs
@@ -432,5 +433,10 @@ export function buildCvDocument(source: CvSourceData, existing?: Partial<CVProfi
     publications: existing?.publications ?? [],
     research: existing?.research ?? [],
     leadership: existing?.leadership ?? [],
+    // The reading order and the layout are the candidate's decisions about
+    // this document, not facts about a record. Re-projecting the records must
+    // not quietly undo them.
+    sectionOrder: existing?.sectionOrder,
+    layout: existing?.layout,
   };
 }
