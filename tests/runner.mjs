@@ -304,6 +304,11 @@ async function main() {
     // know falls back to the literal title rather than showing the key, and
     // that a message is translated before its values are filled in. Pure.
     join(TESTS_DIR, 'notification-text.test.ts'),
+    // Where a secret is read from: the request-scoped environment when it is
+    // there, and the process environment otherwise. The second path is the
+    // one that matters on Pages, where the request-scoped environment does not
+    // reach the handler that needs the secret. Pure.
+    join(TESTS_DIR, 'runtime-env.test.ts'),
     // Live job vacancies: what the provider record becomes, what the fit
     // explanation says, how the provider's failures are answered, and that the
     // route is private and fails safely without a credential.

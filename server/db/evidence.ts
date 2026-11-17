@@ -437,16 +437,28 @@ export async function listEvidenceForReview(
 ): Promise<EvidenceReviewQueueItem[]> {
   const supabase = getSupabaseServer();
 
-  const { data, error } = await supabase
+  const capped = Math.max(1, Math.min(limit, 200));
+  let result: EvidenceQueryResult = await supabase
     .from('evidence_items')
     .select(`${SELECT_COLUMNS}, profile_id, created_at`)
     .eq('verification_status', 'pending')
     .order('created_at', { ascending: true })
-    .limit(Math.max(1, Math.min(limit, 200)));
-  if (hasEvidenceReviewSchemaError(error)) throw new EvidenceReviewUnavailableError();
-  if (error) throw error;
+    .limit(capped);
+  if (hasEvidenceReviewSchemaError(result.error)) {
+    // The column that records when the artifact arrived may not be there
+    // yet. The queue still works without it — the date the candidate wrote
+    // is a weaker order, but a weaker order is better than no queue.
+    result = await supabase
+      .from('evidence_items')
+      .select(`${LEGACY_SELECT_COLUMNS}, profile_id`)
+      .eq('verification_status', 'pending')
+      .order('date_added', { ascending: true })
+      .limit(capped);
+  }
+  if (hasEvidenceReviewSchemaError(result.error)) throw new EvidenceReviewUnavailableError();
+  if (result.error) throw result.error;
 
-  const rows = (data ?? []) as Array<
+  const rows = (result.data ?? []) as Array<
     EvidenceRow & { profile_id: string | null; created_at: string | null }
   >;
   if (rows.length === 0) return [];

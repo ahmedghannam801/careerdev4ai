@@ -132,12 +132,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (env && typeof env === 'object') {
       for (const [key, value] of Object.entries(env)) {
-        if (
-          key !== 'RESEND_API_KEY' &&
-          key !== 'RESEND_TEST_RECIPIENT' &&
-          typeof value === 'string' &&
-          process.env[key] !== value
-        ) {
+        if (typeof value === 'string' && process.env[key] !== value) {
           process.env[key] = value;
         }
       }
