@@ -5,6 +5,11 @@
 **Scope:** the four changes in the release brief, the verification that was run, and the
 one thing that could not be verified here.
 
+**This document covers two releases on the same day.** Sections 1–6 record the first
+release (`0553b92`, `d5845e6`, `37c8fcb`), which made the paper and the Word file agree.
+Sections 7–12 record the second (`a6f1d1f`), which made the **download** agree with the
+paper and handed the layout to the candidate.
+
 ---
 
 ## 1. What changed, and why it is one change
@@ -307,3 +312,179 @@ URLs, 89 of them opportunities).
 - `src/components/volunteer/VolunteerOpportunities.tsx`, `src/components/subscription/PlanIdentityBadge.tsx`
 - `src/lib/personalizationApi.ts`, `src/types/career.ts`
 - `src/translations/index.ts` and the `cvStudioData`, `discovery`, `jobs`, `subscriptions` parts
+
+---
+
+# The second release — the layout the candidate controls, and the export that is the preview
+
+**Repository:** CareerDev4AI (`D:/Saas/careerpilot-ai`)
+**Date:** 17 November 2026
+**Commit:** `a6f1d1f`
+
+The first release made the paper and the Word file agree. It did not yet make the
+**downloaded file** agree with what the candidate was looking at, because the export was
+still a second rendering drawn from the saved document. This release closes that gap and
+hands the layout to the candidate.
+
+## 7. What changed
+
+### 7.1 The download is the preview
+
+The PDF is now printed by the browser from the paper that is on screen. The document the
+candidate approves is the document the browser prints, so the file carries the same type,
+the same columns, the same Arabic shaping and the same page breaks — because it is the
+same document, not a description of it. The export waits for the stylesheets, for the
+fonts and for the images before it prints, so a page never loses a face it had on screen.
+
+The Word file is drawn from the document the candidate is holding. The route reads the
+document in the request **before** it looks for a stored version, so the export can never
+quietly hand back a CV from the database that the candidate had already changed.
+
+### 7.2 The candidate lays out their own CV
+
+`shared/cvLayout.ts` grew from a description of a template into a description of *this
+document*: the order of the sections, the order of the entries inside them, the column a
+section sits in, where the contact details are printed, and where each professional link
+is printed. The layout editor (`CvSectionOrderControl.tsx`) was rebuilt around it:
+
+- sections are dragged with a pointer **and** moved with the arrow buttons, so the editor
+  answers a mouse and answers a keyboard
+- the entries inside a section can be put in any order
+- a section can be moved into the side column of a template that has one
+- the contact details can be taken out of the masthead into a section of their own
+- each professional link can be moved on its own, without moving the others
+- a change can be undone, and the whole layout can be put back to the template's
+
+The decision is saved with the CV and restored when the candidate reopens it; filling the
+CV from the candidate's records no longer discards the layout they had arranged.
+
+### 7.3 The catalogue's records carry the kind they are
+
+The pillar split was correct — every record was on the right side of the line between
+employment and everything else — but the **kind** was still the kind each record was
+seeded with, and the kind is what the card shows and what the kind filter reads. Fourteen
+records said the wrong thing:
+
+| What the record is | Was filed under | Now |
+|---|---|---|
+| 5 volunteering organisations (*"Code for America — Volunteer"*, *"NumFOCUS — Volunteer and Mentor"*, *"Mozilla — Contribute"*, *"DataKind"*, *"Wikimedia Foundation — Get Involved"*) | `technology` | `volunteering` |
+| 2 academies (*"ITI Cybersecurity Academy"*, *"AI Ambassadors Program"*) | `career_development` | `training` |
+| 3 capacity-building courses (*"Upskilling Programs"*, *"Train To Hire (4 Month)"*, *"Creativa Innovation Hubs"*) | `scholarship` | `training` |
+| *"Post Graduate Diploma"* | `technology` | `training` |
+| 2 free evening events (*"SECC Tech Night"*) | `technology` | `workshop` |
+| *"ProGIG"* | `technology` | `career_development` |
+
+Nothing was deleted, and no record changed pillar: a course, an event and a volunteering
+stint are all on the activities side of the line, which is where they already were. The
+tags were re-synced so that they name the kind again, which is the invariant the sync
+pipeline writes.
+
+### 7.4 The subscription panel reads the plan's own colours
+
+`MembershipPanel.tsx` takes its accent and its feature list from the entitlement matrix
+and the tier table rather than naming them again, so the panel cannot drift from the plan
+it describes. The **entitlement checks are untouched**: a badge says what a plan is, it
+does not decide what a plan may do.
+
+## 8. Verification
+
+| Check | Result |
+|---|---|
+| `npm run lint` (`tsc --noEmit`) | **exit 0** |
+| `npm run test:run` (vitest) | **36 / 36 pass** |
+| node:test suite (93 self-contained files) | **1348 pass, 5 fail** — all 5 are environment gates, below |
+| `tests/cv-layout-parity.test.ts` | **15 / 15 pass** — 7 of them new |
+| `tests/localization.test.ts` | **6 / 6 pass** — 2480 / 2480 strings carry an Arabic entry |
+| `npm run build` | **exit 0** — `dist/_worker.js` written, the bundle carries the public configuration and all 4 sign-in methods |
+| `npm run build:jobs` | **exit 0** — `dist-jobs/worker.js` written |
+
+The five failures are not regressions. Four need `SUPABASE_TEST_PROJECT_REF` and
+`SUPABASE_TEST_PROJECT_EXCLUSIVE` — the runner refuses to point at anything that is not a
+dedicated, disposable test project, and refuses to start at all without them — and one
+asserts that an AI provider is configured, which the environment does not. The integration
+suite could therefore not be run here, and the self-contained files were run directly
+instead.
+
+**The new parity coverage.** The paper and the Word file are compared to each other
+directly, and the seven new assertions are the ones this release needed:
+
+- an Arabic CV is `dir="rtl"` on the paper and `<w:bidi>`/`<w:rtl>` in the file
+- the two carry the same sections in the same order
+- the contact details reach **both** renderings when they are taken out of the masthead
+- the professional links reach **both** renderings when they are moved into it
+- one link can be moved without moving the others
+- the entries inside a section keep the order the candidate chose, in both
+
+The Word file's hyperlinks are checked against the relationships part of the package, so
+a link is only counted when it carries a real destination.
+
+## 9. What could not be verified here
+
+**The pointer drag itself was not exercised in a browser.** jsdom has no
+`elementFromPoint`, so the drag is covered by the keyboard path (the arrow buttons) and by
+the component's own logic, not by a synthetic pointer. The two-column layouts, the
+membership panel and the drag should be looked at by a person before this is called done.
+
+**The integration suite did not run**, for the environment reason above.
+
+## 10. The migration
+
+| | |
+|---|---|
+| File | `supabase/migrations/20261126000001_opportunity_kind_review.sql` |
+| Tables | `public.volunteer_opportunities` (**no column added**) |
+| Changes | 14 records re-kindled; tags re-synced; the pillar invariant re-asserted |
+| Deletes | **none** |
+| Applied to | the production Supabase project (`ciihprsfdojzvjnqgbxl`) |
+| Production | **applied** — before the application was deployed, so the two were never out of step |
+
+## 11. The deployment
+
+| | |
+|---|---|
+| Commit | `a6f1d1f` |
+| Pushed to | `origin/main` — CI **green** (run `44091055195`, 1m0s) |
+| Pages deployment | `c2ce9a17-3165-49a1-84b2-ff6ae309c88e`, Environment **Production**, branch `main`, source **`a6f1d1f`** |
+| Second deployment | `e86e450f-c61f-4454-8b14-cd5c3519dfaa` — Cloudflare's own Git-connected build of the same push, on its own toolchain, so its bundle is hashed differently but carries the same code |
+| Live at | https://careerdev4ai.pages.dev — serving `assets/index-DABd8Pc8.js`, the artifact built locally from `a6f1d1f` |
+| Jobs worker | **not redeployed** — its code imports none of the changed modules, and the rebuilt bundle contains none of the changed logic |
+| Production smoke | `/api/health` → `200 {"status":"ok"}` on **both** the production URL and the deployment URL; `/api/learning/search?q=python` → `200`, 20 courses; `/sitemap.xml` → `200`, 709 URLs; `/opportunities` → `200` |
+
+**The live site was checked against the local build, not merely for a 200.** The
+production URL serves `assets/index-DABd8Pc8.js` and the other eight entry assets, and
+the set is identical to the set `dist/index.html` names — the same bytes that were built
+from `a6f1d1f`. The bundle carries the new strings (`Professional links`, `{name} moved
+up to position {position}`), so the new layout editor is what a candidate is being served.
+
+**The data fix was checked end to end.** The public record page for
+`/opportunities/code-for-america-volunteer` answers `200` and now names the kind
+**Volunteering**; the word *Technology* no longer appears on it.
+
+**The queue was checked end to end** by `scripts/verify-queue-production.mjs`: a job was
+queued on the deployed site, the consumer picked it up, it ran to `completed`, and the
+throwaway identity was removed afterwards.
+
+## 12. Files
+
+**Added**
+
+- `supabase/migrations/20261126000001_opportunity_kind_review.sql`
+
+**Changed**
+
+- `src/lib/cvPdfExport.ts` — the print document, built from the paper that is on screen
+- `src/lib/cvTemplatesApi.ts` — the export carries the document in hand
+- `server/cvTemplates/routes.ts` — the request body wins over a stored version
+- `server/cvTemplates/docx.ts`, `server/seo/publicPages.ts`
+- `shared/cvLayout.ts`, `shared/cvTemplateDocument.ts`, `shared/cvDocument.ts`,
+  `shared/cvProjection.ts`, `shared/cvTemplates.ts`, `shared/opportunities.ts`,
+  `shared/resumeLanguage.ts`
+- `src/components/cv/studio/CvSectionOrderControl.tsx` — the editor, rebuilt
+- `src/components/cv/templates/CvTemplateRenderer.tsx` — the masthead's contact and links
+- `src/components/views/CVStudioView.tsx`, `src/components/views/VolunteerView.tsx`
+- `src/components/volunteer/VolunteerOpportunities.tsx`
+- `src/components/subscription/MembershipPanel.tsx`
+- `src/context/CareerContext.tsx`, `src/types/career.ts`
+- `src/translations/index.ts` and the `cvStudioData`, `discovery`, `subscriptions` parts
+- `tests/cv-layout-parity.test.ts`, `tests/vitest/CvSectionOrderControl.test.tsx`
+
