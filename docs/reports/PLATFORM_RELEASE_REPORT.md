@@ -5,10 +5,12 @@
 **Scope:** the four changes in the release brief, the verification that was run, and the
 one thing that could not be verified here.
 
-**This document covers two releases on the same day.** Sections 1–6 record the first
+**This document covers three releases on the same day.** Sections 1–6 record the first
 release (`0553b92`, `d5845e6`, `37c8fcb`), which made the paper and the Word file agree.
 Sections 7–12 record the second (`a6f1d1f`), which made the **download** agree with the
-paper and handed the layout to the candidate.
+paper and handed the layout to the candidate. Sections 13–18 record the third
+(`e20d232`, `6cfb60c`), which gave the files a candidate uploads one contract, and gave the
+template library the tests it never had.
 
 ---
 
@@ -488,3 +490,127 @@ throwaway identity was removed afterwards.
 - `src/translations/index.ts` and the `cvStudioData`, `discovery`, `subscriptions` parts
 - `tests/cv-layout-parity.test.ts`, `tests/vitest/CvSectionOrderControl.test.tsx`
 
+---
+
+## 13. The third release: one contract for the files a candidate may upload
+
+**Commits** `e20d232` (the fix) and `6cfb60c` (the tests), deployed as `0a897748`.
+
+### 13.1 What the brief reported, and what was actually true
+
+The brief reported four regressions: the upload refused files, the templates were broken, the downloads did not match the paper, and the editor lost the CV on refresh. None of them was taken at face value, because the brief also says not to replace working libraries without evidence. Each area was measured against the running product first.
+
+| Reported | What the measurement showed |
+|---|---|
+| "The upload is broken" | The extraction engine was never broken. A real PDF and a real DOCX were both read end to end by `extractDocument`, line by line, with nothing lost. |
+| "The templates are broken" | All 37 templates render in a real browser with zero lost facts — checked twice: against the dev server, and against the production bundle served as a `<link>` stylesheet. Arabic is `dir=rtl`; a long CV stays clean. |
+| "The PDF does not match the paper" | The print frame is 794px of A4 with one body child, the stylesheets loaded, and all 34 facts of the fixture present. |
+| "The Word file does not match the paper" | The Word writer already read the same layout as the paper (`shared/cvLayout.ts`), which is what the second release had put in place. |
+| "The editor loses the CV" | The editor was fine. What was missing was that the **server** was never told which template was in use when a document was exported as Word, so the file that came back was not the CV on screen. |
+
+The code that worked was therefore left alone. What was genuinely broken was smaller and duller than the report implied:
+
+1. **The format contract had drifted across four places.** The API refused a `.pdf` unless the browser sent exactly `application/pdf`; a `.doc` sent as `application/octet-stream` was accepted by the API and then rejected by the storage bucket; the `accept` attribute, the multer filter, the bucket's allowed types and the extension-to-MIME map each held their own private list.
+2. **The file input was never reset.** After a read the input still held the file, so choosing the same file again fired no `change` event. A candidate who fixed one mistake and re-picked the same CV got nothing at all.
+3. **The analyzer dropped an unsupported file silently.** Nothing happened, and nothing said why.
+4. **There was no size guard in the browser.** A 40MB file was accepted by the picker and rejected by the server, after the wait.
+5. **The Word export did not record the template in use.** `cvId` was not sent, so the server kept the template from before — or none at all.
+6. **The per-template test suite had never run.** `tests/cv-templates.test.ts` imported the database harness, which throws at import time unless `SUPABASE_TEST_PROJECT_REF` is set. In every ordinary run the file died before its first assertion, so the 37 templates had **no** test coverage.
+
+### 13.2 One contract for the files a candidate may upload
+
+`shared/cvUpload.ts` is now the only place that knows what a candidate may upload:
+
+| The decision | Where it lives now |
+|---|---|
+| The formats a candidate may bring | `CV_UPLOAD_FORMATS` |
+| The extensions the picker offers | `CV_UPLOAD_EXTENSIONS` — extensions only, so the picker does not offer every file on the disk |
+| The MIME types the server accepts | `CV_UPLOAD_MIME_TYPES` |
+| The size limit | `CV_UPLOAD_MAX_BYTES` — 10 MB, enforced by multer, by the storage layer and by the browser |
+| The reason a file was refused | `cvUploadRejection()` → `unsupported_type` or `too_large`, or nothing |
+| The MIME a stored file gets | `cvUploadStorageMime()` — decided by the extension, not by what the browser claimed |
+| The message a candidate reads | `cvUploadRejectionMessage()` |
+
+It answers with **reason codes, not English sentences**. The server turns a code into its own wording; the browser turns it into a translated string. That is why the Arabic entries were added: `tests/localization.test.ts` requires an Arabic string for every `t()` key, and a sentence baked into a shared module would have had no translation at all.
+
+The server answers `413` with the code `FILE_TOO_LARGE` when the file is over the limit, and the multer error handler now names the 10MB limit instead of failing vaguely.
+
+### 13.3 The four client fixes
+
+- `CvReviewWorkspace.tsx` — the input's value is reset after every read, so the same file can be re-picked; the client checks the contract before sending and shows the translated refusal; `accept` lists extensions only.
+- `CvAnalysisPanel.tsx` — the silent drop became a message, the size is checked before the upload starts, and the input is reset.
+- `CareerContext.tsx` — the active CV id is exposed, so the editor and the exports agree on which document is in hand.
+- `cv.ts` (translations) — the two new messages, in English and Arabic.
+
+### 13.4 The export fix
+
+`cvTemplatesApi.ts` now sends `cvId` with the Word export, and the route records the template that was actually in use. The document in the request body still wins over the stored version — that rule was not changed.
+
+### 13.5 The suite that had never run
+
+`tests/cv-templates.test.ts` is no longer one file that depends on a database. It was split:
+
+- `tests/cv-template-library.test.ts` — the part that needs no database, and which therefore always runs: every template, its facts, its layout, the free one being free.
+- `tests/cv-templates.test.ts` — the part that talks to the API, which stays database-gated.
+
+Nothing was deleted; the coverage that was silently switched off is now on.
+
+## 14. The regression suites
+
+| File | What it proves | Result |
+|---|---|---|
+| `tests/cv-template-library.test.ts` | every one of the 37 templates renders, keeps its facts, and the free template is the free one | 25 pass, no database |
+| `tests/cv-upload-regression.test.ts` | the format contract: every accepted extension, every refused one, the 10MB limit, the reason codes, the storage MIME map, the messages | 12 pass |
+| `tests/cv-export-regression.test.ts` | the Word export carries the document in hand, the body wins over the stored version, the template is recorded, the headers and filename are right, the layout still matches the paper | 14 pass |
+| `tests/cv-studio-workflow.test.ts` | the whole studio: upload → extract → review → apply → editor → refresh → export | 10 steps, database-gated |
+
+All four are registered in `tests/runner.mjs`, so they run in the ordinary suite rather than only on demand.
+
+**Local runs, all green:** `tsc --noEmit` clean; Vitest 6 files / 36 tests; the 15 CV test files pass, including `localization.test.ts`; the Playwright smoke passes; the production build succeeds.
+
+## 15. The deployment
+
+| | |
+|---|---|
+| Commits | `e20d232`, `6cfb60c` — pushed to `origin/main` (`e2d0174..6cfb60c`) |
+| Pages deployment | `0a897748`, branch `main`, Environment **Production** |
+| Live at | https://careerdev4ai.pages.dev — serving `assets/index-BlHp8Xdr.js` and the eight other entry assets |
+| Deployment URL | https://0a897748.careerdev4ai.pages.dev |
+| Production smoke | `/api/health` → `200 {"status":"ok"}` on **both** the production URL and the deployment URL |
+
+**The live site was checked against the local build, not merely for a 200.** The set of assets the production URL names is identical to the set `dist/index.html` names, and the served bundle carries the new upload strings — so the contract in `shared/cvUpload.ts` is what a candidate is being served, not a stale bundle.
+
+## 16. The live acceptance pass
+
+The deployed site was driven in a signed-in browser, against the owner's own account, with no record written.
+
+- CV Studio loads with the five-step flow, the editor and preview, the Resume Language toggle, and **37 of 37** templates in the Template Library, each with its preview.
+- The Import step says **"Nothing has been saved to your profile yet"** and offers "Choose a file · PDF, DOCX, DOC, TXT or JSON".
+- A real PDF (1,879 bytes) was uploaded: the server extracted it, and the review showed **93% confidence**, `High 22 · Medium 4 · Low 2 · Missing 6`, the sections with their value counts, and one issue raised (overlapping roles). Nothing was applied.
+- A real DOCX (10,158 bytes, the same content) was uploaded: the review reads **`sample-cv.docx · DOCX · 1 page(s)`** with the same 93% and 22/4/2/6. The values came out right (name, email, phone, location, professional title), the LinkedIn link was marked as *assembled* rather than copied, GitHub and Website were marked *missing*, and the sections that are not in the document were marked **"Not in the document"**.
+- **0 console errors and 0 warnings** across the pass.
+- The account's CV document was still empty afterwards. The import step is read-only until Apply is pressed, and Apply was not pressed.
+
+## 17. What could not be verified here
+
+**The database-gated half of the suites.** `cv-studio-workflow.test.ts` and the API half of `cv-templates.test.ts` need a disposable Supabase project. None is configured: the linked project `ciihprsfdojzvjnqgbxl` is production, and `tests/env.mjs` requires both `SUPABASE_TEST_PROJECT_REF` and `SUPABASE_TEST_PROJECT_EXCLUSIVE` precisely so that the suite cannot write to production. There is no Docker and no Supabase CLI on this machine, so no local stack either.
+
+**The CI run is red on one step only.** Run `44184272050` fails at `npm audit --audit-level=high`, which flags a `picomatch` ReDoS advisory reached through `vite` → `vitest` → `@vitejs/plugin-react`. No dependency was changed in this release; the advisory is pre-existing and lives entirely in the dev and build toolchain. Clearing it would mean downgrading vite 8 → 6 and vitest 5 → 3 — a breaking toolchain change, and not part of this release. Every other step in the run is green: Vitest, `tsc`, the build, Playwright and Semgrep.
+
+## 18. Files
+
+**Added**
+
+- `shared/cvUpload.ts` — the upload contract
+- `tests/cv-template-library.test.ts`, `tests/cv-upload-regression.test.ts`,
+  `tests/cv-export-regression.test.ts`, `tests/cv-studio-workflow.test.ts`
+
+**Changed**
+
+- `app.ts` — the upload route, the document reader, the size limit, the multer error
+- `server/db/cvStorage.ts` — the extension-to-MIME map, the size limit
+- `server/cvTemplates/routes.ts` — the template in use is recorded
+- `src/components/cv/CvReviewWorkspace.tsx`, `src/components/cv/CvAnalysisPanel.tsx`
+- `src/components/views/CVStudioView.tsx`, `src/context/CareerContext.tsx`
+- `src/lib/cvTemplatesApi.ts`, `src/translations/parts/cv.ts`
+- `tests/cv-templates.test.ts`, `tests/runner.mjs`
