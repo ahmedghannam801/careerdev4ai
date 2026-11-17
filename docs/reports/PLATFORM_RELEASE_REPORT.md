@@ -246,8 +246,8 @@ release.
 | Tables | `public.volunteer_opportunities` (one column added) |
 | Adds | `pillar text` + `volunteer_opportunities_pillar_check` (`NOT VALID`, as the kind constraint beside it) + two partial indexes |
 | Changes | 4 training programmes re-filed from their subject to their form; 90 rows backfilled |
-| Applied to | the working database |
-| Production | **not applied** — this migration must be deployed with the release, in the documented order |
+| Applied to | the production Supabase project (`ciihprsfdojzvjnqgbxl`) |
+| Production | **applied** — before the application was deployed, so the two were never out of step |
 
 This is the only schema change in the release, and it belongs to the opportunity split.
 The subscription work added **no** migration and touched **no** table, as the release
@@ -255,7 +255,36 @@ gate requires of a change that only moves the presentation of a subscription.
 
 ---
 
-## 5. Files
+## 5. The deployment
+
+| | |
+|---|---|
+| Commits | `0553b92` (the release) and `d5845e6` (a correction found by deploying) |
+| Pushed to | `origin/main` — CI **green on both** |
+| Pages deployment | `a0cfd092-08b5-4503-b36b-d0a7a8ddae64`, Environment **Production**, branch `main`, source `d5845e6` |
+| Live at | https://careerdev4ai.pages.dev |
+| Jobs worker | **not redeployed** — its code imports none of the changed modules, so a redeploy would have changed nothing |
+| Production smoke | `/api/health` → `{"status":"ok"}` on both the production URL and the deployment URL; `/opportunities` and `/sitemap.xml` render from the live database |
+
+### What deploying found
+
+The first production read of the public catalogue showed **90** records and the title
+"Volunteering Opportunities & Internships" — the internship was being published among
+the volunteering programmes, on a surface the release had not touched. The split was
+real in the product and absent from the public page.
+
+`d5845e6` fixed it: the public page now asks the database for the activities pillar,
+the same stored column the application filters on, and says what it is. It now
+publishes **89** records as "Opportunities & Activities".
+
+A record's own page is looked up in the whole catalogue, so the URL a search engine
+has already indexed keeps working: `/opportunities/opp-eg-undp` still answers **200**
+with its own title, while the internship has left the index and the sitemap (709
+URLs, 89 of them opportunities).
+
+---
+
+## 6. Files
 
 **Added**
 
