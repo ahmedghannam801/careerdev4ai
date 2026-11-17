@@ -200,4 +200,18 @@ describe('the split in the server', () => {
       'the vacancies feed asks for the employment pillar'
     );
   });
+
+  it('publishes the activities half on the public catalogue page', () => {
+    const seoSource = readFileSync(new URL('seo/publicPages.ts', serverRoot), 'utf8');
+    assert.match(
+      seoSource,
+      /\.eq\('pillar', 'opportunities'\)/,
+      'the public catalogue page publishes the activities pillar'
+    );
+    assert.match(
+      seoSource,
+      /loadOpportunities\('all'\)/,
+      "a record's own page is still reachable whichever half it belongs to"
+    );
+  });
 });

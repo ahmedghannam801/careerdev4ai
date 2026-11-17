@@ -124,7 +124,16 @@ interface CacheEntry<T> {
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const courseCache: { entry: CacheEntry<PublicCourse[]> | null } = { entry: null };
-const opportunityCache: { entry: CacheEntry<PublicOpportunity[]> | null } = { entry: null };
+// The catalogue is read in two scopes: the activities half, which the public
+// index publishes, and the whole catalogue, which a record's own page is
+// looked up in.
+const opportunityCache: {
+  activities: { entry: CacheEntry<PublicOpportunity[]> | null };
+  all: { entry: CacheEntry<PublicOpportunity[]> | null };
+} = {
+  activities: { entry: null },
+  all: { entry: null },
+};
 
 /**
  * Reads the learning catalogue.
@@ -197,22 +206,39 @@ export async function loadCourses(): Promise<PublicCourse[]> {
  *
  * Only live rows are published: an expired or deactivated opportunity is not
  * an opportunity, and the public page must not advertise it.
+ *
+ * WHICH HALF OF THE ECOSYSTEM
+ * The catalogue holds two kinds of record, and the public page is about one
+ * of them. A volunteer programme, a training course, a competition and a
+ * fellowship are things a candidate joins; an internship is a role somebody
+ * is taken on to do, and it is offered with the vacancies on Live Jobs.
+ * The page therefore publishes the activities pillar, chosen by the same
+ * stored column the application filters on, so the public catalogue and the
+ * product can never disagree about what belongs where.
+ *
+ * A record's own page is still reachable whichever pillar it belongs to: a
+ * URL that a search engine has already indexed does not stop working because
+ * the record moved to the other half of the catalogue.
  */
-export async function loadOpportunities(): Promise<PublicOpportunity[]> {
+export async function loadOpportunities(
+  scope: 'activities' | 'all' = 'activities'
+): Promise<PublicOpportunity[]> {
   const now = Date.now();
-  if (opportunityCache.entry && opportunityCache.entry.expiresAt > now) {
-    return opportunityCache.entry.value;
+  const cached = opportunityCache[scope];
+  if (cached.entry && cached.entry.expiresAt > now) {
+    return cached.entry.value;
   }
 
   try {
     const supabase = getSupabaseServer();
-    const { data, error } = await supabase
+    let query = supabase
       .from('volunteer_opportunities')
       .select(
         'id, title, organization, description, category, location, is_remote, commitment, skills_gained, application_url, country, deadline, verification_status, updated_at'
       )
-      .eq('is_active', true)
-      .order('is_featured', { ascending: false })
+      .eq('is_active', true);
+    if (scope === 'activities') query = query.eq('pillar', 'opportunities');
+    const { data, error } = await query.order('is_featured', { ascending: false })
       .order('organization', { ascending: true });
 
     if (error) throw error;
@@ -238,11 +264,11 @@ export async function loadOpportunities(): Promise<PublicOpportunity[]> {
       })
     );
 
-    opportunityCache.entry = { value: opportunities, expiresAt: now + CACHE_TTL_MS };
+    opportunityCache[scope].entry = { value: opportunities, expiresAt: now + CACHE_TTL_MS };
     return opportunities;
   } catch (error) {
     console.error('SEO: could not read the volunteering catalogue:', error);
-    return opportunityCache.entry?.value ?? [];
+    return opportunityCache[scope].entry?.value ?? [];
   }
 }
 
@@ -326,7 +352,7 @@ function buildAboutPage(): PublicPage {
         <div class="cta">
           ${appLink('/careers', 'Browse career roles')}
           ${appLink('/learning', 'Browse learning resources')}
-          ${appLink('/opportunities', 'Browse volunteering opportunities')}
+          ${appLink('/opportunities', 'Browse opportunities & activities')}
         </div>
       </section>`;
 
@@ -1098,7 +1124,7 @@ ${facts.map(([label, value]) => `          <li><strong>${escapeHtml(label)}:</st
 /** The index of the volunteering catalogue. */
 function buildOpportunitiesIndexPage(opportunities: PublicOpportunity[]): PublicPage {
   const path = '/opportunities';
-  const description = `${opportunities.length} volunteering opportunities, internships, fellowships and programmes in Egypt and worldwide — filtered to the ones you can actually act on.`;
+  const description = `${opportunities.length} volunteering opportunities, training programmes, fellowships and activities in Egypt and worldwide — filtered to the ones you can actually act on.`;
 
   const cards = opportunities
     .map(
@@ -1115,7 +1141,7 @@ function buildOpportunitiesIndexPage(opportunities: PublicOpportunity[]): Public
     .join('\n');
 
   const body = `      <section class="hero">
-        <h1>Volunteering opportunities</h1>
+        <h1>Opportunities &amp; activities</h1>
         <p class="lede">${escapeHtml(description)}</p>
       </section>
 
@@ -1138,11 +1164,11 @@ ${cards}
 
   return {
     path,
-    title: `Volunteering Opportunities & Internships — ${opportunities.length} | ${SITE_NAME}`,
+    title: `Opportunities & Activities — ${opportunities.length} | ${SITE_NAME}`,
     description,
     body,
     jsonLd: [
-      webPageSchema({ name: 'Volunteering Opportunities', description, path, hasBreadcrumb: true }),
+      webPageSchema({ name: 'Opportunities & Activities', description, path, hasBreadcrumb: true }),
       breadcrumbSchema(
         [
           { name: 'Home', path: '/' },
@@ -1150,7 +1176,7 @@ ${cards}
         ],
         path
       ),
-      itemListSchema('Volunteering opportunities', items),
+      itemListSchema('Opportunities & activities', items),
     ],
     breadcrumb: [
       { name: 'Home', path: '/' },
@@ -1305,7 +1331,10 @@ export async function resolvePublicPage(pathname: string): Promise<PublicPageRes
     page = buildOpportunitiesIndexPage(await loadOpportunities());
   } else if (path.startsWith('/opportunities/')) {
     const id = decodeURIComponent(path.slice('/opportunities/'.length));
-    const opportunities = await loadOpportunities();
+    // A record's own page is looked up in the WHOLE catalogue, so a URL that
+    // a search engine has already indexed keeps working whichever half of
+    // the ecosystem the record belongs to.
+    const opportunities = await loadOpportunities('all');
     const opportunity = opportunities.find((candidate) => candidate.id === id);
     if (opportunity) page = buildOpportunityPage(opportunity);
   }
