@@ -65,7 +65,21 @@ const SECRET_KEYS = [
  * product: the server reports that card checkout is not ready and the
  * interface hides the rail. The Egyptian wallet rails are unaffected.
  */
-const OPTIONAL_SECRET_KEYS = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
+const OPTIONAL_SECRET_KEYS = [
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+];
+
+/**
+ * The email-delivery secrets.
+ *
+ * The API key and the address the test message is sent to. Both are optional:
+ * a deployment without them simply has no email delivery, and the rest of the
+ * platform is unaffected. They are listed here rather than left out so that a
+ * run of this script does not report a credential the deployment still holds
+ * as one that should be removed.
+ */
+const OPTIONAL_EMAIL_SECRET_KEYS = ['RESEND_API_KEY', 'RESEND_TEST_RECIPIENT'];
 
 /**
  * The build-time variables. They are public by design — they already ship
@@ -212,7 +226,7 @@ async function call(method, body) {
 function buildEnvVars() {
   const vars = {};
   for (const key of SECRET_KEYS) vars[key] = { type: 'secret_text', value: env[key] };
-  for (const key of OPTIONAL_SECRET_KEYS) {
+  for (const key of [...OPTIONAL_SECRET_KEYS, ...OPTIONAL_EMAIL_SECRET_KEYS]) {
     // Only a key that is actually configured is sent. A half-configured
     // deployment — a key without a webhook secret — is worse than an
     // unconfigured one, because the server would refuse every session
@@ -255,7 +269,12 @@ function buildBuildVars() {
  * silently left behind.
  */
 function staleEnvVars(current) {
-  const keep = new Set([...SECRET_KEYS, ...OPTIONAL_SECRET_KEYS, ...PLAIN_KEYS]);
+  const keep = new Set([
+    ...SECRET_KEYS,
+    ...OPTIONAL_SECRET_KEYS,
+    ...OPTIONAL_EMAIL_SECRET_KEYS,
+    ...PLAIN_KEYS,
+  ]);
   return Object.keys(current ?? {}).filter((name) => !keep.has(name));
 }
 

@@ -72,4 +72,21 @@ describe('where a secret is read from', () => {
 
     assert.equal(value, undefined);
   });
+
+  it('trims a value that was written with a line break around it', () => {
+    // A secret that was piped into a command receives a line break. It is the
+    // same secret, and a recipient address that carries one is not an
+    // address — the message would be refused as malformed.
+    const value = withRuntimeEnv({ CAREERPILOT_TEST_SECRET: 'someone@example.com\r\n' }, () =>
+      runtimeSecret('CAREERPILOT_TEST_SECRET')
+    );
+
+    assert.equal(value, 'someone@example.com');
+  });
+
+  it('trims a value in the process environment as well', () => {
+    process.env.CAREERPILOT_TEST_SECRET = '  someone@example.com  ';
+
+    assert.equal(runtimeSecret('CAREERPILOT_TEST_SECRET'), 'someone@example.com');
+  });
 });

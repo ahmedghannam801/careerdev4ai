@@ -16,11 +16,15 @@ export function withRuntimeEnv<T>(env: Record<string, unknown>, callback: () => 
  * The process environment is the fallback. Local development and the test
  * suite set the value there, and a deployment that does not run the request
  * inside the scoped store still finds it.
+ *
+ * The value is trimmed. A secret that was written with a trailing line break
+ * — which is what a value piped into a command receives — is the same secret,
+ * and a recipient address that carries one is not an address.
  */
 export function runtimeSecret(name: string): string | undefined {
   const scoped = requestEnv.getStore()?.[name];
-  if (typeof scoped === 'string' && scoped.length > 0) return scoped;
+  if (typeof scoped === 'string' && scoped.trim().length > 0) return scoped.trim();
 
   const localValue = process.env[name];
-  return localValue || undefined;
+  return localValue?.trim() ? localValue.trim() : undefined;
 }
