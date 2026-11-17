@@ -9,17 +9,13 @@
 // server-side before any object is touched, so RLS is a second line of defence.
 import { randomUUID } from 'crypto';
 import { getSupabaseServer } from './supabase';
+import {
+  CV_UPLOAD_MAX_BYTES,
+  cvUploadExtensionForStorageMime,
+} from '../../shared/cvUpload.ts';
 
 export const CV_BUCKET = 'cv-files';
-export const MAX_CV_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
-
-const EXT_BY_MIME: Record<string, string> = {
-  'application/pdf': 'pdf',
-  'application/msword': 'doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-  'text/plain': 'txt',
-  'application/json': 'json',
-};
+export const MAX_CV_FILE_BYTES = CV_UPLOAD_MAX_BYTES;
 
 export interface UploadedCvFile {
   path: string;
@@ -27,9 +23,15 @@ export interface UploadedCvFile {
   fileName: string;
 }
 
-/** Maps a client mime type to a safe extension. Returns null when unsupported. */
+/**
+ * Maps a client mime type to a safe extension.
+ *
+ * The types and the extensions are declared once, in `shared/cvUpload.ts`, so
+ * the storage layer cannot accept a file the API refuses, or refuse a file
+ * the API accepted.
+ */
 export function extensionForMimeType(mimeType: string): string | null {
-  return EXT_BY_MIME[mimeType.toLowerCase()] ?? null;
+  return cvUploadExtensionForStorageMime(mimeType);
 }
 
 /**

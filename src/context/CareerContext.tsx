@@ -725,6 +725,14 @@ interface CareerContextType {
 
   // CV Studio & Upload Pipeline
   activeCV: CVProfile;
+  /**
+   * The id of the CV the studio is working on.
+   *
+   * The export needs it: the server records which template a CV was produced
+   * with, and it can only do that when it knows which CV the document came
+   * from. It is empty for a candidate who has never saved a CV.
+   */
+  activeCvId: string;
   cvVersions: CVVersion[];
   updateCV: (updates: Partial<CVProfile>) => void;
   /**
@@ -6234,6 +6242,7 @@ Skills: ${activeCV.skillsList.join(', ')}
       projects,
       evidenceItems,
       activeCV,
+      activeCvId,
       cvVersions,
       applications,
       interviewSessions,
@@ -6320,6 +6329,7 @@ Skills: ${activeCV.skillsList.join(', ')}
     notificationPreferences,
     privacyPreferences,
     activeCV,
+    activeCvId,
     applications,
   ]);
 
@@ -6451,6 +6461,7 @@ Skills: ${activeCV.skillsList.join(', ')}
         addEvidence,
         deleteEvidence,
         activeCV,
+        activeCvId,
         cvVersions,
         updateCV,
         profileLinks,

@@ -18,6 +18,16 @@ import multer from 'multer';
 import { GoogleGenAI } from '@google/genai/web';
 import { normalizeTargetOpportunityType } from './shared/careerIdentity.ts';
 import {
+  CV_UPLOAD_MAX_BYTES,
+  CV_UPLOAD_MAX_LABEL,
+  cvUploadExtension,
+  cvUploadFormatsLabel,
+  cvUploadMimeType,
+  cvUploadRejection,
+  cvUploadRejectionMessage,
+  cvUploadStorageMime,
+} from './shared/cvUpload.ts';
+import {
   assessDocumentQuality,
   extractDocument,
   extractTextDocument,
@@ -655,7 +665,7 @@ app.use('/api', (req: Request, _res: Response, next: () => void) => {
 // Multer in-memory storage for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: CV_UPLOAD_MAX_BYTES },
 });
 
 // Job ads are parsed from memory only and capped below the general CV limit.
@@ -666,29 +676,14 @@ const jobDescriptionUpload = multer({
 
 // Accepted CV upload formats.
 //
-// A file must match BOTH its extension and one of the MIME types declared for
-// that extension, so a renamed or crafted upload cannot pass the format check
-// under a false identity.
+// The formats are declared once, in `shared/cvUpload.ts`, and shared by the
+// API, the storage layer and the browser. A file must match BOTH its
+// extension and one of the MIME types declared for that extension, so a
+// renamed or crafted upload cannot pass the format check under a false
+// identity.
 //
 // Supported formats: PDF, DOCX, DOC, TXT, JSON.
-const CV_UPLOAD_TYPES: Record<string, string[]> = {
-  '.pdf': ['application/pdf'],
-  '.docx': [
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/zip',
-    'application/octet-stream',
-    'application/x-zip-compressed',
-  ],
-  '.doc': [
-    'application/msword',
-    'application/vnd.ms-word',
-    'application/octet-stream',
-  ],
-  '.txt': ['text/plain'],
-  '.json': ['application/json'],
-};
-const CV_UPLOAD_TYPE_ERROR =
-  'Unsupported file type. Please upload a .pdf, .docx, .doc, .txt, or .json file.';
+const CV_UPLOAD_TYPE_ERROR = `Unsupported file type. Please upload a ${cvUploadFormatsLabel()} file.`;
 
 // Canonical skill lookup map built from CATALOG_SKILL_NAMES
 const CANONICAL_SKILL_MAP = new Map<string, string>();
@@ -1633,23 +1628,28 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
     let extraction: DocumentExtraction | null = null;
 
     if (req.file) {
-      const originalName = req.file.originalname.toLowerCase();
+      const originalName = req.file.originalname;
       // The declared MIME type is compared without its parameters, so
       // 'text/plain; charset=utf-8' still matches 'text/plain'.
-      const mimeType = req.file.mimetype.split(';')[0].trim().toLowerCase();
-      const dot = originalName.lastIndexOf('.');
-      const extension = dot > -1 ? originalName.slice(dot) : '';
+      const mimeType = cvUploadMimeType(req.file.mimetype);
 
       // Check format: the extension must be accepted AND the declared MIME
       // type must be one of the types accepted for that extension.
-      const allowedMimeTypes = CV_UPLOAD_TYPES[extension];
-      if (!allowedMimeTypes || !allowedMimeTypes.includes(mimeType)) {
-        return res.status(400).json({ error: CV_UPLOAD_TYPE_ERROR });
+      const rejection = cvUploadRejection({
+        fileName: originalName,
+        mimeType,
+        size: req.file.size,
+      });
+      if (rejection) {
+        return res.status(rejection === 'too_large' ? 413 : 400).json({
+          error: cvUploadRejectionMessage(rejection),
+          code: rejection === 'too_large' ? 'FILE_TOO_LARGE' : 'unsupported_type',
+        });
       }
 
       extraction = await extractDocument(
         req.file.buffer,
-        extension.slice(1) as DocumentFormat
+        cvUploadExtension(originalName).slice(1) as DocumentFormat
       );
     } else {
       const pastedText = str(req.body?.text, 200_000);
@@ -1775,17 +1775,19 @@ app.post('/api/resumes/upload', requireAuth, aiRateLimit, upload.single('file'),
     const userId = req.authUser!.id;
     let storedFile: { path: string; size: number; fileName: string } | null = null;
     if (req.file) {
-      const mimeType = req.file.mimetype.split(';')[0].trim().toLowerCase();
-      let storageMime = mimeType;
-      if (req.file.originalname.toLowerCase().endsWith('.docx') || mimeType.includes('officedocument') || mimeType.includes('zip')) {
-        storageMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      }
+      const mimeType = cvUploadMimeType(req.file.mimetype);
+      // The type a file is STORED as is decided by its extension, not by the
+      // type the browser happened to declare. A Word file that arrived as a
+      // plain byte stream is still stored as a Word file.
+      const storageMime = cvUploadStorageMime(req.file.originalname) ?? mimeType;
       const ext = extensionForMimeType(storageMime);
       if (!ext) {
         return res.status(400).json({ error: CV_UPLOAD_TYPE_ERROR });
       }
       if (req.file.size > MAX_CV_FILE_BYTES) {
-        return res.status(400).json({ error: 'File exceeds the maximum size' });
+        return res
+          .status(413)
+          .json({ error: `This file is larger than ${CV_UPLOAD_MAX_LABEL}.` });
       }
       try {
         storedFile = await uploadCvFile(
@@ -1877,21 +1879,26 @@ async function readCvDocument(
   req: Request
 ): Promise<{ extraction: DocumentExtraction; fileName?: string } | { error: string; code: string }> {
   if (req.file) {
-    const originalName = req.file.originalname.toLowerCase();
-    const mimeType = req.file.mimetype.split(';')[0].trim().toLowerCase();
-    const dot = originalName.lastIndexOf('.');
-    const extension = dot > -1 ? originalName.slice(dot) : '';
+    const originalName = req.file.originalname;
+    const mimeType = cvUploadMimeType(req.file.mimetype);
 
-    const allowedMimeTypes = CV_UPLOAD_TYPES[extension];
-    if (!allowedMimeTypes || !allowedMimeTypes.includes(mimeType)) {
-      return { error: CV_UPLOAD_TYPE_ERROR, code: 'unsupported_type' };
+    const rejection = cvUploadRejection({
+      fileName: originalName,
+      mimeType,
+      size: req.file.size,
+    });
+    if (rejection) {
+      return {
+        error: cvUploadRejectionMessage(rejection),
+        code: rejection === 'too_large' ? 'FILE_TOO_LARGE' : 'unsupported_type',
+      };
     }
 
     const extraction = await extractDocument(
       req.file.buffer,
-      extension.slice(1) as DocumentFormat
+      cvUploadExtension(originalName).slice(1) as DocumentFormat
     );
-    return { extraction, fileName: req.file.originalname };
+    return { extraction, fileName: originalName };
   }
 
   const pastedText = str(req.body?.text, 200_000);
@@ -7954,9 +7961,9 @@ app.use((err: any, req: Request, res: Response, next: (e?: unknown) => void) => 
     const code = err?.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
     const message =
       err?.code === 'LIMIT_FILE_SIZE'
-        ? 'File exceeds the maximum size'
+        ? `This file is larger than ${CV_UPLOAD_MAX_LABEL}. Please choose a smaller file.`
         : 'Malformed upload';
-    return res.status(code).json({ error: message });
+    return res.status(code).json({ error: message, code: err?.code });
   }
 
   // A malformed JSON body is rejected by express.json() with a SyntaxError.

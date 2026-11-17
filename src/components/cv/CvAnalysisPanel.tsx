@@ -46,6 +46,7 @@ import {
   type MeasurementRecord,
 } from '../../lib/cvAnalysisApi';
 import { extractCv } from '../../lib/cvExtractionApi';
+import { CV_UPLOAD_MAX_BYTES, CV_UPLOAD_MAX_LABEL } from '../../../shared/cvUpload';
 import { useCareer } from '../../context/CareerContext';
 import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
 import { CvMeasurementReport } from './CvMeasuredAnalysis';
@@ -246,13 +247,28 @@ export const CvAnalysisPanel: React.FC<CvAnalysisPanelProps> = ({
     const allowed =
       ACCEPTED_TYPES.includes(candidate.type) ||
       ACCEPTED_EXTENSIONS.some((extension) => name.endsWith(extension));
-    if (!allowed) return;
+    if (!allowed) {
+      // A file the platform cannot read is refused with a reason, not with
+      // silence. Dropping a file that is then ignored looks like a broken
+      // drag-and-drop.
+      setError(t('This file type is not supported. Please choose a PDF or Word file.'));
+      return;
+    }
+    if (candidate.size > CV_UPLOAD_MAX_BYTES) {
+      setError(
+        t('This file is larger than {limit}. Please choose a smaller file.').replace(
+          '{limit}',
+          CV_UPLOAD_MAX_LABEL
+        )
+      );
+      return;
+    }
     setFile(candidate);
     setVersionId(null);
     // A new file is a new subject: the last measurement is not about it.
     setSubject(null);
     setError(null);
-  }, []);
+  }, [t]);
 
   const completedStages = useMemo(
     () => Object.values(stageStates).filter((state) => state === 'completed').length,
@@ -346,9 +362,16 @@ export const CvAnalysisPanel: React.FC<CvAnalysisPanelProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept={[...ACCEPTED_EXTENSIONS, ...ACCEPTED_TYPES].join(',')}
+              accept={ACCEPTED_EXTENSIONS.join(',')}
               className="hidden"
-              onChange={(event) => acceptFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                // The input is emptied before the file is read, so choosing the
+                // same file again after a failure reports a change and is
+                // read again.
+                event.target.value = '';
+                acceptFile(file);
+              }}
             />
           </div>
 

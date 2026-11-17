@@ -34,11 +34,16 @@ import type {
 import { CV_SECTION_LABELS } from '../../../shared/cvExtraction';
 import { extractCv, importReviewedCv } from '../../lib/cvExtractionApi';
 import { ApiRequestError } from '../../lib/apiClient';
+import {
+  CV_UPLOAD_EXTENSIONS,
+  CV_UPLOAD_MAX_LABEL,
+  cvUploadRejection,
+} from '../../../shared/cvUpload';
 import { useCareer } from '../../context/CareerContext';
 import { useToast } from '../toast/ToastProvider';
 import { CvExtractionReview, type CvApplyMode } from './CvExtractionReview';
 
-const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.json'];
+const ACCEPTED_EXTENSIONS = [...CV_UPLOAD_EXTENSIONS];
 
 export interface CvReviewWorkspaceProps {
   /** Puts the reviewed document into the studio. */
@@ -58,6 +63,31 @@ export const CvReviewWorkspace: React.FC<CvReviewWorkspaceProps> = ({ onApplied 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const readDocument = async (file: File | null, text: string | null) => {
+    // A file that cannot be uploaded is refused here, in the interface, with
+    // a reason the candidate can act on. The same limits are enforced by the
+    // server; checking them in the browser as well means an oversized or
+    // unsupported file is never sent, and never fails silently.
+    if (file) {
+      const rejection = cvUploadRejection({
+        fileName: file.name,
+        mimeType: file.type,
+        size: file.size,
+      });
+      if (rejection) {
+        setReview(null);
+        setResult(null);
+        setError(
+          rejection === 'too_large'
+            ? t('This file is larger than {limit}. Please choose a smaller file.').replace(
+                '{limit}',
+                CV_UPLOAD_MAX_LABEL
+              )
+            : t('This file type is not supported. Please choose a PDF or Word file.')
+        );
+        return;
+      }
+    }
+
     setIsReading(true);
     setError(null);
     setResult(null);
@@ -322,6 +352,11 @@ export const CvReviewWorkspace: React.FC<CvReviewWorkspaceProps> = ({ onApplied 
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
+              // The input is emptied before the file is read. A file picker
+              // only reports a change when the file is different from the
+              // one it held, so a candidate who picked the same file again
+              // after a failure would see nothing happen at all.
+              event.target.value = '';
               if (file) readDocument(file, null);
             }}
           />

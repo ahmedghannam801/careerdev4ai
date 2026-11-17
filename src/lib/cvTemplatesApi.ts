@@ -126,6 +126,14 @@ export async function downloadCvTemplateDocx(input: {
   cv: CVProfile;
   language: ResumeLanguage;
   fileName?: string;
+  /**
+   * The id of the CV the document came from.
+   *
+   * The document itself is always sent, so the file is the one on screen. The
+   * id tells the server which CV it was, so the template can be recorded
+   * against it.
+   */
+  cvId?: string;
 }): Promise<void> {
   const token = await getAccessToken();
   const res = await fetch(
@@ -137,7 +145,11 @@ export async function downloadCvTemplateDocx(input: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ cv: input.cv, language: input.language }),
+      body: JSON.stringify({
+        cv: input.cv,
+        language: input.language,
+        ...(input.cvId ? { cvId: input.cvId } : {}),
+      }),
     }
   );
 

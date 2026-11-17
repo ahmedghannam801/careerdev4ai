@@ -73,6 +73,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
     learningItems,
     learningCatalog,
     settings,
+    activeCvId,
     t } = useCareer();
   const aiWritingEnabled =
     aiPreferences.writingAssistance && privacyPreferences.shareAnalyticsWithAi;
@@ -380,6 +381,10 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         cv: activeCV,
         language: settings.resumeLanguage,
         fileName: `${activeCV.fullName?.trim() || 'CV'}.docx`,
+        // The document on the screen is always what is exported. The id tells
+        // the server which CV it was, so the template can be recorded against
+        // that CV.
+        ...(activeCvId ? { cvId: activeCvId } : {}),
       });
     } catch (error) {
       setExportError(

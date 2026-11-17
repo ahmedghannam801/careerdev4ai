@@ -189,6 +189,10 @@ export const cvAr: Record<string, string> = {
   'Ready for extraction': 'جاهز للاستخراج',
   'Supported formats: PDF, DOCX, TXT, JSON (max 10MB)':
     'الصيغ المدعومة: PDF، DOCX، TXT، JSON (بحد أقصى 10MB)',
+  'This file type is not supported. Please choose a PDF or Word file.':
+    'نوع الملف هذا غير مدعوم. يُرجى اختيار ملف PDF أو Word.',
+  'This file is larger than {limit}. Please choose a smaller file.':
+    'حجم هذا الملف أكبر من {limit}. يُرجى اختيار ملف أصغر.',
   'characters': 'حرفًا',
   'confidence': 'ثقة',
   'overall confidence': 'الثقة الإجمالية',
