@@ -10,6 +10,7 @@ import {
   Clock,
   FileText,
   FolderGit2,
+  GraduationCap,
   LayoutGrid,
   PlayCircle,
   ShieldCheck,
@@ -949,10 +950,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               </button>
               <button
                 type="button"
-                onClick={() => onNavigate('jobs')}
+                onClick={() => onNavigate('volunteer')}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--accent-primary)]"
               >
-                <Briefcase className="h-3.5 w-3.5 text-[var(--color-success-strong)]" />
+                <GraduationCap className="h-3.5 w-3.5 text-[var(--color-success-strong)]" />
                 {t('Training & Courses')}
               </button>
               <button

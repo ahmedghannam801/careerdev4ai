@@ -127,6 +127,67 @@ export function isInternshipJob(job: LiveJob): boolean {
   return job.isInternship;
 }
 
+/**
+ * Whether an employment type means a TRAINING PROGRAMME rather than a job.
+ *
+ * Some providers publish their courses through the same feed as their
+ * vacancies, and the only thing that says which is which is the free-text
+ * employment type. A training programme is not employment: a candidate
+ * looking for a role is not looking for a course, and the two belong on
+ * different sides of the line.
+ *
+ * This is deliberately NOT the opposite of an internship. The Arabic "تدريب"
+ * covers both a placement and a course, and the platform has always read it
+ * as an internship; that reading is kept, and a course is recognised only
+ * when the posting says so in its own words: "training", "bootcamp",
+ * "course", or the Arabic for a course.
+ */export function isTrainingEmploymentType(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const text = value.toLowerCase();
+  // A posting that calls itself a course is a course, whatever else it says.
+  // This is checked FIRST, because the Arabic for a training programme
+  // ("برنامج تدريبي") contains the Arabic for a placement ("تدريب"), and a
+  // training programme is a course rather than a placement.
+  if (/\btraining\b/.test(text)) return true;
+  if (/\bbootcamp\b/.test(text)) return true;
+  if (/\bcourses?\b/.test(text)) return true;
+  // Arabic: دورة and دورات (a course and its plural), and تدريبي (the
+  // adjective in a training programme). A bare تدريب is a placement.
+  if (/دور(?:ة|ات)/.test(text)) return true;
+  if (text.includes('تدريبي')) return true;
+  return false;
+}
+
+/**
+ * The two halves of what a provider publishes.
+ *
+ * A vacancy is employment; a training programme is a course. The two are
+ * found in the same feed, and the platform shows them on different screens.
+ */
+export type JobPillar = 'jobs' | 'opportunities';
+
+/**
+ * Which half of the ecosystem a posting belongs to.
+ *
+ * The same rule the catalogue uses: an internship is employment, and so is a
+ * vacancy; a training programme is not.
+ */
+export function jobPillarFor(job: LiveJob): JobPillar {
+  return job.isTraining ? 'opportunities' : 'jobs';
+}
+
+/**
+ * Keeps only the postings of one half of the ecosystem.
+ *
+ * The live feed is the employment feed, so the training programmes the
+ * providers publish alongside their vacancies are taken out of it. They are
+ * not lost: they are the same kind of thing as the training programmes in
+ * the catalogue, and they belong with them.
+ */
+export function filterLiveJobsByPillar(jobs: LiveJob[], pillar: JobPillar): LiveJob[] {
+  return jobs.filter((job) => jobPillarFor(job) === pillar);
+}
+
 /* -------------------------------------------------------------------------- */
 /* The shape of a vacancy                                                     */
 /* -------------------------------------------------------------------------- */
@@ -183,6 +244,14 @@ export interface LiveJob {
    * Read from the employment type the posting stated, not assumed.
    */
   isInternship: boolean;
+  /**
+   * True when the posting is a training programme rather than employment.
+   *
+   * Some providers publish their courses through the same feed as their
+   * vacancies. A course is not a role, so it is kept out of the employment
+   * feed and offered with the training instead.
+   */
+  isTraining: boolean;
   /** The skills the posting asked for. */
   requiredSkills: string[];
   /** Where `requiredSkills` came from, so the interface can be precise. */
@@ -319,6 +388,7 @@ export function normalizeLiveJob(raw: unknown, now: Date = new Date()): LiveJob 
     publisher,
     source: resolveJobSource(publisher),
     isInternship: isInternshipEmploymentType(employmentType),
+    isTraining: isTrainingEmploymentType(employmentType),
     requiredSkills: publishedSkills,
     skillSource: publishedSkills.length ? 'publisher' : 'none',
     requiredExperience: asText(record.job_required_experience) ?? asText(record.required_experience),

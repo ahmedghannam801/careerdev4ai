@@ -39,6 +39,14 @@ export interface PlanIdentityBadgeProps {
   label?: string | null;
   /** Hides the name, leaving only the mark. */
   markOnly?: boolean;
+  /**
+   * The interface's language.
+   *
+   * A tier has a name in each language the platform speaks, and the name the
+   * candidate reads should be the one in their own. An Arabic-speaking
+   * candidate reads "بلس", not "Plus".
+   */
+  language?: 'ar' | 'en';
   className?: string;
 }
 
@@ -49,13 +57,14 @@ export const PlanIdentityBadge: React.FC<PlanIdentityBadgeProps> = ({
   size = 'sm',
   label,
   markOnly = false,
+  language = 'en',
   className = '',
 }) => {
   const identity = tier
     ? planIdentityFor(tier)
     : planIdentityFor(planCode);
 
-  const name = label ?? identity.label;
+  const name = label ?? (language === 'ar' ? identity.labelAr : identity.label);
   const isUltra = identity.tier === 'ultra';
 
   // The mark-only variant carries no padding of its own, so the size never

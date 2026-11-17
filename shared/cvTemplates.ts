@@ -52,6 +52,17 @@ export const CV_SECTION_KEYS = [
 
 export type CvSectionKey = (typeof CV_SECTION_KEYS)[number];
 
+/**
+ * True when the value names a section of a CV.
+ *
+ * A stored order comes from the candidate's own record, so it is checked
+ * before it is used: an order that names a section that does not exist would
+ * silently drop it from the document.
+ */
+export function isCvSectionKey(value: unknown): value is CvSectionKey {
+  return typeof value === 'string' && (CV_SECTION_KEYS as readonly string[]).includes(value);
+}
+
 /** The reading order most recruiters expect. */
 export const DEFAULT_CV_SECTION_ORDER: readonly CvSectionKey[] = [
   'summary',

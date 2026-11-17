@@ -176,6 +176,18 @@ export const subscriptionsAr: Record<string, string> = {
   'Card subscription': 'اشتراك البطاقة',
   'Cancels on': 'يُلغى في',
   'Renews on': 'يتجدد في',
+
+  // ---- The membership, shown beside the profile ----------------------------
+  'Membership': 'العضوية',
+  'Manage plan': 'إدارة الباقة',
+  'Upgrade': 'ترقية',
+  'Upgrade to {tier}': 'ترقية إلى {tier}',
+  'AI credits left': 'الرصيد الذكي المتبقي',
+  'tokens available': 'رموز متاحة',
+  'Unlock tailored CVs, detailed ATS analysis and interview practice.':
+    'افتح السيرة الذاتية المخصصة، وتحليل ATS التفصيلي، وتدرّب المقابلات.',
+  'Everything in your plan, with the credits that go with it.':
+    'كل ما في باقتك، مع الرصيد الذي يرافقها.',
   'Test mode': 'وضع الاختبار',
   'Manage billing': 'إدارة الفواتير',
   'Failed to open the billing portal': 'تعذر فتح بوابة إدارة الفواتير',

@@ -4,7 +4,7 @@
  * The page began as a volunteering catalogue. It now covers the wider
  * ecosystem the user asked for: volunteering, student activities, youth
  * programmes, career development, competitions, entrepreneurship,
- * fellowships, internships, academic and technology programmes.
+ * fellowships, training programmes, academic and technology programmes.
  *
  * Every row is a real catalogue entry. The list is ordered by how closely the
  * opportunity matches the user's own skill gaps, target role, roadmap and
@@ -52,6 +52,7 @@ import {
   OPPORTUNITY_KINDS,
   OPPORTUNITY_LABELS,
   PARTICIPATION_LABELS,
+  isTrainingOpportunityKind,
   type OpportunityAudience,
   type OpportunityKind,
 } from '../../../shared/opportunities';
@@ -90,6 +91,12 @@ const MODE_OPTIONS: Array<{ id: ModeFilter; label: string }> = [
  * The focus vocabulary the brief asks for. A chip only appears when the live
  * catalogue actually contains a matching tag or kind, so an empty filter is
  * never offered.
+ *
+ * There is no internship chip here, and that is the point of the split. An
+ * internship is employment: it is a role somebody is taken on to do, and it is
+ * offered with the vacancies on the Live Jobs page. A course is not
+ * employment either, but it is something a candidate JOINS rather than is
+ * HIRED for, so it stays here, with the training.
  */
 const FOCUS_KEYS = [
   'leadership',
@@ -104,7 +111,6 @@ const FOCUS_KEYS = [
   'volunteering',
   'competition',
   'training',
-  'internship',
 ] as const;
 
 const FOCUS_LABELS: Record<string, string> = {
@@ -120,7 +126,6 @@ const FOCUS_LABELS: Record<string, string> = {
   volunteering: 'Volunteering',
   competition: 'Competitions',
   training: 'Training',
-  internship: 'Internships',
 };
 
 function normalize(value: string): string {
@@ -136,19 +141,28 @@ function initials(value: string): string {
     .join('');
 }
 
+/**
+ * Whether an opportunity matches the focus the candidate picked.
+ *
+ * The kind decides it wherever there is a kind to decide it. The tags are
+ * only consulted for the subject-matter focuses, where no kind says
+ * "marketing".
+ */
 function matchesFocus(item: VolunteerOpportunity, focus: string): boolean {
   if (focus === 'all') return true;
   const tags = item.tags.map(normalize);
   if (tags.includes(focus)) return true;
   if (focus === 'volunteering') return item.kind === 'volunteering';
   if (focus === 'competition') return item.kind === 'competition';
-  if (focus === 'internship') return item.kind === 'internship';
   if (focus === 'entrepreneurship') return item.kind === 'entrepreneurship';
   if (focus === 'technology') return item.kind === 'technology' || tags.includes('tech');
   if (focus === 'hr') return tags.includes('hr') || tags.includes('human resources');
   if (focus === 'pr') return tags.includes('pr') || tags.includes('public relations');
   if (focus === 'training') {
-    return tags.includes('training') || item.opportunityType === 'program';
+    // The kind says whether a record is a training programme. The tags are
+    // only a second opinion now: the migration made the kind agree with
+    // them, so the two cannot disagree.
+    return isTrainingOpportunityKind(item.kind);
   }
   return false;
 }
@@ -169,7 +183,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    fetchVolunteerOpportunities()
+    fetchVolunteerOpportunities('opportunities')
       .then((response) => {
         if (cancelled) return;
         setOpportunities(response.opportunities ?? []);
@@ -403,7 +417,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-2xl">
             {t(
-              'Volunteering, student activities, youth programmes, competitions, fellowships, internships and more — real organisations you can apply to, ordered by how closely they match your goals.'
+              'Volunteering, student activities, youth programmes, competitions, fellowships, training programmes and more — real organisations you can apply to, ordered by how closely they match your goals.'
             )}
           </p>
         </div>

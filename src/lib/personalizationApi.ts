@@ -10,6 +10,7 @@ import type {
   OpportunityAudience,
   OpportunityCostType,
   OpportunityKind,
+  OpportunityPillar,
   OpportunityStatus,
   ParticipationMode,
 } from '../../shared/opportunities';
@@ -179,6 +180,13 @@ export interface VolunteerOpportunity {
   /** When the source published it. */
   publishedAt: string | null;
   kind: OpportunityKind;
+  /**
+   * Which half of the ecosystem this record belongs to.
+   *
+   * Employment on one side, volunteering and training on the other. The
+   * server decides it and the interface reads it, so the two never disagree.
+   */
+  pillar: OpportunityPillar;
   participationMode: ParticipationMode;
   audiences: OpportunityAudience[];
   eligibility: string | null;
@@ -199,6 +207,9 @@ export interface VolunteerOpportunitiesResponse {
   opportunities: VolunteerOpportunity[];
   total: number;
   categories: string[];
+  /** Which half of the ecosystem this answer covers: 'jobs', 'opportunities' or 'all'. */
+  pillar: OpportunityPillar | 'all';
+  pillars: readonly OpportunityPillar[];
 }
 
 /** A CV assembled from the user's own records. */
@@ -295,9 +306,20 @@ export async function fetchSkillGaps(): Promise<SkillGapResponse> {
   return apiRequest<SkillGapResponse>('/api/skill-gaps');
 }
 
-/** Loads the volunteer opportunities catalogue, ranked for the user. */
-export async function fetchVolunteerOpportunities(): Promise<VolunteerOpportunitiesResponse> {
-  return apiRequest<VolunteerOpportunitiesResponse>('/api/volunteer/opportunities');
+/**
+ * Loads the opportunities catalogue, ranked for the user.
+ *
+ * The pillar chooses the half of the ecosystem to ask for. It is sent to the
+ * server, which asks the database for it, so the same rows come back
+ * whoever asks.
+ */
+export async function fetchVolunteerOpportunities(
+  pillar?: OpportunityPillar
+): Promise<VolunteerOpportunitiesResponse> {
+  const query = pillar ? `?pillar=${encodeURIComponent(pillar)}` : '';
+  return apiRequest<VolunteerOpportunitiesResponse>(
+    `/api/volunteer/opportunities${query}`
+  );
 }
 
 /** Saves an opportunity for the user. */

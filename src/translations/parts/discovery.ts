@@ -39,13 +39,13 @@ export const discoveryAr: Record<string, string> = {
   'COMMUNITY IMPACT, ACTIVITIES & OPPORTUNITIES':
     'الأثر المجتمعي والأنشطة والفرص',
   'Opportunities & Activities': 'الفرص والأنشطة',
-  'Discover volunteering, student activities, youth programmes, competitions, fellowships and internships — then record what you took part in and the skills it gave you.':
-    'اكتشف التطوع والأنشطة الطلابية وبرامج الشباب والمسابقات والزمالات والتدريب الصيفي — ثم سجّل ما شاركت فيه والمهارات التي اكتسبتها.',
+  'Discover volunteering, student activities, youth programmes, competitions, fellowships and training programmes — then record what you took part in and the skills it gave you.':
+    'اكتشف التطوع والأنشطة الطلابية وبرامج الشباب والمسابقات والزمالات وبرامج التدريب — ثم سجّل ما شاركت فيه والمهارات التي اكتسبتها.',
   'My activities': 'أنشطتي',
   'Loading the opportunities catalogue…': 'جارٍ تحميل كتالوج الفرص…',
   'The opportunities catalogue could not be loaded': 'تعذّر تحميل كتالوج الفرص',
-  'Volunteering, student activities, youth programmes, competitions, fellowships, internships and more — real organisations you can apply to, ordered by how closely they match your goals.':
-    'التطوع والأنشطة الطلابية وبرامج الشباب والمسابقات والزمالات والتدريب الصيفي والمزيد — منظمات حقيقية يمكنك التقديم إليها، مرتبة حسب مدى قربها من أهدافك.',
+  'Volunteering, student activities, youth programmes, competitions, fellowships, training programmes and more — real organisations you can apply to, ordered by how closely they match your goals.':
+    'التطوع والأنشطة الطلابية وبرامج الشباب والمسابقات والزمالات وبرامج التدريب والمزيد — منظمات حقيقية يمكنك التقديم إليها، مرتبة حسب مدى قربها من أهدافك.',
   'matched to your profile': 'مطابقة لملفك',
   'Set a target role to see your matches': 'حدّد وظيفة مستهدفة لعرض مطابقاتك',
   'Search organisations, programmes, skills or cities':

@@ -132,6 +132,12 @@ export const jobsAr: Record<string, string> = {
 
   // The screen covers jobs and internships together, so its name describes the
   // candidate's need rather than treating a placement as a standard job.
+  //
+  // "Live" is part of the name because the feed shows the postings that are
+  // open right now, and because this screen is the EMPLOYMENT half of the
+  // platform: a vacancy or a placement, and nothing that is a course or a
+  // volunteering programme.
+  'Live Jobs & Internships': 'الوظائف والتدريبات الحالية',
   'Jobs & Internships': 'الوظائف والتدريبات',
   'Full-Time / Part-Time Jobs': 'وظائف بدوام كامل / جزئي',
   'Internships': 'التدريبات',

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Sparkles,
   CheckCircle2,
@@ -34,6 +34,7 @@ import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
 import { CvDataManager } from '../cv/studio/CvDataManager';
 import { CvStudioSectionNav, type CvStudioSection } from '../cv/studio/CvStudioSectionNav';
+import { CvSectionOrderControl } from '../cv/studio/CvSectionOrderControl';
 import { ResumeLanguagePicker } from '../cv/studio/ResumeLanguagePicker';
 import { CareerImage } from '../ui/CareerImage';
 import {
@@ -45,6 +46,7 @@ import { fetchCvTemplateCatalog } from '../../lib/cvTemplatesApi';
 import { printCvFromFrame } from '../../lib/cvPdfExport';
 import { CvStudioAiQuotaBadge } from '../cv/CvStudioAiQuotaBadge';
 import type { CvTemplateDefinition } from '../../../shared/cvTemplates';
+import { resolveCvTemplate } from '../../../shared/cvTemplates';
 
 export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = ({
   onNavigate,
@@ -130,6 +132,18 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
    * sees the free one.
    */
   const [studioTemplateCatalog, setStudioTemplateCatalog] = useState<CvTemplateDefinition[]>([]);
+
+  /**
+   * The template the studio is drawing.
+   *
+   * It is resolved against the catalogue the SERVER sent, so a template the
+   * candidate may not use is never drawn, and the reorder control works on
+   * the very template the paper is using rather than on a different one.
+   */
+  const studioTemplate = useMemo(
+    () => resolveCvTemplate(settings.cvTemplateId, studioTemplateCatalog),
+    [settings.cvTemplateId, studioTemplateCatalog]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -627,7 +641,14 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           </div>
 
           {/* Right Clean Paper Preview (7 cols) */}
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7 space-y-4">
+            <CvSectionOrderControl
+              cv={activeCV}
+              template={studioTemplate}
+              update={updateCV}
+              t={t}
+              language={settings.resumeLanguage}
+            />
             <CvPreview
               cv={activeCV}
               language={settings.resumeLanguage}

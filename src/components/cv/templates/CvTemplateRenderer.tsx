@@ -16,36 +16,33 @@ import React from 'react';
 import type { CVProfile } from '../../../types/career';
 import type { ResumeLanguage } from '../../../../shared/resumeLanguage';
 import {
+  type CvSectionKey,
   type CvTemplateDefinition,
-  type CvTemplateStructure,
-  type CvTemplateLayout,
-  type CvDensity,
-  type CvHeadingStyle,
   type CvEntryStyle,
-  type CvSkillsStyle,
-  type CvTypography,
   resolveCvTemplate,
 } from '../../../../shared/cvTemplates';
 import {
-  buildCvTemplateDocument,
-  orderCvSections,
-  splitCvSections,
   type CvDocument,
   type CvDocumentEntry,
   type CvDocumentSection,
   type CvDocumentSectionKind,
 } from '../../../../shared/cvTemplateDocument';
+import {
+  CV_INLINE_SEPARATOR,
+  CV_INK,
+  CV_PAGE_HEIGHT as A4_HEIGHT,
+  CV_PAGE_WIDTH as A4_WIDTH,
+  CV_TEMPLATE_DENSITY,
+  buildCvLayoutPlan,
+  cvDividerDecoration,
+  cvHeaderDecoration,
+  cvHeadingDecoration,
+  cvSkillsDecoration,
+  type CvLayoutSection,
+  type CvLayoutSpec,
+} from '../../../../shared/cvLayout';
 
-/**
- * A sheet of A4 at 96dpi.
- *
- * The renderer lays the document out at this width, and the preview scales it
- * to whatever space it has. The page box is a real A4 sheet rather than a
- * guessed minimum, so a preview can say how many pages a document will print
- * as and a thumbnail can show the whole document rather than a cropped top.
- */
-export const A4_WIDTH = 794;
-export const A4_HEIGHT = 1123;
+export { A4_WIDTH, A4_HEIGHT, CV_TEMPLATE_DENSITY };
 
 interface CvTemplateRendererProps {
   cv: CVProfile;
@@ -71,148 +68,85 @@ interface CvTemplateRendererProps {
  * Exported so that the preview can work out how many sheets of A4 a document
  * would print as: the page's own margin is part of the measurement.
  */
-export const CV_TEMPLATE_DENSITY: Record<
-  CvDensity,
-  { font: number; line: number; gap: number; pad: number }
-> = {
-  compact: { font: 10.2, line: 1.36, gap: 9, pad: 26 },
-  standard: { font: 11.4, line: 1.46, gap: 14, pad: 34 },
-  spacious: { font: 12.3, line: 1.6, gap: 19, pad: 42 },
-};
-
-function fontFamily(typography: CvTypography, part: 'body' | 'heading'): string {
-  if (typography === 'serif') return 'Georgia, "Times New Roman", serif';
-  if (typography === 'mono') return 'ui-monospace, "SFMono-Regular", Menlo, monospace';
-  if (typography === 'mixed') {
-    return part === 'heading'
-      ? 'Georgia, "Times New Roman", serif'
-      : 'Inter, ui-sans-serif, system-ui, sans-serif';
-  }
-  return 'Inter, ui-sans-serif, system-ui, sans-serif';
-}
-
-function headingStyleFor(
-  style: CvHeadingStyle,
-  accent: string,
-  dividers: CvTemplateStructure['dividers']
-): React.CSSProperties {
+function headingStyleFor(spec: CvLayoutSpec): React.CSSProperties {
+  const decoration = cvHeadingDecoration(spec);
   const base: React.CSSProperties = {
     fontSize: '0.92em',
-    fontWeight: 700,
-    letterSpacing: '0.08em',
+    fontWeight: decoration.fontWeight,
+    letterSpacing: decoration.letterSpacing,
     margin: 0,
-    color: '#0f172a',
+    color: CV_INK.heading,
+    fontFamily: decoration.font.css,
   };
-  switch (style) {
-    case 'uppercase':
-      return { ...base, textTransform: 'uppercase' };
-    case 'smallcaps':
-      return { ...base, fontVariant: 'small-caps', letterSpacing: '0.05em' };
-    case 'serif':
-      return {
-        ...base,
-        fontFamily: 'Georgia, "Times New Roman", serif',
-        fontStyle: 'italic',
-        fontWeight: 700,
-        letterSpacing: '0.01em',
-      };
-    case 'numbered':
-      return { ...base, letterSpacing: '0.03em' };
-    case 'bar':
-      return {
-        ...base,
-        textTransform: 'uppercase',
-        borderInlineStart: `3px solid ${accent}`,
-        paddingInlineStart: 8,
-      };
-    case 'underline':
-      return {
-        ...base,
-        textTransform: 'uppercase',
-        borderBottom: `1px solid ${accent}`,
-        paddingBottom: 3,
-        borderBlockEnd:
-          dividers === 'double' ? `3px double ${accent}` : `1px solid ${accent}`,
-      };
-    default:
-      return base;
+  if (decoration.smallCaps) base.fontVariant = 'small-caps';
+  if (decoration.italic) base.fontStyle = 'italic';
+  if (decoration.allCaps) base.textTransform = 'uppercase';
+  if (decoration.rule === 'start') {
+    base.borderInlineStart = `${decoration.ruleWidthPx}px solid ${decoration.ruleColor}`;
+    base.paddingInlineStart = 8;
   }
+  if (decoration.rule === 'bottom') {
+    base.borderBottom = decoration.ruleDouble
+      ? `${decoration.ruleWidthPx}px double ${decoration.ruleColor}`
+      : `${decoration.ruleWidthPx}px solid ${decoration.ruleColor}`;
+    base.paddingBottom = 3;
+  }
+  return base;
 }
 
-function dividerStyle(
-  dividers: CvTemplateStructure['dividers'],
-  accent: string
-): React.CSSProperties {
-  switch (dividers) {
-    case 'line':
-      return { borderBottom: '1px solid #e2e8f0', paddingBottom: 4 };
-    case 'double':
-      return { borderBottom: `3px double ${accent}`, paddingBottom: 4 };
-    case 'accent':
-      return { borderBottom: `2px solid ${accent}`, paddingBottom: 4 };
-    case 'block':
-      return {
-        backgroundColor: `${accent}12`,
-        borderInlineStart: `3px solid ${accent}`,
-        padding: '4px 8px',
-      };
-    default:
-      return {};
+function dividerStyle(spec: CvLayoutSpec): React.CSSProperties {
+  const decoration = cvDividerDecoration(spec);
+  if (decoration.kind === 'bottom') {
+    return {
+      borderBottom: decoration.double
+        ? `${decoration.widthPx}px double ${decoration.color}`
+        : `${decoration.widthPx}px solid ${decoration.color}`,
+      paddingBottom: 4,
+    };
   }
-}
-
-function bulletPrefix(style: CvTemplateStructure['bulletStyle']): string | null {
-  switch (style) {
-    case 'disc':
-      return '•';
-    case 'dash':
-      return '–';
-    case 'square':
-      return '▪';
-    case 'arrow':
-      return '→';
-    default:
-      return null;
+  if (decoration.kind === 'block') {
+    return {
+      backgroundColor: decoration.fill ?? undefined,
+      borderInlineStart: `${decoration.widthPx}px solid ${decoration.color}`,
+      padding: '4px 8px',
+    };
   }
+  return {};
 }
 
 function SectionHeading({
   section,
-  index,
-  structure,
-  accent,
-  typography,
+  number,
+  spec,
 }: {
   section: CvDocumentSection;
-  index: number;
-  structure: CvTemplateStructure;
-  accent: string;
-  typography: CvTypography;
+  number: number;
+  spec: CvLayoutSpec;
 }) {
-  const numbered = structure.headingStyle === 'numbered';
+  const numbered = spec.headingStyle === 'numbered';
   return (
     <div
       className="cv-section-heading"
       style={{
-        ...dividerStyle(structure.dividers, accent),
+        ...dividerStyle(spec),
         marginBottom: 7,
         breakAfter: 'avoid',
       }}
     >
-      <h3 style={{ ...headingStyleFor(structure.headingStyle, accent, structure.dividers), fontFamily: fontFamily(typography, 'heading') }}>
+      <h3 style={headingStyleFor(spec)}>
         {numbered && (
-          <span style={{ color: accent, marginInlineEnd: 7 }}>
-            {String(index + 1).padStart(2, '0')}
+          <span style={{ color: spec.accent, marginInlineEnd: 7 }}>
+            {String(number + 1).padStart(2, '0')}
           </span>
         )}
-        {structure.showIcons && (
+        {spec.showIcons && (
           <span
             aria-hidden="true"
             style={{
               display: 'inline-block',
               width: 5,
               height: 5,
-              backgroundColor: accent,
+              backgroundColor: spec.accent,
               marginInlineEnd: 7,
               verticalAlign: 'middle',
             }}
@@ -226,15 +160,13 @@ function SectionHeading({
 
 function Bullets({
   bullets,
-  structure,
-  accent,
+  spec,
 }: {
   bullets: string[];
-  structure: CvTemplateStructure;
-  accent: string;
+  spec: CvLayoutSpec;
 }) {
   if (bullets.length === 0) return null;
-  const prefix = bulletPrefix(structure.bulletStyle);
+  const prefix = spec.bulletGlyph;
   if (!prefix) {
     return (
       <div style={{ display: 'grid', gap: 3, marginTop: 3 }}>
@@ -258,7 +190,7 @@ function Bullets({
     >
       {bullets.map((bullet, index) => (
         <li key={index} style={{ display: 'flex', gap: 6, breakInside: 'avoid' }}>
-          <span aria-hidden="true" style={{ color: accent, flexShrink: 0 }}>
+          <span aria-hidden="true" style={{ color: spec.accent, flexShrink: 0 }}>
             {prefix}
           </span>
           <span>{bullet}</span>
@@ -273,7 +205,7 @@ function Meta({ children }: { children: React.ReactNode }) {
     <span
       style={{
         flexShrink: 0,
-        color: '#64748b',
+        color: CV_INK.muted,
         fontVariantNumeric: 'tabular-nums',
         whiteSpace: 'nowrap',
       }}
@@ -285,39 +217,34 @@ function Meta({ children }: { children: React.ReactNode }) {
 
 function EntryBlock({
   entry,
-  structure,
-  accent,
-  density,
-  typography,
-  layout,
+  spec,
 }: {
   entry: CvDocumentEntry;
-  structure: CvTemplateStructure;
-  accent: string;
-  density: CvDensity;
-  typography: CvTypography;
-  layout: CvTemplateLayout;
+  spec: CvLayoutSpec;
 }) {
-  const entryStyle: CvEntryStyle = structure.entryStyle;
+  const entryStyle: CvEntryStyle = spec.entryStyle;
+  const accent = spec.accent;
+  const density = spec.density;
+  const layout = spec.layout;
   const titleStyle: React.CSSProperties = {
     fontWeight: 700,
-    color: '#0f172a',
-    fontFamily: fontFamily(typography, 'heading'),
+    color: CV_INK.heading,
+    fontFamily: spec.headingFont.css,
   };
   const subtitle = entry.subtitle ? (
-    <span style={{ color: '#475569' }}>{entry.subtitle}</span>
+    <span style={{ color: CV_INK.secondary }}>{entry.subtitle}</span>
   ) : null;
   const meta = entry.meta ? <Meta>{entry.meta}</Meta> : null;
   const location = entry.location ? (
-    <div style={{ color: '#64748b', fontSize: '0.92em' }}>{entry.location}</div>
+    <div style={{ color: CV_INK.muted, fontSize: '0.92em' }}>{entry.location}</div>
   ) : null;
   const description = entry.description ? (
-    <p style={{ margin: '2px 0 0', color: '#334155' }}>{entry.description}</p>
+    <p style={{ margin: '2px 0 0', color: CV_INK.body }}>{entry.description}</p>
   ) : null;
   const tags =
     entry.tags.length > 0 ? (
-      <div style={{ color: '#475569', fontSize: '0.92em', marginTop: 2 }}>
-        {entry.tags.join(' · ')}
+      <div style={{ color: CV_INK.secondary, fontSize: '0.92em', marginTop: 2 }}>
+        {entry.tags.join(CV_INLINE_SEPARATOR)}
       </div>
     ) : null;
   const url = entry.url ? (
@@ -392,7 +319,7 @@ function EntryBlock({
       {entryStyle !== 'inline' && entryStyle !== 'grid' ? description : null}
       {entryStyle === 'inline' || entryStyle === 'grid' ? location : null}
       {entryStyle === 'inline' || entryStyle === 'grid' ? description : null}
-      <Bullets bullets={entry.bullets} structure={structure} accent={accent} />
+      <Bullets bullets={entry.bullets} spec={spec} />
       {tags}
       {url}
     </>
@@ -421,14 +348,14 @@ function EntryBlock({
         <div style={{ minWidth: 0 }}>
           <div style={{ ...titleStyle, fontSize: '0.98em' }}>{entry.title}</div>
           {entry.subtitle && (
-            <div style={{ color: '#475569', fontSize: '0.93em' }}>{entry.subtitle}</div>
+            <div style={{ color: CV_INK.secondary, fontSize: '0.93em' }}>{entry.subtitle}</div>
           )}
           {meta && <div style={{ marginTop: 2 }}>{meta}</div>}
         </div>
         <div style={{ minWidth: 0 }}>
           {location}
           {description}
-          <Bullets bullets={entry.bullets} structure={structure} accent={accent} />
+          <Bullets bullets={entry.bullets} spec={spec} />
           {tags}
           {url}
         </div>
@@ -441,7 +368,7 @@ function EntryBlock({
       <div
         style={{
           ...common,
-          border: '1px solid #e2e8f0',
+          border: `1px solid ${CV_INK.rule}`,
           borderInlineStart: `3px solid ${accent}`,
           borderRadius: 6,
           padding: density === 'compact' ? 7 : 10,
@@ -458,7 +385,7 @@ function EntryBlock({
       <div
         style={{
           ...common,
-          border: '1px solid #e2e8f0',
+          border: `1px solid ${CV_INK.rule}`,
           borderInlineStart: `3px solid ${accent}`,
           borderRadius: 6,
           padding: density === 'compact' ? 7 : 10,
@@ -475,7 +402,7 @@ function EntryBlock({
       <div
         style={{
           ...common,
-          border: '1px solid #e2e8f0',
+          border: `1px solid ${CV_INK.rule}`,
           borderRadius: 5,
           padding: density === 'compact' ? 6 : 9,
         }}
@@ -508,7 +435,7 @@ function EntryBlock({
               marginTop: 3,
             }}
           />
-          <span style={{ flex: 1, width: 1, backgroundColor: '#cbd5e1', marginTop: 3 }} />
+          <span style={{ flex: 1, width: 1, backgroundColor: CV_INK.hairline, marginTop: 3 }} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>{content}</div>
       </div>
@@ -520,15 +447,17 @@ function EntryBlock({
 
 function SkillsBlock({
   skills,
-  style,
-  accent,
+  spec,
+  sectionKey,
 }: {
   skills: string[];
-  style: CvSkillsStyle;
-  accent: string;
+  spec: CvLayoutSpec;
+  sectionKey?: CvSectionKey;
 }) {
   if (skills.length === 0) return null;
-  if (style === 'chips') {
+  const decoration = cvSkillsDecoration(spec, sectionKey);
+  const accent = spec.accent;
+  if (decoration.mode === 'chips') {
     return (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
         {skills.map((skill) => (
@@ -548,7 +477,7 @@ function SkillsBlock({
       </div>
     );
   }
-  if (style === 'bars') {
+  if (decoration.mode === 'bars') {
     return (
       <div style={{ display: 'grid', gap: 4 }}>
         {skills.map((skill) => (
@@ -563,12 +492,12 @@ function SkillsBlock({
       </div>
     );
   }
-  if (style === 'columns') {
+  if (decoration.mode === 'columns') {
     return (
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gridTemplateColumns: `repeat(${decoration.columns}, minmax(0, 1fr))`,
           gap: '2px 14px',
         }}
       >
@@ -578,13 +507,13 @@ function SkillsBlock({
       </div>
     );
   }
-  if (style === 'grouped') {
+  if (decoration.mode === 'grouped') {
     return (
       <div style={{ display: 'grid', gap: 3 }}>
         {skills.map((skill) => (
           <div key={skill} style={{ display: 'flex', gap: 6 }}>
             <span aria-hidden="true" style={{ color: accent }}>
-              /
+              {decoration.marker}
             </span>
             <span>{skill}</span>
           </div>
@@ -592,35 +521,31 @@ function SkillsBlock({
       </div>
     );
   }
-  return <div>{skills.join(' · ')}</div>;
+  return <div>{skills.join(decoration.separator)}</div>;
 }
 
 function SectionBody({
   section,
-  structure,
-  accent,
-  density,
-  typography,
-  layout,
+  spec,
 }: {
   section: CvDocumentSection;
-  structure: CvTemplateStructure;
-  accent: string;
-  density: CvDensity;
-  typography: CvTypography;
-  layout: CvTemplateLayout;
+  spec: CvLayoutSpec;
 }) {
+  const accent = spec.accent;
+  const density = spec.density;
+  const layout = spec.layout;
+
   if (section.kind === 'text') {
     return (
-      <p style={{ margin: 0, color: '#334155', whiteSpace: 'pre-wrap' }}>{section.text}</p>
+      <p style={{ margin: 0, color: CV_INK.body, whiteSpace: 'pre-wrap' }}>{section.text}</p>
     );
   }
   if (section.kind === 'inline') {
     return (
       <SkillsBlock
         skills={section.inline ?? []}
-        style={section.key === 'skills' ? structure.skillsStyle : 'inline'}
-        accent={accent}
+        spec={spec}
+        sectionKey={section.key}
       />
     );
   }
@@ -628,7 +553,7 @@ function SectionBody({
   // A card grid is the layout, not a decoration: the entries are set as
   // cards whether or not the entry style says so.
   const isCardGrid = layout === 'cards' && section.key !== 'links';
-  const isGrid = structure.entryStyle === 'grid' && section.key !== 'links';
+  const isGrid = spec.entryStyle === 'grid' && section.key !== 'links';
 
   // A timeline is the layout, so the rail is drawn whatever the entry style
   // says. Two consecutive entries share one continuous line.
@@ -657,17 +582,10 @@ function SectionBody({
                   marginTop: 4,
                 }}
               />
-              <span style={{ flex: 1, width: 1, backgroundColor: '#cbd5e1', marginTop: 3 }} />
+              <span style={{ flex: 1, width: 1, backgroundColor: CV_INK.hairline, marginTop: 3 }} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <EntryBlock
-                entry={entry}
-                structure={structure}
-                accent={accent}
-                density={density}
-                typography={typography}
-                layout={layout}
-              />
+              <EntryBlock entry={entry} spec={spec} />
             </div>
           </div>
         ))}
@@ -688,15 +606,7 @@ function SectionBody({
       }
     >
       {section.entries.map((entry) => (
-        <EntryBlock
-          key={entry.id}
-          entry={entry}
-          structure={structure}
-          accent={accent}
-          density={density}
-          typography={typography}
-          layout={layout}
-        />
+        <EntryBlock key={entry.id} entry={entry} spec={spec} />
       ))}
     </div>
   );
@@ -704,40 +614,25 @@ function SectionBody({
 
 function SectionList({
   sections,
-  structure,
-  accent,
-  density,
-  typography,
-  startIndex = 0,
-  layout,
+  spec,
 }: {
-  sections: CvDocumentSection[];
-  structure: CvTemplateStructure;
-  accent: string;
-  density: CvDensity;
-  typography: CvTypography;
-  startIndex?: number;
-  layout: CvTemplateLayout;
+  sections: CvLayoutSection[];
+  spec: CvLayoutSpec;
 }) {
   return (
-    <div style={{ display: 'grid', gap: CV_TEMPLATE_DENSITY[density].gap }}>
-      {sections.map((section, index) => (
-        <section key={section.key} className="cv-section" style={{ breakInside: 'avoid-page' }}>
-          <SectionHeading
-            section={section}
-            index={startIndex + index}
-            structure={structure}
-            accent={accent}
-            typography={typography}
-          />
-          <SectionBody
-            section={section}
-            structure={structure}
-            accent={accent}
-            density={density}
-            typography={typography}
-            layout={layout}
-          />
+    <div style={{ display: 'grid', gap: spec.metrics.gap }}>
+      {sections.map((entry) => (
+        <section
+          key={entry.section.key}
+          className="cv-section"
+          // A section is allowed to flow across a page boundary: a section
+          // longer than one sheet would otherwise be pushed off the page.
+          // The heading keeps the entry under it, and the entries keep
+          // themselves together.
+          style={{ breakInside: 'auto' }}
+        >
+          <SectionHeading section={entry.section} number={entry.number} spec={spec} />
+          <SectionBody section={entry.section} spec={spec} />
         </section>
       ))}
     </div>
@@ -780,40 +675,41 @@ function ContactLine({
 
 function Header({
   document,
-  structure,
-  accent,
-  typography,
+  spec,
 }: {
   document: CvDocument;
-  structure: CvTemplateStructure;
-  accent: string;
-  typography: CvTypography;
+  spec: CvLayoutSpec;
 }) {
+  const accent = spec.accent;
+  const header = cvHeaderDecoration(spec);
   const nameStyle: React.CSSProperties = {
     margin: 0,
-    fontFamily: fontFamily(typography, 'heading'),
+    fontFamily: spec.headingFont.css,
     fontWeight: 800,
     lineHeight: 1.08,
     letterSpacing: '-0.01em',
   };
   const titleStyle: React.CSSProperties = {
     margin: '3px 0 0',
-    color: accent,
+    color: header.titleColor === 'body' ? CV_INK.body : accent,
     fontWeight: 600,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
+    letterSpacing: header.titleAllCaps ? '0.06em' : 'normal',
+    textTransform: header.titleAllCaps ? 'uppercase' : 'none',
+    fontStyle: header.titleItalic ? 'italic' : 'normal',
     fontSize: '0.95em',
   };
   const rule: React.CSSProperties = { height: 2, backgroundColor: accent, margin: '9px 0' };
+  const gap = spec.metrics.gap;
+  const pad = spec.metrics.pad;
 
-  switch (structure.header) {
+  switch (header.kind) {
     case 'left':
       return (
-        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
-          <h1 style={{ ...nameStyle, fontSize: 30 }}>{document.fullName}</h1>
+        <header style={{ marginBottom: gap }}>
+          <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
           {document.title && <p style={titleStyle}>{document.title}</p>}
           <div style={{ marginTop: 6 }}>
-            <ContactLine contact={document.contact} align="start" color="#475569" />
+            <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} />
           </div>
           <div style={rule} />
         </header>
@@ -822,14 +718,16 @@ function Header({
       return (
         <header
           style={{
-            margin: `-${CV_TEMPLATE_DENSITY[structure.density].pad}px -${CV_TEMPLATE_DENSITY[structure.density].pad}px 0`,
-            padding: `${Math.max(20, CV_TEMPLATE_DENSITY[structure.density].pad - 6)}px ${CV_TEMPLATE_DENSITY[structure.density].pad}px`,
+            margin: `-${pad}px -${pad}px 0`,
+            padding: `${Math.max(20, pad - 6)}px ${pad}px`,
             backgroundColor: accent,
             color: '#ffffff',
-            marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap,
+            marginBottom: gap,
           }}
         >
-          <h1 style={{ ...nameStyle, fontSize: 33, color: '#ffffff' }}>{document.fullName}</h1>
+          <h1 style={{ ...nameStyle, fontSize: header.nameSizePx, color: '#ffffff' }}>
+            {document.fullName}
+          </h1>
           {document.title && (
             <p style={{ ...titleStyle, color: '#ffffffdd', marginTop: 4 }}>{document.title}</p>
           )}
@@ -840,7 +738,7 @@ function Header({
       );
     case 'split':
       return (
-        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: gap }}>
           <div
             style={{
               display: 'flex',
@@ -851,11 +749,11 @@ function Header({
             }}
           >
             <div style={{ minWidth: 0 }}>
-              <h1 style={{ ...nameStyle, fontSize: 31 }}>{document.fullName}</h1>
+              <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
               {document.title && <p style={titleStyle}>{document.title}</p>}
             </div>
             <div style={{ textAlign: 'end', maxWidth: '48%' }}>
-              <ContactLine contact={document.contact} align="end" color="#475569" gap={7} />
+              <ContactLine contact={document.contact} align="end" color={CV_INK.secondary} gap={7} />
             </div>
           </div>
           <div style={{ ...rule, marginTop: 10 }} />
@@ -874,7 +772,7 @@ function Header({
             display: 'flex',
             gap: 12,
             alignItems: 'center',
-            marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap,
+            marginBottom: gap,
           }}
         >
           <div
@@ -896,10 +794,10 @@ function Header({
             {initials}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h1 style={{ ...nameStyle, fontSize: 27 }}>{document.fullName}</h1>
+            <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
             {document.title && <p style={{ ...titleStyle, marginTop: 1 }}>{document.title}</p>}
             <div style={{ marginTop: 4 }}>
-              <ContactLine contact={document.contact} align="start" color="#475569" gap={8} />
+              <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} gap={8} />
             </div>
           </div>
         </header>
@@ -907,23 +805,23 @@ function Header({
     }
     case 'stacked':
       return (
-        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: gap }}>
           <div style={{ height: 5, backgroundColor: accent, marginBottom: 9 }} />
-          <h1 style={{ ...nameStyle, fontSize: 30 }}>{document.fullName}</h1>
+          <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
           {document.title && <p style={titleStyle}>{document.title}</p>}
           <div style={{ marginTop: 5 }}>
-            <ContactLine contact={document.contact} align="start" color="#475569" />
+            <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} />
           </div>
         </header>
       );
     case 'editorial':
       return (
-        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: gap }}>
           <h1
             style={{
               ...nameStyle,
-              fontSize: 38,
-              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontSize: header.nameSizePx,
+              fontFamily: spec.headingFont.css,
               fontWeight: 700,
             }}
           >
@@ -933,7 +831,7 @@ function Header({
             <p
               style={{
                 margin: '4px 0 0',
-                color: '#334155',
+                color: CV_INK.body,
                 fontSize: '1.05em',
                 fontStyle: 'italic',
               }}
@@ -942,14 +840,14 @@ function Header({
             </p>
           )}
           <div style={{ marginTop: 7 }}>
-            <ContactLine contact={document.contact} align="start" color="#475569" />
+            <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} />
           </div>
           <div style={{ borderTop: `3px double ${accent}`, marginTop: 9 }} />
         </header>
       );
     case 'compact':
       return (
-        <header style={{ marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap }}>
+        <header style={{ marginBottom: gap }}>
           <div
             style={{
               display: 'flex',
@@ -959,7 +857,7 @@ function Header({
               flexWrap: 'wrap',
             }}
           >
-            <h1 style={{ ...nameStyle, fontSize: 24 }}>{document.fullName}</h1>
+            <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
             {document.title && (
               <span style={{ color: accent, fontWeight: 600, fontSize: '0.96em' }}>
                 {document.title}
@@ -967,25 +865,25 @@ function Header({
             )}
           </div>
           <div style={{ marginTop: 3 }}>
-            <ContactLine contact={document.contact} align="start" color="#475569" gap={8} />
+            <ContactLine contact={document.contact} align="start" color={CV_INK.secondary} gap={8} />
           </div>
-          <div style={{ height: 1, backgroundColor: '#cbd5e1', marginTop: 6 }} />
+          <div style={{ height: 1, backgroundColor: CV_INK.hairline, marginTop: 6 }} />
         </header>
       );
     default:
       return (
         <header
           style={{
-            marginBottom: CV_TEMPLATE_DENSITY[structure.density].gap,
+            marginBottom: gap,
             textAlign: 'center',
-            borderBottom: '1px solid #e2e8f0',
+            borderBottom: `1px solid ${CV_INK.rule}`,
             paddingBottom: 9,
           }}
         >
-          <h1 style={{ ...nameStyle, fontSize: 29 }}>{document.fullName}</h1>
+          <h1 style={{ ...nameStyle, fontSize: header.nameSizePx }}>{document.fullName}</h1>
           {document.title && <p style={titleStyle}>{document.title}</p>}
           <div style={{ marginTop: 5 }}>
-            <ContactLine contact={document.contact} align="center" color="#475569" />
+            <ContactLine contact={document.contact} align="center" color={CV_INK.secondary} />
           </div>
         </header>
       );
@@ -994,33 +892,21 @@ function Header({
 
 function AsideBlock({
   sections,
-  structure,
-  accent,
-  density,
-  typography,
+  spec,
 }: {
-  sections: CvDocumentSection[];
-  structure: CvTemplateStructure;
-  accent: string;
-  density: CvDensity;
-  typography: CvTypography;
+  sections: CvLayoutSection[];
+  spec: CvLayoutSpec;
 }) {
+  const accent = spec.accent;
   return (
     <aside
       style={{
         minWidth: 0,
-        borderInlineStart: structure.accentPosition === 'side' ? `2px solid ${accent}` : undefined,
-        paddingInlineStart: structure.accentPosition === 'side' ? 12 : 0,
+        borderInlineStart: spec.accentPosition === 'side' ? `2px solid ${accent}` : undefined,
+        paddingInlineStart: spec.accentPosition === 'side' ? 12 : 0,
       }}
     >
-      <SectionList
-        sections={sections}
-        structure={{ ...structure, entryStyle: 'stacked', skillsStyle: structure.skillsStyle }}
-        accent={accent}
-        density={density}
-        typography={typography}
-        layout={structure.layout}
-      />
+      <SectionList sections={sections} spec={spec} />
     </aside>
   );
 }
@@ -1034,25 +920,21 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
   printable = true,
 }) => {
   const resolved = template ?? resolveCvTemplate(templateId, catalog);
-  const structure = resolved.structure;
-  const density = structure.density;
-  const metrics = CV_TEMPLATE_DENSITY[density];
-  const accent = resolved.accent;
-  const document = buildCvTemplateDocument(cv, language);
-  const ordered = orderCvSections(document.sections, structure.sectionOrder);
-  const { main, aside } = splitCvSections(ordered, structure.sidebarSections);
-  const hasAside = aside.length > 0;
+  const plan = buildCvLayoutPlan({ cv, template: resolved, language });
+  const spec = plan.spec;
+  const document = plan.document;
+  const metrics = spec.metrics;
+  const accent = spec.accent;
+  const hasAside = plan.aside.length > 0;
   const mainColumn = hasAside ? 'minmax(0, 1fr)' : undefined;
   const asideColumn = hasAside
-    ? density === 'compact'
-      ? 'minmax(118px, 0.42fr)'
-      : 'minmax(132px, 0.46fr)'
+    ? `minmax(${spec.columns.asideMinPx}px, ${spec.columns.asideFr}fr)`
     : undefined;
 
   const page: React.CSSProperties = {
     backgroundColor: '#ffffff',
-    color: '#1e293b',
-    fontFamily: fontFamily(resolved.typography, 'body'),
+    color: CV_INK.page,
+    fontFamily: spec.bodyFont.css,
     fontSize: metrics.font,
     lineHeight: metrics.line,
     padding: metrics.pad,
@@ -1064,8 +946,7 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
     position: 'relative',
   };
 
-  const asideFirst =
-    structure.layout === 'sidebar-left' || (structure.layout === 'editorial' && hasAside);
+  const asideFirst = spec.asideFirst;
 
   const body = hasAside ? (
     <div
@@ -1074,61 +955,31 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
         gridTemplateColumns: asideFirst
           ? `${asideColumn} ${mainColumn}`
           : `${mainColumn} ${asideColumn}`,
-        gap: density === 'compact' ? 14 : density === 'spacious' ? 26 : 20,
+        gap: spec.columns.gapPx,
         alignItems: 'start',
       }}
     >
-      {asideFirst && (
-        <AsideBlock
-          sections={aside}
-          structure={structure}
-          accent={accent}
-          density={density}
-          typography={resolved.typography}
-        />
-      )}
+      {asideFirst && <AsideBlock sections={plan.aside} spec={spec} />}
       <div style={{ minWidth: 0 }}>
-        <SectionList
-          sections={main}
-          structure={structure}
-          accent={accent}
-          density={density}
-          typography={resolved.typography}
-          layout={structure.layout}
-        />
+        <SectionList sections={plan.main} spec={spec} />
       </div>
-      {!asideFirst && (
-        <AsideBlock
-          sections={aside}
-          structure={structure}
-          accent={accent}
-          density={density}
-          typography={resolved.typography}
-        />
-      )}
+      {!asideFirst && <AsideBlock sections={plan.aside} spec={spec} />}
     </div>
   ) : (
-    <SectionList
-      sections={main}
-      structure={structure}
-      accent={accent}
-      density={density}
-      typography={resolved.typography}
-      layout={structure.layout}
-    />
+    <SectionList sections={plan.main} spec={spec} />
   );
 
   // A split or an editorial document reads across two columns rather than
   // down one. It is the difference between a wide sheet of text and a page
   // that behaves like a newspaper, and it is what makes the layout the
   // template's own rather than a wrapper around a list.
-  const twoColumn = !hasAside && (structure.layout === 'split' || structure.layout === 'editorial');
+  const twoColumn = spec.twoColumn;
   const columnedBody = twoColumn ? (
     <div
       style={{
         columnCount: 2,
-        columnGap: density === 'compact' ? 16 : 24,
-        columnRule: structure.layout === 'editorial' ? `1px solid ${accent}33` : undefined,
+        columnGap: spec.density === 'compact' ? 16 : 24,
+        columnRule: spec.layout === 'editorial' ? `1px solid ${accent}33` : undefined,
       }}
     >
       {body}
@@ -1138,9 +989,9 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
   );
 
   const accentEdge =
-    structure.accentPosition === 'border'
+    spec.accentPosition === 'border'
       ? { borderTop: `4px solid ${accent}`, paddingTop: metrics.pad - 6 }
-      : structure.accentPosition === 'side'
+      : spec.accentPosition === 'side'
         ? { borderInlineStart: `6px solid ${accent}`, paddingInlineStart: metrics.pad - 8 }
         : undefined;
 
@@ -1153,12 +1004,7 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
       className={`cv-template cv-template-${resolved.id}`}
       style={{ ...page, ...accentEdge }}
     >
-      <Header
-        document={document}
-        structure={structure}
-        accent={accent}
-        typography={resolved.typography}
-      />
+      <Header document={document} spec={spec} />
       {columnedBody}
     </div>
   );
@@ -1170,10 +1016,7 @@ export function cvTemplateSectionKeys(
   template: CvTemplateDefinition,
   language: ResumeLanguage = 'en'
 ): string[] {
-  const document = buildCvTemplateDocument(cv, language);
-  return orderCvSections(document.sections, template.structure.sectionOrder).map(
-    (section) => section.key
-  );
+  return buildCvLayoutPlan({ cv, template, language }).sections.map((section) => section.key);
 }
 
 /** The kind of a section, used by the library to describe a template. */

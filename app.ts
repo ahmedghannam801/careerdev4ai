@@ -267,8 +267,10 @@ import { isLearningResourceType } from './shared/learningResources.ts';
 import {
   isOpportunityAudience,
   isOpportunityKind,
+  isOpportunityPillar,
   isOpportunityVerificationStatus,
   isParticipationMode,
+  OPPORTUNITY_PILLARS,
 } from './shared/opportunities.ts';
 import { buildCvFromProfile } from './server/cv/buildCv.ts';
 import {
@@ -4700,9 +4702,16 @@ app.get('/api/projects/:id/volunteer', requireAuth, async (req: Request, res: Re
 // The catalogue of real volunteering programmes a user can apply to, ranked
 // for the signed-in user. The ranking never hides a row: the full catalogue
 // is always returned, with the reason for the order shown alongside.
+//
+// `?pillar=` chooses one half of the ecosystem. The default is the whole
+// catalogue, so a caller that does not know about the split still sees
+// everything; a caller that does asks the DATABASE for the half it wants, so
+// the same rows are returned whoever asks.
 app.get('/api/volunteer/opportunities', requireAuth, async (req: Request, res: Response) => {
   try {
-    const opportunities = await listVolunteerOpportunities(req.authUser!.id);
+    const pillarParam = str(req.query?.pillar, 40);
+    const pillar = isOpportunityPillar(pillarParam) ? pillarParam : undefined;
+    const opportunities = await listVolunteerOpportunities(req.authUser!.id, { pillar });
     const category = str(req.query?.category, 60);
     const filtered = category
       ? opportunities.filter((opportunity) => opportunity.category === category)
@@ -4712,6 +4721,9 @@ app.get('/api/volunteer/opportunities', requireAuth, async (req: Request, res: R
       opportunities: filtered,
       total: opportunities.length,
       categories: Array.from(new Set(opportunities.map((item) => item.category))).sort(),
+      // Which half this answer covers, so the caller does not have to guess.
+      pillar: pillar ?? 'all',
+      pillars: OPPORTUNITY_PILLARS,
     });
   } catch (error) {
     console.error('Failed to load volunteer opportunities:', error);
@@ -7509,11 +7521,17 @@ app.get(
   requireAuth,
   requireAdmin,
   requirePermission('opportunities.read'),
-  async (_req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
+      // An administrator can ask for one half of the ecosystem, which is how
+      // the split is checked rather than assumed.
+      const pillarParam = str(req.query?.pillar, 40);
+      const pillar = isOpportunityPillar(pillarParam) ? pillarParam : undefined;
       return res.json({
         success: true,
-        opportunities: await listOpportunitiesForAdmin(),
+        opportunities: await listOpportunitiesForAdmin({ pillar }),
+        pillar: pillar ?? 'all',
+        pillars: OPPORTUNITY_PILLARS,
       });
     } catch (error) {
       return adminFailure(res, error);

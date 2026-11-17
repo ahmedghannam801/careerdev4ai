@@ -380,7 +380,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       <div data-tour="jobs-header-panel" className="flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 md:flex-row md:items-center">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-            {t('Jobs & Internships')}
+            {t('Live Jobs & Internships')}
           </div>
           <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
             {t('Real openings, from real job boards')}

@@ -41,9 +41,11 @@ import {
   isOpportunityVerificationStatus,
   isParticipationMode,
   kindForCategory,
+  pillarForKind,
   type OpportunityAudience,
   type OpportunityCostType,
   type OpportunityKind,
+  type OpportunityPillar,
   type OpportunityStatus,
   type ParticipationMode,
 } from '../../shared/opportunities.ts';
@@ -88,6 +90,14 @@ export interface VolunteerOpportunityDTO {
   publishedAt: string | null;
   /** The broader ecosystem category. */
   kind: OpportunityKind;
+  /**
+   * Which half of the ecosystem this record belongs to.
+   *
+   * Employment is one half and everything else is the other. The column is
+   * stored with the row and filtered on in the database, so the API, the
+   * administration screen and the sync pipeline all answer the same way.
+   */
+  pillar: OpportunityPillar;
   /** How a participant takes part. */
   participationMode: ParticipationMode;
   /** Who the opportunity is aimed at. */
@@ -141,6 +151,7 @@ interface OpportunityRow {
   published_at: string | null;
   source_id: string | null;
   opportunity_kind: string | null;
+  pillar: string | null;
   participation_mode: string | null;
   audience: string[] | null;
   eligibility: string | null;
@@ -153,7 +164,7 @@ interface OpportunityRow {
 }
 
 const OPPORTUNITY_COLUMNS =
-  'id, title, organization, description, category, location, is_remote, commitment, application_url, skills_gained, required_skills, role_slugs, domain_ids, verification_status, verified_at, country, languages, opportunity_type, deadline, deadline_text, deadline_precision, status, cost_type, cost_note, cohort, published_at, source_id, opportunity_kind, participation_mode, audience, eligibility, source_url, thumbnail_url, organization_type, tags, is_featured, is_active';
+  'id, title, organization, description, category, location, is_remote, commitment, application_url, skills_gained, required_skills, role_slugs, domain_ids, verification_status, verified_at, country, languages, opportunity_type, deadline, deadline_text, deadline_precision, status, cost_type, cost_note, cohort, published_at, source_id, opportunity_kind, pillar, participation_mode, audience, eligibility, source_url, thumbnail_url, organization_type, tags, is_featured, is_active';
 
 function toOpportunity(
   row: OpportunityRow,
@@ -168,6 +179,12 @@ function toOpportunity(
     row.opportunity_kind && isOpportunityKind(row.opportunity_kind)
       ? row.opportunity_kind
       : kindForCategory(row.category);
+  // The stored pillar is the answer. The kind is only consulted for a row
+  // written before the split, so that a row can never end up without one.
+  const pillar: OpportunityPillar =
+    row.pillar === 'jobs' || row.pillar === 'opportunities'
+      ? row.pillar
+      : pillarForKind(kind);
   const participationMode: ParticipationMode =
     row.participation_mode && isParticipationMode(row.participation_mode)
       ? row.participation_mode
@@ -206,6 +223,7 @@ function toOpportunity(
     cohort: row.cohort ?? null,
     publishedAt: row.published_at ?? null,
     kind,
+    pillar,
     participationMode,
     audiences: Array.from(new Set((row.audience ?? []).filter(isOpportunityAudience))),
     eligibility: row.eligibility,
@@ -584,23 +602,38 @@ function scoreOpportunity(
  *
  * Expired rows are excluded: a deadline in the past is not an opportunity. An
  * inactive row is excluded for the same reason. Nothing else is hidden.
+ *
+ * A caller may ask for ONE half of the ecosystem. The half is chosen in the
+ * database, by the stored column, rather than by picking rows out of the
+ * result: the filter has to be the same for the API, the administration
+ * screen and the sync pipeline, and a filter that runs in the database is the
+ * only one of those that can be.
  */
 export async function listVolunteerOpportunities(
-  profileId: string
+  profileId: string,
+  options: { pillar?: OpportunityPillar } = {}
 ): Promise<VolunteerOpportunityDTO[]> {
+  const pillar = options.pillar;
+  const catalogue = getSupabaseServer()
+    .from('volunteer_opportunities')
+    .select(OPPORTUNITY_COLUMNS)
+    .eq('is_active', true)
+    // A record the source pipeline was not confident about waits for an
+    // administrator. It is kept in the table so that the review can happen,
+    // but it is not offered to candidates until it has been approved.
+    .eq('review_state', 'approved')
+    // The catalogue is scoped to what this product offers: opportunities in
+    // Egypt and opportunities that can be done online or hybrid from
+    // anywhere. An on-site role in another country is not actionable here.
+    .or('country.eq.Egypt,is_remote.eq.true,participation_mode.eq.online,participation_mode.eq.hybrid');
+
+  // The half of the ecosystem is chosen in the database, by the stored column,
+  // rather than by picking rows out of the result afterwards. A caller that
+  // asks for no half at all still sees the whole catalogue.
+  const scoped = pillar ? catalogue.eq('pillar', pillar) : catalogue;
+
   const [opportunitiesResult, savesResult] = await Promise.all([
-    getSupabaseServer()
-      .from('volunteer_opportunities')
-      .select(OPPORTUNITY_COLUMNS)
-      .eq('is_active', true)
-      // A record the source pipeline was not confident about waits for an
-      // administrator. It is kept in the table so that the review can happen,
-      // but it is not offered to candidates until it has been approved.
-      .eq('review_state', 'approved')
-      // The catalogue is scoped to what this product offers: opportunities in
-      // Egypt and opportunities that can be done online or hybrid from
-      // anywhere. An on-site role in another country is not actionable here.
-      .or('country.eq.Egypt,is_remote.eq.true,participation_mode.eq.online,participation_mode.eq.hybrid')
+    scoped
       .order('is_featured', { ascending: false })
       .order('organization', { ascending: true }),
     getSupabaseServer()
@@ -676,11 +709,21 @@ export async function unsaveVolunteerOpportunity(
 /* Administration                                                             */
 /* -------------------------------------------------------------------------- */
 
-/** The whole catalogue, including inactive and expired rows, for an admin. */
-export async function listOpportunitiesForAdmin(): Promise<VolunteerOpportunityDTO[]> {
-  const { data, error } = await getSupabaseServer()
+/**
+ * The whole catalogue, including inactive and expired rows, for an admin.
+ *
+ * An administrator can ask for one half of the ecosystem, because "where did
+ * this internship end up?" and "show me every training programme" are the
+ * questions the split exists to answer.
+ */
+export async function listOpportunitiesForAdmin(
+  options: { pillar?: OpportunityPillar } = {}
+): Promise<VolunteerOpportunityDTO[]> {
+  const query = getSupabaseServer()
     .from('volunteer_opportunities')
-    .select(OPPORTUNITY_COLUMNS)
+    .select(OPPORTUNITY_COLUMNS);
+  const scoped = options.pillar ? query.eq('pillar', options.pillar) : query;
+  const { data, error } = await scoped
     .order('is_active', { ascending: false })
     .order('organization', { ascending: true });
   if (error) throw error;

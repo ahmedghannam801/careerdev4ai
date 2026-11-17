@@ -42,6 +42,8 @@ import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
 import { useAdminAccess } from '../../lib/useAdminAccess';
 import { CreditBalanceBadge } from '../subscription/CreditBalanceBadge';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
+import { MembershipPanel } from '../subscription/MembershipPanel';
+import { resolvePlanIdentityTier } from '../../../shared/planIdentity';
 
 const GlobalSearchModal = lazy(() =>
   import('./GlobalSearchModal').then((module) => ({ default: module.GlobalSearchModal }))
@@ -118,6 +120,16 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
    * reloaded. The identity is now resolved once, in the context.
    */
   const displayName = identity.displayName || t('Signed in');
+
+  /**
+   * Whether the candidate is on the free plan.
+   *
+   * The tier is read from the plan code the server sent, never chosen here.
+   * A free candidate is not nagged in the header: they get the quiet mark and
+   * a clear upgrade path where it belongs, in the profile and the account
+   * menu.
+   */
+  const isFreePlan = resolvePlanIdentityTier(subscription?.planCode) === 'free';
 
   // Global Ctrl/Cmd + K keyboard shortcut
   useEffect(() => {
@@ -331,8 +343,21 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 className="w-7 h-7 rounded-lg border border-[var(--border-subtle)]"
               />
               <div className="min-w-0">
-                <div className="text-xs font-bold text-[var(--text-primary)] truncate">
-                  {identity.displayName}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-xs font-bold text-[var(--text-primary)] truncate">
+                    {identity.displayName}
+                  </span>
+                  {/* The tier, beside the name it belongs to. It is drawn from
+                      the plan the server resolved, so it cannot say a plan the
+                      candidate does not hold. */}
+                  <PlanIdentityBadge
+                    planCode={subscription?.planCode ?? 'free'}
+                    variant="solid"
+                    size="sm"
+                    language={settings.language}
+                    markOnly={isFreePlan}
+                    className="shrink-0"
+                  />
                 </div>
                 <div className="text-[10px] text-[var(--text-muted)] truncate">
                   @{profile.username || 'user'}
@@ -411,12 +436,16 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <div data-tour="notifications-account" className="flex items-center gap-1.5 sm:gap-2">
               {/* The tier's identity, always visible in the header.
                   It is drawn from the plan the server resolved, so it cannot
-                  say a plan the candidate does not hold. */}
+                  say a plan the candidate does not hold. A paid plan carries
+                  its name — the candidate paid for it and should see it; the
+                  free plan stays a quiet mark, because "Free" on every screen
+                  is noise rather than information. */}
               <PlanIdentityBadge
                 planCode={subscription?.planCode ?? 'free'}
                 variant="outline"
-                markOnly
-                className="h-7 w-7 justify-center"
+                markOnly={isFreePlan}
+                language={settings.language}
+                className={isFreePlan ? 'h-7 w-7 justify-center' : ''}
               />
               <CreditBalanceBadge onOpenPricing={() => onNavigate('pricing')} />
 
@@ -475,6 +504,17 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                           @{profile.username || t('no username set')}
                         </div>
                       </div>
+                      {/* The membership, in the place the candidate looks when
+                          they ask what they are on. The tier, the plan and the
+                          way to change it are one row above the menu items. */}
+                      <MembershipPanel
+                        variant="row"
+                        onManagePlan={() => {
+                          setUserMenuOpen(false);
+                          onNavigate('pricing');
+                        }}
+                        className="border-b border-[var(--border-subtle)]"
+                      />
                       <button
                         onClick={() => { setUserMenuOpen(false); onNavigate('profile'); }}
                         className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
@@ -634,6 +674,16 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               </div>
 
             <div className="space-y-2 border-t border-[var(--border-subtle)] px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              {/* The membership, on a phone as well. The tier and the plan are
+                  one row; the way to change them is the row itself. */}
+              <MembershipPanel
+                variant="row"
+                onManagePlan={() => {
+                  setMobileMenuOpen(false);
+                  onNavigate('pricing');
+                }}
+                className="rounded-xl border border-[var(--border-subtle)]"
+              />
               <div className="flex items-center justify-between gap-2 pb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   {t('Display')}

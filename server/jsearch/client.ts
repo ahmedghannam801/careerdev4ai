@@ -16,6 +16,7 @@ import {
   buildJobSearchQuery,
   dedupeLiveJobs,
   filterLiveJobsByKind,
+  filterLiveJobsByPillar,
   filterLiveJobsBySource,
   normalizeLiveJob,
   type JobSearchQuery,
@@ -443,8 +444,15 @@ export async function searchJobs(
   // The provider's own employment-type filter is a hint, not a promise: it
   // answers with "Full-time" alongside the internships it was asked for. So the
   // kind is applied again here, on the type each posting actually stated.
+  //
+  // The pillar is applied after that. Some providers publish their courses
+  // through the same feed as their vacancies, and a course is not a role: it
+  // belongs with the training programmes, not with the vacancies.
   const jobs = filterLiveJobsBySource(
-    filterLiveJobsByKind(normalized, query.kind),
+    filterLiveJobsByPillar(
+      filterLiveJobsByKind(normalized, query.kind),
+      'jobs'
+    ),
     query.sources
   );
 

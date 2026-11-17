@@ -217,7 +217,7 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
             {t('Opportunities & Activities')}
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1.5 max-w-2xl">
-            {t('Discover volunteering, student activities, youth programmes, competitions, fellowships and internships — then record what you took part in and the skills it gave you.')}
+            {t('Discover volunteering, student activities, youth programmes, competitions, fellowships and training programmes — then record what you took part in and the skills it gave you.')}
           </p>
         </div>
 

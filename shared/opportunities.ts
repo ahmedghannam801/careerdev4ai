@@ -201,6 +201,96 @@ export function isOpportunityKind(value: string): value is OpportunityKind {
   return (OPPORTUNITY_KINDS as readonly string[]).includes(value);
 }
 
+/* -------------------------------------------------------------------------- */
+/* The two pillars                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The two things a candidate is looking for, which are not the same thing.
+ *
+ * One is employment: a job, or an internship, which is a role somebody is
+ * hired into. The other is an activity or a course: volunteering, a student
+ * programme, a training course, a competition, a scholarship. They are
+ * advertised by different organisations, they are found in different places,
+ * and they are read by a candidate with a different question in mind.
+ *
+ * Mixing them is how a feed ends up offering a vacancy to somebody looking for
+ * a course. The pillar is therefore a property of the RECORD, stored with it
+ * and filtered on in the database, rather than a decision the interface makes
+ * about what it would like to show.
+ */
+export const OPPORTUNITY_PILLARS = ['jobs', 'opportunities'] as const;
+export type OpportunityPillar = (typeof OPPORTUNITY_PILLARS)[number];
+
+export const OPPORTUNITY_PILLAR_LABELS: Record<OpportunityPillar, string> = {
+  jobs: 'Live Jobs & Internship',
+  opportunities: 'Opportunities & Activities',
+};
+
+/**
+ * The kinds that are employment.
+ *
+ * An internship is a role somebody is taken on to do for a period of paid or
+ * unpaid work under supervision, which is why it belongs with the vacancies
+ * rather than with the activities. Everything else in the vocabulary is
+ * something a candidate joins, attends or studies.
+ */
+export const EMPLOYMENT_OPPORTUNITY_KINDS: readonly OpportunityKind[] = ['internship'];
+
+/**
+ * The kinds that are training.
+ *
+ * A training programme, a bootcamp, a workshop, a webinar and a certification
+ * are all ways of learning something, which is what puts them on the same
+ * side of the line as volunteering.
+ */
+export const TRAINING_OPPORTUNITY_KINDS: readonly OpportunityKind[] = [
+  'training',
+  'bootcamp',
+  'workshop',
+  'webinar',
+  'certification',
+];
+
+/**
+ * The pillar a kind belongs to.
+ *
+ * This is the ONE place the rule is written. The database stores the answer
+ * beside the row, the API filters on it, and the interface reads it.
+ */
+export function pillarForKind(kind: OpportunityKind): OpportunityPillar {
+  return EMPLOYMENT_OPPORTUNITY_KINDS.includes(kind) ? 'jobs' : 'opportunities';
+}
+
+/** Whether a value names a known pillar, for server-side validation. */
+export function isOpportunityPillar(value: unknown): value is OpportunityPillar {
+  return (
+    typeof value === 'string' &&
+    (OPPORTUNITY_PILLARS as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Whether a kind is a training programme.
+ *
+ * The kind decides it, not a free-text tag: a tag can say anything, and the
+ * filter has to be the same answer every time it is asked.
+ */
+export function isTrainingOpportunityKind(kind: string | null | undefined): boolean {
+  if (!kind) return false;
+  return (TRAINING_OPPORTUNITY_KINDS as readonly string[]).includes(kind);
+}
+
+/**
+ * The kinds that belong to a pillar.
+ *
+ * Useful for a query that asks for the whole pillar without naming every
+ * kind, and for the administration screen, which shows what is where.
+ */
+export function kindsForPillar(pillar: OpportunityPillar): OpportunityKind[] {
+  return OPPORTUNITY_KINDS.filter((kind) => pillarForKind(kind) === pillar);
+}
+
 export function isParticipationMode(value: string): value is ParticipationMode {
   return (PARTICIPATION_MODES as readonly string[]).includes(value);
 }

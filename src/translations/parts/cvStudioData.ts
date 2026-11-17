@@ -39,6 +39,23 @@ export const cvStudioDataAr: Record<string, string> = {
   'Credential URL': 'رابط الشهادة',
   'The change could not be saved.': 'تعذّر حفظ التغيير.',
 
+  // ---- The order of the sections ------------------------------------------
+  'Section order': 'ترتيب الأقسام',
+  'Your CV has one section, so there is nothing to reorder.':
+    'يحتوي سيرتك الذاتية على قسم واحد فقط، لذا لا يوجد ما يمكن إعادة ترتيبه.',
+  'Drag a section, or use the arrows, to change the order your CV is read in. The template still decides how each section looks.':
+    'اسحب القسم، أو استخدم الأسهم، لتغيير ترتيب قراءة سيرتك الذاتية. ويبقى القالب هو من يقرر شكل كل قسم.',
+  'Reset': 'إعادة ضبط',
+  'Side column': 'العمود الجانبي',
+  'Drag to reorder': 'اسحب لإعادة الترتيب',
+  'Move {name} up': 'نقل {name} إلى الأعلى',
+  'Move {name} down': 'نقل {name} إلى الأسفل',
+  '{name} moved up to position {position}': 'تم نقل {name} إلى الموضع {position}',
+  '{name} moved down to position {position}': 'تم نقل {name} إلى الموضع {position}',
+  '{name} moved to position {position}': 'تم نقل {name} إلى الموضع {position}',
+  'The section order is back to the one the template suggests':
+    'عاد ترتيب الأقسام إلى الترتيب الذي يقترحه القالب',
+
   // ---- The AI suggestions offered on each section ------------------------
   'AI Suggestions': 'اقتراحات الذكاء الاصطناعي',
   'Write it for me': 'اكتبها لي',

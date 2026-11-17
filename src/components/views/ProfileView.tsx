@@ -44,6 +44,8 @@ import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { CareerGoalRolePanel } from '../career/CareerGoalRolePanel';
+import { MembershipPanel } from '../subscription/MembershipPanel';
+import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 
 export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const {
@@ -63,6 +65,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     deleteVolunteerExperience,
     careerIdentity,
     identity,
+    subscription,
+    settings,
     t
   } = useCareer();
 
@@ -736,6 +740,15 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   {profile.isPublic ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                   {profile.isPublic ? 'Public Profile' : 'Private'}
                 </span>
+                {/* The tier, beside the name. It is drawn from the plan the
+                    server resolved, so it cannot say a plan the candidate does
+                    not hold, and its colour is the tier's own. */}
+                <PlanIdentityBadge
+                  planCode={subscription?.planCode ?? 'free'}
+                  variant="solid"
+                  size="sm"
+                  language={settings.language}
+                />
               </div>
 
               <p className="text-sm font-medium text-[var(--color-primary-text)]">
@@ -812,6 +825,13 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <span>{t('Edit Profile')}</span>
             </button>
           </div>
+        </div>
+
+        {/* The membership, beside the profile it belongs to.
+            The candidate sees here what they are on, what they have left, and
+            the way forward — without hunting for the pricing page. */}
+        <div className="mt-6 relative z-10">
+          <MembershipPanel onManagePlan={() => onNavigate('pricing')} />
         </div>
 
         {/* Profile Completeness Bar & Missing Checklist */}

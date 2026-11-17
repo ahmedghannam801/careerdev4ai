@@ -13,6 +13,7 @@ import type { SkillCategory, TargetRole } from '../../shared/careerTypes.ts';
 import type { ProjectLifecycleStatus } from '../../shared/projectLifecycle.ts';
 import type { AiLanguageCode } from '../../shared/aiLanguages.ts';
 import type { ResumeLanguage } from '../../shared/resumeLanguage.ts';
+import type { CvSectionKey } from '../../shared/cvTemplates.ts';
 
 export type CareerState = 
   | 'student' 
@@ -411,6 +412,16 @@ export interface CVProfile {
   hiddenContactFields?: Array<'email' | 'phone' | 'location'>;
   /** Whether the profile summary is intentionally omitted from this CV. */
   hiddenSummary?: boolean;
+  /**
+   * The order the sections of this CV are read in.
+   *
+   * The candidate chooses it in the studio. A template proposes an order, and
+   * this replaces it: the template still decides how a section is set and
+   * which column it sits in, but the candidate decides the reading order.
+   *
+   * A section that is not named here keeps the place the template gave it.
+   */
+  sectionOrder?: CvSectionKey[];
   experiences: {
     id: string;
     company: string;
