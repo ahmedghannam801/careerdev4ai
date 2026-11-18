@@ -129,6 +129,15 @@ export interface JobSearchResult {
   quota: ProviderQuota;
   /** True when this answer came from the cache. */
   cached: boolean;
+  /**
+   * When the boards were actually read, as an ISO timestamp.
+   *
+   * It is the moment the provider answered, not the moment the browser asked.
+   * A cached answer keeps the timestamp of the fetch it was built from, so the
+   * "last checked" line the candidate reads is the truth about the postings
+   * rather than the truth about their own request.
+   */
+  fetchedAt: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -183,6 +192,32 @@ function writeCache(key: string, value: JobSearchResult): void {
 /** Empties the cache. Used by the tests. */
 export function clearJobSearchCache(): void {
   cache.clear();
+}
+
+/**
+ * The cached answer for a search, or null when there is none.
+ *
+ * It is exported so the cache's own rules can be proved by a test rather than
+ * assumed — in particular that a cached answer keeps the moment the boards
+ * were read, and does not claim it was read again just now.
+ */
+export function readCachedJobSearch(
+  rawParams: Record<string, unknown>
+): JobSearchResult | null {
+  return readCache(cacheKey(buildJobSearchQuery(rawParams)));
+}
+
+/**
+ * Stores an answer in the cache.
+ *
+ * Exported for the same reason as `readCachedJobSearch`: so the rule above can
+ * be tested against the real cache rather than a copy of it.
+ */
+export function writeJobSearchCache(
+  rawParams: Record<string, unknown>,
+  value: JobSearchResult
+): void {
+  writeCache(cacheKey(buildJobSearchQuery(rawParams)), value);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -461,6 +496,7 @@ export async function searchJobs(
     cursor: readCursor(payload),
     quota,
     cached: false,
+    fetchedAt: now.toISOString(),
   };
 
   writeCache(key, result);

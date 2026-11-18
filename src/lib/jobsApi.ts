@@ -26,6 +26,8 @@ export interface JobSearchResponse {
   quota: JobQuota;
   cached: boolean;
   source: string;
+  /** When the job boards were read, as an ISO timestamp. */
+  checkedAt: string;
 }
 
 /** The parameters the search screen can change. */

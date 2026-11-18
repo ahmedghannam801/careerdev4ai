@@ -175,8 +175,11 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       setSource(response.source);
       // When the vacancies were actually read. The candidate is told how old
       // the list is, because a job board that was checked an hour ago is not
-      // the same thing as one that was checked a minute ago.
-      setLastCheckedAt(Date.now());
+      // the same thing as one that was checked a minute ago. The timestamp is
+      // the provider's own, so a cached answer is not passed off as a fresh
+      // one.
+      const checkedAt = Date.parse(response.checkedAt);
+      setLastCheckedAt(Number.isNaN(checkedAt) ? Date.now() : checkedAt);
     } catch (caught) {
       if (requestId !== searchRequestIdRef.current) return;
       // The failure code is kept; the server's English sentence is not shown

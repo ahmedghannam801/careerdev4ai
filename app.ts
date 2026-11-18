@@ -6390,6 +6390,10 @@ app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request
       quota: result.quota,
       cached: result.cached,
       source: JOB_SOURCE_LABEL,
+      // When the boards were read. The candidate is told how old the list is,
+      // and this is the truth about the postings rather than the truth about
+      // their own request.
+      checkedAt: result.fetchedAt,
     });
   } catch (error) {
     if (error instanceof JobSearchError) {
