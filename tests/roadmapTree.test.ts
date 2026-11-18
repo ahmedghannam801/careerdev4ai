@@ -271,12 +271,17 @@ describe('the roadmap node tree', () => {
       state: 'recommended',
     };
 
-    assert.equal(resolveNodeState(node, { currentStageId: null }), 'recommended');
-    assert.equal(resolveNodeState(node, { currentStageId: 'foundation' }), 'inProgress');
+    // The tree stores the resolved state; `done` is what the rule reads, so it
+    // is passed alongside the node exactly as the tree builder does.
+    assert.equal(resolveNodeState({ ...node, done: false }, { currentStageId: null }), 'recommended');
+    assert.equal(resolveNodeState({ ...node, done: false }, { currentStageId: 'foundation' }), 'inProgress');
     assert.equal(
-      resolveNodeState({ ...node, done: true } as RoadmapTreeNode, { currentStageId: null }),
+      resolveNodeState({ ...node, done: true }, { currentStageId: null }),
       'done'
     );
-    assert.equal(resolveNodeState({ ...node, required: false }, { currentStageId: null }), 'optional');
+    assert.equal(
+      resolveNodeState({ ...node, done: false, required: false }, { currentStageId: null }),
+      'optional'
+    );
   });
 });

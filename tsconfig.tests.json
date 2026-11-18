@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Unused imports in a test file are harmless: a test may import a symbol
+    // only to prove that it exists, or a fixture may keep an import it no
+    // longer needs. The product code keeps the strict rule.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src",
+    "server",
+    "shared",
+    "server.ts",
+    "app.ts",
+    "worker",
+    "tests"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    // Semgrep fixtures are code samples, not compiled code: they deliberately
+    // contain names that do not resolve.
+    "tests/semgrep"
+  ]
+}

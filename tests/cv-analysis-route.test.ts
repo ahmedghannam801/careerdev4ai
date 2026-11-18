@@ -98,7 +98,7 @@ describe('the measured analysis route', () => {
   });
 
   after(async () => {
-    if (user) await deleteTestUser(user.id);
+    if (user) await deleteTestUser(user);
   });
 
   test('it requires a session', async () => {
@@ -237,7 +237,7 @@ describe('the measured analysis of a stored CV', () => {
   });
 
   after(async () => {
-    if (user) await deleteTestUser(user.id);
+    if (user) await deleteTestUser(user);
   });
 
   test('a stored version is measured and the run is recorded', async () => {
@@ -284,7 +284,7 @@ describe('the measured analysis of a stored CV', () => {
       assert.equal(res.body?.code, 'unknown_version');
       assert.equal(res.body?.analysis, undefined);
     } finally {
-      await deleteTestUser(other.id);
+      await deleteTestUser(other);
     }
   });
 
@@ -299,7 +299,7 @@ describe('the measured analysis of a stored CV', () => {
         'the history of somebody else is empty, not forbidden'
       );
     } finally {
-      await deleteTestUser(other.id);
+      await deleteTestUser(other);
     }
   });
 
@@ -363,7 +363,7 @@ describe('CV analysis requires current legal acceptance', () => {
   });
 
   after(async () => {
-    if (user) await deleteTestUser(user.id);
+    if (user) await deleteTestUser(user);
   });
 
   test('analysis, streaming analysis, and history are denied before consent', async () => {
@@ -422,7 +422,7 @@ describe('the record of the measured analyses', () => {  let user: TestUser;
   });
 
   after(async () => {
-    if (user) await deleteTestUser(user.id);
+    if (user) await deleteTestUser(user);
   });
 
   test('the table holds the whole measurement and who owns it', async () => {

@@ -87,8 +87,8 @@ describe('localisation', () => {
   it('keeps placeholders intact in every translation', () => {
     const broken: string[] = [];
     for (const [source, translation] of Object.entries(AR_STRINGS)) {
-      const sourceTokens = source.match(/\{[^}]+\}/g) ?? [];
-      const translationTokens = translation.match(/\{[^}]+\}/g) ?? [];
+      const sourceTokens: string[] = source.match(/\{[^}]+\}/g) ?? [];
+      const translationTokens: string[] = translation.match(/\{[^}]+\}/g) ?? [];
       const missing = sourceTokens.filter((token) => !translationTokens.includes(token));
       if (missing.length > 0) {
         broken.push(`${source}: missing ${missing.join(', ')}`);

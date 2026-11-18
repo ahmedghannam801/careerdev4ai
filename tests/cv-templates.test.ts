@@ -11,6 +11,31 @@
  * SUPABASE_TEST_PROJECT_REF at one before running them.
  */
 
+import { test, describe, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  FREE_CV_TEMPLATE_ID,
+  CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS,
+} from '../shared/cvTemplates.ts';
+import { cvTemplateSample } from '../shared/cvTemplateSample.ts';
+import {
+  createTestUser,
+  deleteTestUser,
+  admin,
+  api,
+  apiAnonymous,
+  type TestUser,
+} from './helpers.ts';
+
+/**
+ * A complete CV, used by the export tests.
+ *
+ * The export is the one thing that must carry the candidate's facts all the
+ * way into a file, so the tests export a real CV rather than an empty shape.
+ */
+const sampleEn = cvTemplateSample('en');
+
 /* -------------------------------------------------------------------------- */
 /* Access control — the API                                                    */
 /* -------------------------------------------------------------------------- */

@@ -42,6 +42,9 @@ jobs:
       - name: Vitest
         run: npm run test:run
 
+      - name: Database-free test suite
+        run: npm run test:logic
+
       - name: TypeScript check
         run: npm run lint
 

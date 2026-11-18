@@ -100,6 +100,21 @@ export interface RelevanceCandidate {
   roleSlugs?: RoleMapping[];
   /** The catalogue category, used for the domain check. */
   category?: string | null;
+  /**
+   * The entry's own title.
+   *
+   * It is part of the shape of a course or a project, so it is accepted here —
+   * but it is NOT evidence. A title that happens to share a word with the gap
+   * must never make an entry eligible: that was the reason unrelated work
+   * appeared in plans. Nothing in this module reads it.
+   */
+  title?: string | null;
+  /**
+   * The entry's own description.
+   *
+   * Accepted, and not evidence, for the same reason as the title.
+   */
+  description?: string | null;
   /** The entry's own difficulty: 'Beginner' | 'Intermediate' | 'Advanced'. */
   level?: string | null;
   /** The entry's format, e.g. 'video' or 'article'. */

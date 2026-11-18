@@ -193,11 +193,11 @@ export async function createTestUser(
 
   // The profile row is created by a database trigger on auth signup; create it
   // defensively in case the trigger is absent.
-  await withTransientRetry('createTestUser profile', () =>
-    admin
+  await withTransientRetry('createTestUser profile', async () => {
+    await admin
       .from('profiles')
-      .upsert({ id: data.user.id, full_name: `Test ${label}` }, { onConflict: 'id' })
-  );
+      .upsert({ id: data.user.id, full_name: `Test ${label}` }, { onConflict: 'id' });
+  });
 
   if (options.consent !== false) {
     await withTransientRetry('grantConsent', () =>

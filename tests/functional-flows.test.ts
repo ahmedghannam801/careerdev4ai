@@ -123,7 +123,7 @@ describe('FT-01 — the CV Studio integration', () => {
 
     assert.equal(first.experiences.length, 1, 'the experience appears');
     assert.equal(first.projects.length, 1, 'the project appears');
-    assert.equal(first.certificationDetails.length, 1, 'the certificate appears');
+    assert.equal(first.certificationDetails?.length, 1, 'the certificate appears');
     assert.deepEqual(
       first.skillsList,
       ['SQL'],
@@ -145,7 +145,7 @@ describe('FT-01 — the CV Studio integration', () => {
 
     assert.equal(second.experiences.length, 1, 'no duplicate experience');
     assert.equal(second.projects.length, 1, 'no duplicate project');
-    assert.equal(second.certificationDetails.length, 1, 'no duplicate certificate');
+    assert.equal(second.certificationDetails?.length, 1, 'no duplicate certificate');
     assert.deepEqual(second.skillsList, ['SQL'], 'no duplicate skill');
 
     assert.equal(
@@ -168,7 +168,7 @@ describe('FT-01 — the CV Studio integration', () => {
   it('keeps the certificate the candidate wrote about', () => {
     const document = mergeCanonicalCvDocument(profileRecords(), emptyDocument());
     assert.equal(
-      document.certificationDetails[0].description,
+      document.certificationDetails?.[0]?.description,
       'Completed the programme.',
       'the description is kept'
     );

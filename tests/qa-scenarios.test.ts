@@ -487,8 +487,8 @@ describe('the shared measurement is one measurement', () => {
       {
         profile: { fullName: 'Mona Hassan' },
         skills: [
-          { name: 'SQL', category: 'technical', currentLevel: 3 },
-          { name: 'Python', category: 'technical', currentLevel: 4 },
+          { name: 'SQL', level: 3 },
+          { name: 'Python', level: 4 },
         ],
       },
       {
@@ -500,6 +500,7 @@ describe('the shared measurement is one measurement', () => {
         summary: '',
         experiences: [],
         education: [],
+        projects: [],
         skillsList: ['TECHNICAL SKILLS', 'sql', '  Python '],
         certifications: [],
       }

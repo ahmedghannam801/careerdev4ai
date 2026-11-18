@@ -218,7 +218,9 @@ describe('domain CRUD', () => {
     // The record is readable through the list endpoint as well.
     const list = await api('GET', '/api/job-applications', { token: userA.token });
     assert.equal(list.status, 200);
-    const found = (list.body.applications ?? []).find((item) => item.id === row.id);
+    const found = (list.body.applications ?? []).find(
+      (item: { id: string }) => item.id === row.id
+    );
     assert.ok(found, 'the new application must be listed');
     assert.equal(found.appliedDate, '2026-11-03');
     assert.equal(found.notes, 'Applied from the live jobs screen.');

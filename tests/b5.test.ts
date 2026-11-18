@@ -128,6 +128,7 @@ function baseContext(overrides: Partial<LearningContext> = {}): LearningContext 
     roadmapCourseIds: ['ts-course'],
     experienceLevel: 'entry',
     language: 'en',
+    aiLanguage: 'en',
     preferredFormat: 'course',
     weeklyHours: 5,
     budget: 'free_only',

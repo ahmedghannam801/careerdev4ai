@@ -224,7 +224,7 @@ describe('the template catalogue', () => {
     for (const category of CV_TEMPLATE_CATEGORIES) {
       assert.ok(
         (byCategory.get(category.id) ?? 0) >= 5,
-        `the "${category.nameEn}" category must hold at least 5 templates, found ${
+        `the "${category.label}" category must hold at least 5 templates, found ${
           byCategory.get(category.id) ?? 0
         }`
       );
@@ -288,14 +288,14 @@ describe('a rendered template', () => {
       ...sampleEn.education.flatMap((education) => [education.institution, education.degree]),
       ...sampleEn.projects.flatMap((project) => [project.title, ...project.bullets]),
       ...sampleEn.skillsList,
-      ...sampleEn.courses.map((course) => course.title),
-      ...sampleEn.volunteering.map((entry) => entry.organization),
-      ...sampleEn.internships.map((entry) => entry.organization),
-      ...sampleEn.languages.map((language) => language.name),
-      ...sampleEn.awards.map((award) => award.title),
-      ...sampleEn.publications.map((publication) => publication.title),
-      ...sampleEn.research.map((entry) => entry.title),
-      ...sampleEn.leadership.map((entry) => entry.organization),
+      ...(sampleEn.courses ?? []).map((course) => course.title),
+      ...(sampleEn.volunteering ?? []).map((entry) => entry.organization),
+      ...(sampleEn.internships ?? []).map((entry) => entry.organization),
+      ...(sampleEn.languages ?? []).map((language) => language.name),
+      ...(sampleEn.awards ?? []).map((award) => award.title),
+      ...(sampleEn.publications ?? []).map((publication) => publication.title),
+      ...(sampleEn.research ?? []).map((entry) => entry.title),
+      ...(sampleEn.leadership ?? []).map((entry) => entry.organization),
     ].filter((fact) => fact && fact.trim().length > 0);
 
     for (const template of CV_TEMPLATES) {

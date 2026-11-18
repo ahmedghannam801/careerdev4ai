@@ -181,7 +181,7 @@ describe('the deterministic CV analysis', () => {
 
   test('the pipeline reports every stage in the order the catalogue declares', () => {
     const pipeline = runCvAnalysisPipeline(input(), FIXED_NOW);
-    const events = [];
+    const events: Array<{ stage: string; status: string }> = [];
     let step = pipeline.next();
     while (!step.done) {
       events.push(step.value);

@@ -63,7 +63,13 @@ function careerContext(roleId: string, skills: string[]): AiCareerContext {
     targetRoleDomain: role.domainId,
     language: 'en',
     skillGaps: [],
-    currentSkills: skills.map((name) => ({ name, level: 3 })),
+    currentSkills: skills.map((name) => ({
+      name,
+      level: 3,
+      selfReportedLevel: 3,
+      assessedLevel: null,
+      evidenceSources: ['self_reported'],
+    })),
     strengths: [],
     education: ['BSc — Human Resources — Cairo University'],
     experience: ['HR Coordinator at Acme Corp (2021 - 2024)'],
@@ -74,6 +80,8 @@ function careerContext(roleId: string, skills: string[]): AiCareerContext {
     learningSummary: [],
     applicationsCount: 0,
     evidenceCount: 0,
+    evidenceSummary: [],
+    experienceLevel: 'entry',
   };
 }
 

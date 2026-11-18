@@ -250,7 +250,7 @@ describe('the order of the sections', () => {
   it('is the candidate\'s, not the template\'s, once the candidate chooses one', async () => {
     const cv = cvTemplateSample('en');
     const template = CV_TEMPLATES.find(
-      (candidate) => candidate.structure.layout === 'single-column'
+      (candidate) => candidate.structure.layout === 'single'
     ) ?? CV_TEMPLATES[0];
 
     const before = buildCvLayoutPlan({ cv, template, language: 'en' });

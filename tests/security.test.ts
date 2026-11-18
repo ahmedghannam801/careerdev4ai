@@ -334,7 +334,7 @@ async function extractCv(
 ): Promise<{ status: number; body: any }> {
   const form = new FormData();
   const bytes = typeof content === 'string' ? Buffer.from(content) : content;
-  form.append('file', new Blob([bytes], { type: contentType }), fileName);
+  form.append('file', new Blob([new Uint8Array(bytes)], { type: contentType }), fileName);
   const res = await fetch(`${process.env.TEST_API_BASE_URL}/api/cv/extract`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },

@@ -386,7 +386,7 @@ describe('the document metadata of the application', () => {
     assert.equal(website.url, 'https://careerdev4ai.pages.dev/');
     assert.equal(websiteSchema().name, website.name);
     assert.equal(websiteSchema().url, website.url);
-    assert.equal(websiteSchema().alternateName[0], website.alternateName[0]);
+    assert.equal((websiteSchema().alternateName as string[])[0], website.alternateName[0]);
     assert.match(html, /<link rel="canonical" href="https:\/\/careerdev4ai\.pages\.dev\/"\s*\/>/);
     assert.match(html, /<meta property="og:site_name" content="CareerDev4AI"\s*\/>/);
     assert.match(html, /<title>CareerDev4AI — Turn Your Ambition Into a Career Plan<\/title>/);

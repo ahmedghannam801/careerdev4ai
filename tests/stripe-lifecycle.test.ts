@@ -185,7 +185,7 @@ function makeDeps() {
       disputes.set(input.dispute.id, input);
     },
     updateCustomerEmail: async (id, email, deleted) => {
-      customerUpdates.push({ id, email, deleted });
+      customerUpdates.push({ id, email, deleted: deleted ?? false });
     },
     getInvoiceByPaymentIntent: async (paymentIntentId) =>
       paymentIntentId === 'pi_sub_1' ? ({ id: 'in_test_1' } as any) : null,

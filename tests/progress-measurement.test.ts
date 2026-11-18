@@ -272,6 +272,10 @@ describe('skill gap explanation', () => {
       gap: 2,
       priority: 'critical',
       required: true,
+      weight: 1,
+      verified: false,
+      verifiedLevel: 0,
+      proof: 'none',
     });
     assert.equal(explanation.name, 'SQL');
     assert.equal(explanation.currentLevel, 2);
@@ -289,6 +293,10 @@ describe('skill gap explanation', () => {
       gap: 0,
       priority: 'sufficient',
       required: true,
+      weight: 0,
+      verified: true,
+      verifiedLevel: 4,
+      proof: 'evidence',
     });
     assert.equal(explanation.met, true);
   });

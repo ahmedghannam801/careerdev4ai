@@ -29,7 +29,7 @@ describe('CV Studio deletion regression', () => {
     const before = mergeCanonicalCvDocument(source, emptyCv);
     assert.equal(before.experiences.length, 1);
 
-    const deleted = {
+    const deleted: CVProfile = {
       ...before,
       experiences: before.experiences.filter((entry) => entry.id !== job.id),
       hiddenRecordIds: [job.id],

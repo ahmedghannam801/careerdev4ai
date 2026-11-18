@@ -46,6 +46,7 @@ import {
   normalizeSkillName,
   resolveSkillSource,
   skillDedupeKey,
+  type SkillLike,
 } from '../shared/skillNormalizer.ts';
 import { resolveEducationStatus } from '../shared/careerIdentity.ts';
 import {
@@ -355,7 +356,7 @@ describe('Workstream 1 — a skill knows where it came from', () => {
   });
 
   it('merges two records for one skill without losing a signal', () => {
-    const merged = dedupeSkillRecords([
+    const merged = dedupeSkillRecords<SkillLike>([
       {
         name: 'SQL',
         category: 'analytical',
@@ -376,7 +377,7 @@ describe('Workstream 1 — a skill knows where it came from', () => {
     assert.equal(merged[0].selfReportedLevel, 3);
     assert.equal(merged[0].assessedLevel, 4);
     assert.equal(merged[0].source, 'assessment');
-    assert.deepEqual(merged[0].evidenceSources?.sort(), [
+    assert.deepEqual([...(merged[0].evidenceSources ?? [])].sort(), [
       'diagnostic_assessment',
       'self_reported',
     ]);

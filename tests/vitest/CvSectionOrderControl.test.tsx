@@ -7,7 +7,7 @@ import { cvTemplateSample } from '../../shared/cvTemplateSample';
 import type { CVProfile } from '../../src/types/career';
 
 const singleColumnTemplate =
-  CV_TEMPLATES.find((candidate) => candidate.structure.layout === 'single-column') ??
+  CV_TEMPLATES.find((candidate) => candidate.structure.layout === 'single') ??
   CV_TEMPLATES[0];
 
 const sidebarTemplate =
@@ -92,7 +92,7 @@ describe('the order of the sections', () => {
   });
 
   it('puts the order back to the template\'s when the candidate resets it', () => {
-    const cv = { ...cvTemplateSample('en'), sectionOrder: ['skills', 'summary'] };
+    const cv: CVProfile = { ...cvTemplateSample('en'), sectionOrder: ['skills', 'summary'] };
     const { update } = renderControl(cv);
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
@@ -141,7 +141,7 @@ describe('undoing a layout change', () => {
   });
 
   it('puts the previous layout back when the candidate undoes a move', () => {
-    const cv = { ...cvTemplateSample('en'), sectionOrder: ['skills', 'summary'] };
+    const cv: CVProfile = { ...cvTemplateSample('en'), sectionOrder: ['skills', 'summary'] };
     const { update } = renderControl(cv);
 
     fireEvent.click(screen.getAllByRole('button', { name: /Move .* down/ })[0]);

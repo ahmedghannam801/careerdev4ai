@@ -208,6 +208,7 @@ function context(roleId: string): LearningContext {
     roadmapCourseIds: [],
     experienceLevel: 'entry',
     language: 'en',
+    aiLanguage: 'en',
     preferredFormat: 'any',
     weeklyHours: 5,
     budget: 'free_only',

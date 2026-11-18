@@ -107,6 +107,12 @@ export async function waitForServer(baseUrl, timeoutMs = 120_000) {
  * need.
  *
  * Returns a handle with the child process and a `stop` function.
+ *
+ * @param {{
+ *   port?: number,
+ *   env?: Record<string, string>,
+ *   timeoutMs?: number,
+ * }} [options]
  */
 export async function startServer({ port, env, timeoutMs = 120_000 } = {}) {
   if (await isPortInUse(port)) {

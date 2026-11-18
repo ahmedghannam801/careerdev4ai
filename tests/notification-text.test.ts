@@ -107,9 +107,9 @@ describe('the words a notification is shown in', () => {
   });
 
   it('keeps the placeholders of the message in the Arabic entry', () => {
-    const source = NEW_OPPORTUNITY_MESSAGE_TEMPLATE.match(/\{[^}]+\}/g) ?? [];
+    const source: string[] = NEW_OPPORTUNITY_MESSAGE_TEMPLATE.match(/\{[^}]+\}/g) ?? [];
     const translation = AR_STRINGS[NEW_OPPORTUNITY_MESSAGE_TEMPLATE] ?? '';
-    const translated = translation.match(/\{[^}]+\}/g) ?? [];
+    const translated: string[] = translation.match(/\{[^}]+\}/g) ?? [];
 
     for (const token of source) {
       assert.ok(

@@ -16,8 +16,8 @@ let user: TestUser;
 let other: TestUser;
 
 before(async () => {
-  user = await createTestUser();
-  other = await createTestUser();
+  user = await createTestUser('feedback');
+  other = await createTestUser('feedback-other');
 });
 
 after(async () => {
