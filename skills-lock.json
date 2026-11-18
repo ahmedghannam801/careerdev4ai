@@ -1,0 +1,96 @@
+{
+  "version": 2,
+  "skills": {
+    "ai-sdk": {
+      "source": "vercel/ai",
+      "commit": "700089c0480b0a341d33ae65b2f17628d41da854",
+      "sourceType": "github",
+      "skillPath": "skills/use-ai-sdk/SKILL.md",
+      "computedHash": "59cd2dc82c5458f2819992fc3d27204ed16edfc9170870c6f8f04c44bac17772"
+    },
+    "browser": {
+      "source": "browserbase/skills",
+      "commit": "bac30e266488dc133cb8fa6d45638a05600acfe4",
+      "sourceType": "github",
+      "skillPath": "skills/browser/SKILL.md",
+      "computedHash": "93bfd9f0401e12ca8a11ca815d20d6fe14469a628b518a4da2d59addefd2ec49"
+    },
+    "build-agent": {
+      "source": "duyet/build-agent",
+      "commit": "d4e32b7ffe7db166336270c9043ddcb9ff4a66db",
+      "sourceType": "github",
+      "skillPath": "skills/build-agent/SKILL.md",
+      "computedHash": "7706fdc429f77b51ab7d88528c98d1b21c4a25c9da70b60cdff5a387535fc1c6"
+    },
+    "docx": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/docx/SKILL.md",
+      "computedHash": "20881307726dc87b9a1b0b2f9770ae869c2753081faedb5f89249d89a94e30a2"
+    },
+    "firecrawl": {
+      "source": "firecrawl/skills",
+      "commit": "1d4b0728d0f448cafef2eb8370c907fde7cb6f42",
+      "sourceType": "github",
+      "skillPath": "skills/core/firecrawl/SKILL.md",
+      "computedHash": "968d601a4015b995d8b226b48b5fad9454073be83a15eb278ffb942904483a67"
+    },
+    "firecrawl-crawl": {
+      "source": "firecrawl/skills",
+      "commit": "1d4b0728d0f448cafef2eb8370c907fde7cb6f42",
+      "sourceType": "github",
+      "skillPath": "skills/core/firecrawl-crawl/SKILL.md",
+      "computedHash": "c81687665629f868fa8261568724bbfa3d7fd02e32efeac6f23a8a6ef0755d33"
+    },
+    "firecrawl-scrape": {
+      "source": "firecrawl/skills",
+      "commit": "1d4b0728d0f448cafef2eb8370c907fde7cb6f42",
+      "sourceType": "github",
+      "skillPath": "skills/core/firecrawl-scrape/SKILL.md",
+      "computedHash": "50ef166f469a3c12fe7161e7f2d7630c6bf40069bb791ae971923510bf5660d9"
+    },
+    "pdf": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/pdf/SKILL.md",
+      "computedHash": "c9c58ce1e1c334d4beb50dfe97aee27aee1d074aed17b3aa1df03b8982028200"
+    },
+    "pptx": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/pptx/SKILL.md",
+      "computedHash": "e3c37c284de3a271a7e135d0cea5ead7cfaf002b83719d72e958963ccc5dd52f"
+    },
+    "safe-browser": {
+      "source": "browserbase/skills",
+      "commit": "bac30e266488dc133cb8fa6d45638a05600acfe4",
+      "sourceType": "github",
+      "skillPath": "skills/safe-browser/SKILL.md",
+      "computedHash": "9b0c78823be582ce16a87a29a02e3e66474aad849435a9eb8ad27f114b5937d3"
+    },
+    "supabase": {
+      "source": "supabase/agent-skills",
+      "commit": "c9be0e931b7930f7d02126d04774d904c381e7d7",
+      "sourceType": "github",
+      "skillPath": "skills/supabase/SKILL.md",
+      "computedHash": "2fbff32fd63b7d31585cacf0ed43e5bf8d05dd20d6c0c751d256cb967a00eec1"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "commit": "c9be0e931b7930f7d02126d04774d904c381e7d7",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "3eb972c2d7c818e544e35cc33ea8d7147d4d78ae08142ef40037b0fbac7a2505"
+    },
+    "xlsx": {
+      "source": "anthropics/skills",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/xlsx/SKILL.md",
+      "computedHash": "5100b54957a73ce2cb55933b224a483793f5f71555a181f287f43f94a9c1e149"
+    }
+  }
+}

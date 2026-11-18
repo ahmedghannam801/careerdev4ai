@@ -155,6 +155,7 @@ export const jobsAr: Record<string, string> = {
   'Not set': 'غير محدد',
   'Fit Score': 'درجة الملاءمة',
   'Why this Match Score?': 'لماذا درجة الملاءمة هذه؟',
+  'Semantic match': 'التطابق الدلالي',
   'Required skills': 'المهارات المطلوبة',
   'Preferred skills': 'المهارات المفضلة',
   'Matched': 'مطابقة',

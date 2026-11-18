@@ -7,11 +7,19 @@
 
 import { apiRequest } from './apiClient';
 import type { JobKind, JobSkillMatch, JobSourceId, LiveJob } from '../../shared/jobs';
+import type { SemanticFactorBreakdown } from '../../shared/jobMatching';
 
 /** One vacancy together with the candidate's fit against it. */
 export interface MatchedJob {
   job: LiveJob;
   match: JobSkillMatch;
+  /**
+   * The semantic factor, when the server could compute it.
+   *
+   * It is absent rather than zero when there was no comparison to make, so
+   * the interface never shows a score for something that was not measured.
+   */
+  semantic?: SemanticFactorBreakdown;
 }
 
 /** What the provider's quota looks like. */

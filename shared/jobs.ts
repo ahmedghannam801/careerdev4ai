@@ -45,6 +45,18 @@ import { createSkillLookup, skillNameVariants } from './skillMatching.ts';
  * therefore does not pretend to hold Wonderin postings it has not fetched. It
  * offers Wonderin as a place the candidate searches directly, with the query
  * they typed, and a posting that links to Wonderin is labelled as one.
+ *
+ * COMPANY CAREERS PAGES
+ * ---------------------
+ * The sixth board is a set of companies' own applicant-tracking systems.
+ *
+ * Every major ATS — Greenhouse, Lever, Ashby — publishes a documented, public,
+ * key-free JSON endpoint listing the postings on a company's careers board.
+ * Reading one is not scraping: it is the sanctioned way to read that board,
+ * and it is how a posting that never reached a job board reaches a candidate.
+ *
+ * A posting read this way is labelled with the board it came from, and never
+ * with the name of a board the platform did not read it from.
  */
 export const JOB_SOURCE_IDS = [
   'google_jobs',
@@ -52,6 +64,7 @@ export const JOB_SOURCE_IDS = [
   'ziprecruiter',
   'handshake',
   'wonderin',
+  'company_careers',
 ] as const;
 export type JobSourceId = (typeof JOB_SOURCE_IDS)[number];
 
@@ -62,6 +75,7 @@ export const JOB_SOURCE_LABELS: Record<JobSourceId, string> = {
   ziprecruiter: 'ZipRecruiter',
   handshake: 'Handshake',
   wonderin: 'Wonderin.ai',
+  company_careers: 'Company careers pages',
 };
 
 /**
@@ -83,6 +97,10 @@ const PUBLISHER_SOURCE_MATCHERS: ReadonlyArray<readonly [RegExp, JobSourceId]> =
  *
  * A posting whose board the platform does not present came through the
  * Google Jobs feed, so that is what it is called.
+ *
+ * A posting read from a company's own applicant-tracking system is a
+ * different case: the platform knows exactly where it came from, so the
+ * caller says so explicitly rather than the platform guessing from the text.
  */
 export function resolveJobSource(publisher: string | null | undefined): JobSourceId {
   const text = (publisher ?? '').trim();
@@ -91,6 +109,19 @@ export function resolveJobSource(publisher: string | null | undefined): JobSourc
     if (pattern.test(text)) return source;
   }
   return 'google_jobs';
+}
+
+/**
+ * Reads the source a record states for itself.
+ *
+ * Only a source the platform actually presents is accepted, so a record
+ * cannot claim to be a board the platform does not read.
+ */
+export function readDeclaredJobSource(value: unknown): JobSourceId | null {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  const match = JOB_SOURCE_IDS.find((entry) => entry === raw);
+  return match ?? null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -371,6 +402,11 @@ export function normalizeLiveJob(raw: unknown, now: Date = new Date()): LiveJob 
   const employmentType = asText(record.job_employment_type) ?? asText(record.employment_type);
   const publisher = asText(record.job_publisher) ?? asText(record.publisher);
 
+  // A record read from a company's own careers board states where it came
+  // from. A record from the aggregated provider does not, and is attributed
+  // from the board name the provider wrote.
+  const declaredSource = readDeclaredJobSource(record.job_source);
+
   return {
     id,
     title,
@@ -386,7 +422,7 @@ export function normalizeLiveJob(raw: unknown, now: Date = new Date()): LiveJob 
     url: asText(record.job_url) ?? asText(record.job_offer_url) ?? asText(record.job_google_link),
     applyUrl: asText(record.job_apply_link) ?? asText(record.job_apply_url),
     publisher,
-    source: resolveJobSource(publisher),
+    source: declaredSource ?? resolveJobSource(publisher),
     isInternship: isInternshipEmploymentType(employmentType),
     isTraining: isTrainingEmploymentType(employmentType),
     requiredSkills: publishedSkills,

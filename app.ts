@@ -160,6 +160,11 @@ import {
   listApplicationPackages,
   updateApplicationPackage,
 } from './server/db/applicationPackages.ts';
+import {
+  listApplicationPackageReviews,
+  transitionApplicationPackage,
+  type ApplicationPackageAction,
+} from './server/db/applicationApprovals.ts';
 import { PRIVACY_VERSION, TERMS_VERSION } from './shared/legal.ts';
 import { hasServerTermsApproval } from './server/legal.ts';
 import { resolveTargetRoleWrite } from './server/targetRole.ts';
@@ -472,11 +477,13 @@ import { submitIndexNow } from './server/seo/indexnow.ts';
 import { fetchTrafficReport } from './server/analytics/ga4.ts';
 import { VERIFICATION_PATH, verificationFileBody } from './server/seo/verification.ts';
 import {
-  searchJobs,
   getJobDetails,
   isJobSearchConfigured,
   JobSearchError,
 } from './server/jsearch/client.ts';
+import { searchAllJobs } from './server/jobs/feed.ts';
+import { hasConfiguredAtsBoards } from './server/jobs/ats.ts';
+import { semanticFactorsFor } from './server/jobs/semantic.ts';
 import {
   JOB_SOURCE_LABEL,
   matchJobToSkills,
@@ -4515,6 +4522,91 @@ app.patch('/api/application-packages/:id', requireAuth, async (req: Request, res
   }
 });
 
+// ---- The approval gate ----
+//
+// An application goes out in the candidate's name, so the candidate is the one
+// who agrees to it. The rule is enforced by a trigger in the database, and
+// these routes are how the candidate exercises it.
+//
+// The four moves are the four things a candidate can do:
+//
+//   submit_for_review  the candidate asks for the package to be looked at
+//   approve            the candidate has read it and says yes
+//   reject             the candidate has read it and says no
+//   withdraw           the candidate takes back something they approved
+//
+// Nothing here approves anything on the candidate's behalf: every move is
+// made through the candidate's own verified account.
+
+const APPLICATION_PACKAGE_ACTIONS = [
+  'submit_for_review',
+  'approve',
+  'reject',
+  'withdraw',
+] as const;
+
+/** Reads the action the caller asked for, refusing anything else. */
+function readApplicationPackageAction(value: unknown): ApplicationPackageAction | null {
+  const raw = String(value ?? '').trim().toLowerCase();
+  const match = APPLICATION_PACKAGE_ACTIONS.find((action) => action === raw);
+  return match ?? null;
+}
+
+app.post('/api/application-packages/:id/decision', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+
+    const body = req.body ?? {};
+    const action = readApplicationPackageAction(body.action);
+    if (!action) {
+      return res.status(400).json({
+        error: `The action must be one of ${APPLICATION_PACKAGE_ACTIONS.join(', ')}`,
+      });
+    }
+
+    const outcome = await transitionApplicationPackage(
+      req.authUser!.id,
+      req.params.id,
+      action,
+      typeof body.note === 'string' ? body.note : null
+    );
+
+    if (!outcome.ok) {
+      return res.status(outcome.status).json({ error: outcome.error });
+    }
+
+    // The decision history comes back with the answer, so the candidate can
+    // see that the decision was recorded rather than only that it was
+    // accepted.
+    const reviews = await listApplicationPackageReviews(req.authUser!.id, req.params.id);
+
+    return res.json({
+      success: true,
+      decision: outcome.result,
+      reviews,
+    });
+  } catch (error) {
+    console.error('Failed to record the application decision:', error);
+    return res.status(500).json({ error: 'Failed to record this decision' });
+  }
+});
+
+// The decisions made on one package.
+//
+// This is the record that "the candidate approved this" can be checked
+// against later, rather than taken on trust.
+app.get('/api/application-packages/:id/reviews', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+
+    const reviews = await listApplicationPackageReviews(req.authUser!.id, req.params.id);
+    return res.json({ success: true, reviews });
+  } catch (error) {
+    console.error('Failed to list the application reviews:', error);
+    return res.status(500).json({ error: 'Failed to load the decision history' });
+  }
+});
+
 // ---- Projects ----
 app.get('/api/projects', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -6354,8 +6446,7 @@ async function loadCandidateSkillNames(userId: string): Promise<string[]> {
 }
 
 /** Answers a provider failure with a state the interface can explain. */
-function sendJobSearchError(res: Response, error: JobSearchError): void {
-  if (error.retryAfterSeconds !== null) {
+function sendJobSearchError(res: Response, error: JobSearchError): void {  if (error.retryAfterSeconds !== null) {
     res.setHeader('Retry-After', String(error.retryAfterSeconds));
   }
   res.status(error.status).json({
@@ -6368,7 +6459,7 @@ function sendJobSearchError(res: Response, error: JobSearchError): void {
 
 app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
   try {
-    if (!isJobSearchConfigured()) {
+    if (!isJobSearchConfigured() && !hasConfiguredAtsBoards()) {
       return res.status(503).json({
         success: false,
         error: 'Live job search is not configured on this server.',
@@ -6376,12 +6467,28 @@ app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request
       });
     }
 
-    const result = await searchJobs({ ...(req.query as Record<string, unknown>) });
+    // One search across every board the platform reads: the aggregated
+    // provider feed and the company careers boards this deployment
+    // configures. The candidate sees one list; the provenance of each posting
+    // is on the posting.
+    const result = await searchAllJobs({ ...(req.query as Record<string, unknown>) });
     const candidateSkills = await loadCandidateSkillNames(req.authUser!.id);
+
+    // The semantic factor is computed for the whole result set in one go, so
+    // the cost is one model call and one comparison however many postings
+    // came back. It is an addition: when it cannot be computed, the exact
+    // factors carry the whole score exactly as before.
+    const semanticFactors = await semanticFactorsFor(
+      result.jobs,
+      req.authUser!.id,
+      { skillNames: candidateSkills },
+      CATALOG_SKILL_NAMES
+    );
 
     const jobs = result.jobs.map((job: LiveJob) => ({
       job,
       match: matchJobToSkills(job, candidateSkills, CATALOG_SKILL_NAMES),
+      ...(semanticFactors.get(job.id) ? { semantic: semanticFactors.get(job.id)! } : {}),
     }));
 
     return res.json({
@@ -6394,6 +6501,11 @@ app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request
       // and this is the truth about the postings rather than the truth about
       // their own request.
       checkedAt: result.fetchedAt,
+      // Which boards contributed to this list, and which could not be read.
+      // A board that failed is named rather than hidden, so the candidate
+      // knows the list is smaller than it could have been.
+      boardsRead: result.boardsRead,
+      boardsFailed: result.boardsFailed,
     });
   } catch (error) {
     if (error instanceof JobSearchError) {

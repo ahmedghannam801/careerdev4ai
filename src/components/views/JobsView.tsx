@@ -257,7 +257,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const candidateBand = useMemo(() => deriveCandidateBand(candidate), [candidate]);
   const hideSeniorByDefault = candidateBand === 'student' || candidateBand === 'intern' || candidateBand === 'entry';
   const includeSenior = showSeniorRoles ?? !hideSeniorByDefault;
-  const scores = useMemo(() => new Map(results.map((item) => [item.job.id, explainJobMatch(item.job, candidate, CATALOG_SKILL_NAMES, CAREER_ROLES)])), [results, candidate]);
+  const scores = useMemo(() => new Map(results.map((item) => [item.job.id, explainJobMatch(item.job, candidate, CATALOG_SKILL_NAMES, CAREER_ROLES, item.semantic ?? null)])), [results, candidate]);
 
   const ordered = useMemo(() => {
     const copy = results.filter((item) => includeSenior || !shouldFilterSeniorJob(scores.get(item.job.id)?.jobSeniority ?? null, candidateBand));
@@ -434,7 +434,9 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           Four of them are fetched by the provider, and every posting below
           names the one it came from. The fifth, Wonderin.ai, matches roles
           inside the candidate's own account and publishes no feed, so it is
-          offered as a place to search rather than pretended at. */}
+          offered as a place to search rather than pretended at. The sixth is
+          the set of companies' own applicant-tracking systems, which are read
+          from the vendors' public endpoints. */}
       <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 shadow-xs">
         <div>
           <span className="text-xs font-bold text-[var(--text-primary)]">
@@ -447,7 +449,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {(['google_jobs', 'indeed', 'ziprecruiter', 'handshake'] as const).map((source) => (
+          {(['google_jobs', 'indeed', 'ziprecruiter', 'handshake', 'company_careers'] as const).map((source) => (
             <span
               key={source}
               className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] bg-[var(--surface-secondary)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--text-primary)]"
@@ -810,6 +812,11 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                         {t(factor.factor === 'requiredSkills' ? 'Required skills' : factor.factor === 'preferredSkills' ? 'Preferred skills' : factor.factor === 'experience' ? 'Experience / seniority' : factor.factor === 'education' ? 'Education' : 'Location / work type')}: {factor.score}% · {factor.weight}% · +{factor.contribution.toFixed(1)} — {factor.reason}
                       </p>
                     ))}
+                    {match?.semantic && (
+                      <p className="mt-2 text-[var(--text-secondary)]">
+                        {t('Semantic match')}: {match.semantic.score}% · {match.semantic.weight}% · +{match.semantic.contribution.toFixed(1)} — {match.semantic.reason}
+                      </p>
+                    )}
                   </details>
                 </div>
                 <LiveJobCard

@@ -1,4 +1,5 @@
 import { getSupabaseServer } from './supabase';
+import type { ApplicationPackageStatus } from './applicationApprovals';
 
 export interface ApplicationPackageDTO {
   id: string;
@@ -14,6 +15,15 @@ export interface ApplicationPackageDTO {
   tailoredCvId: string | null;
   tailoredCvVersionId: string | null;
   coverLetterId: string | null;
+  /**
+   * Where the package is in the approval flow.
+   *
+   * A package that is not 'approved' has not been agreed by the candidate, so
+   * it must not be sent.
+   */
+  status: ApplicationPackageStatus;
+  reviewedAt: string | null;
+  reviewNote: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,12 +71,15 @@ interface ApplicationPackageRow {
   tailored_cv_id: string | null;
   tailored_cv_version_id: string | null;
   cover_letter_id: string | null;
+  status: ApplicationPackageStatus;
+  reviewed_at: string | null;
+  review_note: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const SELECT_COLUMNS =
-  'id, profile_id, job_title, company, job_description, analysis, match_analysis, match_score, language, source_cv_id, tailored_cv_id, tailored_cv_version_id, cover_letter_id, created_at, updated_at';
+  'id, profile_id, job_title, company, job_description, analysis, match_analysis, match_score, language, source_cv_id, tailored_cv_id, tailored_cv_version_id, cover_letter_id, status, reviewed_at, review_note, created_at, updated_at';
 
 function toDTO(row: ApplicationPackageRow): ApplicationPackageDTO {
   return {
@@ -83,6 +96,9 @@ function toDTO(row: ApplicationPackageRow): ApplicationPackageDTO {
     tailoredCvId: row.tailored_cv_id,
     tailoredCvVersionId: row.tailored_cv_version_id,
     coverLetterId: row.cover_letter_id,
+    status: row.status ?? 'draft',
+    reviewedAt: row.reviewed_at ?? null,
+    reviewNote: row.review_note ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

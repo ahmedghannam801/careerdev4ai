@@ -314,6 +314,13 @@ async function main() {
     // route is private and fails safely without a credential.
     join(TESTS_DIR, 'jobs.test.ts'),
     join(TESTS_DIR, 'jobs-feed-contract.test.ts'),
+    // The resources this integration added: the company careers boards the
+    // platform can read, the semantic factor that explains a match in plain
+    // words, and the approval gate that keeps an application from being sent
+    // without the candidate's own decision. The first two are pure; the third
+    // runs against the live API and the database.
+    join(TESTS_DIR, 'resource-integration.test.ts'),
+    join(TESTS_DIR, 'application-approval.test.ts'),
     // The personalisation engine, the grounding validator and the
     // localisation catalogue. These are pure: they need no database, but
     // they run in the same process as the rest of the suite so a regression

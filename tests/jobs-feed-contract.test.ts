@@ -28,13 +28,17 @@ function providerJob(id: string, publisher: string, employmentType: string) {
 }
 
 describe('Jobs & Internships source and filter contract', () => {
-  it('presents all five requested sources without claiming Wonderin is a live feed', () => {
+  it('presents every source it reads without claiming Wonderin is a live feed', () => {
+    // The sixth board is the set of companies' own applicant-tracking
+    // systems, which the platform reads from the vendors' public endpoints.
+    // It is a real board that is really read, so it is named here.
     assert.deepEqual(JOB_SOURCE_IDS, [
       'google_jobs',
       'indeed',
       'ziprecruiter',
       'handshake',
       'wonderin',
+      'company_careers',
     ]);
     assert.deepEqual(Object.values(JOB_SOURCE_LABELS), [
       'Google Jobs',
@@ -42,9 +46,16 @@ describe('Jobs & Internships source and filter contract', () => {
       'ZipRecruiter',
       'Handshake',
       'Wonderin.ai',
+      'Company careers pages',
     ]);
+    // Wonderin still publishes no feed, so the interface must still say so
+    // rather than claim postings it has not fetched.
     assert.match(jobsView, /Search on Wonderin\.ai/);
     assert.match(jobsView, /publishes no job feed/);
+  });
+
+  it('names the company careers pages board in the interface', () => {
+    assert.match(jobsView, /company_careers/);
   });
 
   it('classifies the four aggregated feeds and the direct-search source by attribution', () => {
