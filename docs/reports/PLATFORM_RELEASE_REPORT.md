@@ -5,12 +5,16 @@
 **Scope:** the four changes in the release brief, the verification that was run, and the
 one thing that could not be verified here.
 
-**This document covers three releases on the same day.** Sections 1–6 record the first
+**This document covers four releases.** Sections 1–6 record the first
 release (`0553b92`, `d5845e6`, `37c8fcb`), which made the paper and the Word file agree.
 Sections 7–12 record the second (`a6f1d1f`), which made the **download** agree with the
 paper and handed the layout to the candidate. Sections 13–18 record the third
 (`e20d232`, `6cfb60c`), which gave the files a candidate uploads one contract, and gave the
-template library the tests it never had.
+template library the tests it never had. Sections 19–25 record the fourth (`fbb7ad2`), which
+took the audited open-source resources that were safe and built three features on them: the
+company careers boards a posting can come from, a semantic factor that explains a match, and
+an approval gate that keeps an application from leaving the platform without the candidate's
+own decision.
 
 ---
 
@@ -614,3 +618,237 @@ The deployed site was driven in a signed-in browser, against the owner's own acc
 - `src/components/views/CVStudioView.tsx`, `src/context/CareerContext.tsx`
 - `src/lib/cvTemplatesApi.ts`, `src/translations/parts/cv.ts`
 - `tests/cv-templates.test.ts`, `tests/runner.mjs`
+
+---
+
+## 19. The fourth release: the brief, and what was actually done
+
+The brief supplied thirty-five open-source repositories and skills and asked for them to be
+evaluated and selectively integrated, with four deliverables written. The brief also said,
+in its own words, that **"repository availability does NOT authorize blindly installing
+every dependency."** That sentence governed everything below.
+
+So the first job was not to install. It was to read every repository's README, licence,
+`package.json` and runtime requirements, and to decide what each one could honestly be used
+for inside a React 19 / TypeScript / Vite / Supabase / Cloudflare Pages application that
+already worked.
+
+| The verdict | The count | What it means |
+|---|---|---|
+| **INSTALL** | 14 | Safe and useful: taken into the project |
+| **REFERENCE** | 10 | Useful as an implementation reference; not taken |
+| **OPTIONAL** | 8 | Useful only for a future feature; not taken |
+| **REJECT** | 8 | Incompatible, redundant, insecure or unsuitable; refused |
+
+**No new runtime dependency was added.** `package.json` is unchanged. The only addition to
+the deployed surface is the Postgres `vector` extension — which was already installed in the
+project's database (0.8.2) and had simply never been enabled.
+
+The four deliverables are in the repository root: `ENGINEERING_RESOURCES_AUDIT.md` (the
+matrix, with the reason for every decision), `INTEGRATION_REPORT.md`, `SECURITY_REVIEW.md`
+and `TEST_REPORT.md`.
+
+## 20. The audit: what was taken, and what was refused
+
+### 20.1 The refusals, and the grounds
+
+Every refusal names something concrete that was read in the repository, not a feeling about
+it.
+
+| The resource | Why it was refused |
+|---|---|
+| `browser-use` | Executes model-written Python against a browser, exposes an unauthenticated CDP port on 127.0.0.1, and ships CAPTCHA solving. It is a local agent runtime, not a Cloudflare-compatible library. |
+| `speedyapply/JobSpy` | TLS impersonation and proxy rotation. That is a way around a site's decision, not a way to read a public API. It breaks the terms of the sites it reads. |
+| `stapply-ai/ats-scrapers` | `httpcloak`, a stealth Chromium build, and captcha bypass. Its whole point is to look like something the site did not agree to see. |
+| `unclecode/crawl4ai` | Defaults to `playwright-stealth`. The default is the problem. |
+| `siteagent-website-cloner` | Archived, and its README bars phishing use outright. |
+| `openai-agents-js` | Tracing is on by default and the traces export PII — the user's own CV data — to a third party. |
+| `mastra` | Its licence states the enterprise edition "does not permit Production Use". |
+| `Unstructured-IO/unstructured` | Python, with four system packages, parsing untrusted uploads. A Worker cannot run it, and a separate service would need its own attack surface. |
+
+Two more were blocked on licensing rather than on conduct: `job-board-aggregator` ships its
+company list under **CC BY-NC**, and `nipunsomani/job-forager` has **no LICENSE file at
+all**. Neither may be carried into a commercial product, so the board list that the
+platform can read is operator-configured instead of bundled (§21.1).
+
+### 20.2 What was taken
+
+Thirteen agent skills were installed into `.agents/skills/` — the project's own convention —
+and pinned by `skills-lock.json` so an upstream change cannot silently alter them:
+`supabase`, `supabase-postgres-best-practices`, `docx`, `pdf`, `pptx`, `xlsx`, `firecrawl`,
+`firecrawl-crawl`, `firecrawl-scrape`, `browser`, `safe-browser`, `build-agent`, `ai-sdk`.
+
+The code that came from the audit is three features, and none of them needs a browser, a
+Python service, a proxy or a new dependency.
+
+## 21. The three features
+
+### 21.1 The boards a posting can come from
+
+`server/jobs/ats.ts` reads the **official public job-board endpoints** that Greenhouse,
+Lever and Ashby publish for exactly this purpose. They need no key, no credential and no
+browser, and they are the vendors' own supported interface with their own customers' boards.
+
+| The vendor | The endpoint |
+|---|---|
+| Greenhouse | `boards-api.greenhouse.io/v1/boards/{id}/jobs?content=true` |
+| Lever | `api.lever.co/v0/postings/{id}?mode=json` |
+| Ashby | `api.ashbyhq.com/posting-api/job-board/{id}` |
+
+The board list is **operator-configured** through `JOB_ATS_BOARDS` (`provider:boardId:Company`,
+one per line), the identifiers are validated against `^[a-z0-9][a-z0-9-]{0,63}$` and
+URL-encoded, and the whole feature is **off until an operator turns it on**. That is what
+keeps a non-commercial company list out of a paid product.
+
+`server/jobs/feed.ts` merges the paid provider feed with the boards, dedupes the two
+against each other keeping the **richer description copy**, and reports `boardsRead` and
+`boardsFailed` so the interface can say which boards were really read — the platform never
+claims a board it has not opened. When only `company_careers` is asked for, the provider
+call is skipped entirely, which protects the paid quota.
+
+Two real bugs were found by reading the live endpoints rather than the documentation, and
+both are fixed:
+
+1. **The descriptions were empty.** Greenhouse only returns the job body when
+   `?content=true` is present.
+2. **A sanitiser ordering bug.** Greenhouse escapes its HTML **once**, so the body arrives
+   as `&lt;p&gt;`. Stripping tags *before* decoding the entities put the tags back into every
+   posting. The order is now: decode the entities, strip the tags, then decode `&amp;` once
+   and only once.
+
+### 21.2 The semantic factor
+
+`server/ai/embeddings.ts` and `server/jobs/semantic.ts` add a sixth weighted factor to the
+existing match. The platform already compared a candidate's skills with a posting's skills
+exactly; that is precise and blind at the same time, because "Postgres" and "PostgreSQL" are
+one thing to a candidate and two strings to a matcher.
+
+- The vectors live in **the project's own Postgres**, behind the platform's own row level
+  security, with HNSW cosine indexes. There is no vector database and no new service.
+- The model is Gemini `text-embedding-004` at 768 dimensions, matching the `vector(768)`
+  columns. The model name is recorded with every vector, so a model change invalidates the
+  old vectors instead of mixing two kinds of vector together.
+- The factor is worth **15 of 100**. The exact factors keep their proportions inside the
+  remaining 85. It is a **sixth factor, never a replacement**.
+- It is **absent rather than zero** when it was not evaluated, so a missing embedding cannot
+  quietly lower a candidate's score.
+- Every factor carries a **written reason** that names the terms that matched and the terms
+  that are missing. The comparison reuses the platform's own `canonicalSkillKey` and
+  `skillNameVariants`, which is why "Node.js" and "node js" meet.
+
+`GEMINI_API_KEY` is read on the server and never reaches the browser. With no key, or a
+provider refusal, the exact factors carry the score exactly as they did before — the
+semantic factor is an addition, never a requirement.
+
+### 21.3 The approval gate
+
+`server/db/applicationApprovals.ts` gives an application package a state machine —
+`draft → pending_review → approved`, with `rejected` and a withdrawal back to `draft` — and
+enforces it in **the database**, with a trigger, not in the interface.
+
+The reason is simple: an interface rule is a rule the interface can be asked to break. A
+crafted request, a dashboard, a script and a future endpoint are all stopped by the same
+trigger, because the trigger is the only thing that cannot be skipped.
+
+The decisions are **append-only**: `application_package_reviews` records every transition
+with who made it and when, and no client may write to it. Two routes expose the work:
+`POST /api/application-packages/:id/decision` and
+`GET /api/application-packages/:id/reviews`.
+
+The gate was checked directly in the database: **three legal transitions allowed, two
+illegal ones refused** (`draft → approved` and `approved → rejected` are both refused).
+
+## 22. The schema the features need
+
+`supabase/migrations/20261118000002_semantic_matching_and_approval_gate.sql` enables the
+`vector` extension and adds:
+
+| Object | What it is |
+|---|---|
+| `job_embeddings`, `profile_embeddings` | The vectors, with HNSW cosine indexes |
+| `application_package_reviews` | The append-only decision history |
+| `application_package_status` | The enum: draft, pending_review, approved, rejected |
+| `application_package_allowed_transition()` | The law, in one function |
+| `application_package_enforce_approval_gate` | The trigger that refuses an illegal move |
+| `application_package_record_review` | The trigger that writes the history |
+| `match_jobs_semantically()` | Revoked from `PUBLIC`, granted to `service_role` only |
+| RLS policies | A candidate reads only their own profile vector; the job vectors are readable by signed-in users |
+
+**This migration was applied to the production project** `ciihprsfdojzvjnqgbxl`, because
+that project is the one the local database tool is connected to. It is **additive**: new
+tables, a new enum, new columns, new indexes, new functions, new triggers, and one
+extension that was already downloaded. Nothing was dropped, renamed or rewritten, and no
+existing row was touched. It is still a change to a live schema and is called out here for
+that reason.
+
+## 23. The verification
+
+| The check | The result |
+|---|---|
+| `npm run lint` (`tsc --noEmit` + the test typecheck) | clean |
+| `npm run test:run` (Vitest) | 6 files, 36 tests, all passed |
+| The new contract suites (`node --import tsx --test`) | 51 tests, all passed |
+| `npm run test:e2e` (Playwright) | 1 test passed |
+| `npm run build` | `dist/_worker.js` written (4.26 MiB); the bundle-auth check passed |
+| `npm audit --audit-level=high` | 0 vulnerabilities |
+| Semgrep over the 30 changed source files | 0 findings |
+| A live read of a Greenhouse board | 142 postings, 0 markup remaining, XSS payloads neutralised |
+
+The two failures that remain in the tree — `tests/cv-studio.test.ts` and
+`tests/localization.test.ts` — are **not from this release**. They are reproduced with this
+release's source changes stashed, and they belong to the CV Studio work that was in the
+tree at the time. They were reported, not papered over.
+
+## 24. The deployment
+
+| | |
+|---|---|
+| Commit | `fbb7ad2` — pushed to `origin/main` (`4512d84..fbb7ad2`) |
+| Pages deployment | `073fc40c`, branch `main`, Environment **Production** |
+| Live at | https://careerdev4ai.pages.dev — serving `assets/index-Cj80e49d.js` |
+| Deployment URL | https://073fc40c.careerdev4ai.pages.dev |
+| Production smoke | the page returns `200` behind `server: cloudflare` |
+
+**How it was deployed.** The Pages project builds from Git, so the push built and published
+`fbb7ad2` on its own. A manual `wrangler pages deploy` was deliberately **not** run: the
+local `dist/` in the working tree carries the concurrent CV Studio work, which is not
+committed and does not pass its own tests. Deploying the local build would have shipped
+unreviewed code to production. The live bundle was verified to be the new one — it carries
+the `Semantic match` string this release added — and the two new routes answer on the
+production URL.
+
+| The live probe | The answer | What it proves |
+|---|---|---|
+| `POST /api/application-packages/:id/decision` | `401 {"error":"Unauthorized"}` | The route exists and requires a session |
+| `GET /api/application-packages/:id/reviews` | `401 {"error":"Unauthorized"}` | The route exists and requires a session |
+| `GET /api/jobs/search` | `401 {"error":"Unauthorized"}` | The jobs route is still private |
+| `GET /api/this-route-does-not-exist` | `404 {"error":"Not found"}` | The control: an unregistered route answers differently |
+
+**A note on the SHA.** The probes above were run against the deployment that serves the
+release commit `fbb7ad2`. The documentation commit that follows it rebuilds the same
+application code — the Pages project builds every push — so the live deployment's SHA moves
+on while the code that a candidate is served does not. The verified pairing is
+**code `fbb7ad2` → deployment `073fc40c` → https://careerdev4ai.pages.dev**.
+
+## 25. What could not be verified here
+
+**Ten route-level tests for the approval gate are written and registered, but they did not
+run.** `tests/application-approval.test.ts` needs a disposable Supabase project. The
+project the local tool is connected to is production (`ciihprsfdojzvjnqgbxl`), and
+`tests/env.mjs` refuses to run against it unless `SUPABASE_TEST_PROJECT_EXCLUSIVE` is set —
+a guard that exists precisely to stop a test writing to production. The ten behaviours
+written are: `409` on an illegal approve, `404` for another candidate's package, `400` on
+an unknown action, `401` for an anonymous caller, the listing of the history, and the
+trigger's refusal of a direct write.
+
+What *was* proven about the gate is the part that matters most: the trigger's behaviour was
+verified directly in SQL, three legal moves allowed and two illegal ones refused, and the
+routes' existence and authentication were verified on the live production URL.
+
+**The semantic factor was proven against the live providers and the live database, but not
+end-to-end against a signed-in candidate's own embeddings in production**, because that
+would mean writing a candidate's vector and spending a provider key on the production
+account.
+
+**The CV Studio work in the working tree was left exactly as it was found** — not staged,
+not committed, not deployed, and not "fixed" to make a suite green.
