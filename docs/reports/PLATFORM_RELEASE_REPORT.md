@@ -832,23 +832,59 @@ on while the code that a candidate is served does not. The verified pairing is
 
 ## 25. What could not be verified here
 
-**Ten route-level tests for the approval gate are written and registered, but they did not
-run.** `tests/application-approval.test.ts` needs a disposable Supabase project. The
-project the local tool is connected to is production (`ciihprsfdojzvjnqgbxl`), and
-`tests/env.mjs` refuses to run against it unless `SUPABASE_TEST_PROJECT_EXCLUSIVE` is set —
-a guard that exists precisely to stop a test writing to production. The ten behaviours
-written are: `409` on an illegal approve, `404` for another candidate's package, `400` on
-an unknown action, `401` for an anonymous caller, the listing of the history, and the
-trigger's refusal of a direct write.
+**The ten route-level tests for the approval gate were run, and they all passed.**
+They needed a disposable Supabase project, and the suite's own guard refused to
+run against production — correctly. A disposable project was then provisioned
+(`yqiuzbwaqfrvhynkobpu`, a separate empty project in its own organisation, on
+the free plan), the repository's migrations were applied to it, and the file was
+run against a real server and a real database:
 
-What *was* proven about the gate is the part that matters most: the trigger's behaviour was
-verified directly in SQL, three legal moves allowed and two illegal ones refused, and the
-routes' existence and authentication were verified on the live production URL.
+```
+▶ the application approval gate
+  ✔ starts a new package as a draft nobody has approved
+  ✔ refuses to approve a package that was never sent for review
+  ✔ goes through review and then approves
+  ✔ records every decision it makes
+  ✔ refuses an action it does not know
+  ✔ does not let one candidate decide for another
+  ✔ does not let one candidate read another candidate's decisions
+  ✔ refuses the decision to a caller who is not signed in
+  ✔ keeps the gate in the database, not only in the route
+  ✔ leaves the package untouched after a refused move
+ℹ tests 10   ℹ pass 10   ℹ fail 0
+```
 
-**The semantic factor was proven against the live providers and the live database, but not
-end-to-end against a signed-in candidate's own embeddings in production**, because that
-would mean writing a candidate's vector and spending a provider key on the production
-account.
+The runner's own cleanup confirmed it: no test identities remain, no orphaned
+storage objects remain, and the state file is unchanged. The disposable project
+was **paused** afterwards, so it does not hold the account's free-project
+allowance and can be restored for the next run.
 
-**The CV Studio work in the working tree was left exactly as it was found** — not staged,
-not committed, not deployed, and not "fixed" to make a suite green.
+**Provisioning that project uncovered a real property of the repository, which
+is worth the project owner's attention.** The migrations folder is not a
+complete recipe for the production schema:
+
+- Production's tracked migration history stops at `20261115150123`. Everything
+  after it in the folder was applied to production outside that history, so the
+  folder and the deployed database have drifted apart.
+- **Four migrations in the folder cannot be applied to a database built from
+  scratch.** Two of them — `20261116000001_daily_credit_allowance_three.sql`
+  and `20261117000001_daily_token_claim.sql` — contain a PL/pgSQL
+  `FOR … IN UPDATE … RETURNING … LOOP` over a data-modifying statement, which
+  PL/pgSQL accepts only through `EXECUTE`; the parser rejects them with
+  `syntax error at or near "LOOP"`. `20261023105343_production_security_function_hardening.sql`
+  revokes and pins `public.handle_new_user()` and `public.rls_auto_enable()`,
+  which exist neither in production nor in a rebuilt database.
+- Production's `claim_daily_credits` takes `p_amount` with no default, while
+  the folder's newer version gives the daily allowance a default of three.
+
+The approval gate's own migration applied cleanly, and the gate is unaffected by
+all of this. But **a fresh rebuild of this database from the repository alone
+is not currently possible**, and that is a separate decision from this release.
+
+**The semantic factor was proven against the live providers and the live
+database, but not end-to-end against a signed-in candidate's own embeddings in
+production**, because that would mean writing a candidate's vector and spending
+a provider key on the production account.
+
+**The CV Studio work in the working tree was left exactly as it was found** —
+not staged, not committed, not deployed, and not "fixed" to make a suite green.

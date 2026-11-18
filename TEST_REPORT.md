@@ -25,7 +25,7 @@ that was not observed to pass.
 | 9 | Dependency audit | `npm audit --audit-level=high` | **PASSED** — 0 vulnerabilities |
 | 10 | Production build | `npm run build` | **PASSED** |
 | 11 | Bundle secret check | `scripts/verify-bundle-auth-config.mjs` (runs in the build) | **PASSED** |
-| 12 | Integration suite (database) | `npm run test:integration` | **NOT RUN — refused by design** (§5) |
+| 12 | Integration suite (database) | `TEST_ONLY=application-approval npm run test:integration` | **PASSED** — 10 tests, against a real server and a disposable database (§5) |
 | 13 | Live ATS adapter | direct call to the three official endpoints | **PASSED** — 142 postings read, 0 with markup left (§3) |
 | 14 | Approval gate on the live database | direct SQL against the migration's trigger | **PASSED** — 3 legal moves allowed, 2 illegal moves blocked |
 
@@ -243,10 +243,7 @@ inconsistency. It is left exactly as it was found.
 
 ---
 
-## 5. The integration suite was not run
-
-`npm run test:integration` **was not run**, and this is a deliberate
-limitation of the environment rather than an oversight.
+## 5. The integration suite was run
 
 The suite refuses to start unless it is pointed at a dedicated, exclusive,
 disposable Supabase project. `tests/env.mjs` enforces this by comparing the
@@ -259,40 +256,94 @@ if (urlProjectRef === projectRefFromUrl(productionUrl)) {
 }
 ```
 
-In this environment `.env.test` points at the production project
-(`ciihprsfdojzvjnqgbxl`), which is the same reference as
-`wrangler.jsonc`'s `VITE_SUPABASE_URL`. The suite therefore refuses to run —
-correctly.
+The guard is real and it held: the suite refused to start while `.env.test`
+pointed at the production project (`ciihprsfdojzvjnqgbxl`), which is the same
+reference as `wrangler.jsonc`'s `VITE_SUPABASE_URL`. That is the guard working,
+not an obstacle to work around.
 
-**What this means for the new tests:**
+**A disposable project was then provisioned**, with the account owner's
+agreement, and the suite was run against it:
 
-`tests/application-approval.test.ts` — 10 tests against the running API and
-the live database — is **written and registered** (it is listed in
-`tests/runner.mjs`, so it will run in the opt-in integration job) but has
-**not been executed**.
+| | |
+| --- | --- |
+| The project | `yqiuzbwaqfrvhynkobpu` — a separate, empty Supabase project, in its own organisation, on the free plan |
+| Its schema | the repository's own migrations, applied through `supabase db push` and the Management API |
+| The credentials | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_TEST_PROJECT_REF=yqiuzbwaqfrvhynkobpu`, `SUPABASE_TEST_PROJECT_EXCLUSIVE=true`, written to the gitignored `.env.test` |
+| The command | `TEST_ONLY=application-approval npm run test:integration` |
 
-To be explicit about what is and is not proven:
+**The result — 10 tests, 10 passed, 0 failed:**
+
+```
+▶ the application approval gate
+  ✔ starts a new package as a draft nobody has approved
+  ✔ refuses to approve a package that was never sent for review
+  ✔ goes through review and then approves
+  ✔ records every decision it makes
+  ✔ refuses an action it does not know
+  ✔ does not let one candidate decide for another
+  ✔ does not let one candidate read another candidate's decisions
+  ✔ refuses the decision to a caller who is not signed in
+  ✔ keeps the gate in the database, not only in the route
+  ✔ leaves the package untouched after a refused move
+ℹ tests 10   ℹ pass 10   ℹ fail 0
+```
+
+These ran against the **real server** (the runner starts an isolated API server
+on a free port and waits until it is healthy) and a **real database**, so every
+assertion is about the deployed behaviour and not about a mock.
+
+The runner also reported its own cleanup: `.careerpilot_state.json` is
+unchanged, **no test identities remain**, and **no orphaned storage objects
+remain**. The suite leaves nothing behind in the disposable project.
+
+So the earlier table is now settled:
 
 | Behaviour | Proven by | Executed here |
 | --- | --- | --- |
 | The trigger refuses `draft → approved` | direct SQL against the live database | **yes** |
 | The trigger refuses `approved → rejected` | direct SQL against the live database | **yes** |
 | The trigger records every decision | direct SQL against the live database | **yes** |
-| The route returns 409 with an explanation | the integration test | **no** |
-| The route refuses another candidate's package | the integration test | **no** |
-| The route refuses an unknown action | the integration test | **no** |
-| An anonymous caller is refused | the integration test | **no** |
+| The route returns 409 with an explanation | the integration test | **yes** |
+| The route refuses another candidate's package | the integration test | **yes** |
+| The route refuses another candidate's decisions | the integration test | **yes** |
+| The route refuses an unknown action | the integration test | **yes** |
+| An anonymous caller is refused | the integration test | **yes** |
+| The trigger refuses a direct write, past the route | the integration test | **yes** |
+| A refused move leaves the package untouched | the integration test | **yes** |
 
-The route logic itself is small and its state machine is covered by the unit
-tests, but the six route behaviours above are **unverified by execution**.
-They should be run before this reaches production.
+### 5.1 What provisioning the disposable project uncovered
 
-Running them requires a dedicated Supabase test project and:
+Running the migrations against an empty database showed that **the migrations
+folder is not a complete recipe for the production schema**. This is a property
+of the repository, not of this work, and it is worth recording:
 
-```
-SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
-SUPABASE_TEST_PROJECT_REF, SUPABASE_TEST_PROJECT_EXCLUSIVE=true
-```
+- Production's own `supabase_migrations.schema_migrations` stops at
+  `20261115150123_canonical_skill_taxonomy`. Every migration after that in the
+  folder was applied to production outside the tracked history, so the folder and
+  the deployed database have drifted apart.
+- Four of the migrations in the folder cannot be applied to a database built from
+  scratch. Two of them (`20261116000001_daily_credit_allowance_three.sql` and
+  `20261117000001_daily_token_claim.sql`) contain a PL/pgSQL `FOR … IN UPDATE
+  … RETURNING … LOOP` over a data-modifying statement, which PL/pgSQL only
+  accepts through `EXECUTE`; the parser rejects them with
+  `syntax error at or near "LOOP"`. `20261023105343_production_security_function_hardening.sql`
+  revokes and pins `public.handle_new_user()` and `public.rls_auto_enable()`,
+  which exist neither in production nor in a rebuilt database, so it stops with
+  `function does not exist`. `20261122000002_security_hardening_rls_objects.sql`
+  then fails on the same missing function.
+- The folder also carries a `public.handle_new_user()` trigger function that
+  production does not have, and production's `claim_daily_credits` takes
+  `p_amount` with no default, while the folder's newer version gives the
+  allowance a default of three.
+
+None of this touches the approval gate, and the gate's own migration
+(`20261118000002`) applied cleanly. But it means **a fresh rebuild of this
+database from the repository alone is not currently possible**, and that is a
+real finding for the project owner, separate from this release.
+
+The disposable project was **paused** afterwards rather than deleted, so it
+does not count against the account's free-project allowance and can be restored
+when the suite needs to run again.
 
 ---
 
@@ -302,7 +353,7 @@ SUPABASE_TEST_PROJECT_REF, SUPABASE_TEST_PROJECT_EXCLUSIVE=true
 | --- | --- |
 | The semantic factor against real embeddings | It needs a `GEMINI_API_KEY` and a paid model call, and it writes to the production database's vector tables. The scoring logic, the term comparison and the reason text are covered by unit tests; the provider call itself is not exercised here. |
 | The aggregation of two live sources at once | It needs a paid JSearch key and a configured `JOB_ATS_BOARDS`. Each source was verified separately against its real endpoint; the merge and deduplicate logic is straightforward and is exercised by the type checker. |
-| The integration suite | §5 — the environment forbids it, by design. |
+| The whole integration suite | Only the approval-gate file was run here (`TEST_ONLY=application-approval`). The rest of the suite was not re-run against the disposable project. |
 | The two failing checks | §4 — they belong to other, unrelated work. |
 
 ---
@@ -326,8 +377,12 @@ node --import tsx --test tests/resource-integration.test.ts
 node --import tsx --test tests/resource-integration.test.ts tests/jobs-feed-contract.test.ts tests/job-matching.test.ts
 ```
 
-And the integration file, once a dedicated test project exists:
+And the integration file, against a disposable project:
 
 ```bash
 TEST_ONLY=application-approval npm run test:integration
 ```
+
+That command needs the five variables named in §5. The disposable project
+`yqiuzbwaqfrvhynkobpu` is paused; restore it before a run and pause it
+afterwards, so it never holds the account's free-project slot.
