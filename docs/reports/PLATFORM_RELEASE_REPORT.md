@@ -953,6 +953,26 @@ projection running between every keystroke, and asserts that every character
 survives. Against the old rule it fails seven assertions; against the new one
 it passes.
 
+That test is about the rule. `tests/vitest/CvStudioTypingRegression.test.tsx`
+is about the screen: it types into the **real editor inside the real studio**,
+with the real projection running between the keystroke and the record that
+comes back one keystroke later, and it watches the field the candidate is
+looking at. It covers the six ways a screen can lose text even when the rule
+is right — the input trimming it, the record winning, the field being rebuilt
+on every keystroke, the paper being opened and closed, another part of the
+studio being visited, and the summary losing its trailing space and its line
+breaks.
+
+Against the old rule it fails exactly as the bug did:
+
+```
+AssertionError: expected 'Ahmed' to be 'Ahmed '
+AssertionError: the field showed "A" after typing "Ah": expected 'A' to be 'Ah'
+```
+
+The space went, and the lagging record put the older word back. Against the
+current code all six pass.
+
 ### The rest of the release
 
 - The studio's duplicate `<nav>` is gone: the studio carries one navigation,
@@ -968,7 +988,7 @@ it passes.
 | Check | Command | Result |
 |---|---|---|
 | TypeScript | `npm run lint` | **PASSED** — app and tests both clean |
-| Unit suite | `npm run test:run` | **PASSED** — 6 files, 36 tests, 0 failures |
+| Unit suite | `npm run test:run` | **PASSED** — 9 files, 51 tests, 0 failures |
 | Database-free suite | `npm run test:logic` | **PASSED** — 1522 tests, 0 failures |
 | Browser tests | `npm run test:e2e` | **PASSED** — 8 tests, 0 failures |
 | Production build | `npm run build` | **PASSED** — `dist/_worker.js` 4.27 MiB, bundle-auth check passed |
