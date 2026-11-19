@@ -161,6 +161,15 @@ export const cvAr: Record<string, string> = {
   'Run an ATS audit to compare this CV against the keywords and requirements for':
     'شغّل تدقيق ATS لمقارنة هذه السيرة الذاتية بالكلمات المفتاحية والمتطلبات الخاصة بـ',
 
+  // The workspace of the studio itself: the phone's pane switcher and the
+  // export of the document as a PDF file.
+  'CV editor view': 'عرض محرر السيرة الذاتية',
+  'Back to Editing': 'العودة إلى التحرير',
+  'Downloads the document you see as a PDF file.': 'ينزّل المستند الذي تراه في ملف PDF.',
+  'Drawing pages...': 'جارٍ رسم الصفحات...',
+  'Writing the file...': 'جارٍ كتابة الملف...',
+  'Preparing fonts...': 'جارٍ تجهيز الخطوط...',
+
   // CV import (CVImportModal)
   'Import Your Career CV': 'استيراد سيرتك الذاتية المهنية',
   'Review Extracted Information': 'مراجعة المعلومات المستخرجة',

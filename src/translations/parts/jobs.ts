@@ -164,4 +164,65 @@ export const jobsAr: Record<string, string> = {
   'Experience / seniority': 'الخبرة / الأقدمية',
   'Education': 'التعليم',
   'Location / work type': 'الموقع / نوع العمل',
+
+  // Recommendations and comparison
+  'Recommended for you': 'مقترحة لك',
+  'Finding openings that fit your record…': 'جارٍ البحث عن وظائف تناسب سجلك…',
+  'Chosen from your own record': 'اختيرت من سجلّك الخاص',
+  '{count} skills, {level}': '{count} مهارة، {level}',
+  'level not stated': 'المستوى غير محدد',
+  'no skills recorded yet': 'لا توجد مهارات مسجلة بعد',
+  'Compare': 'قارن',
+  'In the comparison': 'في المقارنة',
+  'Compare vacancies': 'مقارنة الوظائف',
+  'You meet': 'ما تتقنه',
+  'Only this one asks for': 'يطلب هذا الإعلان فقط',
+  'Strongest on': 'الأقوى في',
+  'No factor stands out on this posting.': 'لا يتفوق هذا الإعلان في أي معيار بشكل واضح.',
+  'Every posting here asks for': 'كل إعلان هنا يطلب',
+  'Location not given': 'لم يُذكر الموقع',
+
+  // The job discovery dashboard
+  'Job discovery': 'استكشاف سوق العمل',
+  'Reading the live job market…': 'جارٍ قراءة سوق العمل الحي…',
+  'The job market could not be read': 'تعذّرت قراءة سوق العمل',
+  'The job market could not be read.': 'تعذّرت قراءة سوق العمل.',
+  'Every figure below comes from the openings this platform really read, and states how it was worked out.':
+    'كل رقم أدناه مصدره الفرص التي قرأتها المنصة فعليًا، مع بيان طريقة احتسابه.',
+  'Boards read': 'اللوحات المقروءة',
+  'Boards that failed': 'اللوحات التي تعذّرت',
+  'Openings read': 'الفرص المقروءة',
+  'How many openings the platform read from the boards above.':
+    'عدد الفرص التي قرأتها المنصة من اللوحات المذكورة أعلاه.',
+  'Measured against your record': 'مقيسة مقابل سجلك',
+  'How many of those could be compared with your own record.':
+    'عدد الفرص التي أمكن مقارنتها بسجلك الخاص.',
+  'Strong matches': 'تطابقات قوية',
+  'How many scored at or above {threshold} out of 100.':
+    'عدد الفرص التي حصلت على {threshold} من 100 أو أكثر.',
+  'Remote share': 'نسبة الوظائف عن بُعد',
+  '{percent}%': '{percent}%',
+  'Not stated': 'غير محدد',
+  '{remote} of the {of} openings that said whether they are remote.':
+    '{remote} من أصل {of} فرصة ذكرت إن كانت عن بُعد.',
+  'No opening said whether it is remote, so no share can be worked out.':
+    'لم تذكر أي فرصة إن كانت عن بُعد، لذلك لا يمكن احتساب النسبة.',
+  'What the market asks for that your record does not show':
+    'ما يطلبه السوق ولا يظهر في سجلك',
+  'Each skill is counted once per opening that asks for it, across the openings read.':
+    'تُحتسب كل مهارة مرة واحدة لكل فرصة تطلبها، عبر الفرص المقروءة.',
+  'No opening asked for a skill your record does not show.':
+    'لم تطلب أي فرصة مهارة لا تظهر في سجلك.',
+  'Work on these in the Skills Centre': 'اعمل على هذه في مركز المهارات',
+  'What the market asks for that your record already shows':
+    'ما يطلبه السوق ويظهر في سجلك بالفعل',
+  'No opening asked for a skill your record shows yet.':
+    'لم تطلب أي فرصة مهارة تظهر في سجلك بعد.',
+  'in {count} openings': 'في {count} فرصة',
+  'Openings per board': 'الفرص حسب اللوحة',
+  'Openings per level': 'الفرص حسب المستوى',
+  'Openings per employment type': 'الفرص حسب نوع العمل',
+  'The openings that ask for the most you do not have':
+    'الفرص التي تطلب أكثر ما لا تملكه',
+  'skills': 'مهارة',
 };

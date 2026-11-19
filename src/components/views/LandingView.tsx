@@ -39,91 +39,93 @@ interface LandingViewProps {
   onOpenDashboard: () => void;
 }
 
-/** The product's promise, stated once. */
-const HERO_HEADLINE = 'Turn Your Ambition Into a Career Plan.';
-
-const HERO_SUPPORTING =
-  'CareerDev4AI helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.';
+/**
+ * The translator, as the career context exposes it.
+ *
+ * The copy on this page is part of the Arabic experience, so the data lists
+ * below are built from the translator rather than from raw English strings.
+ */
+type Translate = (key: string) => string;
 
 /** The problems the platform exists to remove. */
-const FRAGMENTATION_POINTS = [
+const FRAGMENTATION_POINTS = (t: Translate) => [
   {
-    title: 'Skills are scattered',
-    body: 'A spreadsheet here, a course list there, and no honest picture of what is actually missing.',
+    title: t('Skills are scattered'),
+    body: t('A spreadsheet here, a course list there, and no honest picture of what is actually missing.'),
   },
   {
-    title: 'CVs go stale',
-    body: 'The version you send is out of date before the interview, and it never speaks to the role in front of you.',
+    title: t('CVs go stale'),
+    body: t('The version you send is out of date before the interview, and it never speaks to the role in front of you.'),
   },
   {
-    title: 'Learning lacks direction',
-    body: 'Endless courses with no link to the job you want, so effort turns into hours rather than progress.',
+    title: t('Learning lacks direction'),
+    body: t('Endless courses with no link to the job you want, so effort turns into hours rather than progress.'),
   },
   {
-    title: 'Applications disconnect',
-    body: 'Every opportunity tracked somewhere else, with no record of what you did, learned, or proved.',
+    title: t('Applications disconnect'),
+    body: t('Every opportunity tracked somewhere else, with no record of what you did, learned, or proved.'),
   },
 ];
 
 /** The chain the platform keeps connected. */
-const CAREER_CHAIN = [
-  'Goal',
-  'Skills',
-  'Roadmap',
-  'Learning',
-  'Projects',
-  'Evidence',
-  'CV',
-  'Opportunities',
+const CAREER_CHAIN = (t: Translate) => [
+  t('Goal'),
+  t('Skills'),
+  t('Roadmap'),
+  t('Learning'),
+  t('Projects'),
+  t('Evidence'),
+  t('CV'),
+  t('Opportunities'),
 ];
 
 /** How it works, in the order a career actually unfolds. */
-const HOW_IT_WORKS = [
+const HOW_IT_WORKS = (t: Translate) => [
   {
     icon: Target,
-    title: 'Discover your direction',
-    body: 'Set the role you are working towards and get a concrete picture of what that role demands.',
+    title: t('Discover your direction'),
+    body: t('Set the role you are working towards and get a concrete picture of what that role demands.'),
   },
   {
     icon: Sparkles,
-    title: 'Identify your skill gaps',
-    body: 'Compare where you are against the benchmark and see exactly which gaps will hold you back.',
+    title: t('Identify your skill gaps'),
+    body: t('Compare where you are against the benchmark and see exactly which gaps will hold you back.'),
   },
   {
     icon: Route,
-    title: 'Follow your personalized roadmap',
-    body: 'A phased plan that recalculates as you learn, so the next step is always the right one.',
+    title: t('Follow your personalized roadmap'),
+    body: t('A phased plan that recalculates as you learn, so the next step is always the right one.'),
   },
   {
     icon: GraduationCap,
-    title: 'Build evidence and projects',
-    body: 'Turn skills into finished work you can point a hiring manager at.',
+    title: t('Build evidence and projects'),
+    body: t('Turn skills into finished work you can point a hiring manager at.'),
   },
   {
     icon: FileBadge2,
-    title: 'Strengthen your CV',
-    body: 'Rewrite, version and target your CV against the role you are applying for.',
+    title: t('Strengthen your CV'),
+    body: t('Rewrite, version and target your CV against the role you are applying for.'),
   },
   {
     icon: ArrowUpRight,
-    title: 'Move toward real opportunities',
-    body: 'Track applications, prepare for interviews, and keep your momentum visible.',
+    title: t('Move toward real opportunities'),
+    body: t('Track applications, prepare for interviews, and keep your momentum visible.'),
   },
 ];
 
 /** What the AI actually does — and what it deliberately does not claim. */
-const AI_PROMISES = [
+const AI_PROMISES = (t: Translate) => [
   {
-    title: 'Grounded in your records',
-    body: 'Every recommendation is drawn from your own goals, skills, progress and learning journey.',
+    title: t('Grounded in your records'),
+    body: t('Every recommendation is drawn from your own goals, skills, progress and learning journey.'),
   },
   {
-    title: 'Explains the reasoning',
-    body: 'You see why a suggestion was made and which of your records it came from.',
+    title: t('Explains the reasoning'),
+    body: t('You see why a suggestion was made and which of your records it came from.'),
   },
   {
-    title: 'Updates as you progress',
-    body: 'Complete a task, close a gap, and the next recommendation moves with you.',
+    title: t('Updates as you progress'),
+    body: t('Complete a task, close a gap, and the next recommendation moves with you.'),
   },
 ];
 
@@ -146,6 +148,13 @@ const navLinks = [
     { href: '#faq', label: t('FAQ') },
   ];
 
+  // The copy lists are translated once per render, so the Arabic page shows
+  // Arabic rather than an English page inside an Arabic frame.
+  const fragmentationPoints = FRAGMENTATION_POINTS(t);
+  const careerChain = CAREER_CHAIN(t);
+  const howItWorks = HOW_IT_WORKS(t);
+  const aiPromises = AI_PROMISES(t);
+
   const closeMobileNav = () => setMobileNavOpen(false);
 
   return (
@@ -153,7 +162,7 @@ const navLinks = [
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--surface-main)]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <a href="#" className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90" aria-label={t('CareerDev4AI')}>
+          <a href="/" className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90" aria-label={t('CareerDev4AI')}>
             <Logo variant="icon" className="h-8 w-8 shrink-0" alt="" />
             <span className="hidden shrink-0 whitespace-nowrap text-base font-semibold tracking-tight text-[var(--text-primary)] sm:inline">
               {t('CareerDev4AI')}
@@ -180,7 +189,7 @@ const navLinks = [
               onClick={() => setMobileNavOpen((open) => !open)}
               aria-expanded={mobileNavOpen}
               aria-controls="landing-mobile-nav"
-              aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+              aria-label={mobileNavOpen ? t('Close menu') : t('Open menu')}
               className="rounded-lg border border-[var(--color-border)] p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-secondary)] hover:text-[var(--text-primary)] lg:hidden"
             >
               {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -190,7 +199,7 @@ const navLinks = [
               onClick={profile.onboardingCompleted ? onOpenDashboard : onStartOnboarding}
               className="whitespace-nowrap rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-[background-color,box-shadow,transform] hover:bg-[var(--color-primary-hover)] hover:shadow-sm"
             >
-              {profile.onboardingCompleted ? 'Open Career Dashboard' : 'Start Your Journey'}
+              {profile.onboardingCompleted ? t('Open Career Dashboard') : t('Start Your Career Journey')}
             </button>
           </div>
         </div>
@@ -240,13 +249,13 @@ const navLinks = [
 
               <Reveal delay={0.06}>
                 <h1 className="mt-5 text-balance text-3xl font-bold leading-[1.12] tracking-tight text-[var(--text-primary)] sm:text-4xl md:text-5xl lg:text-[3.25rem]">
-                  {HERO_HEADLINE}
+                  {t('Turn Your Ambition Into a Career Plan.')}
                 </h1>
               </Reveal>
 
               <Reveal delay={0.12}>
                 <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
-                  {HERO_SUPPORTING}
+                  {t('CareerDev4AI helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.')}
                 </p>
               </Reveal>
 
@@ -316,7 +325,7 @@ const navLinks = [
           </Reveal>
 
           <Stagger inView gap={0.08} className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {FRAGMENTATION_POINTS.map((point) => (
+            {fragmentationPoints.map((point) => (
               <StaggerItem key={point.title}>
                 <div className="h-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
                   <h3 className="text-sm font-bold text-[var(--text-primary)]">{point.title}</h3>
@@ -348,12 +357,12 @@ const navLinks = [
           {/* The chain */}
           <Reveal delay={0.08}>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-center">
-              {CAREER_CHAIN.map((step, index) => (
+              {careerChain.map((step, index) => (
                 <React.Fragment key={step}>
                   <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--text-primary)]">
                     {step}
                   </span>
-                  {index < CAREER_CHAIN.length - 1 && (
+                  {index < careerChain.length - 1 && (
                     <ArrowRight
                       aria-hidden="true"
                       className="h-3.5 w-3.5 shrink-0 text-[var(--color-border-strong)] rtl:rotate-180"
@@ -365,7 +374,7 @@ const navLinks = [
           </Reveal>
 
           <Stagger inView gap={0.09} className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {HOW_IT_WORKS.map((step, index) => {
+            {howItWorks.map((step, index) => {
               const Icon = step.icon;
               return (
                 <StaggerItem key={step.title}>
@@ -533,7 +542,7 @@ const navLinks = [
             </div>
 
             <Stagger inView gap={0.1} className="grid grid-cols-1 gap-4 lg:col-span-7 sm:grid-cols-3">
-              {AI_PROMISES.map((promise) => (
+              {aiPromises.map((promise) => (
                 <StaggerItem key={promise.title}>
                   <div className="h-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
                     <div className="mb-3 h-1 w-8 rounded-full bg-[var(--color-ai)]" />
@@ -569,38 +578,38 @@ const navLinks = [
             {[
               {
                 id: 'student',
-                title: 'Student',
+                title: t('Student'),
                 category: 'students',
-                focus: 'Fundamentals & Internships',
-                desc: 'Foundational coursework, first GitHub repositories, internships, and portfolio development.',
+                focus: t('Fundamentals & Internships'),
+                desc: t('Foundational coursework, first GitHub repositories, internships, and portfolio development.'),
               },
               {
                 id: 'fresh_grad',
-                title: 'Fresh Graduate',
+                title: t('Fresh Graduate'),
                 category: 'education',
-                focus: 'Employability & Proof',
-                desc: 'Bridging academic-to-industry gaps, CV optimization, targeted entry applications, and interview prep.',
+                focus: t('Employability & Proof'),
+                desc: t('Bridging academic-to-industry gaps, CV optimization, targeted entry applications, and interview prep.'),
               },
               {
                 id: 'working_pro',
-                title: 'Working Professional',
+                title: t('Working Professional'),
                 category: 'professionals',
-                focus: 'Progression & Promotion',
-                desc: 'Advanced specialization, quantifiable achievements, leadership evidence, and market positioning.',
+                focus: t('Progression & Promotion'),
+                desc: t('Advanced specialization, quantifiable achievements, leadership evidence, and market positioning.'),
               },
               {
                 id: 'career_switcher',
-                title: 'Career Switcher',
+                title: t('Career Switcher'),
                 category: 'switchers',
-                focus: 'Transferable Skills',
-                desc: 'Identifying transferable strengths, targeted transition roadmaps, and proof-of-skill portfolio pieces.',
+                focus: t('Transferable Skills'),
+                desc: t('Identifying transferable strengths, targeted transition roadmaps, and proof-of-skill portfolio pieces.'),
               },
               {
                 id: 'exploring',
-                title: 'Exploring',
+                title: t('Exploring'),
                 category: 'entrepreneurship',
-                focus: 'Discovery & Fit',
-                desc: 'Comparing emerging disciplines, understanding market compensations, and discovering your optimal path.',
+                focus: t('Discovery & Fit'),
+                desc: t('Comparing emerging disciplines, understanding market compensations, and discovering your optimal path.'),
               },
             ].map((persona) => (
               <StaggerItem key={persona.id}>
@@ -681,7 +690,7 @@ const navLinks = [
                       </div>
                     </div>
                     <span className="shrink-0 rounded bg-[var(--color-success-surface)] px-2 py-0.5 font-mono text-xs font-medium text-[var(--color-success-strong)]">
-                      {role.salaryRange.startsWith('$') ? role.salaryRange.split(' ')[0] : 'Varies'}
+                      {role.salaryRange.startsWith('$') ? role.salaryRange.split(' ')[0] : t('Varies')}
                     </span>
                   </div>
 

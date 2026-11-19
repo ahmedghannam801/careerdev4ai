@@ -9,6 +9,7 @@ import {
   FolderGit2, 
   FileText, 
   Briefcase, 
+  BarChart3,
   Calendar, 
   Sparkles, 
   TrendingUp, 
@@ -36,6 +37,7 @@ import { useCareer } from '../../context/CareerContext';
 import { useFeedback } from '../../context/FeedbackContext';
 import { FEEDBACK_FORM_URL } from '../../../shared/feedback';
 import { Logo } from '../brand/Logo';
+import { AiMascot } from '../copilot/AiMascot';
 import { backdropVariants, drawerLeftVariants, drawerVariants } from '../../lib/motion';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerPilotAvatar } from '../ui/CareerPilotAvatars';
@@ -183,6 +185,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       items: [
         { id: 'cv-studio', label: t('navCV'), icon: FileText },
         { id: 'jobs', label: t('navJobs'), icon: Briefcase },
+        { id: 'job-discovery', label: t('navJobDiscovery'), icon: BarChart3 },
         { id: 'applications', label: t('navApplications'), icon: Calendar },
         { id: 'interviews', label: t('navInterviews'), icon: Target },
       ],
@@ -326,9 +329,9 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         <div data-tour="copilot-button" className="p-3 border-t border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 space-y-2">
           <button
             onClick={openCopilot}
-            className="w-full py-2.5 px-3 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
+            className="w-full py-2.5 px-3 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs group"
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <AiMascot className="w-4 h-4 object-contain transition-transform group-hover:scale-110" state="idle" alt="" />
             <span>{t('askCopilot')}</span>
           </button>
 
@@ -697,7 +700,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 onClick={() => { openCopilot(); setMobileMenuOpen(false); }}
                 className="w-full min-h-11 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center justify-center gap-2"
               >
-                <Sparkles className="w-4 h-4" />
+                <AiMascot className="w-5 h-5 object-contain" state="idle" alt="" />
                 <span>{t('askCopilot')}</span>
               </button>
               <a

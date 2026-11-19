@@ -647,6 +647,8 @@ export interface CvLayoutSpec {
   bulletGlyph: string | null;
   /** The order the sections are read in. */
   sectionOrder: readonly CvSectionKey[];
+  /** Sections the candidate hid from the printed document. */
+  hiddenSections: readonly CvSectionKey[];
   /** The sections placed in the narrow column. */
   sidebarSections: readonly CvSectionKey[];
   /** Whether the document has a narrow column at all. */
@@ -683,6 +685,8 @@ export interface CvLayoutPlan {
   document: CvDocument;
   /** Every section, in reading order. */
   sections: CvDocumentSection[];
+  /** Sections the candidate hid; they are in `sections` but not in a column. */
+  hiddenSections: readonly CvSectionKey[];
   /** The sections of the wide column. */
   main: CvLayoutSection[];
   /** The sections of the narrow column. */
@@ -726,6 +730,9 @@ function buildSpec(
   }
   const sidebarSections = [...sidebar];
   const hasSidebar = supportsSidebar && sidebarSections.length > 0;
+  // Hiding a section is a printing decision, not a deletion: the key stays in
+  // the order of the document, so showing it again restores its place.
+  const hiddenSections = [...new Set((layout?.hiddenSections ?? []).filter(isCvSectionKey))];
 
   return {
     layout: structure.layout,
@@ -759,6 +766,7 @@ function buildSpec(
 
     bulletGlyph: cvBulletGlyph(structure.bulletStyle),
     sectionOrder,
+    hiddenSections,
     sidebarSections,
     hasSidebar,
     asideFirst:
@@ -789,12 +797,17 @@ export function buildCvLayoutPlan(options: {
   const spec = buildSpec(template, sectionOrder, cv.layout);
 
   const ordered = orderCvSections(document.sections, sectionOrder);
-  const { main, aside } = splitCvSections(ordered, spec.sidebarSections);
+  const hidden = new Set(spec.hiddenSections);
+  const visible = ordered.filter((section) => !hidden.has(section.key));
+  const { main, aside } = splitCvSections(visible, spec.sidebarSections);
 
   return {
     spec,
     document,
+    // `sections` is the whole document, including the parts the candidate hid,
+    // because the layout editor has to offer a hidden section back.
     sections: ordered,
+    hiddenSections: spec.hiddenSections,
     main: main.map((section, number) => ({ section, number, column: 'main' as const })),
     aside: aside.map((section, number) => ({ section, number, column: 'aside' as const })),
     candidateOrder,
@@ -831,12 +844,24 @@ export function normalizeCandidateOrder(
  */
 export function cvOrderableSections(
   plan: CvLayoutPlan
-): Array<{ key: CvSectionKey; heading: string; column: 'main' | 'aside' }> {
+): Array<{
+  key: CvSectionKey;
+  heading: string;
+  column: 'main' | 'aside';
+  hidden: boolean;
+}> {
+  const hidden = new Set(plan.hiddenSections);
+  const inAside = new Set(plan.aside.map((entry) => entry.section.key));
+  const sidebarProposal = new Set(plan.spec.sidebarSections);
   return plan.sections.map((section) => {
-    const column = plan.aside.some((entry) => entry.section.key === section.key)
-      ? 'aside'
-      : 'main';
-    return { key: section.key, heading: section.heading, column };
+    const isHidden = hidden.has(section.key);
+    // A hidden section is not in a column, so its column is read from the
+    // layout's proposal rather than from the rendered page.
+    const column =
+      inAside.has(section.key) || (isHidden && sidebarProposal.has(section.key))
+        ? 'aside'
+        : 'main';
+    return { key: section.key, heading: section.heading, column, hidden: isHidden };
   });
 }
 

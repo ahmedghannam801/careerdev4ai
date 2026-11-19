@@ -321,6 +321,14 @@ async function main() {
     // runs against the live API and the database.
     join(TESTS_DIR, 'resource-integration.test.ts'),
     join(TESTS_DIR, 'application-approval.test.ts'),
+    // What the platform recommends and how two postings are compared. Pure:
+    // the ranking, the reason it gives, and the comparison are worked out from
+    // the postings themselves.
+    join(TESTS_DIR, 'job-recommendations.test.ts'),
+    // The right-to-left guard: the source must use logical direction utilities
+    // so the Arabic interface is not broken by a left/right layout. Pure: it
+    // reads the source tree and needs neither a database nor a browser.
+    join(TESTS_DIR, 'rtl-and-mobile.test.ts'),
     // The personalisation engine, the grounding validator and the
     // localisation catalogue. These are pure: they need no database, but
     // they run in the same process as the rest of the suite so a regression
@@ -399,6 +407,24 @@ async function main() {
     join(TESTS_DIR, 'premium-motion-contract.test.ts'),
     join(TESTS_DIR, 'cv-studio-deletion.test.ts'),
     join(TESTS_DIR, 'cv-preview.test.ts'),
+    // The PDF export is a real file, not a print dialog: its pagination, its
+    // text layer, its links and its file name. Pure, except for the JPEG
+    // fixture the writer embeds.
+    join(TESTS_DIR, 'cv-pdf-export.test.ts'),
+    // The studio's autosave: one write in flight, the newest revision wins,
+    // and a local draft is scoped to the account and the CV. Pure.
+    join(TESTS_DIR, 'cv-autosave.test.ts'),
+    // The text the candidate is typing must stay on the screen: a space
+    // typed between two words, a sentence in the summary, and a record that
+    // is a keystroke behind must never put older words back. Pure.
+    join(TESTS_DIR, 'cv-data-loss.test.ts'),
+    // The Word file keeps the template's page, columns and entry shapes:
+    // A4, a masthead above both columns, a fixed column share, cards and the
+    // academic two-column record. Pure.
+    join(TESTS_DIR, 'cv-docx-parity.test.ts'),
+    // A section the candidate hides leaves the paper and the Word file but
+    // stays in the document, so it can be shown again. Pure.
+    join(TESTS_DIR, 'cv-section-visibility.test.ts'),
     // The studio's own data: the resume language and its separation from the
     // interface language, the AI actions offered on each section, the order
     // of the entries on the document, and the placement of the tour's

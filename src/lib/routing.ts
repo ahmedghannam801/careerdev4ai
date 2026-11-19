@@ -35,6 +35,7 @@ export const APP_ROUTES = [
   'cv-studio',
   'documents',
   'jobs',
+  'job-discovery',
   'applications',
   'interviews',
   'profile',

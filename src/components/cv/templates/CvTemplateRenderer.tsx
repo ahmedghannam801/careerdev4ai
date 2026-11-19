@@ -189,7 +189,11 @@ function Bullets({
       }}
     >
       {bullets.map((bullet, index) => (
-        <li key={index} style={{ display: 'flex', gap: 6, breakInside: 'avoid' }}>
+        <li
+          key={index}
+          data-cv-block
+          style={{ display: 'flex', gap: 6, breakInside: 'avoid' }}
+        >
           <span aria-hidden="true" style={{ color: spec.accent, flexShrink: 0 }}>
             {prefix}
           </span>
@@ -337,6 +341,7 @@ function EntryBlock({
   if (layout === 'academic') {
     return (
       <div
+        data-cv-block
         style={{
           ...common,
           display: 'grid',
@@ -366,6 +371,7 @@ function EntryBlock({
   if (layout === 'cards') {
     return (
       <div
+        data-cv-block
         style={{
           ...common,
           border: `1px solid ${CV_INK.rule}`,
@@ -383,6 +389,7 @@ function EntryBlock({
   if (entryStyle === 'card') {
     return (
       <div
+        data-cv-block
         style={{
           ...common,
           border: `1px solid ${CV_INK.rule}`,
@@ -400,6 +407,7 @@ function EntryBlock({
   if (entryStyle === 'grid') {
     return (
       <div
+        data-cv-block
         style={{
           ...common,
           border: `1px solid ${CV_INK.rule}`,
@@ -414,7 +422,7 @@ function EntryBlock({
 
   if (entryStyle === 'timeline') {
     return (
-      <div style={{ ...common, display: 'flex', gap: 10 }}>
+      <div data-cv-block style={{ ...common, display: 'flex', gap: 10 }}>
         <div
           aria-hidden="true"
           style={{
@@ -442,7 +450,11 @@ function EntryBlock({
     );
   }
 
-  return <div style={common}>{content}</div>;
+  return (
+    <div data-cv-block style={common}>
+      {content}
+    </div>
+  );
 }
 
 function SkillsBlock({
@@ -624,6 +636,7 @@ function SectionList({
       {sections.map((entry) => (
         <section
           key={entry.section.key}
+          data-cv-block
           className="cv-section"
           // A section is allowed to flow across a page boundary: a section
           // longer than one sheet would otherwise be pushed off the page.
@@ -1083,7 +1096,9 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
       className={`cv-template cv-template-${resolved.id}`}
       style={{ ...page, ...accentEdge }}
     >
-      <Header document={document} spec={spec} />
+      <div data-cv-block>
+        <Header document={document} spec={spec} />
+      </div>
       {columnedBody}
     </div>
   );

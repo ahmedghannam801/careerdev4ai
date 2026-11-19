@@ -161,6 +161,7 @@ export const commonAr: Record<string, string> = {
   // Accessibility
   'Close dialog': 'إغلاق النافذة',
   'Open menu': 'فتح القائمة',
+  'Close menu': 'إغلاق القائمة',
   'Previous step': 'الخطوة السابقة',
   'Next step': 'الخطوة التالية',
 };

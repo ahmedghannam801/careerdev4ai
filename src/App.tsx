@@ -49,6 +49,7 @@ const VolunteerView = lazy(() => import('./components/views/VolunteerView').then
 const EvidenceView = lazy(() => import('./components/views/EvidenceView').then((m) => ({ default: m.EvidenceView })));
 const CVStudioView = lazy(() => import('./components/views/CVStudioView').then((m) => ({ default: m.CVStudioView })));
 const JobsView = lazy(() => import('./components/views/JobsView').then((m) => ({ default: m.JobsView })));
+const JobDiscoveryView = lazy(() => import('./components/views/JobDiscoveryView').then((m) => ({ default: m.JobDiscoveryView })));
 const ApplicationsView = lazy(() => import('./components/views/ApplicationsView').then((m) => ({ default: m.ApplicationsView })));
 const InterviewsView = lazy(() => import('./components/views/InterviewsView').then((m) => ({ default: m.InterviewsView })));
 const ProgressView = lazy(() => import('./components/views/ProgressView').then((m) => ({ default: m.ProgressView })));
@@ -413,6 +414,8 @@ function AppRoutes() {
         return <DocumentsView onNavigate={navigateTo} />;
       case 'jobs':
         return <JobsView onNavigate={navigateTo} />;
+      case 'job-discovery':
+        return <JobDiscoveryView onNavigate={navigateTo} />;
       case 'applications':
         return <ApplicationsView />;
       case 'interviews':

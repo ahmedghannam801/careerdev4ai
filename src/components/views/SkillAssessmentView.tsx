@@ -986,9 +986,32 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
             )}
           </p>
 
-          {/* The bands, in full. */}
-          <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
-            <table className="w-full text-left text-[11px]">
+          {/* The bands, in full. Three columns do not fit a phone: the table
+              needs about 300px and a 320px screen has under 260px for it, so
+              the last column used to be clipped away with no way to reach it.
+              Below `sm` every band is therefore a labelled block, and the
+              table itself returns from `sm:` up. The bands are unchanged. */}
+          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+            {/* The narrow layout: one labelled block per band. */}
+            <ul className="divide-y divide-[var(--color-border)] sm:hidden">
+              {ASSESSMENT_RUBRIC.map((band) => (
+                <li key={band.level} className="px-2.5 py-2 text-[11px]">
+                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5">
+                    <dt className="text-[var(--text-muted)]">{t('Score')}</dt>
+                    <dd className="font-mono">{band.from}%+</dd>
+                    <dt className="text-[var(--text-muted)]">{t('Level')}</dt>
+                    <dd className="font-semibold text-[var(--text-primary)]">
+                      {band.level}/5 {t(band.label)}
+                    </dd>
+                    <dt className="text-[var(--text-muted)]">{t('Meaning')}</dt>
+                    <dd className="leading-relaxed">{t(band.description)}</dd>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+
+            {/* The table, from `sm:` up. */}
+            <table className="hidden w-full text-start text-[11px] sm:table">
               <thead>
                 <tr className="bg-[var(--color-surface-secondary)]">
                   <th className="px-2.5 py-1.5 font-semibold text-[var(--text-primary)]">

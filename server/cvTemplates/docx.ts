@@ -44,8 +44,16 @@ export interface CvDocxInput {
   template: CvTemplateDefinition;
 }
 
-/** A sheet of A4 in twips: 210mm wide. */
+/**
+ * A sheet of A4 in twips: 210 × 297 mm.
+ *
+ * Word's default is US Letter. Without an explicit page size the exported CV
+ * was 216 mm wide and 279 mm tall, so the same document that filled one sheet
+ * on the paper preview could spill onto a second page in Word and every margin
+ * measured against the wrong width.
+ */
 const A4_WIDTH_TWIPS = 11906;
+const A4_HEIGHT_TWIPS = 16838;
 
 /**
  * Builds the DOCX file.
@@ -66,6 +74,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     TabStopType,
     Table,
     TableCell,
+    TableLayoutType,
     TableRow,
     TextRun,
     VerticalAlign,
@@ -145,14 +154,16 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     InstanceType<typeof Paragraph> | InstanceType<typeof Table>
   > = [];
 
-  const nameRun = (size: number, color?: string) =>
+  // The paper paints the name in the page ink, not in Word's automatic black.
+  // Passing no colour produced a black masthead beside a slate-grey body.
+  const nameRun = (size: number, color: string = CV_INK_WORD.page) =>
     new TextRun({
       text: document.fullName || 'Curriculum Vitae',
       bold: true,
       size,
+      color,
       font: headingFont,
       rightToLeft: rtl,
-      ...(color ? { color } : {}),
     });
 
   const titleRun = (size: number, color: string, caps: boolean) =>
@@ -567,6 +578,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         text: entry.section.heading,
         bold: true,
         size: headingSize,
+        color: CV_INK_WORD.heading,
         allCaps: headingDecoration.allCaps,
         smallCaps: headingDecoration.smallCaps,
         italics: headingDecoration.italic,
@@ -613,7 +625,14 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           alignment,
           bidirectional: rtl,
           spacing: { after: cvPixelsToTwips(spec.metrics.gap) },
-          children: [new TextRun({ text: section.text ?? '', size: bodySize, rightToLeft: rtl })],
+          children: [
+            new TextRun({
+              text: section.text ?? '',
+              size: bodySize,
+              color: CV_INK_WORD.body,
+              rightToLeft: rtl,
+            }),
+          ],
         })
       );
       return blocks;
@@ -624,45 +643,12 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       return blocks;
     }
 
-    const entryBlocks = section.entries.map((cvEntry) => entryBlock(cvEntry));
-    const grid = spec.entryStyle === 'grid' || spec.layout === 'cards';
-
-    if (grid && entryBlocks.length > 0) {
-      // A card grid is a two-column grid on the paper. Word draws it as a
-      // two-column table, one entry to a cell.
-      const rows: InstanceType<typeof TableRow>[] = [];
-      for (let index = 0; index < entryBlocks.length; index += 2) {
-        const pair = entryBlocks.slice(index, index + 2);
-        rows.push(
-          new TableRow({
-            children: [
-              new TableCell({
-                width: { size: 50, type: WidthType.PERCENTAGE },
-                verticalAlign: VerticalAlign.TOP,
-                margins: { top: 0, bottom: 120, left: 0, right: 120 },
-                children: pair[0],
-              }),
-              new TableCell({
-                width: { size: 50, type: WidthType.PERCENTAGE },
-                verticalAlign: VerticalAlign.TOP,
-                margins: { top: 0, bottom: 120, left: 120, right: 0 },
-                children: pair[1] ?? [],
-              }),
-            ],
-          })
-        );
-      }
-      blocks.push(
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          borders: noBorders,
-          rows,
-        })
-      );
-      return blocks;
+    // Each entry decides its own shape: a card is a bordered one-cell table, an
+    // academic record is a two-cell record, and the rest are paragraphs. The
+    // section only preserves the order.
+    for (const cvEntry of section.entries) {
+      blocks.push(...entryBlock(cvEntry));
     }
-
-    for (const block of entryBlocks) blocks.push(...block);
     return blocks;
   };
 
@@ -699,7 +685,12 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
                   bidirectional: rtl,
                   spacing: { after: 20 },
                   children: [
-                    new TextRun({ text: item ?? '', size: bodySize, rightToLeft: rtl }),
+                    new TextRun({
+                      text: item ?? '',
+                      size: bodySize,
+                      color: CV_INK_WORD.body,
+                      rightToLeft: rtl,
+                    }),
                   ],
                 }),
               ],
@@ -734,7 +725,12 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
                 font: bodyFont,
                 rightToLeft: rtl,
               }),
-              new TextRun({ text: item, size: bodySize, rightToLeft: rtl }),
+              new TextRun({
+                text: item,
+                size: bodySize,
+                color: CV_INK_WORD.body,
+                rightToLeft: rtl,
+              }),
             ],
           })
       );
@@ -752,6 +748,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           new TextRun({
             text: items.join(CV_INLINE_SEPARATOR_WORD),
             size: bodySize,
+            color: CV_INK_WORD.body,
             rightToLeft: rtl,
           }),
         ],
@@ -765,15 +762,19 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
    * The paper sets the title, the date and the employer in a particular way
    * for each entry style, and the file sets them the same way.
    */
-  const entryBlock = (
-    entry: CvDocumentEntry
-  ): Array<InstanceType<typeof Paragraph> | InstanceType<typeof Table>> => {
-    const blocks: Array<InstanceType<typeof Paragraph> | InstanceType<typeof Table>> = [];
-    const inline = spec.entryStyle === 'inline' || spec.entryStyle === 'grid';
+  const entryInline = spec.entryStyle === 'inline' || spec.entryStyle === 'grid';
 
+  // The parts of an entry are built separately because two layouts read them
+  // in two places: an academic record puts what the thing was on one side and
+  // what it involved on the other. Composing the same paragraphs twice is what
+  // kept the two halves of that layout in step.
+  const entryTitle = (entry: CvDocumentEntry, tabWidth: number = contentWidth) => {
     const titleRuns: InstanceType<typeof TextRun>[] = [
       new TextRun({
-        text: inline && entry.subtitle ? `${entry.title} — ${entry.subtitle}` : entry.title,
+        text:
+          entryInline && entry.subtitle
+            ? `${entry.title} — ${entry.subtitle}`
+            : entry.title,
         bold: true,
         size: bodySize,
         color: CV_INK_WORD.heading,
@@ -795,72 +796,63 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       );
     }
 
-    blocks.push(
-      new Paragraph({
-        alignment,
-        bidirectional: rtl,
-        spacing: { before: 60, after: 20 },
-        keepNext: true,
-        tabStops: [{ type: TabStopType.RIGHT, position: contentWidth }],
-        children: titleRuns,
-      })
-    );
+    return new Paragraph({
+      alignment,
+      bidirectional: rtl,
+      spacing: { before: 60, after: 20 },
+      keepNext: true,
+      tabStops: [{ type: TabStopType.RIGHT, position: tabWidth }],
+      children: titleRuns,
+    });
+  };
 
-    if (!inline && entry.subtitle) {
-      blocks.push(
-        new Paragraph({
-          alignment,
-          bidirectional: rtl,
-          spacing: { after: 20 },
-          children: [
-            new TextRun({
-              text: entry.subtitle,
-              size: bodySize,
-              color: CV_INK_WORD.secondary,
-              rightToLeft: rtl,
-            }),
-          ],
-        })
-      );
-    }
+  const entrySubtitle = (entry: CvDocumentEntry) =>
+    new Paragraph({
+      alignment,
+      bidirectional: rtl,
+      spacing: { after: 20 },
+      children: [
+        new TextRun({
+          text: entry.subtitle ?? '',
+          size: bodySize,
+          color: CV_INK_WORD.secondary,
+          rightToLeft: rtl,
+        }),
+      ],
+    });
 
-    if (entry.location) {
-      blocks.push(
-        new Paragraph({
-          alignment,
-          bidirectional: rtl,
-          spacing: { after: 20 },
-          children: [
-            new TextRun({
-              text: entry.location,
-              size: smallSize,
-              color: CV_INK_WORD.muted,
-              rightToLeft: rtl,
-            }),
-          ],
-        })
-      );
-    }
+  const entryLocation = (entry: CvDocumentEntry) =>
+    new Paragraph({
+      alignment,
+      bidirectional: rtl,
+      spacing: { after: 20 },
+      children: [
+        new TextRun({
+          text: entry.location ?? '',
+          size: smallSize,
+          color: CV_INK_WORD.muted,
+          rightToLeft: rtl,
+        }),
+      ],
+    });
 
-    if (entry.description) {
-      blocks.push(
-        new Paragraph({
-          alignment,
-          bidirectional: rtl,
-          spacing: { after: 30 },
-          children: [
-            new TextRun({
-              text: entry.description,
-              size: bodySize,
-              color: CV_INK_WORD.body,
-              rightToLeft: rtl,
-            }),
-          ],
-        })
-      );
-    }
+  const entryDescription = (entry: CvDocumentEntry) =>
+    new Paragraph({
+      alignment,
+      bidirectional: rtl,
+      spacing: { after: 30 },
+      children: [
+        new TextRun({
+          text: entry.description ?? '',
+          size: bodySize,
+          color: CV_INK_WORD.body,
+          rightToLeft: rtl,
+        }),
+      ],
+    });
 
-    for (const bullet of entry.bullets) {
+  const entryBullets = (entry: CvDocumentEntry): InstanceType<typeof Paragraph>[] =>
+    entry.bullets.map((bullet) => {
       const runs: InstanceType<typeof TextRun>[] = [];
       if (spec.bulletGlyph) {
         // The paper writes the bullet into the line, in the accent colour.
@@ -877,58 +869,157 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           })
         );
       }
-      runs.push(new TextRun({ text: bullet, size: bodySize, rightToLeft: rtl }));
-      blocks.push(
-        new Paragraph({
-          alignment,
-          bidirectional: rtl,
-          spacing: { after: 20 },
-          indent: spec.bulletGlyph ? { left: 200, hanging: 200 } : undefined,
-          children: runs,
-        })
+      runs.push(
+        new TextRun({ text: bullet, size: bodySize, color: CV_INK_WORD.body, rightToLeft: rtl })
       );
-    }
+      return new Paragraph({
+        alignment,
+        bidirectional: rtl,
+        spacing: { after: 20 },
+        indent: spec.bulletGlyph ? { left: 200, hanging: 200 } : undefined,
+        children: runs,
+      });
+    });
 
-    if (entry.tags.length > 0) {
-      blocks.push(
-        new Paragraph({
-          alignment,
-          bidirectional: rtl,
-          spacing: { after: 20 },
+  const entryTags = (entry: CvDocumentEntry) =>
+    new Paragraph({
+      alignment,
+      bidirectional: rtl,
+      spacing: { after: 20 },
+      children: [
+        new TextRun({
+          text: entry.tags.join(CV_INLINE_SEPARATOR_WORD),
+          size: smallSize,
+          color: CV_INK_WORD.secondary,
+          rightToLeft: rtl,
+        }),
+      ],
+    });
+
+  const entryUrl = (entry: CvDocumentEntry) =>
+    new Paragraph({
+      alignment,
+      bidirectional: rtl,
+      spacing: { after: 40 },
+      children: [
+        new ExternalHyperlink({
+          link: entry.url ?? '',
           children: [
             new TextRun({
-              text: entry.tags.join(CV_INLINE_SEPARATOR_WORD),
+              text: entry.url ?? '',
               size: smallSize,
-              color: CV_INK_WORD.secondary,
+              color: accent,
+              underline: {},
               rightToLeft: rtl,
             }),
           ],
-        })
-      );
-    }
+        }),
+      ],
+    });
 
-    if (entry.url) {
-      blocks.push(
-        new Paragraph({
-          alignment,
-          bidirectional: rtl,
-          spacing: { after: 40 },
+  /**
+   * The shape of a card on the paper, as a one-cell table in Word.
+   *
+   * The preview draws a card as a bordered box with an accent edge on the
+   * reading side. Word's table can carry exactly those borders, so a card
+   * template no longer exports as plain paragraphs and loses its structure.
+   */
+  const cardTable = (blocks: InstanceType<typeof Paragraph>[], accentEdge: boolean) => {
+    const edge = accentEdge
+      ? {
+          style: BorderStyle.SINGLE,
+          size: 18,
+          color: accent,
+        }
+      : {
+          style: BorderStyle.SINGLE,
+          size: 4,
+          color: CV_INK_WORD.rule,
+        };
+
+    return new Table({
+      width: { size: contentWidth, type: WidthType.DXA },
+      columnWidths: [contentWidth],
+      layout: TableLayoutType.FIXED,
+      visuallyRightToLeft: rtl,
+      borders: {
+        ...noBorders,
+        top: { style: BorderStyle.SINGLE, size: 4, color: CV_INK_WORD.rule },
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: CV_INK_WORD.rule },
+        // "Inline start" is the left in a left-to-right document and the right
+        // in an Arabic one.
+        ...(rtl ? { right: edge } : { left: edge }),
+        ...(rtl ? { left: noBorders.left } : { right: noBorders.right }),
+      },
+      rows: [
+        new TableRow({
           children: [
-            new ExternalHyperlink({
-              link: entry.url,
+            new TableCell({
+              width: { size: contentWidth, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.TOP,
+              margins: { top: 80, bottom: 80, left: 120, right: 120 },
+              children: blocks,
+            }),
+          ],
+        }),
+      ],
+    });
+  };
+
+  const entryBlock = (
+    entry: CvDocumentEntry
+  ): Array<InstanceType<typeof Paragraph> | InstanceType<typeof Table>> => {
+    const detail: InstanceType<typeof Paragraph>[] = [];
+    if (!entryInline && entry.subtitle) detail.push(entrySubtitle(entry));
+    if (entry.location) detail.push(entryLocation(entry));
+    if (entry.description) detail.push(entryDescription(entry));
+    detail.push(...entryBullets(entry));
+    if (entry.tags.length > 0) detail.push(entryTags(entry));
+    if (entry.url) detail.push(entryUrl(entry));
+
+    if (spec.layout === 'academic') {
+      // What the record was on one side, what it involved on the other — the
+      // same two-column record the paper draws.
+      const leftWidth = Math.round(contentWidth * 0.388);
+      const rightWidth = contentWidth - leftWidth;
+      const left: InstanceType<typeof Paragraph>[] = [entryTitle(entry, leftWidth)];
+      if (entry.subtitle) left.push(entrySubtitle(entry));
+      return [
+        new Table({
+          width: { size: contentWidth, type: WidthType.DXA },
+          columnWidths: [leftWidth, rightWidth],
+          layout: TableLayoutType.FIXED,
+          visuallyRightToLeft: rtl,
+          borders: noBorders,
+          rows: [
+            new TableRow({
               children: [
-                new TextRun({
-                  text: entry.url,
-                  size: smallSize,
-                  color: accent,
-                  underline: {},
-                  rightToLeft: rtl,
+                new TableCell({
+                  width: { size: leftWidth, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.TOP,
+                  margins: { top: 0, bottom: 80, left: 0, right: 120 },
+                  children: left,
+                }),
+                new TableCell({
+                  width: { size: rightWidth, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.TOP,
+                  margins: { top: 0, bottom: 80, left: 120, right: 0 },
+                  children: detail,
                 }),
               ],
             }),
           ],
-        })
-      );
+        }),
+      ];
+    }
+
+    const blocks: InstanceType<typeof Paragraph>[] = [entryTitle(entry), ...detail];
+
+    if (spec.layout === 'cards' || spec.entryStyle === 'card') {
+      return [cardTable(blocks, true)];
+    }
+    if (spec.entryStyle === 'grid') {
+      return [cardTable(blocks, false)];
     }
 
     return blocks;
@@ -951,23 +1042,47 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
    * words in a different arrangement. The share of the page the narrow column
    * takes comes from the shared layout, so it is the same share as the paper.
    */
+  // The masthead spans the page, exactly as it does on the paper. It used to
+  // be pushed into the wide cell of a sidebar layout, which put the candidate's
+  // name inside the column and left the top of the narrow column empty.
+  if (spec.hasSidebar || spec.twoColumn) children.push(...headerBlocks);
+
   if (spec.hasSidebar) {
     const sidebarBlocks = renderedAside.flatMap((entry) => entry.blocks);
-    const mainBlocks = [
-      ...headerBlocks,
-      ...rendered.flatMap((entry) => entry.blocks),
-    ];
+    const mainBlocks = rendered.flatMap((entry) => entry.blocks);
+
+    // Explicit twips and a fixed grid: Word otherwise autofits the sidebar to
+    // its longest word, so the same CV had a different column share from the
+    // preview and from another copy of Word.
+    const asideTwips = Math.round(
+      (contentWidth * spec.columns.asidePercent) / 100
+    );
+    const mainTwips = contentWidth - asideTwips;
 
     const sidebarCell = new TableCell({
-      width: { size: spec.columns.asidePercent, type: WidthType.PERCENTAGE },
+      width: { size: asideTwips, type: WidthType.DXA },
       verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 0, right: 200 },
+      margins: { top: 0, bottom: 0, left: 0, right: 240 },
+      // The paper draws the narrow column as a column, with an accent edge
+      // when the template asks for one.
+      ...(spec.accentPosition === 'side'
+        ? {
+            borders: {
+              ...noBorders,
+              left: {
+                style: BorderStyle.SINGLE,
+                size: 12,
+                color: accent,
+              },
+            },
+          }
+        : {}),
       children: sidebarBlocks,
     });
     const mainCell = new TableCell({
-      width: { size: spec.columns.mainPercent, type: WidthType.PERCENTAGE },
+      width: { size: mainTwips, type: WidthType.DXA },
       verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 200, right: 0 },
+      margins: { top: 0, bottom: 0, left: 240, right: 0 },
       children: mainBlocks,
     });
 
@@ -979,7 +1094,12 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
     children.push(
       new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: contentWidth, type: WidthType.DXA },
+        columnWidths: spec.asideFirst
+          ? [asideTwips, mainTwips]
+          : [mainTwips, asideTwips],
+        layout: TableLayoutType.FIXED,
+        visuallyRightToLeft: rtl,
         borders: noBorders,
         rows: [row],
       })
@@ -988,30 +1108,32 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     // A split or an editorial document reads across two columns rather than
     // down one. The paper flows the text across the columns; Word cannot
     // flow a paragraph across cells, so the sections are divided between two
-    // columns, which is the same reading order on the same page.
+    // columns, which is the same reading order on the same page. The masthead
+    // was already written above both columns.
     const half = Math.ceil(rendered.length / 2);
-    const leftBlocks = [
-      ...headerBlocks,
-      ...rendered.slice(0, half).flatMap((entry) => entry.blocks),
-    ];
+    const leftBlocks = rendered.slice(0, half).flatMap((entry) => entry.blocks);
     const rightBlocks = rendered.slice(half).flatMap((entry) => entry.blocks);
+    const columnTwips = Math.floor((contentWidth - 240) / 2);
 
     const leftCell = new TableCell({
-      width: { size: 50, type: WidthType.PERCENTAGE },
+      width: { size: columnTwips, type: WidthType.DXA },
       verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 0, right: 200 },
+      margins: { top: 0, bottom: 0, left: 0, right: 120 },
       children: leftBlocks,
     });
     const rightCell = new TableCell({
-      width: { size: 50, type: WidthType.PERCENTAGE },
+      width: { size: contentWidth - columnTwips, type: WidthType.DXA },
       verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 200, right: 0 },
+      margins: { top: 0, bottom: 0, left: 120, right: 0 },
       children: rightBlocks,
     });
 
     children.push(
       new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: contentWidth, type: WidthType.DXA },
+        columnWidths: [columnTwips, contentWidth - columnTwips],
+        layout: TableLayoutType.FIXED,
+        visuallyRightToLeft: rtl,
         borders: spec.layout === 'editorial'
           ? {
               ...noBorders,
@@ -1046,6 +1168,13 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       {
         properties: {
           page: {
+            // A4, stated explicitly. Word's default Letter made the exported
+            // page 6 mm wider and 18 mm shorter than the sheet the candidate
+            // sees, which changed both the line wraps and the page count.
+            size: {
+              width: A4_WIDTH_TWIPS,
+              height: A4_HEIGHT_TWIPS,
+            },
             margin: {
               top: spec.marginTwips,
               right: spec.marginTwips,

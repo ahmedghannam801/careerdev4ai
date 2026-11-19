@@ -50,7 +50,9 @@ export interface ProcessingOverlayProps {
 const ProgressBar: React.FC<{
   progress: number | null;
   reduced: boolean;
-}> = ({ progress, reduced }) => {
+  /** True when the interface is Arabic, so the shimmer travels the other way. */
+  rtl?: boolean;
+}> = ({ progress, reduced, rtl = false }) => {
   if (progress !== null) {
     const percent = Math.max(0, Math.min(100, Math.round(progress * 100)));
     return (
@@ -78,9 +80,12 @@ const ProgressBar: React.FC<{
         <div className="h-full w-full rounded-full bg-[var(--accent-primary)] opacity-30" />
       ) : (
         <motion.div
-          className="absolute inset-y-0 left-0 w-2/5 rounded-full bg-[var(--accent-primary)]"
-          initial={{ x: '-120%' }}
-          animate={{ x: '320%' }}
+          // `start-0` anchors the segment to the reading edge and the offset
+          // is mirrored for Arabic, so the shimmer always travels the way the
+          // text is read rather than always left to right.
+          className="absolute inset-y-0 start-0 w-2/5 rounded-full bg-[var(--accent-primary)]"
+          initial={{ x: rtl ? '120%' : '-120%' }}
+          animate={{ x: rtl ? '-320%' : '320%' }}
           transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
@@ -155,7 +160,7 @@ export const ProcessingPanel: React.FC<ProcessingOverlayProps & { modal?: boolea
   onDismiss,
   modal = true,
 }) => {
-  const { t } = useCareer();
+  const { t, settings } = useCareer();
   const { reduced } = useMotionVariants();
   const titleId = 'processing-overlay-title';
 
@@ -223,7 +228,7 @@ export const ProcessingPanel: React.FC<ProcessingOverlayProps & { modal?: boolea
 
       {busy ? (
         <div className="mt-6 space-y-4" role="status" aria-live="polite">
-          <ProgressBar progress={operation.progress} reduced={reduced} />
+          <ProgressBar progress={operation.progress} reduced={reduced} rtl={settings.language === 'ar'} />
 
           {operation.progress !== null ? (
             <p className="text-[11px] font-medium text-[var(--text-secondary)]">

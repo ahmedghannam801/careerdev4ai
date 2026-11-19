@@ -107,7 +107,7 @@ const ROLE_OPTIONS: AdminRole[] = [
   'moderator',
 ];
 
-const RESPONSIVE_TABLE = 'w-full text-left text-xs';
+const RESPONSIVE_TABLE = 'w-full text-start text-xs';
 const CARD = 'rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]';
 
 function formatDate(value: string | null): string {

@@ -33,7 +33,19 @@ import { EmptyState } from '../ui/EmptyState';
 import { LiveJobCard } from '../jobs/LiveJobCard';
 import { AnimatedList } from '../react-bits/AnimatedList';
 import { MagnetButton } from '../react-bits/MagnetButton';
-import { fetchLiveJobs, type JobQuota, type JobSearchFilters, type MatchedJob } from '../../lib/jobsApi';
+import {
+  compareJobs,
+  fetchLiveJobs,
+  fetchRecommendedJobs,
+  type JobComparison,
+  type JobQuota,
+  type JobRecommendation,
+  type JobSearchFilters,
+  type MatchedJob,
+  type RecommendationBasis,
+} from '../../lib/jobsApi';
+import { RecommendedJobsPanel } from '../jobs/RecommendedJobsPanel';
+import { JobComparisonPanel } from '../jobs/JobComparisonPanel';
 import { ApiRequestError } from '../../lib/apiClient';
 import { buildRouteHash } from '../../lib/routing';
 import { refreshRoute } from '../../lib/useRouteParams';
@@ -49,8 +61,7 @@ import {
   type JobKind,
 } from '../../../shared/jobs';
 import { todayIsoDate } from '../../../shared/dateRange';
-import { CAREER_ROLES, CATALOG_SKILL_NAMES } from '../../../shared/careerRoles';
-import { deriveCandidateBand, educationLevelFromText, explainJobMatch, shouldFilterSeniorJob, type JobMatchCandidate } from '../../../shared/jobMatching';
+import { deriveCandidateBand, shouldFilterSeniorJob } from '../../../shared/jobMatching';
 
 type SortOrder = 'match' | 'newest';
 
@@ -119,10 +130,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const {
     t,
     targetRole,
-    profile,
     experienceLevel,
     careerIdentity,
-    ownedSkills,
     isHydrated,
     bookmarkedJobIds,
     toggleBookmarkJob,
@@ -155,6 +164,15 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const [tailoringId, setTailoringId] = useState<string | null>(null);
   /** The outcome of the last request for a tailored CV. */
   const [tailorNotice, setTailorNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  /** The openings the platform recommends, against the candidate's own record. */
+  const [recommendations, setRecommendations] = useState<JobRecommendation[]>([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
+  const [recommendationBasis, setRecommendationBasis] = useState<RecommendationBasis | null>(null);
+  /** The postings the candidate is comparing. */
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  /** The comparison itself, once the server has made it. */
+  const [comparison, setComparison] = useState<JobComparison | null>(null);
 
   /** The first search runs once, after the profile has loaded. */
   const startedRef = useRef(false);
@@ -192,6 +210,68 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
     }
   }, []);
 
+  /**
+   * Asks the server what this candidate should look at.
+   *
+   * The server builds the search from the candidate's own record, so this is
+   * a request without a query in it. A failure here never touches the search
+   * below: the list the candidate asked for is still worth showing.
+   */
+  const loadRecommendations = useCallback(async () => {
+    setRecommendationsLoading(true);
+    setRecommendationsError(null);
+    try {
+      const response = await fetchRecommendedJobs({
+        location: filters.location,
+        country: filters.country,
+        datePosted: filters.datePosted,
+        remoteOnly: filters.remoteOnly,
+        kind: filters.kind,
+        sources: filters.sources,
+        employmentTypes: filters.employmentTypes,
+      });
+      setRecommendations(response.recommendations);
+      setRecommendationBasis(response.candidate);
+    } catch (caught) {
+      setRecommendations([]);
+      const code = caught instanceof ApiRequestError ? caught.code : null;
+      setRecommendationsError(providerFailureMessage(code, t));
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  }, [filters.location, filters.country, filters.datePosted, filters.remoteOnly, filters.kind, filters.sources, filters.employmentTypes, t]);
+
+  /**
+   * Adds a posting to the comparison, or takes it out again.
+   *
+   * The comparison is made by the server, which reads the postings itself.
+   * So the browser holds only the list of identifiers, and the comparison
+   * arrives as an answer.
+   */
+  const toggleCompare = useCallback(
+    async (jobId: string) => {
+      const next = compareIds.includes(jobId)
+        ? compareIds.filter((id) => id !== jobId)
+        : [...compareIds, jobId].slice(-4);
+
+      setCompareIds(next);
+
+      if (next.length < 2) {
+        setComparison(null);
+        return;
+      }
+
+      try {
+        const response = await compareJobs(next, filters);
+        setComparison(response.comparison);
+      } catch (caught) {
+        const code = caught instanceof ApiRequestError ? caught.code : null;
+        setRecommendationsError(providerFailureMessage(code, t));
+      }
+    },
+    [compareIds, filters, t]
+  );
+
   // The first search waits for the profile so the target role can seed it.
   useEffect(() => {
     if (!isHydrated || startedRef.current) return;
@@ -204,6 +284,19 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
     setFilters(next);
     void runSearch(next);
   }, [isHydrated, targetRole?.title ?? '', filters, runSearch]);
+
+  // The recommendations follow the same filters as the search, so what the
+  // platform suggests is never wider than what the candidate asked to see.
+  const recommendationsStartedRef = useRef(false);
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (!recommendationsStartedRef.current) {
+      recommendationsStartedRef.current = true;
+      void loadRecommendations();
+      return;
+    }
+    void loadRecommendations();
+  }, [isHydrated, loadRecommendations]);
 
   const update = (patch: Partial<JobSearchFilters>) => {
     setFilters((previous) => ({ ...previous, ...patch }));
@@ -241,23 +334,26 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
    * A vacancy whose fit could not be compared never sorts above one whose
    * fit could: an unknown is never treated as a good match.
    */
-  const candidate = useMemo<JobMatchCandidate>(() => {
-    const educationOrder = ['high_school', 'bachelor', 'master', 'doctorate'] as const;
-    const education = profile.education.map((entry) => educationLevelFromText(entry.degree)).filter((level) => level !== null);
-    const educationLevel = education.sort((a, b) => educationOrder.indexOf(b) - educationOrder.indexOf(a))[0] ?? null;
-    return {
-      skillNames: ownedSkills.filter((skill) => skill.level > 0).map((skill) => skill.name),
-      experienceLevel,
-      targetOpportunityType: careerIdentity.targetOpportunityType,
-      educationLevel,
-      country: profile.country ?? null,
-      city: profile.city ?? profile.location ?? null,
-    };
-  }, [profile.education, profile.country, profile.city, profile.location, ownedSkills, experienceLevel, careerIdentity.targetOpportunityType]);
-  const candidateBand = useMemo(() => deriveCandidateBand(candidate), [candidate]);
+  /**
+   * The band the candidate is aiming at.
+   *
+   * It decides whether senior roles are hidden by default, so the screen
+   * reads it from the candidate's own record. The score of a posting is not
+   * worked out here: the server computes it against the same record and the
+   * screen reads the answer.
+   */
+  const candidateBand = useMemo(
+    () =>
+      deriveCandidateBand({
+        experienceLevel,
+        targetOpportunityType: careerIdentity.targetOpportunityType,
+      }),
+    [experienceLevel, careerIdentity.targetOpportunityType]
+  );
   const hideSeniorByDefault = candidateBand === 'student' || candidateBand === 'intern' || candidateBand === 'entry';
   const includeSenior = showSeniorRoles ?? !hideSeniorByDefault;
-  const scores = useMemo(() => new Map(results.map((item) => [item.job.id, explainJobMatch(item.job, candidate, CATALOG_SKILL_NAMES, CAREER_ROLES, item.semantic ?? null)])), [results, candidate]);
+  // The explanation every posting was given by the server.
+  const scores = useMemo(() => new Map(results.map((item) => [item.job.id, item.match])), [results]);
 
   const ordered = useMemo(() => {
     const copy = results.filter((item) => includeSenior || !shouldFilterSeniorJob(scores.get(item.job.id)?.jobSeniority ?? null, candidateBand));
@@ -794,6 +890,24 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
         />
       )}
 
+      {/* The openings the platform recommends, against the candidate's own
+          record. It sits above the list because it is the answer to "what
+          should I look at?", which is the question the list cannot answer. */}
+      {recommendationBasis && (
+        <RecommendedJobsPanel
+          recommendations={recommendations}
+          basis={recommendationBasis}
+          loading={recommendationsLoading}
+          error={recommendationsError}
+          onCompare={(jobId) => void toggleCompare(jobId)}
+          comparingIds={compareIds}
+          t={t}
+        />
+      )}
+
+      {/* The comparison, when there is one. */}
+      {comparison && <JobComparisonPanel comparison={comparison} t={t} />}
+
       {/* Results */}
       {!loading && !error && ordered.length > 0 && (
         <AnimatedList className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -825,6 +939,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                   onToggleBookmark={toggleBookmarkJob}
                   onTrackApplication={(entry) => void handleTrackApplication(entry)}
                   onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
+                  onCompare={(entry) => void toggleCompare(entry.job.id)}
+                  comparing={compareIds.includes(item.job.id)}
                   tracking={trackingId === item.job.id}
                   tailoring={tailoringId === item.job.id}
                   t={t}

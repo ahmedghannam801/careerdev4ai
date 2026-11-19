@@ -470,7 +470,7 @@ export const InterviewsView: React.FC = () => {
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] hover:opacity-90"
           >
             {t('Start Technical Interview')}
-            <ArrowRight className="h-4 w-4 shrink-0" />
+            <ArrowRight className="h-4 w-4 shrink-0 rtl:rotate-180" />
           </button>
         </section>
       )}
@@ -659,7 +659,7 @@ export const InterviewsView: React.FC = () => {
                   {currentQuestion.index + 1 >= plan.length
                     ? t('Finish Interview')
                     : t('Next Question')}
-                  <ArrowRight className="h-4 w-4 shrink-0" />
+                  <ArrowRight className="h-4 w-4 shrink-0 rtl:rotate-180" />
                 </button>
               </div>
             </Reveal>

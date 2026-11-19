@@ -1,4 +1,5 @@
-// The strings of the CV studio's data manager and the resume language.
+// The strings of the CV studio's editor: the data manager, the order of the
+// sections, the state of the save, and the draft left behind on a device.
 //
 // The studio is where a candidate manages the records the CV is built from,
 // so the words used there are here rather than scattered through the
@@ -89,6 +90,26 @@ export const cvStudioDataAr: Record<string, string> = {
   '{name} moved to position {position}': 'تم نقل {name} إلى الموضع {position}',
   'The section order is back to the one the template suggests':
     'عاد ترتيب الأقسام إلى الترتيب الذي يقترحه القالب',
+
+  // ---- Which sections the CV shows ----------------------------------------
+  '{name} hidden from the document': 'تم إخفاء {name} من المستند',
+  '{name} shown on the document': 'تم إظهار {name} في المستند',
+  'Show this section on the CV': 'إظهار هذا القسم في السيرة الذاتية',
+  'Hide this section from the CV': 'إخفاء هذا القسم من السيرة الذاتية',
+  'Show {name} on the CV': 'إظهار {name} في السيرة الذاتية',
+  'Hide {name} from the CV': 'إخفاء {name} من السيرة الذاتية',
+
+  // ---- The state of the save ----------------------------------------------
+  'Could not save your latest changes.': 'تعذّر حفظ آخر تعديلاتك.',
+  'Retrying…': 'جارٍ إعادة المحاولة…',
+  'Saved to your account': 'تم الحفظ في حسابك',
+
+  // ---- The draft left behind on the device --------------------------------
+  'An unsaved draft of this CV was found on this device.':
+    'عُثر على مسودة غير محفوظة لهذه السيرة الذاتية على هذا الجهاز.',
+  'It was last changed {time}. Recover it to put those changes back in the editor and save them; discard it to keep the version in your account.':
+    'آخر تغيير لها كان {time}. استعدها لإرجاع تلك التعديلات إلى المحرر وحفظها، أو تجاهلها للإبقاء على النسخة الموجودة في حسابك.',
+  'Recover draft': 'استعادة المسودة',
 
   // ---- The AI suggestions offered on each section ------------------------
   'AI Suggestions': 'اقتراحات الذكاء الاصطناعي',

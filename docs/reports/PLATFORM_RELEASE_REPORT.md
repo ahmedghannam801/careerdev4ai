@@ -860,26 +860,37 @@ was **paused** afterwards, so it does not hold the account's free-project
 allowance and can be restored for the next run.
 
 **Provisioning that project uncovered a real property of the repository, which
-is worth the project owner's attention.** The migrations folder is not a
-complete recipe for the production schema:
+is worth the project owner's attention.** The migrations folder could not
+rebuild the database:
 
-- Production's tracked migration history stops at `20261115150123`. Everything
-  after it in the folder was applied to production outside that history, so the
-  folder and the deployed database have drifted apart.
-- **Four migrations in the folder cannot be applied to a database built from
-  scratch.** Two of them — `20261116000001_daily_credit_allowance_three.sql`
-  and `20261117000001_daily_token_claim.sql` — contain a PL/pgSQL
-  `FOR … IN UPDATE … RETURNING … LOOP` over a data-modifying statement, which
-  PL/pgSQL accepts only through `EXECUTE`; the parser rejects them with
-  `syntax error at or near "LOOP"`. `20261023105343_production_security_function_hardening.sql`
-  revokes and pins `public.handle_new_user()` and `public.rls_auto_enable()`,
-  which exist neither in production nor in a rebuilt database.
-- Production's `claim_daily_credits` takes `p_amount` with no default, while
-  the folder's newer version gives the daily allowance a default of three.
+- **Two migration files contained invalid PL/pgSQL**, and both were in the
+  daily-credit expiry path. `20261116000001_daily_credit_allowance_three.sql`
+  used a bare `UPDATE … RETURNING` as a loop's query, which PL/pgSQL accepts
+  only through `EXECUTE` — and which, even with the syntax repaired, would
+  have counted the *new* value (zero) instead of the amount that expired, so
+  expired credits would have stayed spendable. `20261117000001_daily_token_claim.sql`
+  closed an `IF` with `END LOOP`. Both are fixed, and the corrected form was
+  taken from the deployed project's own live function.
+- **One column the application depends on was created by no file at all**:
+  `roadmap_tasks.work_kind`. `server/db/roadmap.ts` reads and writes it, so a
+  rebuilt database would have had a roadmap table the application could not
+  write to. A forward migration now adds it.
 
-The approval gate's own migration applied cleanly, and the gate is unaffected by
-all of this. But **a fresh rebuild of this database from the repository alone
-is not currently possible**, and that is a separate decision from this release.
+The gate's own migration applied cleanly, and the gate is unaffected by all of
+this.
+
+**Separately, the folder's version numbers and production's do not agree.**
+Production has 82 recorded migrations; 24 of them carry a version number the
+folder does not use, even though the change itself is in the folder in every
+case. `supabase db push` against production would therefore try to re-apply
+24 migrations that have already been applied. The full measurement, and a
+reconciliation plan, are in `DATABASE_MIGRATION_INTEGRITY.md`.
+
+> **Correction (18 November 2026).** An earlier version of this section said
+> production's history stopped at `20251115150123`. That was measured against
+> the disposable test project, not production — the Supabase tools follow
+> `supabase/.temp/project-ref`, and the link had been pointed at the test
+> project for the run. Production's history is complete and continuous.
 
 **The semantic factor was proven against the live providers and the live
 database, but not end-to-end against a signed-in candidate's own embeddings in
@@ -888,3 +899,81 @@ a provider key on the production account.
 
 **The CV Studio work in the working tree was left exactly as it was found** —
 not staged, not committed, not deployed, and not "fixed" to make a suite green.
+
+---
+
+## The fifth release — the CV Studio data loss, and the studio's own work
+
+**Date:** 19 November 2026
+
+### The defect
+
+Text typed in the CV Studio sometimes disappeared. A space typed between two
+words could vanish, and a whole sentence in the executive summary could vanish
+with it.
+
+The cause was the projection that keeps the document in step with the
+platform's records. It ran while the candidate was typing — every write of the
+CV header changes the profile, and the profile is part of the projection's
+source — and it resolved the header with one line:
+
+```ts
+profile.fullName?.trim() || previous.fullName?.trim()
+```
+
+Three things were wrong with that line:
+
+- **It trimmed.** The record and the document were both trimmed before they
+  were compared, so a trailing space the candidate had just typed was
+  destroyed by the comparison itself.
+- **The record won.** The record is a copy of what was typed, written back a
+  moment later, so it is often a keystroke or two behind the document — and
+  the older words went back on the screen.
+- **The summary was trimmed and folded.** A paragraph the candidate was still
+  writing could be judged "the same as" an earlier one and deleted.
+
+### The fix
+
+- `shared/cvProjection.ts` — the header is resolved by a rule that can tell
+  the studio's own copy of the records from a record that was changed
+  somewhere else, and the candidate's text is never trimmed.
+- `shared/cvProjection.ts` — the candidate's summary is kept exactly as it was
+  written. A repeated paragraph in a summary that comes from the *records* is
+  still folded, exactly as before.
+- `shared/cvTemplateDocument.ts` — the printed CV folds a repeated paragraph
+  in the candidate's own summary, which is where that cleanup belongs. The
+  preview, the PDF and the DOCX all read this one place, so they still agree.
+- `src/context/CareerContext.tsx` — the studio remembers the header values it
+  wrote to the profile, so the records can be recognised as its own copy.
+
+### The proof
+
+`tests/cv-data-loss.test.ts` types a name one character at a time with the
+projection running between every keystroke, and asserts that every character
+survives. Against the old rule it fails seven assertions; against the new one
+it passes.
+
+### The rest of the release
+
+- The studio's duplicate `<nav>` is gone: the studio carries one navigation,
+  and the mobile pane switcher is a labelled group rather than a second
+  navigation landmark.
+- The 18 Arabic entries the studio was missing are in the catalogue. The
+  localisation suite now reports 100% coverage.
+- The Skill Assessment rubric table is readable on a phone: below `sm:` each
+  band is a labelled block, and the table itself is unchanged above it.
+
+### The checks
+
+| Check | Command | Result |
+|---|---|---|
+| TypeScript | `npm run lint` | **PASSED** — app and tests both clean |
+| Unit suite | `npm run test:run` | **PASSED** — 6 files, 36 tests, 0 failures |
+| Database-free suite | `npm run test:logic` | **PASSED** — 1522 tests, 0 failures |
+| Browser tests | `npm run test:e2e` | **PASSED** — 8 tests, 0 failures |
+| Production build | `npm run build` | **PASSED** — `dist/_worker.js` 4.27 MiB, bundle-auth check passed |
+| Dependency audit | `npm audit --audit-level=high` | **PASSED** — 0 vulnerabilities |
+
+**Production data was not touched.** No migration was applied, no row was
+written, and `supabase db push` was not run. The migration folder changes
+travel with the release, and the deployment does not apply them.

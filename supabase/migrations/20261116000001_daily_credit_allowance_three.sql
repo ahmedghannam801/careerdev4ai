@@ -117,15 +117,34 @@ BEGIN
   END IF;
 
   -- 1. Expire every earlier day's bucket that still holds credits.
+  --
+  -- The OLD remaining is what is counted, not the new one.
+  --
+  -- `UPDATE ... RETURNING remaining` returns the value AFTER the update, which
+  -- is zero — the very value this loop is trying to count. The earlier version
+  -- of this function had that mistake, so it zeroed the bucket and then
+  -- believed it had expired nothing: the credits left the bucket and stayed in
+  -- the running balance, where they could still be spent long after they had
+  -- expired. The CTE reads the amount before the update takes it away.
+  --
+  -- The CTE is also what makes the loop valid PL/pgSQL at all: a bare
+  -- data-modifying statement is not accepted as a loop's query, only through
+  -- `EXECUTE`. This is the form the deployed project runs.
   FOR v_expired_row IN
-    UPDATE public.daily_credit_grants
+    WITH stale AS (
+      SELECT id, remaining AS old_remaining
+        FROM public.daily_credit_grants
+       WHERE profile_id = p_profile_id
+         AND grant_date < v_today
+         AND remaining > 0
+    )
+    UPDATE public.daily_credit_grants g
        SET remaining = 0
-     WHERE profile_id = p_profile_id
-       AND grant_date < v_today
-       AND remaining > 0
-    RETURNING remaining
+      FROM stale s
+     WHERE g.id = s.id
+    RETURNING s.old_remaining
   LOOP
-    v_expired := v_expired + v_expired_row.remaining;
+    v_expired := v_expired + v_expired_row.old_remaining;
   END LOOP;
 
   IF v_expired > 0 THEN

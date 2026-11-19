@@ -223,7 +223,7 @@ const ToastCard: React.FC<{ toast: ToastRecord; onDismiss: (id: number) => void 
         type="button"
         onClick={() => onDismiss(toast.id)}
         aria-label="Dismiss notification"
-        className="relative -mr-1 -mt-1 shrink-0 rounded-lg p-1 text-[var(--text-muted)] transition-colors hover:bg-black/5 hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] dark:hover:bg-white/10"
+        className="relative -me-1 -mt-1 shrink-0 rounded-lg p-1 text-[var(--text-muted)] transition-colors hover:bg-black/5 hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] dark:hover:bg-white/10"
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>

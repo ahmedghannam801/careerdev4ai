@@ -9,6 +9,74 @@
  */
 
 export const landingAr: Record<string, string> = {
+  // ---- Hero, the problems, the chain, the steps and the AI promises ----
+  // The page's own copy. It used to be raw English constants, which meant the
+  // Arabic landing page was an English page inside an Arabic frame.
+  'Turn Your Ambition Into a Career Plan.': 'حوّل طموحك إلى خطة مهنية.',
+  'CareerDev4AI helps you discover where you’re going, what you’re missing, and what to do next — from your first skill to your next opportunity.':
+    'يساعدك CareerDev4AI على اكتشاف أين أنت ذاهب، وما ينقصك، وما ينبغي أن تفعل بعد ذلك — من مهارتك الأولى إلى فرصتك التالية.',
+  'Skills are scattered': 'المهارات مُبعثرة',
+  'A spreadsheet here, a course list there, and no honest picture of what is actually missing.':
+    'جدول بيانات هنا، وقائمة دورات هناك، ولا صورة صادقة لما ينقصك حقًا.',
+  'CVs go stale': 'السير الذاتية تتقادم',
+  'The version you send is out of date before the interview, and it never speaks to the role in front of you.':
+    'النسخة التي ترسلها تتقادم قبل المقابلة، ولا تتحدث أبدًا عن الوظيفة التي أمامك.',
+  'Learning lacks direction': 'التعلّم بلا اتجاه',
+  'Endless courses with no link to the job you want, so effort turns into hours rather than progress.':
+    'دورات لا تنتهي ولا تربط بوظيفة تريدها، فيتحوّل الجهد إلى ساعات بدلًا من تقدّم.',
+  'Applications disconnect': 'الطلبات تنقطع عن سياقها',
+  'Every opportunity tracked somewhere else, with no record of what you did, learned, or proved.':
+    'كل فرصة تُتابَع في مكان آخر، دون سجل لما فعلت أو تعلمت أو أثبتّ.',
+  'Discover your direction': 'اكتشف اتجاهك',
+  'Set the role you are working towards and get a concrete picture of what that role demands.':
+    'حدّد الوظيفة التي تعمل نحوها، واحصل على صورة واضحة عمّا تتطلبه.',
+  'Identify your skill gaps': 'حدّد فجوات مهاراتك',
+  'Compare where you are against the benchmark and see exactly which gaps will hold you back.':
+    'قارن مستواك بالمعيار المرجعي، وشاهد الفجوات التي ستمنعك من التقدّم بالضبط.',
+  'Follow your personalized roadmap': 'اتبع خارطة طريقك المخصّصة',
+  'A phased plan that recalculates as you learn, so the next step is always the right one.':
+    'خطة على مراحل تُعاد حسابها مع تعلّمك، فيكون الخطوة التالية هي الصحيحة دائمًا.',
+  'Build evidence and projects': 'ابنِ الأدلة والمشاريع',
+  'Turn skills into finished work you can point a hiring manager at.':
+    'حوّل مهاراتك إلى عمل منجز يمكنك أن تعرضه على مسؤول التوظيف.',
+  'Strengthen your CV': 'قوّ سيرتك الذاتية',
+  'Rewrite, version and target your CV against the role you are applying for.':
+    'أعد صياغة سيرتك الذاتية، واجعل لها نسخًا متعددة، ووجّهها نحو الوظيفة التي تتقدم لها.',
+  'Move toward real opportunities': 'تحرّك نحو فرص حقيقية',
+  'Track applications, prepare for interviews, and keep your momentum visible.':
+    'تابع طلباتك، واستعدّ للمقابلات، وأبقِ تقدّمك ظاهرًا.',
+  'Grounded in your records': 'مبني على سجلاتك',
+  'Every recommendation is drawn from your own goals, skills, progress and learning journey.':
+    'كل توصية تُستمد من أهدافك ومهاراتك وتقدّمك ورحلة تعلّمك.',
+  'Explains the reasoning': 'يشرح السبب',
+  'You see why a suggestion was made and which of your records it came from.':
+    'ترى لماذا اقتُرح هذا الاقتراح، ومن أي سجلاتك جاء.',
+  'Updates as you progress': 'يتحدّث مع تقدّمك',
+  'Complete a task, close a gap, and the next recommendation moves with you.':
+    'أكمل مهمة، وأغلق فجوة، وستتحرّك التوصية التالية معك.',
+  'Varies': 'يختلف',
+
+  // ---- Personas --------------------------------------------------------
+  'Fundamentals & Internships': 'الأساسيات والتدريبات',
+  'Foundational coursework, first GitHub repositories, internships, and portfolio development.':
+    'مقررات التأسيس، وأول مستودعات GitHub، والتدريبات، وبناء معرض الأعمال.',
+  'Fresh Graduate': 'خريج جديد',
+  'Employability & Proof': 'قابلية التوظيف والأدلة',
+  'Bridging academic-to-industry gaps, CV optimization, targeted entry applications, and interview prep.':
+    'سدّ الفجوات بين الدراسة وسوق العمل، وتحسين السيرة الذاتية، وتقديمات موجّهة لوظائف البداية، والتحضير للمقابلات.',
+  'Working Professional': 'محترف عامل',
+  'Progression & Promotion': 'التقدّم والترقية',
+  'Advanced specialization, quantifiable achievements, leadership evidence, and market positioning.':
+    'تخصّص متقدّم، وإنجازات قابلة للقياس، وأدلة على القيادة، وتحديد موقعك في السوق.',
+  'Career Switcher': 'مغيّر المسار المهني',
+  'Transferable Skills': 'مهارات قابلة للنقل',
+  'Identifying transferable strengths, targeted transition roadmaps, and proof-of-skill portfolio pieces.':
+    'تحديد نقاط قوتك القابلة للنقل، وخارطة طريق موجّهة للتحوّل، وأعمال في معرض تُثبت المهارة.',
+  'Exploring': 'مستكشف',
+  'Discovery & Fit': 'الاستكشاف والملاءمة',
+  'Comparing emerging disciplines, understanding market compensations, and discovering your optimal path.':
+    'مقارنة التخصصات الناشئة، وفهم التعويضات في السوق، واكتشاف مسارك الأمثل.',
+
   // ---- Interactive product preview ------------------------------------
   'Live preview': 'معاينة حية',
   'Pick a role to preview': 'اختر وظيفة لمعاينتها',

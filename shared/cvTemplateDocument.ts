@@ -21,6 +21,7 @@ import {
   type ResumeDirection,
   type ResumeLanguage,
 } from './resumeLanguage.ts';
+import { dedupeSummaryParagraphs } from './cvCanonical.ts';
 
 export interface CvDocumentLink {
   label: string;
@@ -141,7 +142,13 @@ export function buildCvTemplateDocument(
     sections.push(
       section('summary', language, {
         kind: 'text',
-        text: cv.summary.trim(),
+        // The printed CV folds a paragraph that repeats another one: the
+        // candidate pasted it twice, and a CV that says the same thing twice
+        // reads as noise. This happens HERE, where the document becomes a
+        // CV, and not in the editor — the text there is exactly what the
+        // candidate wrote, and folding it there would delete a sentence they
+        // are still typing.
+        text: dedupeSummaryParagraphs(cv.summary),
         entries: [],
       })
     );

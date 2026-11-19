@@ -484,9 +484,13 @@ import {
 import { searchAllJobs } from './server/jobs/feed.ts';
 import { hasConfiguredAtsBoards } from './server/jobs/ats.ts';
 import { semanticFactorsFor } from './server/jobs/semantic.ts';
+import { loadMatchCandidate } from './server/jobs/candidate.ts';
+import { explainJobs } from './server/jobs/match.ts';
+import { buildRecommendationQuery, rankRecommendations } from './server/jobs/recommend.ts';
+import { compareJobs, MAX_COMPARED_JOBS } from './server/jobs/compare.ts';
+import { computeJobInsights } from './server/jobs/insights.ts';
 import {
   JOB_SOURCE_LABEL,
-  matchJobToSkills,
   type LiveJob,
 } from './shared/jobs.ts';
 
@@ -6430,21 +6434,6 @@ app.post(
 // instead of a flattering default.
 const jobSearchRateLimit = rateLimit(20, 60_000, 'jobs');
 
-/** The candidate's own skill names, used to explain a match. */
-async function loadCandidateSkillNames(userId: string): Promise<string[]> {
-  try {
-    const rows = await getUserSkills(userId);
-    return rows
-      .map((row) => row.skill?.name)
-      .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
-  } catch (error) {
-    // A failure to read the candidate's skills must not fail the search: the
-    // vacancies are still real, only the explanation is missing.
-    console.error('Failed to load candidate skills for job matching:', error);
-    return [];
-  }
-}
-
 /** Answers a provider failure with a state the interface can explain. */
 function sendJobSearchError(res: Response, error: JobSearchError): void {  if (error.retryAfterSeconds !== null) {
     res.setHeader('Retry-After', String(error.retryAfterSeconds));
@@ -6472,7 +6461,7 @@ app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request
     // configures. The candidate sees one list; the provenance of each posting
     // is on the posting.
     const result = await searchAllJobs({ ...(req.query as Record<string, unknown>) });
-    const candidateSkills = await loadCandidateSkillNames(req.authUser!.id);
+    const candidate = await loadMatchCandidate(req.authUser!.id);
 
     // The semantic factor is computed for the whole result set in one go, so
     // the cost is one model call and one comparison however many postings
@@ -6481,14 +6470,25 @@ app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request
     const semanticFactors = await semanticFactorsFor(
       result.jobs,
       req.authUser!.id,
-      { skillNames: candidateSkills },
+      {
+        headline: candidate.headline,
+        skillNames: candidate.skillNames,
+        targetRoleTitles: candidate.targetRole ? [candidate.targetRole] : [],
+        experienceLevel: candidate.experienceLevel,
+        educationLevel: candidate.educationLevel,
+        location: candidate.city,
+      },
       CATALOG_SKILL_NAMES
     );
 
+    // The explanation is computed here, on the server, against the candidate's
+    // own record. The browser used to re-derive it, which meant two answers
+    // to the same question; now there is one.
+    const breakdowns = explainJobs(result.jobs, candidate, semanticFactors);
+
     const jobs = result.jobs.map((job: LiveJob) => ({
       job,
-      match: matchJobToSkills(job, candidateSkills, CATALOG_SKILL_NAMES),
-      ...(semanticFactors.get(job.id) ? { semantic: semanticFactors.get(job.id)! } : {}),
+      match: breakdowns.get(job.id)!,
     }));
 
     return res.json({
@@ -6516,6 +6516,239 @@ app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request
   }
 });
 
+// Vacancies the platform recommends for this candidate.
+//
+// A search answers a question the candidate asked. This answers the other one:
+// what should I look at? The ranking is the platform's own matcher, run on
+// the candidate's own record, read from the database — so a recommendation
+// and a search result are scored by one function and never disagree.
+//
+// Every recommendation carries its reason. A ranking the candidate cannot
+// read is a ranking they cannot act on.
+app.get('/api/jobs/recommend', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
+  try {
+    if (!isJobSearchConfigured() && !hasConfiguredAtsBoards()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Live job search is not configured on this server.',
+        code: 'not_configured',
+      });
+    }
+
+    const candidate = await loadMatchCandidate(req.authUser!.id);
+
+    // The search is built from the candidate's own record, so a candidate who
+    // has not said what to look for still gets something that fits. The
+    // filters the caller may narrow it with are the ones the search route
+    // already accepts, and they are validated by the provider's own rules.
+    const requested = req.query as Record<string, unknown>;
+    const filters: Record<string, unknown> = {};
+    for (const key of ['country', 'location', 'language', 'datePosted', 'remoteOnly', 'kind', 'sources', 'employmentTypes', 'requirements']) {
+      if (requested[key] !== undefined) filters[key] = requested[key];
+    }
+
+    const result = await searchAllJobs({
+      ...filters,
+      query: buildRecommendationQuery(candidate),
+      numPages: 2,
+    });
+
+    // One batch, one model call, however many postings came back.
+    const semanticFactors = await semanticFactorsFor(
+      result.jobs,
+      req.authUser!.id,
+      {
+        headline: candidate.headline,
+        skillNames: candidate.skillNames,
+        targetRoleTitles: candidate.targetRole ? [candidate.targetRole] : [],
+        experienceLevel: candidate.experienceLevel,
+        educationLevel: candidate.educationLevel,
+        location: candidate.city,
+      },
+      CATALOG_SKILL_NAMES
+    );
+
+    const breakdowns = explainJobs(result.jobs, candidate, semanticFactors);
+    const limit = Math.min(24, Math.max(1, Number(req.query.limit) || 12));
+    const recommendations = rankRecommendations(result.jobs, breakdowns, limit);
+
+    return res.json({
+      success: true,
+      recommendations,
+      quota: result.quota,
+      cached: result.cached,
+      source: JOB_SOURCE_LABEL,
+      checkedAt: result.fetchedAt,
+      boardsRead: result.boardsRead,
+      boardsFailed: result.boardsFailed,
+      // What the ranking was based on, so the candidate can see why it is the
+      // ranking it is. Nothing here is inferred: it is what the record says.
+      candidate: {
+        skillCount: candidate.skillNames.length,
+        experienceLevel: candidate.experienceLevel,
+        targetOpportunityType: candidate.targetOpportunityType,
+        educationLevel: candidate.educationLevel,
+        location: candidate.city,
+        targetRole: candidate.targetRole,
+      },
+    });
+  } catch (error) {
+    if (error instanceof JobSearchError) {
+      return sendJobSearchError(res, error);
+    }
+    console.error('Failed to recommend jobs:', error);
+    return res.status(500).json({ error: 'Failed to recommend jobs' });
+  }
+});
+
+// Two or more vacancies, side by side.
+//
+// The postings are read by the server, never taken from the browser: the
+// browser names the postings, the server reads them and scores them. So a
+// comparison cannot be built on a posting the caller invented.
+app.post('/api/jobs/compare', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const rawIds = Array.isArray(body.jobIds) ? body.jobIds : [];
+    const jobIds = [...new Set(rawIds.map((id) => String(id).trim()).filter(Boolean))].slice(0, MAX_COMPARED_JOBS);
+
+    if (jobIds.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: `Pick at least two postings to compare, and no more than ${MAX_COMPARED_JOBS}.`,
+      });
+    }
+
+    if (!isJobSearchConfigured() && !hasConfiguredAtsBoards()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Live job search is not configured on this server.',
+        code: 'not_configured',
+      });
+    }
+
+    const candidate = await loadMatchCandidate(req.authUser!.id);
+
+    // The same search the candidate was looking at, so the postings are read
+    // from the same place the list came from. The filter is the candidate's
+    // own, and it is validated by the provider's rules before it is used.
+    const filters = (body.filters ?? {}) as Record<string, unknown>;
+    const result = await searchAllJobs(filters);
+
+    const wanted = new Set(jobIds);
+    const jobs = result.jobs.filter((job: LiveJob) => wanted.has(job.id));
+
+    const found = new Set(jobs.map((job: LiveJob) => job.id));
+    const missing = jobIds.filter((id) => !found.has(id));
+
+    if (jobs.length < 2) {
+      return res.status(404).json({
+        success: false,
+        error: 'Those postings are no longer in the list. Search again and compare from the fresh list.',
+        missing,
+      });
+    }
+
+    const semanticFactors = await semanticFactorsFor(
+      jobs,
+      req.authUser!.id,
+      {
+        headline: candidate.headline,
+        skillNames: candidate.skillNames,
+        targetRoleTitles: candidate.targetRole ? [candidate.targetRole] : [],
+        experienceLevel: candidate.experienceLevel,
+        educationLevel: candidate.educationLevel,
+        location: candidate.city,
+      },
+      CATALOG_SKILL_NAMES
+    );
+
+    const breakdowns = explainJobs(jobs, candidate, semanticFactors);
+    const comparison = compareJobs(jobs, breakdowns);
+
+    return res.json({
+      success: true,
+      comparison,
+      missing,
+      checkedAt: result.fetchedAt,
+      boardsRead: result.boardsRead,
+      boardsFailed: result.boardsFailed,
+    });
+  } catch (error) {
+    if (error instanceof JobSearchError) {
+      return sendJobSearchError(res, error);
+    }
+    console.error('Failed to compare jobs:', error);
+    return res.status(500).json({ error: 'Failed to compare jobs' });
+  }
+});
+
+// The market, measured.
+//
+// The figures are worked out from the postings the platform really read, and
+// each one states its own calculation. A number that cannot be computed is
+// left out rather than shown as zero.
+app.get('/api/jobs/insights', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
+  try {
+    if (!isJobSearchConfigured() && !hasConfiguredAtsBoards()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Live job search is not configured on this server.',
+        code: 'not_configured',
+      });
+    }
+
+    const candidate = await loadMatchCandidate(req.authUser!.id);
+
+    const requested = req.query as Record<string, unknown>;
+    const filters: Record<string, unknown> = {};
+    for (const key of ['country', 'location', 'language', 'datePosted', 'remoteOnly', 'kind', 'sources', 'employmentTypes', 'requirements']) {
+      if (requested[key] !== undefined) filters[key] = requested[key];
+    }
+
+    const result = await searchAllJobs({ ...filters, query: 'jobs', numPages: 2 });
+
+    const semanticFactors = await semanticFactorsFor(
+      result.jobs,
+      req.authUser!.id,
+      {
+        headline: candidate.headline,
+        skillNames: candidate.skillNames,
+        targetRoleTitles: candidate.targetRole ? [candidate.targetRole] : [],
+        experienceLevel: candidate.experienceLevel,
+        educationLevel: candidate.educationLevel,
+        location: candidate.city,
+      },
+      CATALOG_SKILL_NAMES
+    );
+
+    const breakdowns = explainJobs(result.jobs, candidate, semanticFactors);
+    const insights = computeJobInsights(result.jobs, breakdowns);
+
+    return res.json({
+      success: true,
+      insights,
+      checkedAt: result.fetchedAt,
+      boardsRead: result.boardsRead,
+      boardsFailed: result.boardsFailed,
+      candidate: {
+        skillCount: candidate.skillNames.length,
+        experienceLevel: candidate.experienceLevel,
+        targetOpportunityType: candidate.targetOpportunityType,
+        educationLevel: candidate.educationLevel,
+        location: candidate.city,
+        targetRole: candidate.targetRole,
+      },
+    });
+  } catch (error) {
+    if (error instanceof JobSearchError) {
+      return sendJobSearchError(res, error);
+    }
+    console.error('Failed to work out the job market insights:', error);
+    return res.status(500).json({ error: 'Failed to work out the job market insights' });
+  }
+});
+
 // The provider's identifier for one vacancy.
 app.get('/api/jobs/:jobId', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
   try {
@@ -6533,11 +6766,12 @@ app.get('/api/jobs/:jobId', requireAuth, jobSearchRateLimit, async (req: Request
     const job = await getJobDetails(jobId);
     if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
 
-    const candidateSkills = await loadCandidateSkillNames(req.authUser!.id);
+    const candidate = await loadMatchCandidate(req.authUser!.id);
+    const breakdowns = explainJobs([job], candidate);
     return res.json({
       success: true,
       job,
-      match: matchJobToSkills(job, candidateSkills, CATALOG_SKILL_NAMES),
+      match: breakdowns.get(job.id)!,
       source: JOB_SOURCE_LABEL,
     });
   } catch (error) {

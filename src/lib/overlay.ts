@@ -34,6 +34,11 @@ export const useDismissOnEscape = (isOpen: boolean, onClose: () => void) => {
  *
  * The scrollbar width is compensated with padding so the layout does not
  * shift sideways when the scrollbar disappears.
+ *
+ * The compensation goes on the inline END edge, not on the physical right.
+ * The root scrollbar sits on the right in LTR and on the left in RTL, so a
+ * physical `paddingRight` would compensate the wrong edge in Arabic and the
+ * page would jump sideways the moment a modal opened.
  */
 export const useScrollLock = (isOpen: boolean) => {
   useEffect(() => {
@@ -41,15 +46,15 @@ export const useScrollLock = (isOpen: boolean) => {
 
     const { body } = document;
     const previousOverflow = body.style.overflow;
-    const previousPadding = body.style.paddingRight;
+    const previousPadding = body.style.paddingInlineEnd;
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
 
     body.style.overflow = 'hidden';
-    if (scrollbarWidth > 0) body.style.paddingRight = `${scrollbarWidth}px`;
+    if (scrollbarWidth > 0) body.style.paddingInlineEnd = `${scrollbarWidth}px`;
 
     return () => {
       body.style.overflow = previousOverflow;
-      body.style.paddingRight = previousPadding;
+      body.style.paddingInlineEnd = previousPadding;
     };
   }, [isOpen]);
 };

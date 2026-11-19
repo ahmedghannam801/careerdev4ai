@@ -25,6 +25,8 @@ import {
   ChevronDown,
   ChevronUp,
   Columns2,
+  Eye,
+  EyeOff,
   GripVertical,
   PanelLeft,
   RotateCcw,
@@ -232,6 +234,33 @@ export const CvSectionOrderControl: React.FC<CvSectionOrderControlProps> = ({
             : t('{name} moved to the main column'),
           { name: heading }
         )
+      );
+    },
+    [t]
+  );
+
+  /**
+   * Hides a section from the printed document, or shows it again.
+   *
+   * The key is kept in the order either way, so a section that is shown again
+   * returns to the place the candidate had put it rather than to the end.
+   */
+  const setSectionHidden = useCallback(
+    (key: CvSectionKey, hidden: boolean) => {
+      const current = latest.current.cv;
+      const next = new Set<CvSectionKey>(current.layout?.hiddenSections ?? []);
+      if (hidden) next.add(key);
+      else next.delete(key);
+      const rest: CVLayoutPreferences = { ...(current.layout ?? {}) };
+      delete rest.hiddenSections;
+      const nextLayout: CVLayoutPreferences =
+        next.size > 0 ? { ...rest, hiddenSections: [...next] } : rest;
+      const heading = latest.current.sections.find((section) => section.key === key)?.heading ?? '';
+      commitRef.current(
+        { layout: nextLayout },
+        hidden
+          ? fill(t('{name} hidden from the document'), { name: heading })
+          : fill(t('{name} shown on the document'), { name: heading })
       );
     },
     [t]
@@ -642,9 +671,44 @@ export const CvSectionOrderControl: React.FC<CvSectionOrderControlProps> = ({
                   <GripVertical className="h-4 w-4" aria-hidden="true" />
                 </button>
 
-                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--text-primary)]">
+                <span
+                  className={`min-w-0 flex-1 truncate text-[12px] font-medium ${
+                    section.hidden
+                      ? 'text-[var(--text-muted)] line-through decoration-[var(--text-muted)]/40'
+                      : 'text-[var(--text-primary)]'
+                  }`}
+                >
                   {section.heading}
                 </span>
+
+                {/* Visibility is a printing decision, so it is offered beside
+                    the move controls rather than in a separate screen. The
+                    section's words stay in the document either way. */}
+                <button
+                  type="button"
+                  onClick={() => setSectionHidden(section.key, !section.hidden)}
+                  aria-pressed={!section.hidden}
+                  title={
+                    section.hidden
+                      ? t('Show this section on the CV')
+                      : t('Hide this section from the CV')
+                  }
+                  aria-label={fill(
+                    section.hidden ? t('Show {name} on the CV') : t('Hide {name} from the CV'),
+                    { name: section.heading }
+                  )}
+                  className={`shrink-0 rounded-md p-1 transition-colors hover:bg-[var(--surface-secondary)] ${
+                    section.hidden
+                      ? 'text-[var(--text-muted)]'
+                      : 'text-[var(--color-primary-text)]'
+                  }`}
+                >
+                  {section.hidden ? (
+                    <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                </button>
 
                 {supportsSidebar && (
                   <button

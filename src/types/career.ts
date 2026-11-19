@@ -318,6 +318,14 @@ export interface CVLayoutPreferences {
   sectionColumns?: Partial<Record<CvSectionKey, CvSectionColumn>>;
   /** The order of the entries inside a section, by entry id. */
   entryOrder?: Partial<Record<CvSectionKey, string[]>>;
+  /**
+   * Sections the candidate chose not to print.
+   *
+   * A hidden section is not deleted: its words stay on the document (and in
+   * the records it is projected from), so showing it again puts it back in the
+   * same place instead of asking the candidate to retype it.
+   */
+  hiddenSections?: CvSectionKey[];
 }
 
 /** One volunteering stint, as it appears on a CV. */

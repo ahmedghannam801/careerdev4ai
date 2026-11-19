@@ -252,7 +252,7 @@ export const TrafficAnalyticsPanel: React.FC = () => {
           {report.topPages.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">{t('No data for this period')}</p>
           ) : (
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-start text-xs">
               <thead>
                 <tr className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   <th className="py-1 font-semibold">{t('Page')}</th>
@@ -318,7 +318,7 @@ export const TrafficAnalyticsPanel: React.FC = () => {
           {report.countries.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">{t('No data for this period')}</p>
           ) : (
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-start text-xs">
               <thead>
                 <tr className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   <th className="py-1 font-semibold">{t('Country')}</th>

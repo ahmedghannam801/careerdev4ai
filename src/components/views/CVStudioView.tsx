@@ -4,11 +4,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Upload,
-  Printer,
   Download,
   Loader2,
   Trash2,
   PenLine,
+  Eye,
+  ArrowLeft,
   LayoutTemplate,
   Database,
   History
@@ -36,6 +37,8 @@ import { CvDataManager } from '../cv/studio/CvDataManager';
 import { CvStudioSectionNav, type CvStudioSection } from '../cv/studio/CvStudioSectionNav';
 import { CvSectionOrderControl } from '../cv/studio/CvSectionOrderControl';
 import { ResumeLanguagePicker } from '../cv/studio/ResumeLanguagePicker';
+import { CvSaveStatusIndicator } from '../cv/studio/CvSaveStatusIndicator';
+import { CvDraftRecovery } from '../cv/studio/CvDraftRecovery';
 import { CareerImage } from '../ui/CareerImage';
 import {
   authorizeCvTemplateExport,
@@ -43,7 +46,7 @@ import {
 } from '../../lib/cvTemplatesApi';
 import { takeTailoredCv } from '../../lib/tailoredCvHandoff';
 import { fetchCvTemplateCatalog } from '../../lib/cvTemplatesApi';
-import { printCvFromFrame } from '../../lib/cvPdfExport';
+import { downloadCvPdf } from '../../lib/cvPdfExport';
 import { CvStudioAiQuotaBadge } from '../cv/CvStudioAiQuotaBadge';
 import type { CvTemplateDefinition } from '../../../shared/cvTemplates';
 import { resolveCvTemplate } from '../../../shared/cvTemplates';
@@ -57,7 +60,6 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
     loadCVFromMyData,
     cvVersions,
     saveCVVersion,
-    saveActiveCvDocument,
     deleteCVVersion,
     runAiCvOptimization,
     isOptimizingCV,
@@ -258,67 +260,45 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  // The paper itself, so the PDF frame receives the exact element that is on
-  // the screen rather than a re-render that could differ by a font or a
-  // breakpoint.
+  // The phase the PDF export is in, so a slow phone says "Drawing page 3"
+  // rather than showing an unresponsive button.
+  const [pdfPhase, setPdfPhase] = useState<'fonts' | 'pages' | 'writing' | null>(null);
+  // The paper itself, so the PDF raster is taken from the exact element that
+  // is on the screen rather than from a re-render that could differ by a font
+  // or a breakpoint.
   const paperFrameRef = useRef<HTMLDivElement | null>(null);
 
+  // The document is persisted by the context, which owns the debounce,
+  // the write queue and the draft. The studio only displays the result: a
+  // layout change, a typed bullet and a reordered section all travel through
+  // `updateCV`, so all of them are saved by the same path.
+
   /**
-   * The layout the candidate chose, as a value.
+   * Which half of the editor a phone is showing.
    *
-   * The editor writes it into the document immediately, so the preview is
-   * always current. This signature is only about durability: when it changes,
-   * the document is written back to the newest CV version so a reload keeps
-   * the order, the columns and the placement of the contact block.
+   * A split view does not fit a phone: half a sheet of A4 is unreadable, and a
+   * form squeezed beside it is worse. On a small screen the two become two
+   * full-screen panes with one persistent switch between them. The editor is
+   * never unmounted, so the open section, the cursor and the page's scroll
+   * position survive the switch. Desktop ignores this state and keeps the
+   * split view.
    */
-  const layoutSignature = useMemo(
-    () =>
-      JSON.stringify({
-        sectionOrder: activeCV.sectionOrder ?? [],
-        layout: activeCV.layout ?? {},
-        links: (activeCV.links ?? []).map((link) => [
-          link.id,
-          link.enabled,
-          link.placement ?? null,
-        ]),
-      }),
-    [activeCV.sectionOrder, activeCV.layout, activeCV.links]
-  );
-
-  const saveDocumentRef = useRef(saveActiveCvDocument);
-  useEffect(() => {
-    saveDocumentRef.current = saveActiveCvDocument;
-  }, [saveActiveCvDocument]);
-
-  const layoutSaveReady = useRef(false);
-  useEffect(() => {
-    // The first render is the document as it was loaded, not a change the
-    // candidate made. Writing it back would be a pointless round trip.
-    if (!layoutSaveReady.current) {
-      layoutSaveReady.current = true;
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      void saveDocumentRef.current().catch(() => {
-        // The error is already logged by the context. The document on screen
-        // is still the candidate's; the next change tries again.
-      });
-    }, 1200);
-    return () => window.clearTimeout(timer);
-  }, [layoutSignature]);
+  const [mobilePane, setMobilePane] = useState<'edit' | 'preview'>('edit');
 
   /**
    * Downloads the CV as a PDF.
    *
-   * The file is printed by the browser from the real template. The server
-   * still decides whether this candidate may export the template, so the
-   * frame opens only after the authorisation route says yes. The document is
-   * the one in the preview: same template, same fonts, same colours, same
-   * Arabic shaping, same page breaks.
+   * The file is generated in the browser from the real paper: no print
+   * dialog, no new tab and no redirect. The server still decides whether
+   * this candidate may export the template, so the paper is drawn only after
+   * the authorisation route says yes. The document is the one in the
+   * preview: same template, same fonts, same colours, same Arabic shaping,
+   * same page order.
    */
   const handlePdfExport = async () => {
     if (isExportingPdf) return;
     setIsExportingPdf(true);
+    setPdfPhase('fonts');
     setExportError(null);
     try {
       const result = await authorizeCvTemplateExport(settings.cvTemplateId);
@@ -333,31 +313,12 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         return;
       }
 
-      const templateName =
-        studioTemplateCatalog.find((template) => template.id === settings.cvTemplateId)?.name ??
-        settings.cvTemplateId;
       const name = activeCV.fullName?.trim() || 'CV';
-      await printCvFromFrame({
-        paperHtml: paper.outerHTML,
-        title: `${name} — ${templateName}`,
-        language: settings.resumeLanguage,
-        direction: settings.resumeLanguage === 'ar' ? 'rtl' : 'ltr',
-        baseHref: typeof document !== 'undefined' ? document.baseURI : undefined,
-        styles: (() => {
-          const links: string[] = [];
-          const inline: string[] = [];
-          document
-            .querySelectorAll('link[rel="stylesheet"]')
-            .forEach((node) => {
-              const href = node.getAttribute('href');
-              if (href) links.push(href);
-            });
-          document.querySelectorAll('head style').forEach((node) => {
-            const css = node.textContent ?? '';
-            if (css.trim()) inline.push(css);
-          });
-          return { links, inline };
-        })(),
+      await downloadCvPdf({
+        paper,
+        title: `${name} — CV`,
+        author: name,
+        onProgress: setPdfPhase,
       });
     } catch (error) {
       setExportError(
@@ -367,6 +328,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       );
     } finally {
       setIsExportingPdf(false);
+      setPdfPhase(null);
     }
   };
 
@@ -506,15 +468,23 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               <button
                 onClick={() => void handlePdfExport()}
                 disabled={isExportingPdf}
-                title={t('Opens the browser print dialog. Choose "Save as PDF" as the destination.')}
+                title={t('Downloads the document you see as a PDF file.')}
                 className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
               >
                 {isExportingPdf ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  <Printer className="w-3.5 h-3.5" />
+                  <Download className="w-3.5 h-3.5" />
                 )}
-                <span>{isExportingPdf ? t('Preparing PDF...') : t('Download as PDF')}</span>
+                <span>
+                  {isExportingPdf
+                    ? pdfPhase === 'pages'
+                      ? t('Drawing pages...')
+                      : pdfPhase === 'writing'
+                        ? t('Writing the file...')
+                        : t('Preparing fonts...')
+                    : t('Download as PDF')}
+                </span>
               </button>
             </>
           )}
@@ -526,6 +496,10 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           written in is a property of the CV, and the interface language is a
           separate setting that this must never move. */}
       <ResumeLanguagePicker />
+
+      {/* A draft is offered where the document lives, above the workflow, so
+          it is seen before anything else is touched. */}
+      <CvDraftRecovery />
 
       {/* The background jobs of this candidate. The list is read back from the
           server, so a CV that finished while the tab was closed is still
@@ -658,58 +632,142 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
       {/* TAB 1: DOCUMENT EDITOR */}
       {activeTab === 'editor' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Form Controls (5 cols) */}
-          <div className="lg:col-span-5 space-y-4">
-            <CvSectionEditor
-              cv={activeCV}
-              update={updateCV}
-              targetRoleTitle={targetRole?.title ?? ''}
-              source={editorSource}
-              ratedSkills={ratedSkills}
-              advice={measuredReport}
-            />
-
-            <button
-              onClick={() => setShowVersionModal(true)}
-              className="w-full py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] transition-colors"
+        <>
+          <div className="grid grid-cols-1 gap-8 pb-24 items-start lg:grid-cols-12 lg:pb-0">
+            {/* Left Form Controls (5 cols). On a phone this is the whole
+                screen in "Edit"; it is only hidden, never unmounted, so the
+                open section and the page's scroll position survive a switch
+                to the preview. */}
+            <div
+              className={`space-y-4 lg:col-span-5 lg:block ${
+                mobilePane === 'preview' ? 'hidden' : ''
+              }`}
             >
-              {t('Save as New Version Snapshot')}
-            </button>
-
-            <button
-              onClick={loadCVFromMyData}
-              className="w-full py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)]" />
-              {t('Fill from my records')}
-            </button>
-            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed -mt-2">
-              {t(
-                'Brings in your experience, education, projects, volunteering, completed courses, certificates and rated skills. Anything you have already written is kept.'
-              )}
-            </p>
-          </div>
-
-          {/* Right Clean Paper Preview (7 cols) */}
-          <div className="lg:col-span-7 space-y-4">
-            <CvSectionOrderControl
-              cv={activeCV}
-              template={studioTemplate}
-              update={updateCV}
-              t={t}
-              language={settings.resumeLanguage}
-            />
-            <div ref={paperFrameRef}>
-              <CvPreview
+              <CvSaveStatusIndicator className="px-1" />
+              <CvSectionEditor
                 cv={activeCV}
-                language={settings.resumeLanguage}
-                templateId={settings.cvTemplateId}
-                catalog={studioTemplateCatalog}
+                update={updateCV}
+                targetRoleTitle={targetRole?.title ?? ''}
+                source={editorSource}
+                ratedSkills={ratedSkills}
+                advice={measuredReport}
               />
+
+              <button
+                onClick={() => setShowVersionModal(true)}
+                className="w-full py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] transition-colors"
+              >
+                {t('Save as New Version Snapshot')}
+              </button>
+
+              <button
+                onClick={loadCVFromMyData}
+                className="w-full py-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-primary)] transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)]" />
+                {t('Fill from my records')}
+              </button>
+              <p className="text-[11px] text-[var(--text-muted)] leading-relaxed -mt-2">
+                {t(
+                  'Brings in your experience, education, projects, volunteering, completed courses, certificates and rated skills. Anything you have already written is kept.'
+                )}
+              </p>
+            </div>
+
+            {/* Right Clean Paper Preview (7 cols). On a phone "Preview" turns
+                this into a full-screen sheet with its own back control; the
+                element stays the same, so its scroll position is kept. */}
+            <div
+              className={`space-y-4 lg:col-span-7 lg:block ${
+                mobilePane === 'preview'
+                  ? 'fixed inset-0 z-[70] flex flex-col bg-[var(--surface-main)] lg:static lg:z-auto lg:flex-none lg:bg-transparent'
+                  : ''
+              }`}
+            >
+              {mobilePane === 'preview' && (
+                <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-main)] px-4 py-3 lg:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setMobilePane('edit')}
+                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 text-xs font-semibold text-[var(--text-primary)]"
+                  >
+                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                    {t('Back to Editing')}
+                  </button>
+                  <span className="min-w-0 flex-1 truncate text-right text-[11px] text-[var(--text-muted)]">
+                    {studioTemplate.name}
+                  </span>
+                </div>
+              )}
+
+              <div
+                className={
+                  mobilePane === 'preview'
+                    ? 'min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-4 pb-24 lg:overflow-visible lg:p-0 lg:pb-0'
+                    : ''
+                }
+              >
+                <div className={`space-y-4 ${mobilePane === 'preview' ? 'hidden lg:block' : ''}`}>
+                  <CvSectionOrderControl
+                    cv={activeCV}
+                    template={studioTemplate}
+                    update={updateCV}
+                    t={t}
+                    language={settings.resumeLanguage}
+                  />
+                </div>
+                <div ref={paperFrameRef} className="min-w-0">
+                  <CvPreview
+                    cv={activeCV}
+                    language={settings.resumeLanguage}
+                    templateId={settings.cvTemplateId}
+                    catalog={studioTemplateCatalog}
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* The pane switcher a phone needs while editing. On a desktop the
+              split view shows both halves, so the switch is not offered.
+              It is a labelled group of toggle buttons rather than a landmark,
+              so the application keeps exactly one navigation. */}
+          <div
+            role="group"
+            aria-label={t('CV editor view')}
+            className="fixed inset-x-0 bottom-0 z-[80] border-t border-[var(--border-subtle)] bg-[var(--surface-main)]/95 backdrop-blur lg:hidden"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <div className="mx-auto flex max-w-md items-stretch gap-2 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setMobilePane('edit')}
+                aria-pressed={mobilePane === 'edit'}
+                className={`flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-colors ${
+                  mobilePane === 'edit'
+                    ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+                    : 'border border-[var(--border-subtle)] text-[var(--text-secondary)]'
+                }`}
+              >
+                <PenLine className="h-4 w-4" aria-hidden="true" />
+                {t('Edit')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobilePane('preview')}
+                aria-pressed={mobilePane === 'preview'}
+                className={`flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-colors ${
+                  mobilePane === 'preview'
+                    ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+                    : 'border border-[var(--border-subtle)] text-[var(--text-secondary)]'
+                }`}
+              >
+                <Eye className="h-4 w-4" aria-hidden="true" />
+                {t('Preview')}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* STEP "Analyze": the two systems that read the document, kept apart.

@@ -24,9 +24,11 @@ import {
   FileText,
   GraduationCap,
   MapPin,
+  Scale,
   Sparkles,
 } from 'lucide-react';
 import type { MatchedJob } from '../../lib/jobsApi';
+import type { JobMatchBreakdown } from '../../../shared/jobMatching';
 import { JOB_SOURCE_LABELS } from '../../../shared/jobs';
 import { SpotlightCard } from '../react-bits/SpotlightCard';
 import { CareerImage } from '../ui/CareerImage';
@@ -45,8 +47,23 @@ interface LiveJobCardProps {
   tracking: boolean;
   /** True while this vacancy is on its way to the CV Studio. */
   tailoring: boolean;
+  /** Adds this vacancy to the comparison, when the screen offers one. */
+  onCompare?: (item: MatchedJob) => void;
+  /** True when this vacancy is already in the comparison. */
+  comparing?: boolean;
   /** Translates a source string. */
   t: (key: string) => string;
+}
+
+/**
+ * Whether the fit could be compared at all.
+ *
+ * A posting that states nothing comparable leaves every factor unevaluated.
+ * That is not a score of zero: it is a comparison that was never made, and the
+ * card says so rather than showing a number.
+ */
+function hasComparableMatch(match: JobMatchBreakdown): boolean {
+  return match.factors.some((factor) => factor.evaluated);
 }
 
 /** Formats a date the way the platform's other dates are formatted. */
@@ -108,6 +125,8 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
   onCreateTailoredCv,
   tracking,
   tailoring,
+  onCompare,
+  comparing,
   t,
 }) => {
   const { job, match } = item;
@@ -130,8 +149,12 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
   const hasDescription = description.trim().length > 0;
   const tailorReasonId = `tailored-cv-reason-${job.id}`;
 
+  const matchedSkills = match.requiredSkills.matched;
+  const missingSkills = match.requiredSkills.missing;
+  const comparable = hasComparableMatch(match);
+
   const scoreTone =
-    match.score === null
+    !comparable
       ? 'text-[var(--text-muted)]'
       : match.score >= 70
         ? 'text-[var(--color-success-strong)]'
@@ -151,6 +174,8 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
         <div className="flex items-start gap-3">
           <CareerImage
             category={job.title}
+            src={job.logoUrl}
+            alt={job.company}
             size="sm"
             aspectRatio="square"
             rounded="rounded-xl"
@@ -243,7 +268,7 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
 
       {/* Match explanation */}
       <div data-tour="job-match-badge" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3">
-        {match.score === null ? (
+        {!comparable ? (
           <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
             {t(
               'This posting does not list the skills it asks for, so your fit cannot be compared. Read the description and apply on the employer’s own page.'
@@ -257,13 +282,13 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
                 {t('Your fit: {score}%').replace('{score}', String(match.score))}
               </span>
               <span className="font-normal text-[var(--text-muted)]">
-                {t('({matched} of {total} skills in your profile)').replace('{matched}', String(match.matched.length)).replace('{total}', String(match.matched.length + match.missing.length))}
+                {t('({matched} of {total} skills in your profile)').replace('{matched}', String(matchedSkills.length)).replace('{total}', String(matchedSkills.length + missingSkills.length))}
               </span>
             </p>
 
-            {match.matched.length > 0 && (
+            {matchedSkills.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {match.matched.map((skill) => (
+                {matchedSkills.map((skill) => (
                   <span
                     key={skill}
                     className="rounded-full bg-[var(--color-success-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-success-strong)]"
@@ -274,13 +299,13 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
               </div>
             )}
 
-            {match.missing.length > 0 && (
+            {missingSkills.length > 0 && (
               <div className="space-y-1">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                   {t('Skills to build')}
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  {match.missing.slice(0, 8).map((skill) => (
+                  {missingSkills.slice(0, 8).map((skill) => (
                     <span
                       key={skill}
                       className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-primary)]"
@@ -288,9 +313,9 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
                       {skill}
                     </span>
                   ))}
-                  {match.missing.length > 8 && (
+                  {missingSkills.length > 8 && (
                     <span className="text-[10px] text-[var(--text-muted)]">
-                      {t('+{count} more').replace('{count}', String(match.missing.length - 8))}
+                      {t('+{count} more').replace('{count}', String(missingSkills.length - 8))}
                     </span>
                   )}
                 </div>
@@ -386,6 +411,20 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
         >
           <span>{t('Track application')}</span>
         </button>
+
+        {/* The comparison is offered only where the screen offers one, so the
+            card does not show a button that would do nothing. */}
+        {onCompare && (
+          <button
+            type="button"
+            onClick={() => onCompare(item)}
+            aria-pressed={comparing}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[11px] font-semibold text-[var(--color-primary-text)] transition-colors hover:bg-[var(--accent-surface)]"
+          >
+            <Scale className="h-3.5 w-3.5" />
+            <span>{comparing ? t('In the comparison') : t('Compare')}</span>
+          </button>
+        )}
 
         <button
           type="button"

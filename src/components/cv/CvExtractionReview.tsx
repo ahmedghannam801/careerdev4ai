@@ -937,7 +937,7 @@ const FieldRow: React.FC<FieldRowProps> = ({ field, status, onChange, compact, t
         field.evidence.map((evidence, index) => (
           <p
             key={`${evidence.text}-${index}`}
-            className="text-[10px] leading-relaxed text-[var(--text-muted)] bg-[var(--surface-secondary)]/50 rounded-lg px-2.5 py-1.5 border-l-2 border-[var(--border-subtle)]"
+            className="text-[10px] leading-relaxed text-[var(--text-muted)] bg-[var(--surface-secondary)]/50 rounded-lg px-2.5 py-1.5 border-s-2 border-[var(--border-subtle)]"
           >
             {evidence.text}
           </p>

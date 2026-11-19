@@ -29,17 +29,12 @@ import { CV_TEMPLATES, FREE_CV_TEMPLATE_ID } from '../shared/cvTemplates.ts';
 import { cvTemplateSample } from '../shared/cvTemplateSample.ts';
 import { buildCvLayoutPlan } from '../shared/cvLayout.ts';
 import { CvTemplateRenderer } from '../src/components/cv/templates/CvTemplateRenderer.tsx';
-import { buildCvPrintHtml } from '../src/lib/cvPdfExport.ts';
+import { cvPdfFileName } from '../src/lib/cvPdfExport.ts';
 import { buildCvDocx } from '../server/cvTemplates/docx.ts';
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */
 /* -------------------------------------------------------------------------- */
-
-const styles = {
-  links: ['/assets/app.css'],
-  inline: ['.cv-template { font-family: Georgia; border-top: 4px solid #2563eb; }'],
-};
 
 const freeTemplate =
   CV_TEMPLATES.find((template) => template.id === FREE_CV_TEMPLATE_ID) ?? CV_TEMPLATES[0];
@@ -55,19 +50,6 @@ function renderPaper(cv: ReturnType<typeof cvTemplateSample>, template = freeTem
   );
 }
 
-function printDocument(
-  cv: ReturnType<typeof cvTemplateSample>,
-  template = freeTemplate
-): string {
-  return buildCvPrintHtml({
-    paperHtml: renderPaper(cv, template),
-    title: `${cv.fullName} - ${template.id}`,
-    language: 'en',
-    direction: 'ltr',
-    styles,
-  });
-}
-
 function documentXml(buffer: Buffer): string {
   const archive = unzipSync(new Uint8Array(buffer));
   const xml = archive['word/document.xml'];
@@ -80,70 +62,79 @@ function documentXml(buffer: Buffer): string {
 /* -------------------------------------------------------------------------- */
 
 describe('the PDF export', () => {
-  test('it prints the document that is on the screen', () => {
+  test('it exports the document that is on the screen', () => {
     const cv = cvTemplateSample('en');
-    const html = printDocument(cv);
+    const paper = renderPaper(cv);
 
-    assert.ok(html.includes(cv.fullName), 'the candidate name is printed');
-    assert.ok(html.includes(cv.experiences[0].company), 'the employer is printed');
-    assert.ok(html.includes(cv.skillsList[0]), 'the skills are printed');
+    assert.ok(paper.includes(cv.fullName), 'the candidate name is on the paper');
+    assert.ok(paper.includes(cv.experiences[0].company), 'the employer is on the paper');
+    assert.ok(paper.includes(cv.skillsList[0]), 'the skills are on the paper');
+    assert.ok(paper.includes('data-cv-print'), 'the export reads the real paper');
   });
 
-  test('it prints the document as it is now, not as it was', () => {
+  test('it exports the document as it is now, not as it was', () => {
     const cv = cvTemplateSample('en');
-    const before = printDocument(cv);
+    const before = renderPaper(cv);
     assert.ok(!before.includes('Shipped the new billing engine'), 'the edit is not there yet');
 
-    // The candidate edits the document in the studio.
+    // The candidate edits the document in the studio. The exporter reads the
+    // live paper, so the edit reaches the file.
     const edited = {
       ...cv,
       summary: 'Shipped the new billing engine across eleven markets.',
     };
 
-    const after = printDocument(edited);
+    const after = renderPaper(edited);
     assert.ok(
       after.includes('Shipped the new billing engine across eleven markets.'),
-      'the edit is printed'
+      'the edit is on the paper the export rasterises'
     );
   });
 
   test('it keeps the contact details and the links', () => {
     const cv = cvTemplateSample('en');
-    const html = printDocument(cv);
+    const paper = renderPaper(cv);
 
-    assert.ok(html.includes(cv.email), 'the email address is printed');
-    assert.ok(html.includes(cv.phone), 'the phone number is printed');
+    assert.ok(paper.includes(cv.email), 'the email address is on the paper');
+    assert.ok(paper.includes(cv.phone), 'the phone number is on the paper');
     for (const link of cv.links ?? []) {
-      assert.ok(html.includes(link.url), `the link ${link.label} is printed`);
+      assert.ok(paper.includes(link.url), `the link ${link.label} is on the paper`);
     }
   });
 
-  test('it is a sheet of A4 with the styles the preview uses', () => {
+  test('it is a sheet of A4 with a selectable text layer', () => {
     const cv = cvTemplateSample('en');
-    const html = printDocument(cv);
-
-    assert.ok(html.includes('@page { size: A4; margin: 0; }'), 'the page is A4');
-    assert.ok(html.includes('href="/assets/app.css"'), 'the stylesheets are carried over');
-    assert.ok(html.includes(styles.inline[0]), 'the template styling is carried over');
-    assert.ok(html.includes('data-cv-print'), 'the printed document is the paper');
+    const exporter = readFileSync(
+      new URL('../src/lib/cvPdfExport.ts', import.meta.url),
+      'utf8'
+    );
+    assert.ok(exporter.includes('PAPER_WIDTH_PX = 794'), 'the paper is A4 at 96dpi');
+    assert.ok(exporter.includes('PDF_A4_WIDTH'), 'the file is A4 in points');
+    assert.ok(exporter.includes('collectTextRuns'), 'the words stay selectable');
+    assert.ok(exporter.includes('inlineFontCss'), 'the template fonts are carried into the raster');
+    assert.ok(cv.fullName.length > 0);
   });
 
-  test('the studio exports the document it holds', () => {
-    // The studio's own handler must hand the document it is showing to the
-    // printer. If it sent a stored version instead, the file would not be the
-    // CV on the screen.
+  test('the file is named after the candidate', () => {
+    assert.equal(cvPdfFileName('Ahmed Ebrahim'), 'Ahmed_Ebrahim_CV.pdf');
+    assert.equal(cvPdfFileName('أحمد إبراهيم'), 'أحمد_إبراهيم_CV.pdf');
+  });
+
+  test('the studio exports the document it holds, without a print dialog', () => {
+    // The studio's own handler must hand the live paper to the exporter. If
+    // it sent a stored version instead, the file would not be the CV on the
+    // screen — and if it printed, the candidate would meet a dialog.
     const studio = readFileSync(
       new URL('../src/components/views/CVStudioView.tsx', import.meta.url),
       'utf8'
     );
     assert.ok(
       studio.includes("querySelector<HTMLElement>('[data-cv-print]')"),
-      'the studio must print the paper it is showing'
+      'the studio must export the paper it is showing'
     );
-    assert.ok(
-      studio.includes('printCvFromFrame'),
-      'the studio must print through the shared print builder'
-    );
+    assert.ok(studio.includes('downloadCvPdf'), 'the studio must download a file');
+    assert.ok(!studio.includes('printCvFromFrame'), 'the print dialog is gone');
+    assert.ok(!studio.includes('window.print'), 'no print dialog is opened');
   });
 });
 

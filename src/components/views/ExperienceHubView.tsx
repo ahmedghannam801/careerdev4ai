@@ -528,7 +528,7 @@ export const ExperienceHubView: React.FC = () => {
               onClick={() => setTab('catalog')}
               className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent-strong)] hover:underline"
             >
-              {t('Browse the full catalogue')} <ArrowRight size={12} />
+              {t('Browse the full catalogue')} <ArrowRight size={12} className="rtl:rotate-180" />
             </button>
           </div>
 

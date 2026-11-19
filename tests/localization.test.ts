@@ -45,7 +45,17 @@ function collectTranslatableSources(): string[] {
       // The captured text is the raw source literal, so the escapes are
       // still in it. The runtime key is the unescaped value, which is what
       // the catalogue is keyed by.
-      const value = match[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+      //
+      // A unicode escape is a key like any other: the catalogue holds the
+      // character itself, so the escape has to be decoded here as well, or
+      // the string is reported as missing while the page renders it
+      // correctly.
+      const value = match[1]
+        .replace(/\\'/g, "'")
+        .replace(/\\\\/g, '\\')
+        .replace(/\\u([0-9a-fA-F]{4})/g, (_match, hex: string) =>
+          String.fromCharCode(parseInt(hex, 16))
+        );
       if (!value) continue;
       // A legacy catalogue key is handled by the keyed translation object,
       // not by the source-string catalogue.

@@ -265,7 +265,7 @@ BEGIN
       jsonb_build_object('expired_credits', v_expired, 'grant_date', v_today::text)
     )
     ON CONFLICT (idempotency_key) DO NOTHING;
-  END LOOP;
+  END IF;
 
   -- 2. Grant today's allowance, at most once per day.
   SELECT * INTO v_grant

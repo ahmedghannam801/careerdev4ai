@@ -65,7 +65,7 @@ export const ScoreInfoTooltip: React.FC<ScoreInfoTooltipProps> = ({
       {open && (
         <span
           role="tooltip"
-          className="absolute bottom-full left-1/2 z-50 mb-2 w-72 -translate-x-1/2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-3 text-left shadow-lg"
+          className="absolute bottom-full left-1/2 z-50 mb-2 w-72 -translate-x-1/2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-3 text-start shadow-lg"
         >
           <span className="block text-xs font-bold text-[var(--text-primary)]">
             {label}

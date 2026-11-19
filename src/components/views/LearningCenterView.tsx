@@ -447,7 +447,7 @@ export const LearningCenterView: React.FC = () => {
               onClick={options.onExplore}
               className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent-strong)] hover:underline"
             >
-              {t('Explore all')} <ArrowRight className="h-3 w-3" />
+              {t('Explore all')} <ArrowRight className="h-3 w-3 rtl:rotate-180" />
             </button>
           )}
         </div>

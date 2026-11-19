@@ -149,6 +149,54 @@ function findPrevious<T>(
 }
 
 /**
+ * The header values this studio has written to the profile.
+ *
+ * The header of a CV is a fact, and the facts live in the records. But the
+ * records are a copy of what the candidate typed, written back a moment
+ * later, so a record is very often a keystroke or two behind the document.
+ * The history is how the two are told apart: a record that matches a value
+ * this studio wrote is its own echo, and a record that matches nothing it
+ * wrote was changed somewhere else.
+ */
+export type CvHeaderHistory = Readonly<Record<string, readonly string[]>>;
+
+export interface CvProjectionOptions {
+  /** The header values the studio has written, oldest first. */
+  history?: CvHeaderHistory;
+}
+
+/**
+ * Decides what the document shows for one header field.
+ *
+ * The rules, in order:
+ *
+ *   - the records know nothing: the candidate's text stands;
+ *   - the record says the same words the document does: the candidate's text
+ *     stands, with their own spacing. This is the rule that keeps a typed
+ *     space from vanishing, because the difference between the two is the
+ *     server's normalisation and not an edit;
+ *   - the record is a value this studio wrote: the candidate's text stands.
+ *     The record is a copy written back a moment later, so it is behind the
+ *     document and must not put the older words back on the screen;
+ *   - the candidate has written nothing here yet: the record seeds the field;
+ *   - the record says something this studio never wrote: it was changed
+ *     somewhere else, and it wins.
+ */
+function resolveHeaderText(
+  recordValue: string | undefined | null,
+  documentValue: string | undefined | null,
+  history: readonly string[]
+): string {
+  const record = (recordValue ?? '').trim();
+  const document = documentValue ?? '';
+  if (!record) return document;
+  if (record === document.trim()) return document;
+  if (history.some((value) => value.trim() === record)) return document;
+  if (!document.trim()) return record;
+  return record;
+}
+
+/**
  * Projects the records onto the document.
  *
  * The document is read for the candidate's own wording and written for
@@ -157,10 +205,12 @@ function findPrevious<T>(
  */
 export function mergeCanonicalCvDocument(
   source: CvSourceData,
-  document: CVProfile | null | undefined
+  document: CVProfile | null | undefined,
+  options: CvProjectionOptions = {}
 ): CVProfile {
   const profile = source.profile ?? {};
   const previous = document ?? ({} as CVProfile);
+  const history = options.history ?? {};
 
   const previousExperiences = previous.experiences ?? [];
   const previousEducation = previous.education ?? [];
@@ -176,18 +226,38 @@ export function mergeCanonicalCvDocument(
   // A fact the records know wins. What they do not know is left as the
   // document has it, so a candidate who typed something before the profile
   // caught up does not lose it.
-  const fullName = profile.fullName?.trim() || previous.fullName?.trim() || '';
-  const email = hiddenContactFields.has('email') ? '' : profile.email?.trim() || previous.email?.trim() || '';
-  const phone = hiddenContactFields.has('phone') ? '' : profile.phone?.trim() || previous.phone?.trim() || '';
-  const location = hiddenContactFields.has('location') ? '' : profile.location?.trim() || previous.location?.trim() || '';
-  const title = profile.title?.trim() || previous.title?.trim() || '';
-  // The summary is the candidate's wording for this CV, so the document wins.
-  // A paragraph that repeats an earlier one is folded away either way: the
-  // candidate pasted it twice, and a CV that says the same thing twice reads
-  // as noise.
+  //
+  // The candidate's own text is never trimmed here. The records are a copy of
+  // what was typed, written back a moment later, and trimming the difference
+  // between the two is what used to make a space vanish from the middle of a
+  // name while it was being typed.
+  const fullName = resolveHeaderText(profile.fullName, previous.fullName, history.fullName ?? []);
+  const email = hiddenContactFields.has('email')
+    ? ''
+    : resolveHeaderText(profile.email, previous.email, history.email ?? []);
+  const phone = hiddenContactFields.has('phone')
+    ? ''
+    : resolveHeaderText(profile.phone, previous.phone, history.phone ?? []);
+  const location = hiddenContactFields.has('location')
+    ? ''
+    : resolveHeaderText(profile.location, previous.location, history.location ?? []);
+  const title = resolveHeaderText(profile.title, previous.title, history.title ?? []);
+  // The summary is the candidate's wording for this CV, so the document wins
+  // — and it wins EXACTLY. A trailing space, a blank line between two
+  // paragraphs and a half-written sentence are all part of what they are
+  // typing, and the editor must not normalise them away or fold a paragraph
+  // out from under them.
+  //
+  // A summary that comes from the records is a different matter: it is a fact
+  // the platform holds, and a paragraph that repeats another one is folded
+  // away as it is read in. The printed CV folds a repeat in the candidate's
+  // own summary too — see `buildCvTemplateDocument` — but the editor never
+  // does, because there the text is what they are writing.
   const summary = previous.hiddenSummary
     ? ''
-    : dedupeSummaryParagraphs(previous.summary?.trim() || profile.summary?.trim() || '');
+    : previous.summary
+      ? previous.summary
+      : dedupeSummaryParagraphs(profile.summary ?? '');
 
   /* -- experience -------------------------------------------------------- */
   const consumedExperiences = new Set<string>();

@@ -100,6 +100,20 @@ import {
 } from '../../shared/atsAnalysis';
 import type { CvAiQuotaState } from '../../shared/cvAiQuota';
 import {
+  CvSaveQueue,
+  CV_AUTOSAVE_DEBOUNCE_MS,
+  CV_DRAFT_WRITE_DEBOUNCE_MS,
+  clearAllCvDrafts,
+  clearCvDraft,
+  markCvSavedAt,
+  readCvDraft,
+  readCvSavedAt,
+  writeCvDraft,
+  type CvDraftRecord,
+  type CvSaveStatus,
+} from '../lib/cvAutosave';
+export type { CvSaveStatus } from '../lib/cvAutosave';
+import {
   PRIVACY_VERSION,
   TERMS_VERSION,
   type ConsentSource,
@@ -387,6 +401,16 @@ const emptyProfile: UserProfile = {
   languages: [],
   links: {},
 };
+
+/**
+ * A locally kept copy of a document that has not reached the server yet.
+ *
+ * It exists for the one failure the server cannot cover: the tab closing (or
+ * the network dying) between an edit and the debounced write. The database
+ * remains the durable record; a draft is only ever offered back to the
+ * candidate, never presented as saved.
+ */
+export type CvDraft = CvDraftRecord<CVProfile>;
 
 interface CareerContextType {
   // Authentication
@@ -756,6 +780,23 @@ interface CareerContextType {
    * of the active CV, which is what hydration reads.
    */
   saveActiveCvDocument: (profile?: CVProfile) => Promise<void>;
+  /**
+   * The state of the studio's own write of the document.
+   *
+   * The editor has always applied a change to the screen immediately and
+   * written it back later. This says where that later write is, so a candidate
+   * is never left guessing — and, when it fails, says so instead of letting
+   * the screen imply a save that did not happen.
+   */
+  cvSaveStatus: CvSaveStatus;
+  /** The reason the last write failed, when `cvSaveStatus` is `error`. */
+  cvSaveError: string | null;
+  /** A local copy that outlived its debounce, if there is one. */
+  cvDraft: CvDraft | null;
+  /** Puts the draft back into the studio and tries to persist it again. */
+  recoverCvDraft: () => void;
+  /** Throws the local draft away without touching the server copy. */
+  discardCvDraft: () => void;
   duplicateCVVersion: (versionId: string) => void;
   renameCVVersion: (versionId: string, newName: string) => void;
   deleteCVVersion: (versionId: string) => void;
@@ -2361,6 +2402,40 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isOptimizingCV, setIsOptimizingCV] = useState(false);
   const [cvAnalysisError, setCvAnalysisError] = useState<AtsAnalysisFailure | null>(null);
 
+  // Autosave.
+  //
+  // `cvRevision` counts the candidate's edits, not renders and not the
+  // projection of the platform's records: only a change the candidate made in
+  // the studio is worth writing back. The saved revision is compared with it
+  // after every write, so a slow request cannot be mistaken for the newest
+  // document, and an older request can never overwrite a newer edit.
+  const [cvSaveStatus, setCvSaveStatus] = useState<CvSaveStatus>('idle');
+  const [cvSaveError, setCvSaveError] = useState<string | null>(null);
+  const [cvDraft, setCvDraft] = useState<CvDraft | null>(null);
+  const cvSaveQueueRef = useRef(new CvSaveQueue());
+  const cvSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cvDraftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushCvSaveRef = useRef<() => Promise<void>>(async () => {});
+  const activeCVRef = useRef<CVProfile>(activeCV);
+  const activeCvIdRef = useRef(activeCvId);
+  const cvVersionsRef = useRef<CVVersion[]>(cvVersions);
+  const targetRoleRef = useRef<TargetRole | null>(targetRole);
+  const currentUserIdRef = useRef<string | null>(null);
+  const isHydratedRef = useRef(false);
+  const cvDraftCheckedRef = useRef<string | null>(null);
+
+  /**
+   * The header values this studio has written to the profile.
+   *
+   * The records are a copy of what the candidate typed, written back a moment
+   * later, and the copy is sometimes a keystroke behind the document. A
+   * record that matches one of these values is the studio's own echo, and
+   * the projection must not read it as a newer truth and put the older words
+   * back on the screen. A record that matches none of them was changed
+   * somewhere else, and it wins.
+   */
+  const cvHeaderHistoryRef = useRef<Record<string, string[]>>({});
+
   // The CV Studio AI edit allowance.
   //
   // The studio is where the platform spends the most AI capacity per
@@ -3252,9 +3327,17 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // The projection waits for the hydration to finish. Before it has, the
   // records are empty, and projecting them would wipe a document that was
   // restored from a saved version.
+  //
+  // The header values this studio wrote are passed along, because the
+  // records are a lagging copy of them: without them the projection reads
+  // the copy as a newer truth and puts the candidate's newer words back.
   useEffect(() => {
     if (!isHydrated) return;
-    setActiveCV((previous) => mergeCanonicalCvDocument(cvSource, previous));
+    setActiveCV((previous) =>
+      mergeCanonicalCvDocument(cvSource, previous, {
+        history: cvHeaderHistoryRef.current,
+      })
+    );
   }, [isHydrated, cvSource]);
 
   useEffect(() => {
@@ -3741,6 +3824,27 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setCvVersions([]);
     setActiveCvId('');
     setActiveCV(emptyCVProfile);
+    // The header history belongs to the account that was just signed out.
+    cvHeaderHistoryRef.current = {};
+    // An autosave or a draft belongs to the account that was just signed out.
+    // Neither may fire (or be offered) under the next identity in this tab.
+    if (cvSaveTimerRef.current) {
+      clearTimeout(cvSaveTimerRef.current);
+      cvSaveTimerRef.current = null;
+    }
+    if (cvDraftTimerRef.current) {
+      clearTimeout(cvDraftTimerRef.current);
+      cvDraftTimerRef.current = null;
+    }
+    cvSaveQueueRef.current.reset();
+    activeCVRef.current = emptyCVProfile;
+    activeCvIdRef.current = '';
+    cvVersionsRef.current = [];
+    cvDraftCheckedRef.current = null;
+    setCvSaveStatus('idle');
+    setCvSaveError(null);
+    setCvDraft(null);
+    clearAllCvDrafts(window.localStorage);
     setApplications([]);
     setInterviewSessions([]);
     setNotifications([]);
@@ -5510,18 +5614,44 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const cvProfileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cvProfilePending = useRef<Partial<UserProfile>>({});
 
+  /**
+   * Remembers a header value this studio has written to the profile.
+   *
+   * The value is remembered when the write goes out, not when it comes back:
+   * the records cannot hold it before the write leaves, and a projection that
+   * runs in between must already know the record is the studio's own copy.
+   *
+   * Only a handful of values are kept. The list has to cover a write that is
+   * still on its way, and nothing older than that can still be in the
+   * records.
+   */
+  const rememberHeaderWrite = useCallback((field: string, value: string) => {
+    const history = cvHeaderHistoryRef.current[field] ?? [];
+    if (history[history.length - 1] === value) return;
+    history.push(value);
+    if (history.length > 12) history.splice(0, history.length - 12);
+    cvHeaderHistoryRef.current[field] = history;
+  }, []);
+
   const flushCvProfile = useCallback(() => {
     cvProfileTimer.current = null;
     const pending = cvProfilePending.current;
     cvProfilePending.current = {};
     if (Object.keys(pending).length === 0) return;
+    // The values go out with this write, so the records are now copies of
+    // them and must not be read as a newer truth than the document.
+    if (pending.name !== undefined) rememberHeaderWrite('fullName', pending.name);
+    if (pending.headline !== undefined) rememberHeaderWrite('title', pending.headline);
+    if (pending.phone !== undefined) rememberHeaderWrite('phone', pending.phone);
+    if (pending.location !== undefined) rememberHeaderWrite('location', pending.location);
+    if (pending.email !== undefined) rememberHeaderWrite('email', pending.email);
     // The document already shows the change. If the profile write fails, the
     // next projection puts the old value back rather than leaving the
     // document claiming something the server never accepted.
     void updateProfile(pending).catch((error) => {
       console.error('Failed to persist the CV header:', error);
     });
-  }, [updateProfile]);
+  }, [rememberHeaderWrite, updateProfile]);
 
   const queueCvProfileUpdate = useCallback(
     (updates: Partial<UserProfile>) => {
@@ -5542,6 +5672,243 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     },
     [flushCvProfile]
   );
+
+  // The references the autosave reads. They are updated on render rather than
+  // captured by a callback, so a debounced write always saves the newest
+  // document and the newest version list, never the one from the render that
+  // scheduled it.
+  useEffect(() => {
+    activeCVRef.current = activeCV;
+  }, [activeCV]);
+  useEffect(() => {
+    activeCvIdRef.current = activeCvId;
+  }, [activeCvId]);
+  useEffect(() => {
+    cvVersionsRef.current = cvVersions;
+  }, [cvVersions]);
+  useEffect(() => {
+    targetRoleRef.current = targetRole;
+  }, [targetRole]);
+  useEffect(() => {
+    currentUserIdRef.current = currentUser?.id ?? null;
+  }, [currentUser?.id]);
+  useEffect(() => {
+    isHydratedRef.current = isHydrated;
+  }, [isHydrated]);
+
+  /**
+   * Writes one document to the newest version of the active CV.
+   *
+   * A version is the durable copy of a document: the record tables cannot hold
+   * a section order or a layout decision. Patching the newest version keeps the
+   * history meaningful (a drag is not a milestone); a version is created only
+   * when the candidate has never saved this CV.
+   */
+  const persistCvDocument = useCallback(async (document: CVProfile): Promise<string> => {
+    const roleTitle = targetRoleRef.current?.title ?? '';
+    let cvId = activeCvIdRef.current;
+    if (!isPersistedId(cvId)) {
+      const created = await postCv({ name: 'My CV', targetRoleTitle: roleTitle });
+      cvId = created.id;
+      // The ref is updated immediately: a second write that starts before the
+      // render below must not create a second CV.
+      activeCvIdRef.current = cvId;
+      setActiveCvId(cvId);
+    }
+
+    const latest = cvVersionsRef.current.find((version) => version.cvId === cvId);
+    if (latest && isPersistedId(latest.id)) {
+      const dto = await patchCvVersion(latest.id, { profileJson: document });
+      const saved = toCVVersion(dto);
+      cvVersionsRef.current = cvVersionsRef.current.map((version) =>
+        version.id === saved.id ? saved : version
+      );
+      setCvVersions((previous) =>
+        previous.map((version) => (version.id === saved.id ? saved : version))
+      );
+      return cvId;
+    }
+
+    const dto = await postCvVersion({
+      cvId,
+      name: latest?.name ?? 'My CV',
+      targetRoleTitle: roleTitle,
+      profileJson: document,
+    });
+    const saved = toCVVersion(dto);
+    cvVersionsRef.current = [
+      saved,
+      ...cvVersionsRef.current.filter((version) => version.id !== saved.id),
+    ];
+    setCvVersions((previous) => [
+      saved,
+      ...previous.filter((version) => version.id !== saved.id),
+    ]);
+    return cvId;
+  }, []);
+
+  const scheduleCvSave = useCallback((delay = CV_AUTOSAVE_DEBOUNCE_MS) => {
+    if (cvSaveTimerRef.current) clearTimeout(cvSaveTimerRef.current);
+    cvSaveTimerRef.current = setTimeout(() => {
+      cvSaveTimerRef.current = null;
+      void flushCvSaveRef.current();
+    }, delay);
+  }, []);
+
+  /**
+   * Saves the revision the candidate last produced.
+   *
+   * Only one write is in flight at a time. A write that started for revision 4
+   * can never land after the write for revision 7, because revision 7 waits for
+   * it; and the status only becomes `saved` when the revision that was written
+   * is still the latest, so the label cannot claim a save the screen has
+   * already moved past.
+   */
+  const flushActiveCvDocument = useCallback(async (): Promise<void> => {
+    if (!isHydratedRef.current) return;
+    const queue = cvSaveQueueRef.current;
+    const claim = queue.claim();
+    // Nothing to save, or a write is already on its way. The in-flight write
+    // schedules the next one when it finishes if newer edits exist.
+    if (!claim) return;
+
+    const document = activeCVRef.current;
+    setCvSaveStatus('saving');
+    setCvSaveError(null);
+    try {
+      const cvId = await persistCvDocument(document);
+      queue.complete(claim.revision);
+      const userId = currentUserIdRef.current;
+      if (userId) {
+        clearCvDraft(window.localStorage, userId, cvId);
+        markCvSavedAt(window.localStorage, userId, cvId, new Date().toISOString());
+        setCvDraft(null);
+      }
+      if (queue.hasUnsavedChanges()) {
+        // The candidate typed while the request was in flight. The newest
+        // document is not on the server yet, so the indicator must keep
+        // saying so.
+        scheduleCvSave(0);
+      } else {
+        setCvSaveStatus('saved');
+      }
+    } catch (error) {
+      console.error('Failed to persist the CV document:', error);
+      queue.fail();
+      setCvSaveError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'The document could not be saved. Check your connection.'
+      );
+      setCvSaveStatus('error');
+      // A failed write is not retried in a loop. The local draft keeps the
+      // newest edits, and the next edit (or the retry in the studio) tries
+      // again.
+    }
+  }, [persistCvDocument, scheduleCvSave]);
+  useEffect(() => {
+    flushCvSaveRef.current = flushActiveCvDocument;
+  }, [flushActiveCvDocument]);
+
+  /** Keeps an unsaved document on this device until the server has it. */
+  const writeCvDraftNow = useCallback(() => {
+    if (!isHydratedRef.current) return;
+    const userId = currentUserIdRef.current;
+    if (!userId) return;
+    const queue = cvSaveQueueRef.current;
+    if (!queue.hasUnsavedChanges()) return;
+    const draft: CvDraft = {
+      userId,
+      cvId: activeCvIdRef.current,
+      document: activeCVRef.current,
+      revision: queue.latestRevision,
+      updatedAt: new Date().toISOString(),
+    };
+    if (writeCvDraft(window.localStorage, draft)) {
+      setCvDraft(draft);
+    }
+  }, []);
+
+  const scheduleCvDraft = useCallback(() => {
+    if (cvDraftTimerRef.current) clearTimeout(cvDraftTimerRef.current);
+    cvDraftTimerRef.current = setTimeout(() => {
+      cvDraftTimerRef.current = null;
+      writeCvDraftNow();
+    }, CV_DRAFT_WRITE_DEBOUNCE_MS);
+  }, [writeCvDraftNow]);
+
+  /** Counts one edit by the candidate and schedules the write. */
+  const markCvEdited = useCallback(() => {
+    cvSaveQueueRef.current.markEdited();
+    setCvSaveStatus('saving');
+    setCvSaveError(null);
+    scheduleCvSave();
+    scheduleCvDraft();
+  }, [scheduleCvDraft, scheduleCvSave]);
+
+  // The last few characters of a tab that is being closed would otherwise be
+  // inside a debounce that never fires. A page-hide writes the draft at once;
+  // the server copy is attempted by the write that was already scheduled.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') writeCvDraftNow();
+    };
+    const onPageHide = () => writeCvDraftNow();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+      if (cvDraftTimerRef.current) {
+        clearTimeout(cvDraftTimerRef.current);
+        cvDraftTimerRef.current = null;
+      }
+    };
+  }, [writeCvDraftNow]);
+
+  // A local copy is offered back only when it is newer than the copy the server
+  // confirmed. A draft that was already saved is discarded rather than being
+  // shown as lost work.
+  useEffect(() => {
+    if (!isHydrated) return;
+    const userId = currentUser?.id ?? null;
+    if (!userId) return;
+    const cvId = activeCvIdRef.current;
+    const checkKey = `${userId}:${cvId || 'new'}`;
+    if (cvDraftCheckedRef.current === checkKey) return;
+    cvDraftCheckedRef.current = checkKey;
+    const draft = readCvDraft<CVProfile>(window.localStorage, userId, cvId);
+    if (!draft) return;
+    const savedAt = readCvSavedAt(window.localStorage, userId, cvId);
+    if (typeof savedAt === 'string' && draft.updatedAt <= savedAt) {
+      clearCvDraft(window.localStorage, userId, cvId);
+      return;
+    }
+    setCvDraft(draft);
+  }, [isHydrated, currentUser?.id, activeCvId]);
+
+  const recoverCvDraft = useCallback(() => {
+    if (!cvDraft) return;
+    activeCVRef.current = cvDraft.document;
+    setActiveCV(cvDraft.document);
+    // The header is part of the candidate, not only of this document, exactly
+    // as it is while typing.
+    queueCvProfileUpdate({
+      name: cvDraft.document.fullName,
+      headline: cvDraft.document.title,
+      phone: cvDraft.document.phone,
+      location: cvDraft.document.location,
+      email: cvDraft.document.email,
+    });
+    setCvDraft(null);
+    markCvEdited();
+  }, [cvDraft, markCvEdited, queueCvProfileUpdate]);
+
+  const discardCvDraft = useCallback(() => {
+    const userId = currentUserIdRef.current;
+    if (userId) clearCvDraft(window.localStorage, userId, activeCvIdRef.current);
+    setCvDraft(null);
+  }, []);
 
   /**
    * The editor writes to the document.
@@ -5577,8 +5944,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           next.hiddenSkills = [...new Set([...(previous.hiddenSkills ?? []), ...removed])];
         }
       }
+      // The draft and a page that is being hidden need the new document
+      // before React has re-rendered, so the ref is moved here as well.
+      activeCVRef.current = next;
       return next;
     });
+
+    markCvEdited();
 
     if (Object.keys(profileUpdates).length > 0) {
       queueCvProfileUpdate(profileUpdates);
@@ -5598,9 +5970,16 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
    * words are never replaced by the platform's.
    */
   const loadCVFromMyData = () => {
-    setActiveCV((previous) =>
-      mergeCanonicalCvDocument(cvSource, { ...previous, hiddenSkills: [], hiddenRecordIds: [] })
-    );
+    setActiveCV((previous) => {
+      const next = mergeCanonicalCvDocument(cvSource, {
+        ...previous,
+        hiddenSkills: [],
+        hiddenRecordIds: [],
+      });
+      activeCVRef.current = next;
+      return next;
+    });
+    markCvEdited();
   };
 
   const saveCVVersion = async (name: string, profileSnapshot?: CVProfile): Promise<CVVersion> => {
@@ -5631,52 +6010,27 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   /**
-   * Persists the document the studio is showing.
+   * Persists the document the studio is showing, now.
    *
-   * A CV version is the durable copy of the document (the platform's record
-   * tables cannot hold a section order or a layout decision). Patching the
-   * newest version — rather than creating one — keeps the history meaningful:
-   * a drag is not a new milestone. Snapshotting still has its own button.
+   * The debounce is for typing; this is the path for a retry after a failure
+   * and for a caller that has an explicit document to write. The write itself
+   * is the same one the debounce uses, so both are serialised against each
+   * other and neither can overwrite a newer edit.
    */
   const saveActiveCvDocument = useCallback(
     async (profile?: CVProfile): Promise<void> => {
-      const document = profile ?? activeCV;
-      const roleTitle = targetRole?.title ?? '';
-      try {
-        let cvId = activeCvId;
-        if (!cvId) {
-          const created = await postCv({ name: 'My CV', targetRoleTitle: roleTitle });
-          cvId = created.id;
-          setActiveCvId(created.id);
-        }
-
-        const latest = cvVersions.find((version) => version.cvId === cvId);
-        if (!latest) {
-          const dto = await postCvVersion({
-            cvId,
-            name: 'My CV',
-            targetRoleTitle: roleTitle,
-            profileJson: document,
-          });
-          const saved = toCVVersion(dto);
-          setCvVersions((previous) => [
-            saved,
-            ...previous.filter((version) => version.id !== saved.id),
-          ]);
-          return;
-        }
-
-        const dto = await patchCvVersion(latest.id, { profileJson: document });
-        const saved = toCVVersion(dto);
-        setCvVersions((previous) =>
-          previous.map((version) => (version.id === saved.id ? saved : version))
-        );
-      } catch (error) {
-        console.error('Failed to persist the CV document:', error);
-        throw error;
+      if (profile) {
+        activeCVRef.current = profile;
+        cvSaveQueueRef.current.markEdited();
       }
+      if (!cvSaveQueueRef.current.hasUnsavedChanges()) return;
+      if (cvSaveTimerRef.current) {
+        clearTimeout(cvSaveTimerRef.current);
+        cvSaveTimerRef.current = null;
+      }
+      await flushActiveCvDocument();
     },
-    [activeCV, activeCvId, cvVersions, targetRole]
+    [flushActiveCvDocument]
   );
 
   /**
@@ -5696,8 +6050,13 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     cvVersionId?: string;
   }) => {
     const { cv, versionName, targetRoleTitle, cvId, cvVersionId } = options;
+    activeCVRef.current = cv;
     setActiveCV(cv);
-    if (cvId) setActiveCvId(cvId);
+    if (cvId) {
+      activeCvIdRef.current = cvId;
+      setActiveCvId(cvId);
+    }
+    markCvEdited();
     const newVersion: CVVersion = {
       id: cvVersionId ?? `cv-v-${Date.now()}`,
       cvId,
@@ -6469,6 +6828,11 @@ Skills: ${activeCV.skillsList.join(', ')}
         loadCVFromMyData,
         saveCVVersion,
         saveActiveCvDocument,
+        cvSaveStatus,
+        cvSaveError,
+        cvDraft,
+        recoverCvDraft,
+        discardCvDraft,
         duplicateCVVersion,
         renameCVVersion,
         deleteCVVersion,
