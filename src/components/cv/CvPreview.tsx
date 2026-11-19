@@ -47,7 +47,7 @@ interface CvPreviewProps {
   catalog?: readonly CvTemplateDefinition[];
 }
 
-export const CvPreview: React.FC<CvPreviewProps> = ({
+const CvPreviewPaper: React.FC<CvPreviewProps> = ({
   cv,
   language = 'en',
   templateId,
@@ -129,3 +129,15 @@ export const CvPreview: React.FC<CvPreviewProps> = ({
     </div>
   );
 };
+
+/**
+ * The paper is remembered by its inputs.
+ *
+ * The studio re-renders on every keystroke, on every save-status change and on
+ * every switch between the edit and preview panes. None of those changes the
+ * sheet, so a memoised paper keeps a whole A4 document out of that work: it is
+ * redrawn when the document it draws (or its template or language) changes,
+ * and not otherwise.
+ */
+export const CvPreview = React.memo(CvPreviewPaper);
+CvPreview.displayName = 'CvPreview';

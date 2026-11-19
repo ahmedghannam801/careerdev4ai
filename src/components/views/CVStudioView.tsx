@@ -46,7 +46,7 @@ import {
 } from '../../lib/cvTemplatesApi';
 import { takeTailoredCv } from '../../lib/tailoredCvHandoff';
 import { fetchCvTemplateCatalog } from '../../lib/cvTemplatesApi';
-import { downloadCvPdf } from '../../lib/cvPdfExport';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { CvStudioAiQuotaBadge } from '../cv/CvStudioAiQuotaBadge';
 import type { CvTemplateDefinition } from '../../../shared/cvTemplates';
 import { resolveCvTemplate } from '../../../shared/cvTemplates';
@@ -268,6 +268,16 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   // or a breakpoint.
   const paperFrameRef = useRef<HTMLDivElement | null>(null);
 
+  /**
+   * The document the paper is drawn from.
+   *
+   * It trails the live document by a short delay, so a burst of typing redraws
+   * the sheet once rather than once per character. The document itself is
+   * written on every keystroke, so this delays the picture and never the data:
+   * autosave, the Word export and the saved CV read `activeCV`.
+   */
+  const paperCv = useDebouncedValue(activeCV);
+
   // The document is persisted by the context, which owns the debounce,
   // the write queue and the draft. The studio only displays the result: a
   // layout change, a typed bullet and a reordered section all travel through
@@ -286,6 +296,28 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const [mobilePane, setMobilePane] = useState<'edit' | 'preview'>('edit');
 
   /**
+   * Waits for the paper to have drawn the newest document.
+   *
+   * The sheet follows the document on a short delay, so a burst of typing
+   * redraws it once instead of once per character. An export that starts
+   * inside that delay must not capture the previous sheet: this waits for the
+   * pending redraw to land before anything is read from the page. The delay
+   * is short and the authorisation request already spans it, so in practice
+   * this returns on the first frame.
+   */
+  const waitForPaperToSettle = async (frame: HTMLDivElement | null): Promise<void> => {
+    if (!frame) return;
+    const started = performance.now();
+    while (frame.dataset.cvPreviewPending === 'true') {
+      if (performance.now() - started > 1200) return;
+      await new Promise<void>((resolve) => {
+        if (typeof requestAnimationFrame === 'undefined') setTimeout(resolve, 16);
+        else requestAnimationFrame(() => resolve());
+      });
+    }
+  };
+
+  /**
    * Downloads the CV as a PDF.
    *
    * The file is generated in the browser from the real paper: no print
@@ -294,6 +326,9 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
    * the authorisation route says yes. The document is the one in the
    * preview: same template, same fonts, same colours, same Arabic shaping,
    * same page order.
+   *
+   * The writer is loaded on demand: it is only needed by this button, so a
+   * candidate who never exports does not download it.
    */
   const handlePdfExport = async () => {
     if (isExportingPdf) return;
@@ -307,6 +342,8 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         return;
       }
 
+      await waitForPaperToSettle(paperFrameRef.current);
+
       const paper = paperFrameRef.current?.querySelector<HTMLElement>('[data-cv-print]');
       if (!paper) {
         setExportError(t('Open the document editor to export the CV.'));
@@ -314,6 +351,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       }
 
       const name = activeCV.fullName?.trim() || 'CV';
+      const { downloadCvPdf } = await import('../../lib/cvPdfExport');
       await downloadCvPdf({
         paper,
         title: `${name} — CV`,
@@ -639,6 +677,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                 open section and the page's scroll position survive a switch
                 to the preview. */}
             <div
+              data-cv-pane="edit"
               className={`space-y-4 lg:col-span-5 lg:block ${
                 mobilePane === 'preview' ? 'hidden' : ''
               }`}
@@ -678,6 +717,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                 this into a full-screen sheet with its own back control; the
                 element stays the same, so its scroll position is kept. */}
             <div
+              data-cv-pane="preview"
               className={`space-y-4 lg:col-span-7 lg:block ${
                 mobilePane === 'preview'
                   ? 'fixed inset-0 z-[70] flex flex-col bg-[var(--surface-main)] lg:static lg:z-auto lg:flex-none lg:bg-transparent'
@@ -716,9 +756,13 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                     language={settings.resumeLanguage}
                   />
                 </div>
-                <div ref={paperFrameRef} className="min-w-0">
+                <div
+                  ref={paperFrameRef}
+                  className="min-w-0"
+                  data-cv-preview-pending={paperCv === activeCV ? undefined : 'true'}
+                >
                   <CvPreview
-                    cv={activeCV}
+                    cv={paperCv}
                     language={settings.resumeLanguage}
                     templateId={settings.cvTemplateId}
                     catalog={studioTemplateCatalog}

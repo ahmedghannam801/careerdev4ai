@@ -12,7 +12,7 @@
  * so the paper and the file cannot drift apart.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { CVProfile } from '../../../types/career';
 import type { ResumeLanguage } from '../../../../shared/resumeLanguage';
 import {
@@ -1003,7 +1003,7 @@ function AsideBlock({
   );
 }
 
-export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
+const CvPaperRenderer: React.FC<CvTemplateRendererProps> = ({
   cv,
   language = 'en',
   templateId,
@@ -1012,7 +1012,10 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
   printable = true,
 }) => {
   const resolved = template ?? resolveCvTemplate(templateId, catalog);
-  const plan = buildCvLayoutPlan({ cv, template: resolved, language });
+  const plan = useMemo(
+    () => buildCvLayoutPlan({ cv, template: resolved, language }),
+    [cv, resolved, language]
+  );
   const spec = plan.spec;
   const document = plan.document;
   const metrics = spec.metrics;
@@ -1103,6 +1106,17 @@ export const CvTemplateRenderer: React.FC<CvTemplateRendererProps> = ({
     </div>
   );
 };
+
+/**
+ * The renderer is remembered by its inputs.
+ *
+ * A parent that re-renders for a reason of its own — a save indicator, a pane
+ * switch, an open dialog — must not rebuild a sheet of A4. `CvPreview` already
+ * memoises the paper; this keeps a caller that draws the renderer directly
+ * (the template gallery, the print sheet) from redrawing it for nothing.
+ */
+export const CvTemplateRenderer = React.memo(CvPaperRenderer);
+CvTemplateRenderer.displayName = 'CvTemplateRenderer';
 
 /** The heading of a section, exported so tests can assert the order. */
 export function cvTemplateSectionKeys(
