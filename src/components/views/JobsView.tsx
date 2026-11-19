@@ -893,7 +893,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       {/* The openings the platform recommends, against the candidate's own
           record. It sits above the list because it is the answer to "what
           should I look at?", which is the question the list cannot answer. */}
-      {recommendationBasis && (
+      {(recommendationsLoading || recommendationBasis || recommendationsError) && (
         <RecommendedJobsPanel
           recommendations={recommendations}
           basis={recommendationBasis}
@@ -901,6 +901,12 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           error={recommendationsError}
           onCompare={(jobId) => void toggleCompare(jobId)}
           comparingIds={compareIds}
+          bookmarkedJobIds={bookmarkedJobIds}
+          onToggleBookmark={toggleBookmarkJob}
+          onTrackApplication={(entry) => void handleTrackApplication(entry)}
+          onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
+          trackingId={trackingId}
+          tailoringId={tailoringId}
           t={t}
         />
       )}
