@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Sparkles, X, Send, Bot, User, ArrowRight, Lightbulb } from 'lucide-react';
+import { X, Send, User, ArrowRight, Lightbulb } from 'lucide-react';
+import { AiMascot } from './AiMascot';
 import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 import { AiResponse } from './AiResponse';
@@ -48,8 +49,8 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       {/* Drawer Header */}
       <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent-surface)] flex items-center justify-center text-[var(--color-primary-text)]">
-            <Sparkles className="w-4 h-4" />
+          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+            <AiMascot className="h-9 w-7 object-contain" alt="" />
           </div>
           <div>
             <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerDev4AI Copilot')}</div>
@@ -91,6 +92,13 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           animate="visible"
           className="space-y-4"
         >
+        {copilotMessages.length === 0 && (
+          <div className="flex flex-col items-center px-6 py-8 text-center">
+            <AiMascot className="mb-3 h-24 w-16 object-contain" state="idle" alt="" />
+            <p className="text-sm font-medium text-[var(--text-primary)]">{t('CareerDev4AI Copilot')}</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">{t('copilotPlaceholder')}</p>
+          </div>
+        )}
         {copilotMessages.map((msg) => (
           <motion.div
             key={msg.id}
@@ -98,8 +106,8 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
             className={`flex gap-3 text-sm ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {msg.sender === 'assistant' && (
-              <div className="w-7 h-7 rounded-md bg-[var(--accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center shrink-0 mt-0.5">
-                <Bot className="w-4 h-4" />
+              <div className="w-7 h-7 shrink-0 mt-0.5 flex items-center justify-center">
+                <AiMascot className="h-7 w-5 object-contain" alt="" />
               </div>
             )}
             <div
@@ -145,8 +153,8 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
 
         {isCopilotTyping && (
           <div className="flex gap-3 items-center text-xs text-[var(--text-muted)]">
-            <div className="w-7 h-7 rounded-md bg-[var(--color-accent-surface)] text-[var(--color-primary-text)] flex items-center justify-center">
-              <Bot className="w-4 h-4" />
+            <div className="w-7 h-7 shrink-0 flex items-center justify-center">
+              <AiMascot className="h-7 w-5 object-contain" state="thinking" alt="" />
             </div>
             <span className="flex items-center gap-2">
               <span aria-live="polite">{t('CareerDev4AI is analyzing your graph')}</span>

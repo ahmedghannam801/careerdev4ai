@@ -32,6 +32,7 @@ import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 import { AnimatedList } from '../react-bits/AnimatedList';
+import { AiMascot } from '../copilot/AiMascot';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -391,9 +392,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <button
             type="button"
             onClick={onOpenCopilot}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
+            className="group inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)]"
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <AiMascot className="h-4 w-4 object-contain transition-transform group-hover:scale-110" state="idle" alt="" />
             <span>{t('Ask Copilot')}</span>
           </button>
         </div>
