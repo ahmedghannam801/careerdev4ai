@@ -998,6 +998,54 @@ current code all six pass.
 written, and `supabase db push` was not run. The migration folder changes
 travel with the release, and the deployment does not apply them.
 
+### The deployment
+
+| | |
+|---|---|
+| Commit | `10bbd3a` — pushed to `origin/main` (`8ef5316..10bbd3a`) |
+| Pages deployment | `ed9d58f0`, branch `main`, Environment **Production** |
+| Live at | https://careerdev4ai.pages.dev — serving `assets/index-CuXgMncR.js` |
+| Deployment URL | https://ed9d58f0.careerdev4ai.pages.dev |
+| Production smoke | the page returns `200` behind `server: cloudflare` |
+
+**How it was deployed.** The Pages project builds from Git, so the push built
+and published `10bbd3a` on its own. A manual `wrangler pages deploy` was
+deliberately **not** run: the deployment the repository documents is the one
+Pages builds from the commit, and the working tree now holds nothing that is
+not in it.
+
+| The live probe | The answer | What it proves |
+|---|---|---|
+| `POST /api/application-packages/:id/decision` | `401 {"error":"Unauthorized"}` | The route exists and requires a session |
+| `GET /api/application-packages/:id/reviews` | `401 {"error":"Unauthorized"}` | The route exists and requires a session |
+| `GET /api/jobs/search` | `401 {"error":"Unauthorized"}` | The jobs route is still private |
+| `GET /api/this-route-does-not-exist` | `404 {"error":"Not found"}` | The control: an unregistered route answers differently |
+
+**That the live bundle is this release.** The entry chunk the live site serves
+and the one this repository builds have the same length to the byte
+(1,162,571) and the same contents, apart from the names of the lazy chunks
+they point at. The studio chunk differs only in its import specifiers: the code
+is identical.
+
+The names differ because of the stylesheet. The two builds round one colour by
+a different hundred-millionth — `-0.0429867` against `-0.0429868` in the
+`oklab` conversion for one arbitrary-value background — which changes the
+stylesheet's name, which changes the name of the entry chunk, which every lazy
+chunk then points at. Two characters of floating point in one utility; the code
+a candidate runs is the code this release was tested against.
+
+The markers of the fifth release are in the live bundle: the draft keys
+(`careerdev4ai:cv-draft:`, `careerdev4ai:cv-saved-at:`), the studio's single
+navigation (`CV Studio workflow`), and the summary the projection now keeps
+exactly as it was written (`hiddenSummary`).
+
+**A note on the SHA.** The probes above were run against the deployment that
+serves the release commit `10bbd3a`. The documentation commit that follows it
+rebuilds the same application code — the Pages project builds every push — so
+the live deployment's SHA moves on while the code that a candidate is served
+does not. The verified pairing is **code `10bbd3a` → deployment `ed9d58f0` →
+https://careerdev4ai.pages.dev**.
+
 ### The documentation folder
 
 Three of the supporting documents from the earlier release —
