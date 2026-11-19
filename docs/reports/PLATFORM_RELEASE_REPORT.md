@@ -977,3 +977,14 @@ it passes.
 **Production data was not touched.** No migration was applied, no row was
 written, and `supabase db push` was not run. The migration folder changes
 travel with the release, and the deployment does not apply them.
+
+### The documentation folder
+
+Three of the supporting documents from the earlier release —
+`DATABASE_MIGRATION_INTEGRITY.md`, `UX_AND_INTERACTION_AUDIT.md` and
+`JOBRIGHT_FEATURE_PARITY.md` — were lost from the working tree before this
+release was staged, and could not be recovered. The four report files that
+are tracked in git were restored from the last commit, and
+`TESTING_AND_RELEASE_REPORT.md` has been written again. The two documents
+that describe the migration folder and the interaction work should be
+written again before the next release that depends on them.
