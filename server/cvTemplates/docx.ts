@@ -271,8 +271,11 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       .map((part) => part[0]?.toUpperCase() ?? '')
       .join('');
 
+    const badgeWidth = Math.round(contentWidth * 0.12);
+    const detailWidth = contentWidth - badgeWidth;
+
     const badgeCell = new TableCell({
-      width: { size: 12, type: WidthType.PERCENTAGE },
+      width: { size: badgeWidth, type: WidthType.DXA },
       verticalAlign: VerticalAlign.CENTER,
       shading: { type: ShadingType.CLEAR, fill: accent, color: 'auto' },
       margins: { top: 120, bottom: 120, left: 0, right: 0 },
@@ -295,7 +298,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     });
 
     const detailCell = new TableCell({
-      width: { size: 88, type: WidthType.PERCENTAGE },
+      width: { size: detailWidth, type: WidthType.DXA },
       verticalAlign: VerticalAlign.CENTER,
       margins: { top: 0, bottom: 0, left: 200, right: 0 },
       children: [
@@ -335,7 +338,9 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
     headerBlocks.push(
       new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: contentWidth, type: WidthType.DXA },
+        columnWidths: [badgeWidth, detailWidth],
+        visuallyRightToLeft: rtl,
         borders: noBorders,
         rows: [new TableRow({ children: [badgeCell, detailCell] })],
       })
@@ -343,8 +348,11 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   } else if (header.kind === 'split') {
     // The name on one side and the contact on the other. Word has no
     // "space between", so the two halves are cells in a row.
+    const nameWidth = Math.round(contentWidth * 0.52);
+    const contactWidth = contentWidth - nameWidth;
+
     const nameCell = new TableCell({
-      width: { size: 52, type: WidthType.PERCENTAGE },
+      width: { size: nameWidth, type: WidthType.DXA },
       verticalAlign: VerticalAlign.BOTTOM,
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
       children: [
@@ -373,7 +381,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     });
 
     const contactCell = new TableCell({
-      width: { size: 48, type: WidthType.PERCENTAGE },
+      width: { size: contactWidth, type: WidthType.DXA },
       verticalAlign: VerticalAlign.BOTTOM,
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
       children:
@@ -390,7 +398,9 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
     headerBlocks.push(
       new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: contentWidth, type: WidthType.DXA },
+        columnWidths: [nameWidth, contactWidth],
+        visuallyRightToLeft: rtl,
         borders: noBorders,
         rows: [new TableRow({ children: [nameCell, contactCell] })],
       })
@@ -430,13 +440,14 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
     headerBlocks.push(
       new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        width: { size: contentWidth, type: WidthType.DXA },
+        columnWidths: [contentWidth],
         borders: noBorders,
         rows: [
           new TableRow({
             children: [
               new TableCell({
-                width: { size: 100, type: WidthType.PERCENTAGE },
+                width: { size: contentWidth, type: WidthType.DXA },
                 shading: { type: ShadingType.CLEAR, fill: accent, color: 'auto' },
                 margins: { top: 240, bottom: 240, left: 240, right: 240 },
                 children: bannerText,
@@ -628,7 +639,8 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
    * belong in the narrow column before it can lay the page out.
    */
   const sectionBlocks = (
-    entry: CvLayoutSection
+    entry: CvLayoutSection,
+    availableWidth: number = contentWidth
   ): Array<InstanceType<typeof Paragraph> | InstanceType<typeof Table>> => {
     const section = entry.section;
     const blocks: Array<InstanceType<typeof Paragraph> | InstanceType<typeof Table>> = [
@@ -655,7 +667,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     }
 
     if (section.kind === 'inline') {
-      blocks.push(...inlineBlocks(section));
+      blocks.push(...inlineBlocks(section, availableWidth));
       return blocks;
     }
 
@@ -663,7 +675,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     // academic record is a two-cell record, and the rest are paragraphs. The
     // section only preserves the order.
     for (const cvEntry of section.entries) {
-      blocks.push(...entryBlock(cvEntry));
+      blocks.push(...entryBlock(cvEntry, availableWidth));
     }
     return blocks;
   };
@@ -676,7 +688,8 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
    * which shape it is standing in for.
    */
   const inlineBlocks = (
-    section: CvDocumentSection
+    section: CvDocumentSection,
+    availableWidth: number = contentWidth
   ): InstanceType<typeof Paragraph>[] => {
     const items = section.inline ?? [];
     if (items.length === 0) return [];
@@ -684,6 +697,10 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
     if (decoration.columns > 1) {
       // The paper sets the words in two columns. Word sets them in a table.
+      const colWidth = Math.floor(availableWidth / decoration.columns);
+      const colWidths = Array.from({ length: decoration.columns }, (_, i) =>
+        i === decoration.columns - 1 ? availableWidth - colWidth * (decoration.columns - 1) : colWidth
+      );
       const rows: InstanceType<typeof TableRow>[] = [];
       const perColumn = Math.ceil(items.length / decoration.columns);
       for (let index = 0; index < perColumn; index += 1) {
@@ -692,7 +709,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           const item = items[column * perColumn + index];
           cells.push(
             new TableCell({
-              width: { size: 50, type: WidthType.PERCENTAGE },
+              width: { size: colWidths[column], type: WidthType.DXA },
               verticalAlign: VerticalAlign.TOP,
               margins: { top: 0, bottom: 0, left: 0, right: 0 },
               children: [
@@ -717,7 +734,10 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       }
       return [
         new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
+          width: { size: availableWidth, type: WidthType.DXA },
+          columnWidths: colWidths,
+          layout: TableLayoutType.FIXED,
+          visuallyRightToLeft: rtl,
           borders: noBorders,
           rows,
         }) as unknown as InstanceType<typeof Paragraph>,
@@ -973,7 +993,11 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
    * reading side. Word's table can carry exactly those borders, so a card
    * template no longer exports as plain paragraphs and loses its structure.
    */
-  const cardTable = (blocks: InstanceType<typeof Paragraph>[], accentEdge: boolean) => {
+  const cardTable = (
+    blocks: InstanceType<typeof Paragraph>[],
+    accentEdge: boolean,
+    availableWidth: number = contentWidth
+  ) => {
     const edge = accentEdge
       ? {
           style: BorderStyle.SINGLE,
@@ -987,8 +1011,8 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         };
 
     return new Table({
-      width: { size: contentWidth, type: WidthType.DXA },
-      columnWidths: [contentWidth],
+      width: { size: availableWidth, type: WidthType.DXA },
+      columnWidths: [availableWidth],
       layout: TableLayoutType.FIXED,
       visuallyRightToLeft: rtl,
       borders: {
@@ -1004,7 +1028,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         new TableRow({
           children: [
             new TableCell({
-              width: { size: contentWidth, type: WidthType.DXA },
+              width: { size: availableWidth, type: WidthType.DXA },
               verticalAlign: VerticalAlign.TOP,
               margins: { top: 80, bottom: 80, left: 120, right: 120 },
               children: blocks,
@@ -1016,7 +1040,8 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   };
 
   const entryBlock = (
-    entry: CvDocumentEntry
+    entry: CvDocumentEntry,
+    availableWidth: number = contentWidth
   ): Array<InstanceType<typeof Paragraph> | InstanceType<typeof Table>> => {
     const detail: InstanceType<typeof Paragraph>[] = [];
     if (!entryInline && entry.subtitle) detail.push(entrySubtitle(entry));
@@ -1029,13 +1054,13 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     if (spec.layout === 'academic') {
       // What the record was on one side, what it involved on the other — the
       // same two-column record the paper draws.
-      const leftWidth = Math.round(contentWidth * 0.388);
-      const rightWidth = contentWidth - leftWidth;
+      const leftWidth = Math.round(availableWidth * 0.388);
+      const rightWidth = availableWidth - leftWidth;
       const left: InstanceType<typeof Paragraph>[] = [entryTitle(entry, leftWidth)];
       if (entry.subtitle) left.push(entrySubtitle(entry));
       return [
         new Table({
-          width: { size: contentWidth, type: WidthType.DXA },
+          width: { size: availableWidth, type: WidthType.DXA },
           columnWidths: [leftWidth, rightWidth],
           layout: TableLayoutType.FIXED,
           visuallyRightToLeft: rtl,
@@ -1062,11 +1087,11 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       ];
     }
 
-    const blocks: InstanceType<typeof Paragraph>[] = [entryTitle(entry), ...detail];
+    const blocks: InstanceType<typeof Paragraph>[] = [entryTitle(entry, availableWidth), ...detail];
 
     if (spec.layout === 'timeline' || spec.entryStyle === 'timeline') {
       const railWidth = 360;
-      const contentEntryWidth = contentWidth - railWidth;
+      const contentEntryWidth = Math.max(availableWidth - railWidth, 1000);
       const railBorderKey = rtl ? 'left' : 'right';
       const railAlignment = rtl ? AlignmentType.LEFT : AlignmentType.RIGHT;
 
@@ -1114,7 +1139,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
       return [
         new Table({
-          width: { size: contentWidth, type: WidthType.DXA },
+          width: { size: availableWidth, type: WidthType.DXA },
           columnWidths: [railWidth, contentEntryWidth],
           layout: TableLayoutType.FIXED,
           visuallyRightToLeft: rtl,
@@ -1129,17 +1154,24 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     }
 
     if (spec.layout === 'cards' || spec.entryStyle === 'card') {
-      return [cardTable(blocks, true)];
+      return [cardTable(blocks, true, availableWidth)];
     }
     if (spec.entryStyle === 'grid') {
-      return [cardTable(blocks, false)];
+      return [cardTable(blocks, false, availableWidth)];
     }
 
     return blocks;
   };
 
-  const rendered = plan.main.map((entry) => ({ entry, blocks: sectionBlocks(entry) }));
-  const renderedAside = plan.aside.map((entry) => ({ entry, blocks: sectionBlocks(entry) }));
+  const asideTwips = Math.round(
+    (contentWidth * spec.columns.asidePercent) / 100
+  );
+  const mainTwips = contentWidth - asideTwips;
+  const mainWidth = spec.hasSidebar ? mainTwips : contentWidth;
+  const asideWidth = asideTwips;
+
+  const rendered = plan.main.map((entry) => ({ entry, blocks: sectionBlocks(entry, mainWidth) }));
+  const renderedAside = plan.aside.map((entry) => ({ entry, blocks: sectionBlocks(entry, asideWidth) }));
 
   /* ---------------------------------------------------------------------- */
   /* The page                                                                */
@@ -1205,6 +1237,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     });
 
     const row = new TableRow({
+      cantSplit: false,
       children: spec.asideFirst
         ? [sidebarCell, mainCell]
         : [mainCell, sidebarCell],
@@ -1225,6 +1258,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   } else if (!spec.twoColumn) {
     children.push(...headerBlocks);
     for (const entry of rendered) children.push(...entry.blocks);
+    for (const entry of renderedAside) children.push(...entry.blocks);
   }
 
   const sections = [];
@@ -1249,7 +1283,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         children: headerBlocks,
       });
     }
-    const bodyBlocks = rendered.flatMap((entry) => entry.blocks);
+    const bodyBlocks = [...rendered, ...renderedAside].flatMap((entry) => entry.blocks);
     sections.push({
       properties: {
         type: SectionType.CONTINUOUS,

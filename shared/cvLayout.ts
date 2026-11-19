@@ -715,7 +715,9 @@ function buildSpec(
   const metrics = CV_TEMPLATE_DENSITY[structure.density];
   const headingSizePx = Math.round(metrics.font * 0.92 * 10) / 10;
   const supportsSidebar =
-    structure.layout === 'sidebar-left' || structure.layout === 'sidebar-right';
+    structure.layout === 'sidebar-left' ||
+    structure.layout === 'sidebar-right' ||
+    ((structure.sidebarSections ?? []).length > 0);
   // The template proposes which sections live in the narrow column. The
   // candidate may move a section to the other column, but only a template
   // that HAS two columns can honour that move — a single-column template is

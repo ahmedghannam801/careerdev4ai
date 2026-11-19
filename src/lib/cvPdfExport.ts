@@ -194,7 +194,8 @@ function splitNodeByLine(
       continue;
     }
     const top = rect.top;
-    if (!current || Math.abs(current.top - top) > 1) {
+    const lineHeight = rect.height > 0 ? rect.height : 16;
+    if (!current || Math.abs(current.top - top) > lineHeight * 0.5) {
       current = {
         text: pendingSpace,
         left: rect.left,
@@ -205,7 +206,9 @@ function splitNodeByLine(
       lines.push(current);
       pendingSpace = '';
     } else {
+      current.left = Math.min(current.left, rect.left);
       current.right = Math.max(current.right, rect.right);
+      current.top = Math.min(current.top, rect.top);
       current.bottom = Math.max(current.bottom, rect.bottom);
     }
     current.text += character;
@@ -278,133 +281,164 @@ export async function generateCvPdf(options: CvPdfOptions): Promise<CvPdfResult>
   options.onProgress?.('fonts');
   await waitForFonts();
 
-  const measurement = measurePaper(paper);
-  const windows = paginateCvDocument({
-    contentHeight: measurement.height,
-    pageHeight: PAPER_HEIGHT_PX,
-    margin: measurement.margin,
-    breaks: collectBreaks(paper, measurement),
-  });
+  // Mount an unscaled clone off-screen at exactly PAPER_WIDTH_PX to prevent
+  // preview transforms (e.g. transform: scale(0.69)) from shrinking the canvas
+  // or distorting line measurements and pagination offsets.
+  const host = document.createElement('div');
+  host.setAttribute('data-cv-pdf-host', 'true');
+  host.style.position = 'fixed';
+  host.style.left = '-99999px';
+  host.style.top = '0';
+  host.style.width = `${PAPER_WIDTH_PX}px`;
+  host.style.minWidth = `${PAPER_WIDTH_PX}px`;
+  host.style.maxWidth = `${PAPER_WIDTH_PX}px`;
+  host.style.zIndex = '-9999';
+  host.style.opacity = '1';
+  host.style.pointerEvents = 'none';
+  host.style.transform = 'none';
+  host.style.background = '#ffffff';
 
-  const textRuns = collectTextRuns(paper, measurement);
-  const links = collectLinks(paper, measurement);
+  const clone = paper.cloneNode(true) as HTMLElement;
+  clone.style.transform = 'none';
+  clone.style.width = `${PAPER_WIDTH_PX}px`;
+  clone.style.minWidth = `${PAPER_WIDTH_PX}px`;
+  clone.style.maxWidth = `${PAPER_WIDTH_PX}px`;
+  clone.style.margin = '0';
+  clone.style.boxShadow = 'none';
+  host.appendChild(clone);
+  document.body.appendChild(host);
 
-  const scale = clampScale(options.scale ?? 2.5);
-
-  options.onProgress?.('pages');
-
-  // Load html2canvas dynamically to paint the DOM directly without foreignObject
-  const html2canvasModule = await import('html2canvas');
-  const html2canvas = html2canvasModule.default ?? html2canvasModule;
-
-  // Render the un-tainted canvas directly from the live DOM element
-  const fullCanvas = await html2canvas(paper, {
-    scale,
-    useCORS: true,
-    allowTaint: false,
-    logging: false,
-    backgroundColor: '#ffffff',
-    scrollX: 0,
-    scrollY: 0,
-    windowWidth: PAPER_WIDTH_PX,
-  });
-
-  const width = Math.round(PAPER_WIDTH_PX * scale);
-  const height = Math.round(PAPER_HEIGHT_PX * scale);
-  const pages: PdfPage[] = [];
-
-  for (let index = 0; index < windows.length; index += 1) {
-    const window = windows[index];
-    const cropHeight = window.end - window.start;
-
-    // Create an A4 page canvas
-    const pageCanvas = document.createElement('canvas');
-    pageCanvas.width = Math.max(1, width);
-    pageCanvas.height = Math.max(1, height);
-    const context = pageCanvas.getContext('2d');
-    if (!context) throw new Error('The browser could not give the PDF export a canvas.');
-
-    // Pure white A4 page background
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-
-    // Slice the window corresponding to this page from fullCanvas
-    const sx = 0;
-    const sy = Math.round(window.start * scale);
-    const sWidth = Math.min(fullCanvas.width, width);
-    const sHeight = Math.min(fullCanvas.height - sy, Math.round(cropHeight * scale));
-
-    const dx = 0;
-    const dy = Math.round(window.topInset * scale);
-    const dWidth = sWidth;
-    const dHeight = sHeight;
-
-    if (sHeight > 0 && sWidth > 0) {
-      context.drawImage(fullCanvas, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
-    }
-
-    const jpeg = await new Promise<Uint8Array>((resolve, reject) => {
-      pageCanvas.toBlob(
-        (result) => {
-          if (!result) {
-            reject(new Error('The browser could not encode a page of the PDF.'));
-            return;
-          }
-          void result.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)));
-        },
-        'image/jpeg',
-        0.92
-      );
+  try {
+    const measurement = measurePaper(clone);
+    const windows = paginateCvDocument({
+      contentHeight: measurement.height,
+      pageHeight: PAPER_HEIGHT_PX,
+      margin: measurement.margin,
+      breaks: collectBreaks(clone, measurement),
     });
 
-    const text: PdfText[] = [];
-    for (const run of textRuns) {
-      if (run.top < window.start - 0.5 || run.top >= window.end - 0.5) continue;
-      text.push({
-        text: run.text,
-        x: run.x * PX_TO_PT,
-        top: (run.top - window.start + window.topInset) * PX_TO_PT,
-        width: run.width * PX_TO_PT,
-        size: run.size * PX_TO_PT,
+    const textRuns = collectTextRuns(clone, measurement);
+    const links = collectLinks(clone, measurement);
+
+    const scale = clampScale(options.scale ?? 2.5);
+
+    options.onProgress?.('pages');
+
+    // Load html2canvas dynamically to paint the DOM directly without foreignObject
+    const html2canvasModule = await import('html2canvas');
+    const html2canvas = html2canvasModule.default ?? html2canvasModule;
+
+    // Render the un-tainted canvas directly from the unscaled clone
+    const fullCanvas = await html2canvas(clone, {
+      scale,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      backgroundColor: '#ffffff',
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: PAPER_WIDTH_PX,
+    });
+
+    const width = Math.round(PAPER_WIDTH_PX * scale);
+    const height = Math.round(PAPER_HEIGHT_PX * scale);
+    const pages: PdfPage[] = [];
+
+    for (let index = 0; index < windows.length; index += 1) {
+      const window = windows[index];
+      const cropHeight = window.end - window.start;
+
+      // Create an A4 page canvas
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = Math.max(1, width);
+      pageCanvas.height = Math.max(1, height);
+      const context = pageCanvas.getContext('2d');
+      if (!context) throw new Error('The browser could not give the PDF export a canvas.');
+
+      // Pure white A4 page background
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+      // Slice the window corresponding to this page from fullCanvas
+      const sx = 0;
+      const sy = Math.round(window.start * scale);
+      const sWidth = Math.min(fullCanvas.width, width);
+      const sHeight = Math.min(fullCanvas.height - sy, Math.round(cropHeight * scale));
+
+      const dx = 0;
+      const dy = Math.round(window.topInset * scale);
+      const dWidth = sWidth;
+      const dHeight = sHeight;
+
+      if (sHeight > 0 && sWidth > 0) {
+        context.drawImage(fullCanvas, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+      }
+
+      const jpeg = await new Promise<Uint8Array>((resolve, reject) => {
+        pageCanvas.toBlob(
+          (result) => {
+            if (!result) {
+              reject(new Error('The browser could not encode a page of the PDF.'));
+              return;
+            }
+            void result.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)));
+          },
+          'image/jpeg',
+          0.92
+        );
+      });
+
+      const text: PdfText[] = [];
+      for (const run of textRuns) {
+        if (run.top < window.start - 0.5 || run.top >= window.end - 0.5) continue;
+        text.push({
+          text: run.text,
+          x: run.x * PX_TO_PT,
+          top: (run.top - window.start + window.topInset) * PX_TO_PT,
+          width: run.width * PX_TO_PT,
+          size: run.size * PX_TO_PT,
+        });
+      }
+
+      const pageLinks: PdfLink[] = [];
+      for (const link of links) {
+        if (link.top < window.start - 0.5 || link.top >= window.end - 0.5) continue;
+        pageLinks.push({
+          ...link,
+          x: link.x * PX_TO_PT,
+          top: (link.top - window.start + window.topInset) * PX_TO_PT,
+          width: link.width * PX_TO_PT,
+          height: link.height * PX_TO_PT,
+          url: link.url,
+        });
+      }
+
+      pages.push({
+        jpeg,
+        pixelWidth: pageCanvas.width,
+        pixelHeight: pageCanvas.height,
+        width: PDF_A4_WIDTH,
+        height: PDF_A4_HEIGHT,
+        text,
+        links: pageLinks,
       });
     }
 
-    const pageLinks: PdfLink[] = [];
-    for (const link of links) {
-      if (link.top < window.start - 0.5 || link.top >= window.end - 0.5) continue;
-      pageLinks.push({
-        ...link,
-        x: link.x * PX_TO_PT,
-        top: (link.top - window.start + window.topInset) * PX_TO_PT,
-        width: link.width * PX_TO_PT,
-        height: link.height * PX_TO_PT,
-        url: link.url,
-      });
-    }
-
-    pages.push({
-      jpeg,
-      pixelWidth: pageCanvas.width,
-      pixelHeight: pageCanvas.height,
-      width: PDF_A4_WIDTH,
-      height: PDF_A4_HEIGHT,
-      text,
-      links: pageLinks,
+    options.onProgress?.('writing');
+    const bytes = buildPdf(pages, {
+      title: options.title,
+      author: options.author,
+      subject: 'Curriculum Vitae',
     });
+
+    return {
+      bytes,
+      fileName: cvPdfFileName(options.author),
+      pages: pages.length,
+    };
+  } finally {
+    host.remove();
   }
-
-  options.onProgress?.('writing');
-  const bytes = buildPdf(pages, {
-    title: options.title,
-    author: options.author,
-    subject: 'Curriculum Vitae',
-  });
-
-  return {
-    bytes,
-    fileName: cvPdfFileName(options.author),
-    pages: pages.length,
-  };
 }
 
 /** Hands a PDF to the browser's download machinery. */
