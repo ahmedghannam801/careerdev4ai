@@ -387,7 +387,7 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
   return (
     <div
       role="radiogroup"
-      aria-label="Choose your CareerDev4AI avatar"
+      aria-label="Choose your CareerRa avatar"
       className={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 ${className}`}
     >
       {CAREERPILOT_AVATARS.map((avatar) => {

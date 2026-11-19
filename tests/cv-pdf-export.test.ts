@@ -246,7 +246,7 @@ describe('the paper every template exports', () => {
     assert.ok(source.includes('buildPdf'), 'the bytes are written by the PDF writer');
     assert.ok(source.includes('collectTextRuns'), 'the text layer is built from the paper');
     assert.ok(source.includes('data-cv-block'), 'the page breaks come from the paper');
-    assert.ok(source.includes('foreignObject'), 'each page is drawn from the live markup');
+    assert.ok(source.includes('html2canvas'), 'each page is drawn from the live markup');
     assert.ok(!source.includes('window.print'), 'no print dialog is involved');
     assert.ok(!source.includes('window.open'), 'no new tab is involved');
   });

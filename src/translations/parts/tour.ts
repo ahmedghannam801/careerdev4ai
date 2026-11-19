@@ -39,7 +39,7 @@ export const tourAr: Record<string, string> = {
   'Welcome & Navigation': 'الترحيب والتنقل في المنصة',
   'Learn the platform purpose, sidebar navigation, top bar controls, notifications, and AI Copilot.':
     'تعرف على الغاية من المنصة، شريط التنقل الجانبي، أدوات التحكم العلوية، التنبيهات والمساعد الذكي.',
-  'Welcome to CareerDev4AI': 'مرحباً بك في CareerDev4AI',
+  'Welcome to CareerRa': 'مرحباً بك في CareerRa',
   'Your comprehensive, Egypt-first Career Super App. We connect your entire journey: Discover, Learn, Practice, Prove, Build, Apply, Interview, and Grow — 100% free with zero paywalls.':
     'تطبيقك المهني المتكامل الأول من نوعه في مصر والعالم العربي. نربط رحلتك المهنية كاملة: اكتشف، تعلم، مارس، أثبت، ابنِ، قدم، حاكِ المقابلات، وانمُ — مجاناً 100% بلا أي قيود.',
   'Explore roadmaps, assess skills, build tailored CVs, and practice interviews all in one unified workspace.':
@@ -132,7 +132,7 @@ export const tourAr: Record<string, string> = {
     'اكتشف ما إذا كانت أدوات مثل Docker أو TypeScript تعتبر إلزامية أم مفضلة في وظيفتك.',
 
   'Tailored Career Recommendations': 'توصيات مهنية مخصصة',
-  'CareerDev4AI generates tailored suggestions based on your career stage — whether you are a student building fundamentals or a switcher leveraging transferable skills.':
+  'CareerRa generates tailored suggestions based on your career stage — whether you are a student building fundamentals or a switcher leveraging transferable skills.':
     'توصيات مصممة خصيصاً لمرحلتك المهنية، سواء كنت طالباً تبني الأساسيات أو مغيراً للمسار تستفيد من خبراتك السابقة.',
   'Students receive internship-focused tips; switchers get transition bridge roadmaps.':
     'يحصل الطلاب على نصائح للتدريب الصيفي، بينما يحصل مغيرو المسار على خطط جسور الانتقال.',
@@ -172,7 +172,7 @@ export const tourAr: Record<string, string> = {
     'تعليم المهام كمكتملة ينعكس مباشرة في سجلات نشاطك المهني الموثقة.',
 
   'Connected Platform Progress': 'ترابط التقدم عبر المنصة',
-  'Everything in CareerDev4AI connects together. Completing a recommended course or submitting a project automatically updates your roadmap and closes related skill gaps.':
+  'Everything in CareerRa connects together. Completing a recommended course or submitting a project automatically updates your roadmap and closes related skill gaps.':
     'كل شيء مترابط في المنصة. إنهاء دورة موصى بها أو تسليم مشروع يحدّث خارطتك ويغلق الفجوات المهارية ذات الصلة تلقائياً.',
   'No duplicate tracking — one finished project updates your skills, roadmap, and CV simultaneously.':
     'لا تكرار للجهد — مشروع منجز واحد يحدّث مهاراتك وخارطتك وسيرتك الذاتية في الوقت نفسه.',
@@ -224,7 +224,7 @@ export const tourAr: Record<string, string> = {
   'Honest 1–5 Proficiency Rating': 'التقييم الواقعي من 1 إلى 5',
   'Rate your real-world capability: 1 (Novice), 2 (Learner), 3 (Practitioner), 4 (Advanced), 5 (Expert). Accurate ratings generate realistic roadmaps.':
     'قيّم قدرتك الحقيقية: 1 (مبتدئ)، 2 (متعلم)، 3 (ممارس)، 4 (متقدم)، 5 (خبير). التقييم الدقيق ينتج خارطة واقعية.',
-  'Be honest: a rating of 2 tells CareerDev4AI to give you beginner-friendly learning tasks.':
+  'Be honest: a rating of 2 tells CareerRa to give you beginner-friendly learning tasks.':
     'التقييم الصادق يساعد المنصة على تزويدك بمهام تناسب مستواك الحقيقي دون إحباط.',
 
   'Skill Assessments & Quizzes': 'الاختبارات والتقييمات المهارية',
@@ -398,8 +398,8 @@ export const tourAr: Record<string, string> = {
     'هذه جهات حقيقية يمكنك التقديم إليها، مرتبة حسب مدى تطابقها مع المهارات التي ما زالت تحتاجها.',
   'Your CV, built from your data':
     'سيرتك الذاتية، مبنية من بياناتك',
-  'CareerDev4AI assembles this from the experience, skills, projects, volunteering and courses you have entered. It never invents anything.':
-    'يجمع CareerDev4AI هذه السيرة من خبراتك ومهاراتك ومشاريعك وعملك التطوعي ودوراتك التي أدخلتها. ولا يخترع أي شيء.',
+  'CareerRa assembles this from the experience, skills, projects, volunteering and courses you have entered. It never invents anything.':
+    'يجمع CareerRa هذه السيرة من خبراتك ومهاراتك ومشاريعك وعملك التطوعي ودوراتك التي أدخلتها. ولا يخترع أي شيء.',
   'Rate what you can do':
     'قيّم ما تستطيع فعله',
   'Your ratings are what make the roadmap, the learning and the volunteer list specific to you.':

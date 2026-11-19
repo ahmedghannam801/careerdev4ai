@@ -505,8 +505,8 @@ export function buildPdf(
   if (metadata.author) infoEntries.push(`/Author ${literal(metadata.author)}`);
   if (metadata.subject) infoEntries.push(`/Subject ${literal(metadata.subject)}`);
   infoEntries.push(
-    `/Creator ${literal(metadata.creator ?? 'CareerDev4AI CV Studio')}`,
-    '/Producer (CareerDev4AI)'
+    `/Creator ${literal(metadata.creator ?? 'CareerRa CV Studio')}`,
+    '/Producer (CareerRa)'
   );
   const infoId = store.add(`<< ${infoEntries.join(' ')} >>`);
 

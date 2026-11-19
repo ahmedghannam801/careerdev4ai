@@ -24,13 +24,13 @@ export const VODAFONE_CASH_WALLET = '01027053876';
 export const VODAFONE_CASH_WALLET_INTERNATIONAL = '+201027053876';
 
 /** Registered account holder shown on the Vodafone Cash transfer. */
-export const VODAFONE_CASH_ACCOUNT_HOLDER = 'CareerDev4AI Operations';
+export const VODAFONE_CASH_ACCOUNT_HOLDER = 'CareerRa Operations';
 
 /** InstaPay Instant Payment Address (IPA). */
 export const INSTAPAY_HANDLE = 'ahmed1192005@instapay';
 
 /** Registered account holder shown on the InstaPay transfer. */
-export const INSTAPAY_ACCOUNT_HOLDER = 'CareerDev4AI Commercial';
+export const INSTAPAY_ACCOUNT_HOLDER = 'CareerRa Commercial';
 
 export type PaymentBrand = 'vodafone_cash' | 'instapay';
 

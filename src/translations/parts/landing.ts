@@ -13,8 +13,8 @@ export const landingAr: Record<string, string> = {
   // The page's own copy. It used to be raw English constants, which meant the
   // Arabic landing page was an English page inside an Arabic frame.
   'Turn Your Ambition Into a Career Plan.': 'حوّل طموحك إلى خطة مهنية.',
-  'CareerDev4AI helps you discover where you’re going, what you’re missing, and what to do next — from your first skill to your next opportunity.':
-    'يساعدك CareerDev4AI على اكتشاف أين أنت ذاهب، وما ينقصك، وما ينبغي أن تفعل بعد ذلك — من مهارتك الأولى إلى فرصتك التالية.',
+  'CareerRa helps you discover where you’re going, what you’re missing, and what to do next — from your first skill to your next opportunity.':
+    'يساعدك CareerRa على اكتشاف أين أنت ذاهب، وما ينقصك، وما ينبغي أن تفعل بعد ذلك — من مهارتك الأولى إلى فرصتك التالية.',
   'Skills are scattered': 'المهارات مُبعثرة',
   'A spreadsheet here, a course list there, and no honest picture of what is actually missing.':
     'جدول بيانات هنا، وقائمة دورات هناك، ولا صورة صادقة لما ينقصك حقًا.',
@@ -90,8 +90,8 @@ export const landingAr: Record<string, string> = {
   'This role needs no closing tasks yet.': 'لا تحتاج هذه الوظيفة إلى مهام إغلاق حاليًا.',
   'The same reason is attached to every suggestion: it names the record that produced it, so you can check the recommendation instead of trusting it.':
     'كل اقتراح يحمل سببه: يذكر السجل الذي أنتجه، لتتحقق من التوصية بنفسك بدلًا من الوثوق بها.',
-  'Generated live by the CareerDev4AI planning engine from the role catalogue — not a mock-up.':
-    'يُنتَج مباشرةً بواسطة محرّك التخطيط في CareerDev4AI من دليل الوظائف — وليس نموذجًا توضيحيًا.',
+  'Generated live by the CareerRa planning engine from the role catalogue — not a mock-up.':
+    'يُنتَج مباشرةً بواسطة محرّك التخطيط في CareerRa من دليل الوظائف — وليس نموذجًا توضيحيًا.',
 
   // ---- Features --------------------------------------------------------
   'Career Intelligence': 'الذكاء المهني',
@@ -158,8 +158,8 @@ export const landingAr: Record<string, string> = {
     'من أين يأتي المحتوى التعليمي؟',
   'Each resource in the catalogue carries the provider that published it and a link to the original page. The catalogue only shows resources that address a gap in your profile for your target role, and nothing is recommended to you that the platform cannot point you to.':
     'كل مورد في الدليل يحمل الجهة التي نشرته ورابطًا إلى صفحته الأصلية. ولا يعرض الدليل إلا الموارد التي تعالج فجوة في ملفك بالنسبة لوظيفتك المستهدفة، ولا يُقترح عليك شيء لا تستطيع المنصة أن تدلّك عليه.',
-  'Can I get a job or an offer through CareerDev4AI?':
-    'هل يمكنني الحصول على وظيفة أو عرض عمل عبر CareerDev4AI؟',
+  'Can I get a job or an offer through CareerRa?':
+    'هل يمكنني الحصول على وظيفة أو عرض عمل عبر CareerRa؟',
   'No, and no career platform can honestly promise that. The platform keeps your applications, your tailored documents and your interview preparation in one place so you can apply consistently and prepare properly. It also has no live vacancy feed, so it will not show you a vacancy it cannot verify.':
     'لا، ولا يمكن لأي منصة مهنية أن تَعِد بذلك بأمانة. تجمع المنصة طلباتك ووثائقك المعدّلة وتحضيرك للمقابلات في مكان واحد، فتتقدّم بطلبات متسقة وتستعدّ كما ينبغي. كما أنها لا تملك تغذية مباشرة للوظائف الشاغرة، لذا لن تعرض عليك شاغرة لا تستطيع التحقق منها.',
   'What happens to my original CV?':
@@ -190,7 +190,7 @@ export const landingAr: Record<string, string> = {
   'Published legal documents': 'المستندات القانونية المنشورة',
   'The Terms and the Privacy Policy are published in full, at their own addresses, and are versioned.':
     'يُنشر الشروط وسياسة الخصوصية بنصهما الكامل، على عناوينهما الخاصة، وبإصدارات موثّقة.',
-  'Who builds CareerDev4AI': 'من يبني CareerDev4AI',
+  'Who builds CareerRa': 'من يبني CareerRa',
   'The product is built and published by Ahmed Ebrahim, who is also the contact for the legal documents.':
     'يبني المنتج وينشره أحمد إبراهيم، وهو أيضًا جهة التواصل الخاصة بالمستندات القانونية.',
   'LinkedIn profile': 'ملف LinkedIn',
@@ -288,7 +288,7 @@ export const landingAr: Record<string, string> = {
   'Bilingual English & Arabic': 'بالإنجليزية والعربية',
   'Professional reviewing career roadmap and learning path on laptop in modern workspace':
     'متخصصة تراجع خارطة الطريق المهنية ومسار التعلم على الحاسوب في بيئة عمل عصرية',
-  'CareerDev4AI 3D Architectural Composition': 'تكوين معماري ثلاثي الأبعاد لمنصة CareerDev4AI',
+  'CareerRa 3D Architectural Composition': 'تكوين معماري ثلاثي الأبعاد لمنصة CareerRa',
   'University student studying with a laptop in a modern educational environment':
     'طالبة جامعية تدرس على جهاز حاسوب محمول في بيئة تعليمية عصرية',
   'Professional job interview and recruitment discussion in a modern office':

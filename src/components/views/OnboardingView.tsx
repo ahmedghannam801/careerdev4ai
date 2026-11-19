@@ -285,7 +285,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 {t('Let\'s build your career path')}
               </h2>
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                CareerDev4AI works from one thing: the career you pick. Everything else — your
+                CareerRa works from one thing: the career you pick. Everything else — your
                 roadmap, the courses, the projects, the volunteering and your CV — is built from
                 the role you choose and the skills you actually have.
               </p>

@@ -282,7 +282,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <Logo variant="icon" className="h-8 w-8" alt="" />
             <div>
               <div className="font-bold text-sm tracking-tight text-[var(--text-primary)]">
-                {t('CareerDev4AI')}
+                {t('CareerRa')}
               </div>
               <div className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[140px]">
                 {targetRole?.title ?? ''}
@@ -394,7 +394,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 onClick={() => onNavigate('dashboard')} 
                 className="hidden shrink-0 font-medium hover:text-[var(--text-primary)] sm:inline"
               >
-                {t('CareerDev4AI')}
+                {t('CareerRa')}
               </button>
               <span className="hidden shrink-0 text-[var(--text-muted)] sm:inline">/</span>
               <span className="truncate font-semibold text-[var(--text-primary)]">
@@ -591,7 +591,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         {/* Global Authenticated Shell Footer */}
         <footer className="mt-auto border-t border-[var(--border-subtle)] px-4 sm:px-8 py-3 text-xs text-[var(--text-muted)]">
           <div className="flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-2">
-            <span>© 2026 CareerDev4AI</span>
+            <span>© 2026 CareerRa</span>
             <span>
               {t('Developed by')}{' '}
               <a
@@ -633,7 +633,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2">
                 <Logo variant="icon" className="h-7 w-7" alt="" />
-                <span className="font-bold text-sm text-[var(--text-primary)]">{t('CareerDev4AI')}</span>
+                <span className="font-bold text-sm text-[var(--text-primary)]">{t('CareerRa')}</span>
               </div>
               <button 
                 onClick={() => setMobileMenuOpen(false)}

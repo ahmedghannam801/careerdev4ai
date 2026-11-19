@@ -5,7 +5,7 @@ import { withRuntimeEnv } from '../server/runtimeEnv.ts';
 
 test('test email is branded, responsive, plain-text, and escapes recipient markup', () => {
   const message = buildTestEmail('owner+<test>@example.com');
-  assert.equal(message.from, 'CareerDev4AI <onboarding@resend.dev>');
+  assert.equal(message.from, 'CareerRa <onboarding@resend.dev>');
   assert.deepEqual(message.to, ['owner+<test>@example.com']);
   assert.match(message.html, /#FF5A36/);
   assert.match(message.html, /name="viewport"/);
@@ -41,7 +41,7 @@ test('Resend call uses request-scoped credentials and returns only a valid messa
     assert.equal(authorization, 'Bearer test-only-secret');
     assert.equal(idempotencyKey, 'careerdev4ai-test/user/123');
     assert.deepEqual(requestBody?.to, ['owner@example.com']);
-    assert.equal(requestBody?.from, 'CareerDev4AI <onboarding@resend.dev>');
+    assert.equal(requestBody?.from, 'CareerRa <onboarding@resend.dev>');
   } finally {
     globalThis.fetch = originalFetch;
   }

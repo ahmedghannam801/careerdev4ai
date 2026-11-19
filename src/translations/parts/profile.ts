@@ -14,8 +14,8 @@ export const profileAr: Record<string, string> = {
   "Expired": "منتهية",
   "Key Achievements": "الإنجازات الرئيسية",
   "Key Responsibilities": "المسؤوليات الرئيسية",
-  'Choose CareerDev4AI Avatar': 'اختر صورة CareerDev4AI',
-  'Choose Your CareerDev4AI Avatar': 'اختر صورة CareerDev4AI الخاصة بك',
+  'Choose CareerRa Avatar': 'اختر صورة CareerRa',
+  'Choose Your CareerRa Avatar': 'اختر صورة CareerRa الخاصة بك',
   'Select a curated illustrated avatar that represents your professional profile.':
     'اختر صورة منتقاة تمثّل ملفك المهني.',
   'Copy shareable link': 'انسخ رابط المشاركة',
@@ -149,7 +149,7 @@ export const profileAr: Record<string, string> = {
   'Skills (comma separated)': 'المهارات (مفصولة بفواصل)',
   'GitHub Repo URL': 'رابط مستودع غيت هَب',
   'Live Demo URL': 'رابط العرض الحي',
-  'Back to CareerDev4AI': 'العودة إلى CareerDev4AI',
+  'Back to CareerRa': 'العودة إلى CareerRa',
   'Loading public profile…': 'جارٍ تحميل الملف العام…',
   'Profile not available': 'الملف غير متاح',
   'This profile does not exist or its owner has not made it public.':

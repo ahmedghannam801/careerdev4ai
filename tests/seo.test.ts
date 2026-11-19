@@ -367,7 +367,7 @@ describe('the Search Console verification file', () => {
 });
 
 describe('the document metadata of the application', () => {
-  it('publishes the CareerDev4AI site name in static homepage structured data', () => {
+  it('publishes the CareerRa site name in static homepage structured data', () => {
     const html = readFileSync(join(REPO_ROOT, 'index.html'), 'utf-8');
     const blocks = [
       ...html.matchAll(
@@ -377,19 +377,19 @@ describe('the document metadata of the application', () => {
     const schemas = blocks.map((block) => JSON.parse(block[1]));
     const website = schemas.find((schema) => schema['@type'] === 'WebSite');
     assert.ok(website, 'the static homepage must contain WebSite structured data');
-    assert.equal(website.name, 'CareerDev4AI');
+    assert.equal(website.name, 'CareerRa');
     assert.deepEqual(website.alternateName, [
-      'CareerDev4AI',
-      'Career Dev 4AI',
-      'CareerDev4AI Career Platform',
+      'CareerRa',
+      'CareerRa AI',
+      'CareerRa Career Platform',
     ]);
     assert.equal(website.url, 'https://careerdev4ai.pages.dev/');
     assert.equal(websiteSchema().name, website.name);
     assert.equal(websiteSchema().url, website.url);
     assert.equal((websiteSchema().alternateName as string[])[0], website.alternateName[0]);
     assert.match(html, /<link rel="canonical" href="https:\/\/careerdev4ai\.pages\.dev\/"\s*\/>/);
-    assert.match(html, /<meta property="og:site_name" content="CareerDev4AI"\s*\/>/);
-    assert.match(html, /<title>CareerDev4AI — Turn Your Ambition Into a Career Plan<\/title>/);
+    assert.match(html, /<meta property="og:site_name" content="CareerRa"\s*\/>/);
+    assert.match(html, /<title>CareerRa — Turn Your Ambition Into a Career Plan<\/title>/);
   });
 
   it('indexes the landing page and hides the signed-in views', () => {

@@ -104,7 +104,7 @@ export const careerAr: Record<string, string> = {
   'The problem': 'المشكلة',
   'Career decisions are fragmented.': 'قرارات المسار المهني مُشتّتة.',
   'How it works': 'كيف يعمل',
-  'CareerDev4AI brings the journey together.': 'يجمع CareerDev4AI الرحلة في مكان واحد.',
+  'CareerRa brings the journey together.': 'يجمع CareerRa الرحلة في مكان واحد.',
   'One connected path instead of eight disconnected tools.':
     'مسار واحد متصل بدلًا من ثماني أدوات منفصلة.',
   'AI intelligence': 'ذكاء اصطناعي',
@@ -120,7 +120,7 @@ export const careerAr: Record<string, string> = {
   'Privacy': 'الخصوصية',
   'Terms': 'الشروط',
   'English / العربية': 'English / العربية',
-  'CareerDev4AI is analyzing your graph': 'يحلّل CareerDev4AI رسمك البياني',
+  'CareerRa is analyzing your graph': 'يحلّل CareerRa رسمك البياني',
   "Today's Next Step": 'خطوتك التالية اليوم',
   'No records yet': 'لا توجد سجلات بعد',
   'All': 'الكل',
@@ -156,7 +156,7 @@ export const careerAr: Record<string, string> = {
   'Projects & volunteering': 'المشاريع والتطوع',
   'Your CV': 'سيرتك الذاتية',
   'Your Career Journey': 'مسارك المهني',
-  'The CareerDev4AI journey': 'رحلة CareerDev4AI',
+  'The CareerRa journey': 'رحلة CareerRa',
   'You are here': 'أنت هنا',
 
   // Target roles & path explorer

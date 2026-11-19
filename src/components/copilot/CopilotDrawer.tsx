@@ -38,7 +38,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       {isOpen && (
         <motion.div
           role="dialog"
-          aria-label={t('CareerDev4AI Copilot')}
+          aria-label={t('CareerRa Copilot')}
           data-lenis-prevent
           className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[440px]"
           variants={settings.language === 'ar' ? drawerLeftVariants(reduced) : drawerVariants(reduced)}
@@ -53,7 +53,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
             <AiMascot className="h-9 w-7 object-contain" alt="" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerDev4AI Copilot')}</div>
+            <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerRa Copilot')}</div>
             <div className="text-xs text-[var(--text-secondary)]">{t('Advisor for')} {targetRole?.title ?? ''}</div>
           </div>
         </div>
@@ -95,7 +95,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
         {copilotMessages.length === 0 && (
           <div className="flex flex-col items-center px-6 py-8 text-center">
             <AiMascot className="mb-3 h-24 w-16 object-contain" state="idle" alt="" />
-            <p className="text-sm font-medium text-[var(--text-primary)]">{t('CareerDev4AI Copilot')}</p>
+            <p className="text-sm font-medium text-[var(--text-primary)]">{t('CareerRa Copilot')}</p>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">{t('copilotPlaceholder')}</p>
           </div>
         )}
@@ -157,7 +157,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
               <AiMascot className="h-7 w-5 object-contain" state="thinking" alt="" />
             </div>
             <span className="flex items-center gap-2">
-              <span aria-live="polite">{t('CareerDev4AI is analyzing your graph')}</span>
+              <span aria-live="polite">{t('CareerRa is analyzing your graph')}</span>
               <span className="flex items-center gap-0.5" aria-hidden="true">
                 {[0, 1, 2].map((dot) => (
                   <motion.span

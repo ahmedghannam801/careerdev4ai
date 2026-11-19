@@ -9,32 +9,23 @@
  *
  * Every page is rasterised from the very element the preview shows — the
  * template, its fonts, its colours, its columns, its Arabic shaping and its
- * page order. A second layout engine is never asked to reproduce the
- * template, because no second engine would agree with the first. Over each
- * page an invisible text layer carries the document's words, so the file is
- * selectable and searchable, and the links in the document stay clickable.
+ * page order. Over each page an invisible text layer carries the document's
+ * words, so the file is selectable and searchable, and the links stay clickable.
  *
- * The file format itself is written by `src/lib/pdf/pdfWriter.ts`, which is
- * pure and tested without a browser. This file is only the browser part:
- * measuring the paper, choosing page breaks, drawing each page at print
- * resolution and starting the download.
+ * Direct DOM-to-canvas rendering via html2canvas ensures canvases remain untainted
+ * so canvas.toBlob() generates valid JPEG buffers without SecurityError.
+ * The file format itself is written by `src/lib/pdf/pdfWriter.ts`.
  */
 
 import { buildPdf, PDF_A4_HEIGHT, PDF_A4_WIDTH, type PdfLink, type PdfPage, type PdfText } from './pdf/pdfWriter';
-import { paginateCvDocument, type CvPageWindow } from './pdf/paginate';
+import { paginateCvDocument } from './pdf/paginate';
 
 /** The paper's width at 96dpi, which is A4. */
-const PAPER_WIDTH_PX = 794;
+export const PAPER_WIDTH_PX = 794;
 /** The paper's height at 96dpi, which is A4. */
-const PAPER_HEIGHT_PX = 1123;
+export const PAPER_HEIGHT_PX = 1123;
 /** CSS pixels to PDF points (72/96). */
-const PX_TO_PT = 0.75;
-
-/** The families the application loads, so the raster uses the same faces. */
-const GOOGLE_FONTS_URL =
-  'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700' +
-  '&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400' +
-  '&family=JetBrains+Mono:wght@400;500&display=swap';
+export const PX_TO_PT = 0.75;
 
 export interface CvPdfOptions {
   /** The real paper element: `[data-cv-print]`. */
@@ -58,15 +49,10 @@ export interface CvPdfResult {
 /**
  * The name the file is downloaded as.
  *
- * The requirement is the candidate's own name, not the product: a recruiter
- * receives `Ahmed_Ebrahim_CV.pdf`. Characters a file system dislikes become
- * underscores; an empty name falls back to `CV_CV.pdf`, which is still a
- * valid name rather than an empty one.
+ * The candidate's own name: a recruiter receives `Ahmed_Ebrahim_CV.pdf`.
  */
 export function cvPdfFileName(fullName: string | null | undefined): string {
   const cleaned = (fullName ?? '')
-    // Only Latin diacritics are folded. A compatibility decomposition would
-    // split an Arabic hamza off its alef and lose it from the file name.
     .replace(/[\u00c0-\u024f]/g, (character) =>
       character.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     )
@@ -76,11 +62,7 @@ export function cvPdfFileName(fullName: string | null | undefined): string {
 }
 
 /**
- * Waits for the document's own fonts to be ready.
- *
- * The raster is taken from the live paper. If a web font is still swapping
- * in when the snapshot is drawn, the file would show a fallback face that
- * was never on the screen.
+ * Waits for the document's own fonts to be ready before drawing.
  */
 async function waitForFonts(): Promise<void> {
   try {
@@ -94,234 +76,13 @@ async function waitForFonts(): Promise<void> {
 }
 
 /* -------------------------------------------------------------------------- */
-/* The fonts of the raster                                                     */
-/* -------------------------------------------------------------------------- */
-
-let fontCssPromise: Promise<string> | null = null;
-
-/** Fetches the application's font stylesheet once. */
-function rawFontCss(): Promise<string> {
-  if (!fontCssPromise) {
-    fontCssPromise = fetch(GOOGLE_FONTS_URL, { cache: 'force-cache' })
-      .then((response) => (response.ok ? response.text() : ''))
-      .catch(() => '');
-  }
-  return fontCssPromise;
-}
-
-/** Converts bytes to base64 without overflowing the argument list. */
-function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const chunk = 0x8000;
-  for (let index = 0; index < bytes.length; index += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
-  }
-  return btoa(binary);
-}
-
-/** Whether a font-face block covers any character the document uses. */
-function blockCoversText(block: string, used: ReadonlySet<number>): boolean {
-  const match = /unicode-range\s*:\s*([^;]+);/i.exec(block);
-  if (!match) return true;
-  return match[1].split(',').some((entry) => {
-    const range = /^U\+([0-9A-F?]+)(?:-([0-9A-F]+))?$/i.exec(entry.trim());
-    if (!range) return false;
-    if (range[1].includes('?')) return true;
-    const start = parseInt(range[1], 16);
-    const end = range[2] ? parseInt(range[2], 16) : start;
-    for (const codePoint of used) {
-      if (codePoint >= start && codePoint <= end) return true;
-    }
-    return false;
-  });
-}
-
-/**
- * Builds `@font-face` rules whose sources are data URLs.
- *
- * An SVG drawn as an image cannot reach a stylesheet or a font file on the
- * network: it is an isolated document. The only way the raster can use the
- * template's real typeface is to carry the face inside it, so every font the
- * document actually uses is fetched once and inlined.
- */
-async function inlineFontCss(text: string): Promise<string> {
-  const css = await rawFontCss();
-  if (!css) return '';
-  const used = new Set<number>();
-  for (const character of text) used.add(character.codePointAt(0) ?? 0);
-
-  const blocks = css.match(/@font-face\s*\{[^}]*\}/g) ?? [];
-  const kept = blocks.filter((block) => blockCoversText(block, used));
-  if (kept.length === 0) return '';
-
-  const cache = new Map<string, string>();
-  const inlined = await Promise.all(
-    kept.map(async (block) => {
-      const urls = [...block.matchAll(/url\((https:[^)]+)\)/g)].map((match) => match[1]);
-      if (urls.length === 0) return block;
-      let resolved = block;
-      for (const url of urls) {
-        let data = cache.get(url);
-        if (!data) {
-          try {
-            const response = await fetch(url, { cache: 'force-cache' });
-            if (!response.ok) throw new Error(`font ${response.status}`);
-            const bytes = new Uint8Array(await response.arrayBuffer());
-            data = `data:font/woff2;base64,${toBase64(bytes)}`;
-            cache.set(url, data);
-          } catch {
-            data = '';
-          }
-        }
-        if (data) resolved = resolved.split(url).join(data);
-      }
-      return resolved;
-    })
-  );
-  return inlined.join('\n');
-}
-
-/* -------------------------------------------------------------------------- */
-/* The computed paper                                                          */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The properties copied onto the clone.
- *
- * The preview draws with inline styles, but inherited values (a heading's
- * colour, a bullet's font) and the browser's own layout (a grid's resolved
- * tracks) live only in the computed style. Copying them makes the raster
- * independent of the application's stylesheets, which an SVG image cannot
- * see.
- */
-const STYLE_PROPERTIES = [
-  'color',
-  'background-color',
-  'background-image',
-  'background-size',
-  'background-position',
-  'background-repeat',
-  'border-top',
-  'border-right',
-  'border-bottom',
-  'border-left',
-  'border-top-left-radius',
-  'border-top-right-radius',
-  'border-bottom-left-radius',
-  'border-bottom-right-radius',
-  'box-shadow',
-  'display',
-  'position',
-  'top',
-  'right',
-  'bottom',
-  'left',
-  'width',
-  'height',
-  'min-width',
-  'min-height',
-  'max-width',
-  'max-height',
-  'box-sizing',
-  'overflow',
-  'overflow-x',
-  'overflow-y',
-  'margin-top',
-  'margin-right',
-  'margin-bottom',
-  'margin-left',
-  'padding-top',
-  'padding-right',
-  'padding-bottom',
-  'padding-left',
-  'font-family',
-  'font-size',
-  'font-weight',
-  'font-style',
-  'font-variant',
-  'font-feature-settings',
-  'line-height',
-  'letter-spacing',
-  'text-align',
-  'text-transform',
-  'text-decoration-line',
-  'text-decoration-color',
-  'text-decoration-style',
-  'text-indent',
-  'white-space',
-  'word-break',
-  'overflow-wrap',
-  'vertical-align',
-  'direction',
-  'unicode-bidi',
-  'list-style-type',
-  'list-style-position',
-  'flex-direction',
-  'flex-wrap',
-  'flex-grow',
-  'flex-shrink',
-  'flex-basis',
-  'align-items',
-  'align-content',
-  'align-self',
-  'justify-content',
-  'gap',
-  'row-gap',
-  'column-gap',
-  'grid-template-columns',
-  'grid-template-rows',
-  'grid-auto-flow',
-  'grid-column',
-  'grid-row',
-  'column-count',
-  'column-gap',
-  'column-rule',
-  'break-inside',
-  'break-after',
-  'opacity',
-  'z-index',
-  'border-collapse',
-  'border-spacing',
-] as const;
-
-/** Copies the computed style of every element of the paper onto a clone. */
-function cloneWithComputedStyles(source: Element, clone: Element, depth = 0): void {
-  if (depth > 80) return;
-  const computed = window.getComputedStyle(source);
-  const declarations: string[] = [];
-  for (const property of STYLE_PROPERTIES) {
-    const value = computed.getPropertyValue(property);
-    if (value && value !== 'none' && value !== 'normal' && value !== 'auto') {
-      declarations.push(`${property}:${value}`);
-    } else if (property === 'display' || property === 'position') {
-      declarations.push(`${property}:${value}`);
-    }
-  }
-  if (!(source instanceof HTMLElement) || !(clone instanceof HTMLElement)) {
-    // An SVG child is the only non-HTML element a CV could carry; its
-    // presentation attributes are already serialised with it.
-    return;
-  }
-  clone.style.cssText = declarations.join(';');
-  const sourceChildren = [...source.children];
-  const cloneChildren = [...clone.children];
-  for (let index = 0; index < sourceChildren.length; index += 1) {
-    const child = cloneChildren[index];
-    if (child) cloneWithComputedStyles(sourceChildren[index], child, depth + 1);
-  }
-}
-
-/* -------------------------------------------------------------------------- */
 /* Pagination measurements                                                     */
 /* -------------------------------------------------------------------------- */
 
 interface Measurement {
-  /** The ratio between the on-screen paper and its layout size. */
   scale: number;
-  /** The paper's top-left corner on the screen. */
   left: number;
   top: number;
-  /** The height of the paper in its own (unscaled) pixels. */
   height: number;
   margin: number;
 }
@@ -381,12 +142,6 @@ function rectToRun(
 
 /**
  * Reads the text of the paper, line by line.
- *
- * A Range around a whole text node is enough for a node that fits on one
- * line. A wrapped paragraph returns several rectangles with no text attached
- * to them, so it is walked one character at a time and grouped by the line
- * it landed on. A CV is a few thousand characters; the walk costs a frame,
- * not a second.
  */
 function collectTextRuns(paper: HTMLElement, measurement: Measurement): AbsoluteRun[] {
   const runs: AbsoluteRun[] = [];
@@ -500,125 +255,7 @@ function collectLinks(paper: HTMLElement, measurement: Measurement): PdfLink[] {
   return links;
 }
 
-/* -------------------------------------------------------------------------- */
-/* The raster                                                                  */
-/* -------------------------------------------------------------------------- */
-
-interface PageImage {
-  jpeg: Uint8Array;
-  pixelWidth: number;
-  pixelHeight: number;
-}
-
-function paperMarkup(
-  paperHtml: string,
-  fontCss: string,
-  window: CvPageWindow
-): string {
-  // An SVG image is an isolated document: it has no stylesheets, no fonts
-  // and no page. Everything it needs is inside it.
-  const container = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-  container.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-  container.setAttribute(
-    'style',
-    `width:${PAPER_WIDTH_PX}px;height:${Math.ceil(
-      window.end - window.start
-    )}px;overflow:hidden;position:relative;background:#ffffff;`
-  );
-
-  if (fontCss) {
-    const style = document.createElement('style');
-    style.textContent = fontCss;
-    container.appendChild(style);
-  }
-
-  const shifter = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-  shifter.setAttribute(
-    'style',
-    `position:absolute;left:0;top:${-window.start}px;width:${PAPER_WIDTH_PX}px;`
-  );
-  const paperHolder = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-  paperHolder.innerHTML = paperHtml;
-  const paper = paperHolder.firstElementChild;
-  if (paper) shifter.appendChild(paper);
-  container.appendChild(shifter);
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  svg.setAttribute('width', String(PAPER_WIDTH_PX));
-  svg.setAttribute('height', String(Math.ceil(window.end - window.start)));
-  svg.setAttribute('viewBox', `0 0 ${PAPER_WIDTH_PX} ${Math.ceil(window.end - window.start)}`);
-  const foreignObject = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-  foreignObject.setAttribute('x', '0');
-  foreignObject.setAttribute('y', '0');
-  foreignObject.setAttribute('width', '100%');
-  foreignObject.setAttribute('height', '100%');
-  foreignObject.appendChild(container);
-  svg.appendChild(foreignObject);
-
-  return new XMLSerializer().serializeToString(svg);
-}
-
-async function rasterisePage(
-  markup: string,
-  scale: number,
-  topInset: number,
-  cropHeight: number
-): Promise<PageImage> {
-  const blob = new Blob([markup], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const image = new Image();
-  image.decoding = 'sync';
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () =>
-        reject(new Error('The CV could not be drawn for the PDF export.'));
-      image.src = url;
-    });
-
-    const width = Math.round(PAPER_WIDTH_PX * scale);
-    const height = Math.round(PAPER_HEIGHT_PX * scale);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, width);
-    canvas.height = Math.max(1, height);
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('The browser could not give the PDF export a canvas.');
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(
-      image,
-      0,
-      Math.round(topInset * scale),
-      width,
-      Math.round(cropHeight * scale)
-    );
-
-    const jpeg = await new Promise<Uint8Array>((resolve, reject) => {
-      canvas.toBlob(
-        (result) => {
-          if (!result) {
-            reject(new Error('The browser could not encode a page of the PDF.'));
-            return;
-          }
-          void result.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)));
-        },
-        'image/jpeg',
-        0.92
-      );
-    });
-
-    return { jpeg, pixelWidth: canvas.width, pixelHeight: canvas.height };
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 function clampScale(scale: number): number {
-  // A canvas has a maximum dimension and a maximum area. 2.5× A4 is about
-  // 2,000 × 2,800 pixels; the cap protects a small device from a larger
-  // request without ever dropping below the paper's own resolution.
   const maxByDimension = Math.min(12000 / PAPER_WIDTH_PX, 12000 / PAPER_HEIGHT_PX);
   const maxByArea = Math.sqrt(40_000_000 / (PAPER_WIDTH_PX * PAPER_HEIGHT_PX));
   return Math.max(1, Math.min(scale, maxByDimension, maxByArea));
@@ -651,25 +288,74 @@ export async function generateCvPdf(options: CvPdfOptions): Promise<CvPdfResult>
 
   const textRuns = collectTextRuns(paper, measurement);
   const links = collectLinks(paper, measurement);
-  const fontCss = await inlineFontCss(paper.textContent ?? '');
-
-  const clone = paper.cloneNode(true) as HTMLElement;
-  cloneWithComputedStyles(paper, clone);
-  const paperHtml = clone.outerHTML;
 
   const scale = clampScale(options.scale ?? 2.5);
+
+  options.onProgress?.('pages');
+
+  // Load html2canvas dynamically to paint the DOM directly without foreignObject
+  const html2canvasModule = await import('html2canvas');
+  const html2canvas = html2canvasModule.default ?? html2canvasModule;
+
+  // Render the un-tainted canvas directly from the live DOM element
+  const fullCanvas = await html2canvas(paper, {
+    scale,
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    backgroundColor: '#ffffff',
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: PAPER_WIDTH_PX,
+  });
+
+  const width = Math.round(PAPER_WIDTH_PX * scale);
+  const height = Math.round(PAPER_HEIGHT_PX * scale);
   const pages: PdfPage[] = [];
 
   for (let index = 0; index < windows.length; index += 1) {
-    options.onProgress?.('pages');
     const window = windows[index];
-    const markup = paperMarkup(paperHtml, fontCss, window);
-    const raster = await rasterisePage(
-      markup,
-      scale,
-      window.topInset,
-      window.end - window.start
-    );
+    const cropHeight = window.end - window.start;
+
+    // Create an A4 page canvas
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width = Math.max(1, width);
+    pageCanvas.height = Math.max(1, height);
+    const context = pageCanvas.getContext('2d');
+    if (!context) throw new Error('The browser could not give the PDF export a canvas.');
+
+    // Pure white A4 page background
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+    // Slice the window corresponding to this page from fullCanvas
+    const sx = 0;
+    const sy = Math.round(window.start * scale);
+    const sWidth = Math.min(fullCanvas.width, width);
+    const sHeight = Math.min(fullCanvas.height - sy, Math.round(cropHeight * scale));
+
+    const dx = 0;
+    const dy = Math.round(window.topInset * scale);
+    const dWidth = sWidth;
+    const dHeight = sHeight;
+
+    if (sHeight > 0 && sWidth > 0) {
+      context.drawImage(fullCanvas, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+    }
+
+    const jpeg = await new Promise<Uint8Array>((resolve, reject) => {
+      pageCanvas.toBlob(
+        (result) => {
+          if (!result) {
+            reject(new Error('The browser could not encode a page of the PDF.'));
+            return;
+          }
+          void result.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)));
+        },
+        'image/jpeg',
+        0.92
+      );
+    });
 
     const text: PdfText[] = [];
     for (const run of textRuns) {
@@ -692,13 +378,14 @@ export async function generateCvPdf(options: CvPdfOptions): Promise<CvPdfResult>
         top: (link.top - window.start + window.topInset) * PX_TO_PT,
         width: link.width * PX_TO_PT,
         height: link.height * PX_TO_PT,
+        url: link.url,
       });
     }
 
     pages.push({
-      jpeg: raster.jpeg,
-      pixelWidth: raster.pixelWidth,
-      pixelHeight: raster.pixelHeight,
+      jpeg,
+      pixelWidth: pageCanvas.width,
+      pixelHeight: pageCanvas.height,
       width: PDF_A4_WIDTH,
       height: PDF_A4_HEIGHT,
       text,

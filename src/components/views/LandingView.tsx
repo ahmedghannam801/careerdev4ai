@@ -162,10 +162,10 @@ const navLinks = [
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--surface-main)]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <a href="/" className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90" aria-label={t('CareerDev4AI')}>
+          <a href="/" className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90" aria-label={t('CareerRa')}>
             <Logo variant="icon" className="h-8 w-8 shrink-0" alt="" />
             <span className="hidden shrink-0 whitespace-nowrap text-base font-semibold tracking-tight text-[var(--text-primary)] sm:inline">
-              {t('CareerDev4AI')}
+              {t('CareerRa')}
             </span>
           </a>
 
@@ -255,7 +255,7 @@ const navLinks = [
 
               <Reveal delay={0.12}>
                 <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
-                  {t('CareerDev4AI helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.')}
+                  {t('CareerRa helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.')}
                 </p>
               </Reveal>
 
@@ -346,7 +346,7 @@ const navLinks = [
                 {t('How it works')}
               </div>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                {t('CareerDev4AI brings the journey together.')}
+                {t('CareerRa brings the journey together.')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
                 {t('One connected path instead of eight disconnected tools.')}
@@ -534,7 +534,7 @@ const navLinks = [
                   {t('Guidance grounded in your career, not generic advice.')}
                 </h2>
                 <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
-                  CareerDev4AI recommends based on the goals you set, the skills you have,
+                  CareerRa recommends based on the goals you set, the skills you have,
                   the progress you have made and the courses you have taken — and it shows
                   its reasoning, so you can judge the advice for yourself.
                 </p>
@@ -568,7 +568,7 @@ const navLinks = [
                 {t('Tailored for every career stage')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                CareerDev4AI adapts its priorities, recommendations and roadmaps to where
+                CareerRa adapts its priorities, recommendations and roadmaps to where
                 you are starting from.
               </p>
             </div>
@@ -886,7 +886,7 @@ const navLinks = [
           <Logo variant="full" className="h-10 w-auto self-start sm:h-12" />
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div>
-              <span>© 2026 CareerDev4AI. Personal Career Operating System.</span>
+              <span>© 2026 CareerRa. Personal Career Operating System.</span>
               <span className="mx-2 text-[var(--border-subtle)]">·</span>
               <span>
                 Developed by{' '}

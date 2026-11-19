@@ -111,7 +111,7 @@ describe('the PDF export', () => {
     assert.ok(exporter.includes('PAPER_WIDTH_PX = 794'), 'the paper is A4 at 96dpi');
     assert.ok(exporter.includes('PDF_A4_WIDTH'), 'the file is A4 in points');
     assert.ok(exporter.includes('collectTextRuns'), 'the words stay selectable');
-    assert.ok(exporter.includes('inlineFontCss'), 'the template fonts are carried into the raster');
+    assert.ok(exporter.includes('html2canvas'), 'the template is rendered directly into the canvas');
     assert.ok(cv.fullName.length > 0);
   });
 

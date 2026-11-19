@@ -301,7 +301,7 @@ export const ProductPreview: React.FC = () => {
       <div className="flex items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface-secondary)]/40 px-4 py-2.5 text-[10px] leading-snug text-[var(--text-muted)]">
         <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
         <span>
-          {t('Generated live by the CareerDev4AI planning engine from the role catalogue — not a mock-up.')}
+          {t('Generated live by the CareerRa planning engine from the role catalogue — not a mock-up.')}
         </span>
       </div>
     </div>

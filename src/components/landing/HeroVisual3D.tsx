@@ -42,7 +42,7 @@ export const HeroVisual3D: React.FC = () => {
           />
           <img
             src="/images/hero-3d-hd.jpg"
-            alt={t('CareerDev4AI 3D Architectural Composition')}
+            alt={t('CareerRa 3D Architectural Composition')}
             width={1200}
             height={896}
             fetchPriority="high"

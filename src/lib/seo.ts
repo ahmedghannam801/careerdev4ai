@@ -35,7 +35,7 @@ const SITE_ORIGIN = 'https://careerdev4ai.pages.dev';
 const SITE_URL = `${SITE_ORIGIN}/`;
 
 /** The name of the product, used in the document metadata. */
-const SITE_NAME = 'CareerDev4AI';
+const SITE_NAME = 'CareerRa';
 
 /**
  * The other written forms of the same name.
@@ -45,9 +45,9 @@ const SITE_NAME = 'CareerDev4AI';
  * person actually typed.
  */
 const SITE_ALTERNATE_NAMES = [
-  'CareerDev4AI',
-  'Career Dev 4AI',
-  'CareerDev4AI Career Platform',
+  'CareerRa',
+  'CareerRa AI',
+  'CareerRa Career Platform',
 ];
 
 /** The image used for link previews. */
@@ -75,19 +75,19 @@ export interface RouteMeta {
  */
 const VIEW_META: Record<string, { title: string; description: string }> = {
   landing: {
-    title: `CareerDev4AI — Turn Your Ambition Into a Career Plan`,
+    title: `CareerRa — Turn Your Ambition Into a Career Plan`,
     description:
-      'CareerDev4AI is an AI-powered career operating system for students and young professionals: goals, skills, roadmaps, CVs, job applications, interview practice and volunteering opportunities in one bilingual workspace.',
+      'CareerRa is an AI-powered career operating system for students and young professionals: goals, skills, roadmaps, CVs, job applications, interview practice and volunteering opportunities in one bilingual workspace.',
   },
   onboarding: {
     title: `Set up your career plan | ${SITE_NAME}`,
     description:
-      'Tell CareerDev4AI the role you are aiming at, the experience you have and the time you have, and build a career plan around it.',
+      'Tell CareerRa the role you are aiming at, the experience you have and the time you have, and build a career plan around it.',
   },
   dashboard: {
     title: `Dashboard | ${SITE_NAME}`,
     description:
-      'Your CareerDev4AI dashboard: where your plan stands, what is next, and how your skills, roadmap and applications are progressing.',
+      'Your CareerRa dashboard: where your plan stands, what is next, and how your skills, roadmap and applications are progressing.',
   },
   'my-career': {
     title: `My career | ${SITE_NAME}`,
@@ -97,7 +97,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   roles: {
     title: `Choose your career | ${SITE_NAME}`,
     description:
-      'Pick the career role you are aiming at from the CareerDev4AI catalogue, and make every later step answer to it.',
+      'Pick the career role you are aiming at from the CareerRa catalogue, and make every later step answer to it.',
   },
   analysis: {
     title: `Career analysis | ${SITE_NAME}`,
@@ -167,7 +167,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   profile: {
     title: `Profile | ${SITE_NAME}`,
     description:
-      'Your CareerDev4AI profile: your experience, your education, your skills and the work you have done.',
+      'Your CareerRa profile: your experience, your education, your skills and the work you have done.',
   },
   activity: {
     title: `Activity | ${SITE_NAME}`,
@@ -187,7 +187,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   admin: {
     title: `Administration | ${SITE_NAME}`,
     description:
-      'The CareerDev4AI administration centre: users, catalogue, communications and analytics.',
+      'The CareerRa administration centre: users, catalogue, communications and analytics.',
   },
   referrals: {
     title: `Referrals | ${SITE_NAME}`,
@@ -200,7 +200,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
 const PUBLIC_PROFILE_META = {
   title: `Career profile | ${SITE_NAME}`,
   description:
-    'A public CareerDev4AI profile: the experience, education, skills and projects behind the career.',
+    'A public CareerRa profile: the experience, education, skills and projects behind the career.',
 };
 
 /**
@@ -219,7 +219,7 @@ export function routeMetaFor(
   const title = entry?.title ?? `${SITE_NAME}`;
   const description =
     entry?.description ??
-    'CareerDev4AI is an AI-powered career operating system: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.';
+    'CareerRa is an AI-powered career operating system: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.';
 
   // The public landing page and a public profile may be indexed. Everything
   // else is behind authentication.

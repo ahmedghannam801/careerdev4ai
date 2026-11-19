@@ -6,7 +6,7 @@
  */
 
 export const feedbackAr: Record<string, string> = {
-  'Help shape CareerDev4AI': 'ساعد في تطوير CareerDev4AI',
+  'Help shape CareerRa': 'ساعد في تطوير CareerRa',
   'Tell us what works and what gets in your way. It takes about three minutes.':
     'أخبرنا بما ينجح معك وما يعيقك. يستغرق الأمر نحو ثلاث دقائق.',
   'Share feedback': 'شارك ملاحظاتك',

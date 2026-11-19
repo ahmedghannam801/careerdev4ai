@@ -712,8 +712,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   setAvatarModalOpen(true);
                 }}
                 className="absolute -bottom-2 -end-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] shadow-xs transition-colors"
-                title={t('Choose CareerDev4AI Avatar')}
-                aria-label={t('Choose CareerDev4AI Avatar')}
+                title={t('Choose CareerRa Avatar')}
+                aria-label={t('Choose CareerRa Avatar')}
               >
                 <Smile className="w-3.5 h-3.5" />
               </button>
@@ -1920,7 +1920,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div>
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  {t('Choose Your CareerDev4AI Avatar')}
+                  {t('Choose Your CareerRa Avatar')}
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   {t('Select a curated illustrated avatar that represents your professional profile.')}

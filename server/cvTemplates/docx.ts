@@ -70,6 +70,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     HeadingLevel,
     Packer,
     Paragraph,
+    SectionType,
     ShadingType,
     TabStopType,
     Table,
@@ -93,6 +94,18 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   const accent = spec.accentWord;
   const bodyFont = spec.bodyFont.word;
   const headingFont = spec.headingFont.word;
+  const bodyFontDeclaration = {
+    name: bodyFont,
+    ascii: bodyFont,
+    hAnsi: bodyFont,
+    cs: rtl ? 'IBM Plex Sans Arabic' : bodyFont,
+  };
+  const headingFontDeclaration = {
+    name: headingFont,
+    ascii: headingFont,
+    hAnsi: headingFont,
+    cs: rtl ? 'IBM Plex Sans Arabic' : headingFont,
+  };
   const bodySize = spec.bodySizeHalfPoints;
   const smallSize = Math.round(bodySize * 0.92);
   const headingSize = spec.headingSizeHalfPoints;
@@ -162,7 +175,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       bold: true,
       size,
       color,
-      font: headingFont,
+      font: headingFontDeclaration,
       rightToLeft: rtl,
     });
 
@@ -172,6 +185,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       size,
       color,
       allCaps: caps,
+      font: bodyFontDeclaration,
       rightToLeft: rtl,
     });
 
@@ -180,6 +194,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       text: document.headerContact.join(CV_INLINE_SEPARATOR_WORD),
       size,
       color,
+      font: bodyFontDeclaration,
       rightToLeft: rtl,
     });
 
@@ -525,6 +540,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         : '';
 
     const ruleColor = headingDecoration.ruleColor.replace('#', '').toUpperCase();
+    const startBorderKey = rtl ? 'right' : 'left';
     const ruleBorder =
       headingDecoration.rule === 'bottom'
         ? {
@@ -537,7 +553,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           }
         : headingDecoration.rule === 'start'
           ? {
-              left: {
+              [startBorderKey]: {
                 color: ruleColor,
                 size: borderSize(headingDecoration.ruleWidthPx),
                 style: BorderStyle.SINGLE,
@@ -554,7 +570,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           bold: true,
           size: headingSize,
           color: accent,
-          font: headingFont,
+          font: headingFontDeclaration,
           rightToLeft: rtl,
         })
       );
@@ -568,7 +584,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
           text: '▪',
           size: headingSize,
           color: accent,
-          font: headingFont,
+          font: headingFontDeclaration,
           rightToLeft: rtl,
         })
       );
@@ -582,7 +598,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         allCaps: headingDecoration.allCaps,
         smallCaps: headingDecoration.smallCaps,
         italics: headingDecoration.italic,
-        font: headingDecoration.font.word,
+        font: headingFontDeclaration,
         rightToLeft: rtl,
       })
     );
@@ -722,13 +738,14 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
                 text: `${decoration.marker}  `,
                 size: bodySize,
                 color: decoration.markerAccent ? accent : CV_INK_WORD.secondary,
-                font: bodyFont,
+                font: bodyFontDeclaration,
                 rightToLeft: rtl,
               }),
               new TextRun({
                 text: item,
                 size: bodySize,
                 color: CV_INK_WORD.body,
+                font: bodyFontDeclaration,
                 rightToLeft: rtl,
               }),
             ],
@@ -736,9 +753,40 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
       );
     }
 
-    // The chips and the plain line are one paragraph of words. A chip cannot
-    // be drawn in Word, so the words are laid out as the paper lays them out:
-    // on one line, separated by the same dot.
+    // Visually distinct Word-native shaded chips
+    if (spec.skillsStyle === 'chips' || decoration.mode === 'chips') {
+      const chipRuns: InstanceType<typeof TextRun>[] = [];
+      const chipFill = 'F1F5F9';
+      items.forEach((item, index) => {
+        if (index > 0) {
+          chipRuns.push(new TextRun({ text: '   ', size: bodySize, font: bodyFontDeclaration }));
+        }
+        chipRuns.push(
+          new TextRun({
+            text: `  ${item}  `,
+            size: smallSize,
+            color: CV_INK_WORD.body,
+            shading: {
+              type: ShadingType.CLEAR,
+              fill: chipFill,
+              color: 'auto',
+            },
+            font: bodyFontDeclaration,
+            rightToLeft: rtl,
+          })
+        );
+      });
+      return [
+        new Paragraph({
+          alignment,
+          bidirectional: rtl,
+          spacing: { after: cvPixelsToTwips(spec.metrics.gap), line: Math.round(lineSpacing * 1.35) },
+          children: chipRuns,
+        }),
+      ];
+    }
+
+    // The plain inline line is one paragraph of words separated by inline separator.
     return [
       new Paragraph({
         alignment,
@@ -749,6 +797,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
             text: items.join(CV_INLINE_SEPARATOR_WORD),
             size: bodySize,
             color: CV_INK_WORD.body,
+            font: bodyFontDeclaration,
             rightToLeft: rtl,
           }),
         ],
@@ -1015,6 +1064,70 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
 
     const blocks: InstanceType<typeof Paragraph>[] = [entryTitle(entry), ...detail];
 
+    if (spec.layout === 'timeline' || spec.entryStyle === 'timeline') {
+      const railWidth = 360;
+      const contentEntryWidth = contentWidth - railWidth;
+      const railBorderKey = rtl ? 'left' : 'right';
+      const railAlignment = rtl ? AlignmentType.LEFT : AlignmentType.RIGHT;
+
+      const railCell = new TableCell({
+        width: { size: railWidth, type: WidthType.DXA },
+        verticalAlign: VerticalAlign.TOP,
+        borders: {
+          ...noBorders,
+          [railBorderKey]: {
+            style: BorderStyle.SINGLE,
+            size: 8,
+            color: accent,
+          },
+        },
+        margins: rtl
+          ? { top: 20, bottom: 0, left: 60, right: 0 }
+          : { top: 20, bottom: 0, left: 0, right: 60 },
+        children: [
+          new Paragraph({
+            alignment: railAlignment,
+            bidirectional: rtl,
+            spacing: { before: 20, after: 0 },
+            children: [
+              new TextRun({
+                text: '●',
+                size: 16,
+                color: accent,
+                font: bodyFontDeclaration,
+                rightToLeft: rtl,
+              }),
+            ],
+          }),
+        ],
+      });
+
+      const contentCell = new TableCell({
+        width: { size: contentEntryWidth, type: WidthType.DXA },
+        verticalAlign: VerticalAlign.TOP,
+        borders: noBorders,
+        margins: rtl
+          ? { top: 0, bottom: 80, left: 0, right: 120 }
+          : { top: 0, bottom: 80, left: 120, right: 0 },
+        children: [entryTitle(entry, contentEntryWidth), ...detail],
+      });
+
+      return [
+        new Table({
+          width: { size: contentWidth, type: WidthType.DXA },
+          columnWidths: [railWidth, contentEntryWidth],
+          layout: TableLayoutType.FIXED,
+          visuallyRightToLeft: rtl,
+          borders: noBorders,
+          rows: [
+            new TableRow({
+              children: [railCell, contentCell],
+            }),
+          ],
+        }),
+      ];
+    }
+
     if (spec.layout === 'cards' || spec.entryStyle === 'card') {
       return [cardTable(blocks, true)];
     }
@@ -1045,7 +1158,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   // The masthead spans the page, exactly as it does on the paper. It used to
   // be pushed into the wide cell of a sidebar layout, which put the candidate's
   // name inside the column and left the top of the narrow column empty.
-  if (spec.hasSidebar || spec.twoColumn) children.push(...headerBlocks);
+  if (spec.hasSidebar) children.push(...headerBlocks);
 
   if (spec.hasSidebar) {
     const sidebarBlocks = renderedAside.flatMap((entry) => entry.blocks);
@@ -1059,17 +1172,20 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     );
     const mainTwips = contentWidth - asideTwips;
 
+    const sidebarBorderKey = rtl ? 'right' : 'left';
     const sidebarCell = new TableCell({
       width: { size: asideTwips, type: WidthType.DXA },
       verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 0, right: 240 },
+      margins: rtl
+        ? { top: 0, bottom: 0, left: 240, right: 0 }
+        : { top: 0, bottom: 0, left: 0, right: 240 },
       // The paper draws the narrow column as a column, with an accent edge
       // when the template asks for one.
       ...(spec.accentPosition === 'side'
         ? {
             borders: {
               ...noBorders,
-              left: {
+              [sidebarBorderKey]: {
                 style: BorderStyle.SINGLE,
                 size: 12,
                 color: accent,
@@ -1082,7 +1198,9 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
     const mainCell = new TableCell({
       width: { size: mainTwips, type: WidthType.DXA },
       verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 240, right: 0 },
+      margins: rtl
+        ? { top: 0, bottom: 0, left: 0, right: 240 }
+        : { top: 0, bottom: 0, left: 240, right: 0 },
       children: mainBlocks,
     });
 
@@ -1104,73 +1222,18 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
         rows: [row],
       })
     );
-  } else if (spec.twoColumn) {
-    // A split or an editorial document reads across two columns rather than
-    // down one. The paper flows the text across the columns; Word cannot
-    // flow a paragraph across cells, so the sections are divided between two
-    // columns, which is the same reading order on the same page. The masthead
-    // was already written above both columns.
-    const half = Math.ceil(rendered.length / 2);
-    const leftBlocks = rendered.slice(0, half).flatMap((entry) => entry.blocks);
-    const rightBlocks = rendered.slice(half).flatMap((entry) => entry.blocks);
-    const columnTwips = Math.floor((contentWidth - 240) / 2);
-
-    const leftCell = new TableCell({
-      width: { size: columnTwips, type: WidthType.DXA },
-      verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 0, right: 120 },
-      children: leftBlocks,
-    });
-    const rightCell = new TableCell({
-      width: { size: contentWidth - columnTwips, type: WidthType.DXA },
-      verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 120, right: 0 },
-      children: rightBlocks,
-    });
-
-    children.push(
-      new Table({
-        width: { size: contentWidth, type: WidthType.DXA },
-        columnWidths: [columnTwips, contentWidth - columnTwips],
-        layout: TableLayoutType.FIXED,
-        visuallyRightToLeft: rtl,
-        borders: spec.layout === 'editorial'
-          ? {
-              ...noBorders,
-              insideVertical: {
-                style: BorderStyle.SINGLE,
-                size: 6,
-                color: accent,
-              },
-            }
-          : noBorders,
-        rows: [new TableRow({ children: [leftCell, rightCell] })],
-      })
-    );
-  } else {
+  } else if (!spec.twoColumn) {
     children.push(...headerBlocks);
     for (const entry of rendered) children.push(...entry.blocks);
   }
 
-  const doc = new Document({
-    creator: 'CareerDev4AI',
-    title: document.fullName ? `${document.fullName} — CV` : 'CV',
-    description: `CV exported with the ${input.template.name} template.`,
-    styles: {
-      default: {
-        document: {
-          run: { font: bodyFont, size: bodySize },
-          paragraph: { spacing: { line: lineSpacing } },
-        },
-      },
-    },
-    sections: [
-      {
+  const sections = [];
+  if (spec.twoColumn) {
+    if (headerBlocks.length > 0) {
+      sections.push({
         properties: {
+          type: SectionType.CONTINUOUS,
           page: {
-            // A4, stated explicitly. Word's default Letter made the exported
-            // page 6 mm wider and 18 mm shorter than the sheet the candidate
-            // sees, which changed both the line wraps and the page count.
             size: {
               width: A4_WIDTH_TWIPS,
               height: A4_HEIGHT_TWIPS,
@@ -1183,9 +1246,69 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
             },
           },
         },
-        children,
+        children: headerBlocks,
+      });
+    }
+    const bodyBlocks = rendered.flatMap((entry) => entry.blocks);
+    sections.push({
+      properties: {
+        type: SectionType.CONTINUOUS,
+        page: {
+          size: {
+            width: A4_WIDTH_TWIPS,
+            height: A4_HEIGHT_TWIPS,
+          },
+          margin: {
+            top: spec.marginTwips,
+            right: spec.marginTwips,
+            bottom: spec.marginTwips,
+            left: spec.marginTwips,
+          },
+        },
+        column: {
+          count: 2,
+          space: 360,
+          separate: spec.layout === 'editorial',
+        },
       },
-    ],
+      children: bodyBlocks,
+    });
+  } else {
+    sections.push({
+      properties: {
+        page: {
+          // A4, stated explicitly. Word's default Letter made the exported
+          // page 6 mm wider and 18 mm shorter than the sheet the candidate
+          // sees, which changed both the line wraps and the page count.
+          size: {
+            width: A4_WIDTH_TWIPS,
+            height: A4_HEIGHT_TWIPS,
+          },
+          margin: {
+            top: spec.marginTwips,
+            right: spec.marginTwips,
+            bottom: spec.marginTwips,
+            left: spec.marginTwips,
+          },
+        },
+      },
+      children,
+    });
+  }
+
+  const doc = new Document({
+    creator: 'CareerRa',
+    title: document.fullName ? `${document.fullName} — CV` : 'CV',
+    description: `CV exported with the ${input.template.name} template.`,
+    styles: {
+      default: {
+        document: {
+          run: { font: bodyFontDeclaration, size: bodySize },
+          paragraph: { spacing: { line: lineSpacing } },
+        },
+      },
+    },
+    sections,
   });
 
   return Packer.toBuffer(doc);

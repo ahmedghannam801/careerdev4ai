@@ -34,7 +34,7 @@ export const FaqSection: React.FC = () => {
       ),
     },
     {
-      question: t('Can I get a job or an offer through CareerDev4AI?'),
+      question: t('Can I get a job or an offer through CareerRa?'),
       answer: t(
         'No, and no career platform can honestly promise that. The platform keeps your applications, your tailored documents and your interview preparation in one place so you can apply consistently and prepare properly. It also has no live vacancy feed, so it will not show you a vacancy it cannot verify.'
       ),

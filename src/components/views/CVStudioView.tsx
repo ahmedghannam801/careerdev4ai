@@ -344,7 +344,8 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
       await waitForPaperToSettle(paperFrameRef.current);
 
-      const paper = paperFrameRef.current?.querySelector<HTMLElement>('[data-cv-print]');
+      const paper = paperFrameRef.current?.querySelector<HTMLElement>('[data-cv-print]')
+        || document.querySelector<HTMLElement>('[data-cv-print]');
       if (!paper) {
         setExportError(t('Open the document editor to export the CV.'));
         return;

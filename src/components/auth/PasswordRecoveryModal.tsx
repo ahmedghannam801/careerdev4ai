@@ -119,7 +119,7 @@ export const PasswordRecoveryModal: React.FC = () => {
               onClick={dismissPasswordRecovery}
               className="w-full py-2.5 rounded-xl bg-[var(--accent-primary)] text-[var(--color-on-primary)] text-xs font-bold hover:opacity-90"
             >
-              {t('Continue to CareerDev4AI')}
+              {t('Continue to CareerRa')}
             </button>
           </div>
         ) : (

@@ -898,7 +898,7 @@ export const ExperienceHubView: React.FC = () => {
         <span className="inline-flex items-center gap-1.5">
           <Compass size={13} className="text-[var(--text-muted)]" />
           {t(
-            'Simulations are published by Forage and open on the official provider site. CareerDev4AI curates the catalogue and records your own progress; it does not verify completion or certificates.'
+            'Simulations are published by Forage and open on the official provider site. CareerRa curates the catalogue and records your own progress; it does not verify completion or certificates.'
           )}
         </span>
         <span className="mx-2 text-[var(--text-muted)]">•</span>

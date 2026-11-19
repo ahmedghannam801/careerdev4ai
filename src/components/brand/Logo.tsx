@@ -32,13 +32,13 @@ interface LogoProps {
 }
 
 /**
- * The single place the CareerDev4AI logo is rendered.
+ * The single place the CareerRa logo is rendered.
  *
  * The mark is transparent and fully saturated, so it reads on both the light
  * and the dark theme without any treatment. The artwork itself is never altered.
  */
 export const Logo: React.FC<LogoProps> = ({ variant = 'icon', className = '', alt }) => {
-  const label = alt ?? 'CareerDev4AI';
+  const label = alt ?? 'CareerRa';
 
   if (variant === 'full') {
     return (

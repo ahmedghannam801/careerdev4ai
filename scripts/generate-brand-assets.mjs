@@ -280,7 +280,7 @@ async function build() {
     .resize(512, 512, { kernel: 'lanczos3' })
     .png(PNG_OUTPUT)
     .toBuffer();
-  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CareerDev4AI">
+  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CareerRa">
   <image href="data:image/png;base64,${icon512.toString('base64')}" width="512" height="512"/>
 </svg>
 `;
@@ -291,8 +291,8 @@ async function build() {
   /* ------------------------------------------------------------------ */
   console.log('→ web manifest');
   const manifest = {
-    name: 'CareerDev4AI',
-    short_name: 'CareerDev4AI',
+    name: 'CareerRa',
+    short_name: 'CareerRa',
     description: 'Your personal career operating system.',
     start_url: '/',
     display: 'standalone',
