@@ -4,6 +4,12 @@
  */
 
 export const processingAr: Record<string, string> = {
+  // The mascot's own line, shown while the platform prepares something
+  "Please wait, I'm getting things ready for you...":
+    'انتظر قليلًا، بنجهزلك كل حاجة...',
+  'No verified course link is attached to this course yet.':
+    'لا يوجد رابط مُتحقَّق منه لهذا الكورس بعد.',
+
   // The reassuring lines that sit under a running request
   'Your request is being processed. Please keep this page open.':
     'جارٍ معالجة طلبك. يُرجى إبقاء هذه الصفحة مفتوحة.',

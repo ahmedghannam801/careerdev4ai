@@ -120,7 +120,7 @@ export function parseSubscriptionLookupKey(
   lookupKey: string | null | undefined
 ): { planCode: string; billingCycle: 'monthly' | 'annual' } | null {
   if (!lookupKey) return null;
-  const match = /^careerdev4ai_(.+)_(monthly|annual)$/.exec(lookupKey);
+  const match = /^roadmapak_(.+)_(monthly|annual)$/.exec(lookupKey);
   if (!match) return null;
   return {
     planCode: match[1],

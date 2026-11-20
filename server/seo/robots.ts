@@ -32,7 +32,7 @@ export const DISALLOWED_PATHS = ['/api/', '/admin'] as const;
  */
 export function buildRobotsTxt(): string {
   const lines: string[] = [
-    '# CareerDev4AI',
+    '# Roadmapak',
     '#',
     '# The public pages - the home page, the career catalogue, the learning',
     '# catalogue and the volunteering catalogue - are open to every crawler.',

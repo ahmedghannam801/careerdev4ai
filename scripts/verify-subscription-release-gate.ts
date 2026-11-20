@@ -1,5 +1,5 @@
 /**
- * CareerDev4AI — Subscription System Final Independent Release Gate Verification
+ * Roadmapak — Subscription System Final Independent Release Gate Verification
  * 
  * Runs a complete, end-to-end integration and concurrency audit against a
  * disposable Supabase-compatible PostgreSQL 18 staging instance (PGlite).
@@ -36,7 +36,7 @@ function recordResult(step: string, status: 'PASS' | 'FAIL', details: string, er
 
 async function runAudit() {
   console.log(bold('\n================================================================================'));
-  console.log(bold('   CareerDev4AI — Final Independent Release Gate Audit (Disposable DB)'));
+  console.log(bold('   Roadmapak — Final Independent Release Gate Audit (Disposable DB)'));
   console.log(bold('================================================================================\n'));
 
   const db = new PGlite();

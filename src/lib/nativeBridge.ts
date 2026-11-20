@@ -1,5 +1,5 @@
 /**
- * CareerPilot AI — the native shell of the Android application.
+ * Roadmapak AI — the native shell of the Android application.
  *
  * Everything in this module is a no-op on the web: the browser keeps its own
  * behaviour for the back button (there is none), for external links (the

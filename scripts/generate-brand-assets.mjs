@@ -1,13 +1,13 @@
 /**
- * CareerDev4AI — official brand asset pipeline.
+ * Roadmapak — official brand asset pipeline.
  * -----------------------------------------------------------------------------
- * Turns the approved brand assets in `src/assets/brand/official/` into every
+ * Turns the approved brand artwork in `src/assets/brand/official/` into every
  * derivative the platform ships:
  *
- *   official/careerpilot-icon.png  ->  app / favicon / PWA icon set
- *   official/careerpilot-logo.png  ->  larger UI presentation and social card
+ *   official/roadmapak-logo.png  ->  app / favicon / PWA icon set, the larger
+ *                                    UI presentation and the social card
  *
- * The official files are NEVER redrawn, recoloured, restretched or re-lettered.
+ * The official file is NEVER redrawn, recoloured, restretched or re-lettered.
  * The only operations applied are:
  *
  *   1. removal of the plain white *field* from opaque source art, so the mark
@@ -32,8 +32,7 @@ const BUNDLED_DIR = path.join(ROOT, 'src', 'assets', 'brand');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const PUBLIC_BRAND_DIR = path.join(PUBLIC_DIR, 'brand');
 
-const OFFICIAL_ICON = path.join(OFFICIAL_DIR, 'careerpilot-icon.png');
-const OFFICIAL_LOGO = path.join(OFFICIAL_DIR, 'careerpilot-logo.png');
+const OFFICIAL_LOGO = path.join(OFFICIAL_DIR, 'roadmapak-logo.png');
 
 /** Brand tokens mirrored from `src/index.css`. */
 const BRAND = {
@@ -200,11 +199,11 @@ async function build() {
   /* 1. Icon: prepare the art, trim, centre on a square canvas.           */
   /* ------------------------------------------------------------------ */
   console.log('→ icon');
-  const iconRaw = await prepareArtwork(OFFICIAL_ICON);
+  const iconRaw = await prepareArtwork(OFFICIAL_LOGO);
   const iconSquare = await squareCanvas(iconRaw, 0.94, 512);
 
   // Bundled copy — imported by the React <Logo> component.
-  await writeFile(path.join(BUNDLED_DIR, 'careerpilot-icon.png'), iconSquare);
+  await writeFile(path.join(BUNDLED_DIR, 'roadmapak-icon.png'), iconSquare);
 
   // Favicon / PWA set — served statically from /brand/.
   for (const size of [16, 32, 192, 512]) {
@@ -270,7 +269,7 @@ async function build() {
     .png(PNG_OUTPUT)
     .toBuffer();
 
-  await writeFile(path.join(BUNDLED_DIR, 'careerpilot-logo.png'), lockup);
+  await writeFile(path.join(BUNDLED_DIR, 'roadmapak-logo.png'), lockup);
 
   /* ------------------------------------------------------------------ */
   /* 3. favicon.svg — the official raster, embedded (never redrawn).    */
@@ -280,7 +279,7 @@ async function build() {
     .resize(512, 512, { kernel: 'lanczos3' })
     .png(PNG_OUTPUT)
     .toBuffer();
-  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CareerRa">
+  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Roadmapak">
   <image href="data:image/png;base64,${icon512.toString('base64')}" width="512" height="512"/>
 </svg>
 `;
@@ -291,8 +290,8 @@ async function build() {
   /* ------------------------------------------------------------------ */
   console.log('→ web manifest');
   const manifest = {
-    name: 'CareerRa',
-    short_name: 'CareerRa',
+    name: 'Roadmapak',
+    short_name: 'Roadmapak',
     description: 'Your personal career operating system.',
     start_url: '/',
     display: 'standalone',
@@ -329,11 +328,11 @@ async function build() {
   /* ------------------------------------------------------------------ */
   /* Report                                                              */
   /* ------------------------------------------------------------------ */
-  const bundledIcon = await sharp(path.join(BUNDLED_DIR, 'careerpilot-icon.png')).metadata();
-  const bundledLogo = await sharp(path.join(BUNDLED_DIR, 'careerpilot-logo.png')).metadata();
+  const bundledIcon = await sharp(path.join(BUNDLED_DIR, 'roadmapak-icon.png')).metadata();
+  const bundledLogo = await sharp(path.join(BUNDLED_DIR, 'roadmapak-logo.png')).metadata();
   console.log('');
-  console.log('  src/assets/brand/careerpilot-icon.png ', `${bundledIcon.width}x${bundledIcon.height}`);
-  console.log('  src/assets/brand/careerpilot-logo.png ', `${bundledLogo.width}x${bundledLogo.height}`);
+  console.log('  src/assets/brand/roadmapak-icon.png ', `${bundledIcon.width}x${bundledIcon.height}`);
+  console.log('  src/assets/brand/roadmapak-logo.png ', `${bundledLogo.width}x${bundledLogo.height}`);
   console.log('  public/brand/*.png, public/favicon.svg, public/site.webmanifest');
   console.log('');
   console.log('done');

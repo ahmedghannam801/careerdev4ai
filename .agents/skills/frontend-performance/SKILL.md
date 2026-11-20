@@ -1,11 +1,11 @@
 ---
 name: frontend-performance
-description: Maximizes Core Web Vitals (LCP, INP, CLS), optimizes bundle size, eliminates layout shifts, and ensures lightning-fast execution for CareerDev4AI.
+description: Maximizes Core Web Vitals (LCP, INP, CLS), optimizes bundle size, eliminates layout shifts, and ensures lightning-fast execution for Roadmapak.
 ---
 
 # Frontend Performance Skill
 
-This skill governs runtime efficiency, Core Web Vitals optimization, bundle size management, code-splitting, and asset delivery speed for CareerDev4AI.
+This skill governs runtime efficiency, Core Web Vitals optimization, bundle size management, code-splitting, and asset delivery speed for Roadmapak.
 
 ## When to Use
 
@@ -16,9 +16,9 @@ Activate this skill when:
 - Optimizing web font loading, CSS delivery, and critical rendering paths.
 - Evaluating new third-party npm packages to prevent dependency bloat.
 
-## Core Web Vitals Targets for CareerDev4AI
+## Core Web Vitals Targets for Roadmapak
 
-| Metric | Target | Focus Area in CareerDev4AI |
+| Metric | Target | Focus Area in Roadmapak |
 | :--- | :--- | :--- |
 | **LCP** (Largest Contentful Paint) | < 1.8s | Hero image optimization (`fetchPriority="high"`, WebP, local asset, no render-blocking JS). |
 | **INP** (Interaction to Next Paint) | < 100ms | Lightweight click handlers, non-blocking state updates (`startTransition`), micro-animation limits. |

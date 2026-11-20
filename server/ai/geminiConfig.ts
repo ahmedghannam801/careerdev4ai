@@ -1,9 +1,27 @@
 // Canonical Gemini Configuration and Client Manager
-// Single source of truth for Google Gemini configuration across CareerPilot AI.
+// Single source of truth for Google Gemini configuration across Roadmapak AI.
 
 import { GoogleGenAI } from '@google/genai/web';
 
 export const CANONICAL_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+
+/**
+ * The model that carries the real-time voice conversation.
+ *
+ * The Live API is a different model family from the text generation model
+ * above: it speaks and it listens.
+ *
+ * `gemini-3.8-live` is the current Live model in the Gemini Developer API
+ * ("the default option for most low-latency voice agent experiences"). The
+ * earlier identifiers this file used to name are gone: `gemini-live-2.5-
+ * flash-preview` was shut down on 9 December 2025, and
+ * `gemini-2.5-flash-native-audio-preview-09-2025` was shut down after it.
+ * A token minted for a shut-down model cannot open a session, so this
+ * constant has to name a model that is actually being served.
+ *
+ * See https://ai.google.dev/gemini-api/docs/models/gemini-3.8-live
+ */
+export const CANONICAL_LIVE_MODEL = 'gemini-3.8-live';
 
 /**
  * Returns the active Gemini model name.
@@ -77,6 +95,47 @@ export const ai = {
     };
   },
 };
+
+/**
+ * The client that mints Live API session credentials.
+ *
+ * Ephemeral tokens are requested from the `auth_tokens` endpoint, and they
+ * are only usable against the `v1beta` version of the API: a token issued by
+ * one API version cannot open a session on another. The token is issued here
+ * and spent by the browser against the same version, which is why the version
+ * is pinned in one place and read by both sides.
+ *
+ * This client asks for that API version explicitly. It is a separate client
+ * from the text-generation one on purpose: the version and the headers of
+ * the two calls differ, and one shared client would force one of them to be
+ * wrong.
+ *
+ * The key itself never leaves the server. What leaves the server is a short
+ * lived token that can open ONE live session and nothing else.
+ */
+let liveAuthClient: GoogleGenAI | null = null;
+let liveAuthClientKey: string | null = null;
+
+export const LIVE_API_VERSION = 'v1beta';
+
+export function getLiveAuthClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+  if (!liveAuthClient || liveAuthClientKey !== apiKey) {
+    liveAuthClientKey = apiKey;
+    liveAuthClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        apiVersion: LIVE_API_VERSION,
+        headers: { 'User-Agent': 'aistudio-build' },
+        timeout: 30_000,
+      },
+    });
+  }
+  return liveAuthClient;
+}
 
 /**
  * Checks whether an error is caused by upstream provider overload or 503 unavailability.

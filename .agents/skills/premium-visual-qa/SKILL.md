@@ -1,11 +1,11 @@
 ---
 name: premium-visual-qa
-description: Guides browser-based visual QA, screenshot comparison, layout collision detection, overflow auditing, and aesthetic refinement for CareerDev4AI.
+description: Guides browser-based visual QA, screenshot comparison, layout collision detection, overflow auditing, and aesthetic refinement for Roadmapak.
 ---
 
 # Premium Visual QA Skill
 
-This skill governs visual quality assurance, screenshot auditing, layout regression detection, and pixel-level refinement across CareerDev4AI.
+This skill governs visual quality assurance, screenshot auditing, layout regression detection, and pixel-level refinement across Roadmapak.
 
 ## When to Use
 
@@ -17,7 +17,7 @@ Activate this skill when:
 - Verifying Light Mode vs Dark Mode and English (LTR) vs Arabic (RTL).
 - Validating that visual bug reports (such as overlapping hero cards) have been resolved.
 
-## Visual Quality Principles for CareerDev4AI
+## Visual Quality Principles for Roadmapak
 
 1. **Evidence-Based Verification**:
    - Never declare visual QA passed based on reading source code alone.

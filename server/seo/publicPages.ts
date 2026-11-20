@@ -319,7 +319,7 @@ function capitalise(value: string): string {
 function buildAboutPage(): PublicPage {
   const path = '/about';
   const description =
-    'CareerDev4AI is an AI-powered career operating system: goals, skills, roadmaps, CVs, job applications, interview practice, learning resources and volunteering opportunities in one bilingual workspace.';
+    'Roadmapak is an AI-powered career operating system: goals, skills, roadmaps, CVs, job applications, interview practice, learning resources and volunteering opportunities in one bilingual workspace.';
 
   const body = `      <section class="hero">
         <h1>About ${escapeHtml(SITE_NAME)}</h1>
@@ -383,7 +383,7 @@ function buildAboutPage(): PublicPage {
 function buildPrivacyPage(): PublicPage {
   const path = '/privacy';
   const description =
-    'How CareerDev4AI handles analytics: aggregated, cookie-free measurement of page views and product usage, with no CV text, no contact details and no private profile fields ever sent to Google Analytics.';
+    'How Roadmapak handles analytics: aggregated, cookie-free measurement of page views and product usage, with no CV text, no contact details and no private profile fields ever sent to Google Analytics.';
 
   const body = `      <section class="hero">
         <h1>Privacy and analytics</h1>
@@ -478,7 +478,7 @@ function buildContactPage(): PublicPage {
   const email = details.email?.trim() || null;
 
   const description =
-    'Contact CareerDev4AI: the business address in Egypt, the telephone number on the +20 country code, and the email address the team answers on. Support, feedback and merchant onboarding enquiries.';
+    'Contact Roadmapak: the business address in Egypt, the telephone number on the +20 country code, and the email address the team answers on. Support, feedback and merchant onboarding enquiries.';
 
   /* The details that are still outstanding, named so the notice can be exact
      rather than vague. */
@@ -653,7 +653,7 @@ function buildTermsPage(): PublicPage {
   const path = '/terms';
   const available = hasApprovedTerms();
   const description = available
-    ? 'The current approved Terms & Conditions for CareerDev4AI: account use, acceptable use, AI-generated content, your documents, liability and contact details.'
+    ? 'The current approved Terms & Conditions for Roadmapak: account use, acceptable use, AI-generated content, your documents, liability and contact details.'
     : 'Terms & Conditions are not published yet. Registration and protected platform use remain unavailable until approved legal content is supplied.';
   const content = available
     ? TERMS_DOCUMENT.sections
@@ -715,7 +715,7 @@ ${sections}
       <section>
         <h2>Build your own plan</h2>
         <p>Pick a role inside the platform and it becomes the target every roadmap, learning plan and CV is built around.</p>
-        <div class="cta">${appLink('/#/dashboard', 'Open CareerDev4AI')}</div>
+        <div class="cta">${appLink('/#/dashboard', 'Open Roadmapak')}</div>
       </section>`;
 
   const items = CAREER_ROLES.map((role) => ({ name: role.title, path: rolePath(role) }));
@@ -1213,7 +1213,7 @@ function buildOpportunityPage(opportunity: PublicOpportunity): PublicPage {
                 )}" rel="noopener nofollow" target="_blank">Apply to this opportunity</a>`
               : ''
           }
-          ${appLink('/#/volunteer', 'Open CareerDev4AI', true)}
+          ${appLink('/#/volunteer', 'Open Roadmapak', true)}
         </div>
       </section>
 

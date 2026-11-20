@@ -1,4 +1,4 @@
-// Builds the LearningContext from the persisted CareerPilot graph.
+// Builds the LearningContext from the persisted Roadmapak graph.
 //
 // The Learning Hub never trusts a client-supplied career profile: target role,
 // skills, roadmap and learning state are read from PostgreSQL using the

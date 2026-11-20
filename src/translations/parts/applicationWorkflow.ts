@@ -7,7 +7,7 @@ export const applicationWorkflowAr: Record<string, string> = {
   'Privacy Policy': 'سياسة الخصوصية',
   'Your acceptance could not be recorded. Please try again.': 'تعذر تسجيل موافقتك. يرجى المحاولة مرة أخرى.',
   'Before you start': 'قبل أن تبدأ',
-  'CareerRa keeps your career record, your CVs and your applications on your own account. To use it, please accept the Terms & Conditions and the Privacy Policy.': 'يحفظ CareerRa سجلك المهني وسيرك الذاتية وطلباتك في حسابك الخاص. لاستخدامه، يرجى الموافقة على الشروط والأحكام وسياسة الخصوصية.',
+  'Roadmapak keeps your career record, your CVs and your applications on your own account. To use it, please accept the Terms & Conditions and the Privacy Policy.': 'يحفظ Roadmapak سجلك المهني وسيرك الذاتية وطلباتك في حسابك الخاص. لاستخدامه، يرجى الموافقة على الشروط والأحكام وسياسة الخصوصية.',
   'Your records stay in your account, and you can delete them at any time.': 'تبقى سجلاتك في حسابك، ويمكنك حذفها في أي وقت.',
   'The AI only works from what you have entered. It never invents your experience.': 'يعتمد الذكاء الاصطناعي على المعلومات التي أدخلتها فقط، ولا يختلق خبرات لك.',
   'Checking…': 'جارٍ التحقق…',

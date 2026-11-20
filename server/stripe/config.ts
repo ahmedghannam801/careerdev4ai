@@ -62,7 +62,7 @@ export interface StripeConfigStatus {
   warnings: StripeConfigIssue[];
 }
 
-const DEFAULT_SITE_ORIGIN = 'https://careerdev4ai.pages.dev';
+const DEFAULT_SITE_ORIGIN = 'https://roadmapak.pages.dev';
 const DEFAULT_API_BASE = 'https://api.stripe.com';
 
 export class StripeConfigError extends Error {
@@ -256,6 +256,11 @@ export function isTestMode(): boolean {
  * They are the stable contract between this code and the Dashboard: changing a
  * price means creating a new Price with the same lookup key, never editing
  * these strings.
+ *
+ * The prefix is deliberately NOT the product's public name. It is the key of
+ * the Price objects that already exist in the Stripe account, and those cannot
+ * be renamed without recreating every Price and repointing every live
+ * subscription. A rebrand must not touch it.
  */
 export const LOOKUP_PREFIX = 'careerdev4ai';
 

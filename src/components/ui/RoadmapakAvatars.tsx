@@ -7,7 +7,7 @@ export interface AvatarOption {
   description: string;
 }
 
-export const CAREERPILOT_AVATARS: AvatarOption[] = [
+export const ROADMAPAK_AVATARS: AvatarOption[] = [
   { id: 'avatar-01', name: 'Classic Crew', description: 'Modern minimal crew style' },
   { id: 'avatar-02', name: 'Soft Waves', description: 'Classic professional waves' },
   { id: 'avatar-03', name: 'Modern Glasses', description: 'Curated architectural glasses' },
@@ -26,11 +26,11 @@ export const DEFAULT_AVATAR_ID = 'avatar-01';
 
 export function normalizeAvatarId(input?: string | null): string {
   if (!input) return DEFAULT_AVATAR_ID;
-  const match = CAREERPILOT_AVATARS.find(a => a.id === input);
+  const match = ROADMAPAK_AVATARS.find(a => a.id === input);
   if (match) return match.id;
   // If input contains avatar-XX
   const idMatch = input.match(/avatar-\d{2}/);
-  if (idMatch && CAREERPILOT_AVATARS.some(a => a.id === idMatch[0])) {
+  if (idMatch && ROADMAPAK_AVATARS.some(a => a.id === idMatch[0])) {
     return idMatch[0];
   }
   return DEFAULT_AVATAR_ID;
@@ -42,7 +42,7 @@ interface AvatarSvgProps {
   size?: number | string;
 }
 
-export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className = '', size }) => {
+export const RoadmapakAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className = '', size }) => {
   const normalizedId = normalizeAvatarId(id);
   const sizeStyle = size ? { width: size, height: size } : undefined;
 
@@ -354,19 +354,19 @@ export const CareerPilotAvatarSvg: React.FC<AvatarSvgProps> = ({ id, className =
   }
 };
 
-export interface CareerPilotAvatarProps {
+export interface RoadmapakAvatarProps {
   avatarId?: string | null;
   className?: string;
   size?: number | string;
   alt?: string;
 }
 
-export const CareerPilotAvatar: React.FC<CareerPilotAvatarProps> = ({
+export const RoadmapakAvatar: React.FC<RoadmapakAvatarProps> = ({
   avatarId,
   className = 'w-10 h-10 rounded-2xl',
   size,
 }) => {
-  return <CareerPilotAvatarSvg id={avatarId || DEFAULT_AVATAR_ID} className={className} size={size} />;
+  return <RoadmapakAvatarSvg id={avatarId || DEFAULT_AVATAR_ID} className={className} size={size} />;
 };
 
 export interface AvatarSelectorProps {
@@ -387,10 +387,10 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
   return (
     <div
       role="radiogroup"
-      aria-label="Choose your CareerRa avatar"
+      aria-label="Choose your Roadmapak avatar"
       className={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 ${className}`}
     >
-      {CAREERPILOT_AVATARS.map((avatar) => {
+      {ROADMAPAK_AVATARS.map((avatar) => {
         const isSelected = avatar.id === current;
         return (
           <button
@@ -407,7 +407,7 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
             }`}
           >
             <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-1.5">
-              <CareerPilotAvatarSvg id={avatar.id} className="w-full h-full object-cover" />
+              <RoadmapakAvatarSvg id={avatar.id} className="w-full h-full object-cover" />
               {isSelected && (
                 <div className="absolute top-1 end-1 w-5 h-5 rounded-full bg-[var(--accent-primary)] text-white flex items-center justify-center shadow-xs">
                   <Check className="w-3 h-3 stroke-[3]" />

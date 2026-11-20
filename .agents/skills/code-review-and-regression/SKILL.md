@@ -1,11 +1,11 @@
 ---
 name: code-review-and-regression
-description: Governs rigorous code review, git diff inspection, regression prevention, test coverage enforcement, and safe pair programming for CareerDev4AI.
+description: Governs rigorous code review, git diff inspection, regression prevention, test coverage enforcement, and safe pair programming for Roadmapak.
 ---
 
 # Code Review & Regression Prevention Skill
 
-This skill governs pre-commit code review, diff inspection, regression prevention, test coverage verification, and preservation of existing working functionality across CareerDev4AI.
+This skill governs pre-commit code review, diff inspection, regression prevention, test coverage verification, and preservation of existing working functionality across Roadmapak.
 
 ## When to Use
 
@@ -35,7 +35,7 @@ Activate this skill when:
    - Verify that localization coverage remains 100% and no untranslated strings have been introduced.
 
 4. **Preserve Non-Negotiable Business Rules**:
-   - CareerDev4AI is 100% free with no paywalls or subscriptions.
+   - Roadmapak is 100% free with no paywalls or subscriptions.
    - Zero fake metrics: no fabricated course percentages, fake jobs, or artificial activity.
    - Bilingual Arabic (RTL) & English (LTR) parity must always be maintained.
 

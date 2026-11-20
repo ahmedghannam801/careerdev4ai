@@ -103,7 +103,7 @@ export interface BusinessContactDetails {
  * structured data all read from this one object.
  */
 export const BUSINESS_CONTACT: BusinessContactDetails = {
-  businessName: 'CareerRa',
+  businessName: 'Roadmapak',
   address: {
     street: null,
     locality: null,

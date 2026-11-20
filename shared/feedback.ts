@@ -21,7 +21,7 @@
  */
 
 /**
- * The exact Google Form supplied for CareerDev4AI feedback.
+ * The exact Google Form supplied for Roadmapak feedback.
  *
  * It is kept here as one constant so the dashboard card, the contextual
  * invitation, the account menu and Settings all open the same destination.

@@ -17,6 +17,8 @@ export { ProcessingOverlay, ProcessingPanel } from './ProcessingOverlay';
 export type { ProcessingOverlayProps } from './ProcessingOverlay';
 export { InlineProcessingOverlay } from './InlineProcessingOverlay';
 export type { InlineProcessingOverlayProps } from './InlineProcessingOverlay';
+export { MascotLoader, MASCOT_LOADING_MESSAGE } from './MascotLoader';
+export type { MascotLoaderProps, MascotLoaderSize } from './MascotLoader';
 export type {
   ProcessingOperationView,
   ProcessingRunContext,

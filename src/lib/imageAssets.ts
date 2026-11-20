@@ -3,7 +3,7 @@
  *
  * Provides typed metadata, authentic Unsplash photographer attribution,
  * and stable category-to-asset resolution for all 15 career domains and
- * 20+ key specializations across CareerDev4AI.
+ * 20+ key specializations across Roadmapak.
  */
 
 export interface PlatformVisualAsset {
@@ -466,7 +466,7 @@ export const PLATFORM_ASSETS: Record<string, PlatformVisualAsset> = {
     src: '/images/showcase/learning.webp',
     srcSm: '/images/showcase/learning-sm.webp',
     photographer: 'Licensed Showcase',
-    source: 'CareerDev4AI Showcase',
+    source: 'Roadmapak Showcase',
     license: 'Commercial',
   },
   'showcase-hero-3d': {
@@ -479,8 +479,8 @@ export const PLATFORM_ASSETS: Record<string, PlatformVisualAsset> = {
     altAr: 'العنصر الرئيسي قبل التسجيل.',
     src: '/images/showcase/hero-3d.webp',
     srcSm: '/images/showcase/hero-3d-sm.webp',
-    photographer: 'CareerDev4AI 3D Lab',
-    source: 'CareerDev4AI Brand Assets',
+    photographer: 'Roadmapak 3D Lab',
+    source: 'Roadmapak Brand Assets',
     license: 'Proprietary / Open Access',
   },
   'showcase-career-opportunities': {
@@ -494,7 +494,7 @@ export const PLATFORM_ASSETS: Record<string, PlatformVisualAsset> = {
     src: '/images/showcase/career-opportunities.webp',
     srcSm: '/images/showcase/career-opportunities-sm.webp',
     photographer: 'Licensed Showcase',
-    source: 'CareerDev4AI Showcase',
+    source: 'Roadmapak Showcase',
     license: 'Commercial',
   },
   'showcase-professional-growth': {
@@ -508,7 +508,7 @@ export const PLATFORM_ASSETS: Record<string, PlatformVisualAsset> = {
     src: '/images/showcase/professional-growth.webp',
     srcSm: '/images/showcase/professional-growth-sm.webp',
     photographer: 'Licensed Showcase',
-    source: 'CareerDev4AI Showcase',
+    source: 'Roadmapak Showcase',
     license: 'Commercial',
   },
 };

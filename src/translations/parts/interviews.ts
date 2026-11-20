@@ -37,4 +37,46 @@ export const interviewsAr: Record<string, string> = {
   'Next Question': 'السؤال التالي',
   'Interview readiness is 0% until you complete your first scored mock interview session.':
     'تبقى الجاهزية للمقابلات 0% حتى تكمل أول جلسة محاكاة مقابلة مُقيّمة.',
+
+  // The live voice interview
+  'Live voice interview': 'مقابلة صوتية مباشرة',
+  'Talk with the interviewer': 'تحدّث مع المُقابل',
+  'A spoken conversation with an interviewer who listens and follows up. Only the transcript is kept — your voice is not recorded.':
+    'محادثة صوتية مع مُقابل يستمع إليك ويطرح أسئلة متابعة. يُحفظ النص فقط — صوتك غير مسجَّل.',
+  'Connected': 'متصل',
+  'Not connected': 'غير متصل',
+  'Interview type': 'نوع المقابلة',
+  'Start the interview': 'ابدأ المقابلة',
+  'Connecting to the interviewer…': 'جارٍ الاتصال بالمُقابل…',
+  'The interviewer is speaking': 'المُقابل يتحدث',
+  'You are speaking — the interviewer is listening': 'أنت تتحدث — والمُقابل يستمع',
+  'End the interview': 'أنهِ المقابلة',
+  'The transcript appears here as the conversation happens.':
+    'يظهر النص هنا أثناء المحادثة.',
+  'Interviewer': 'المُقابل',
+  'You': 'أنت',
+  'Your interview report': 'تقرير مقابلتك',
+  'Communication': 'التواصل',
+  'Technical knowledge': 'المعرفة التقنية',
+  'Answer quality': 'جودة الإجابة',
+  'Problem solving': 'حل المشكلات',
+  'Language fluency': 'الطلاقة اللغوية',
+  'Strengths': 'نقاط القوة',
+  'Areas to improve': 'نقاط تحتاج إلى تحسين',
+  'Suggested better answers': 'إجابات أفضل مقترحة',
+  'Recommended training plan': 'خطة تدريب مقترحة',
+  'How you came across in the conversation': 'كيف أبدو في المحادثة',
+  'The interview is over. Start another one whenever you like.':
+    'انتهت المقابلة. ابدأ أخرى متى شئت.',
+  'The live interviewer could not be started.':
+    'تعذّر تشغيل المُقابل المباشر. يُرجى المحاولة مرة أخرى قريبًا.',
+  'The interview produced no transcript, so there is nothing to report.':
+    'لم تُنتج المقابلة أي نص، فلا يوجد ما يمكن التقرير عنه.',
+  'The interview could not be saved.': 'تعذّر حفظ المقابلة.',
+  'HR': 'الموارد البشرية',
+  'Role-based': 'مبنية على الدور',
+  'Mixed': 'مختلطة',
+  'English': 'الإنجليزية',
+  'Arabic': 'العربية',
+  'Egyptian Arabic': 'العامية المصرية',
 };

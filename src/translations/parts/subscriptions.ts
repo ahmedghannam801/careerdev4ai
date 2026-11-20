@@ -183,6 +183,8 @@ export const subscriptionsAr: Record<string, string> = {
   'Upgrade': 'ترقية',
   'Upgrade to {tier}': 'ترقية إلى {tier}',
   'AI credits left': 'الرصيد الذكي المتبقي',
+  'Your AI credits': 'رصيدك الذكي',
+  'Your membership frames your profile photo': 'عضويتك تُزيّن صورتك الشخصية بإطار',
   'tokens available': 'رموز متاحة',
   'Unlock tailored CVs, detailed ATS analysis and interview practice.':
     'افتح السيرة الذاتية المخصصة، وتحليل ATS التفصيلي، وتدرّب المقابلات.',

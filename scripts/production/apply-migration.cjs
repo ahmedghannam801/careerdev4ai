@@ -20,7 +20,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const PROJECT_REF = 'ciihprsfdojzvjnqgbxl';
-const TOKEN_FILE = path.join(os.tmpdir(), 'careerpilot-supabase-token.txt');
+const TOKEN_FILE = path.join(os.tmpdir(), 'roadmapak-supabase-token.txt');
 
 async function query(sql) {
   const token = fs.readFileSync(TOKEN_FILE, 'utf8').trim();

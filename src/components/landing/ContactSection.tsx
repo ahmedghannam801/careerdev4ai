@@ -75,7 +75,7 @@ export const ContactSection: React.FC = () => {
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-surface)] text-[var(--color-primary-text)]">
           <ShieldCheck className="h-4 w-4" />
         </span>
-        <h3 className="mt-3.5 text-sm font-bold text-[var(--text-primary)]">{t('Who builds CareerRa')}</h3>
+        <h3 className="mt-3.5 text-sm font-bold text-[var(--text-primary)]">{t('Who builds Roadmapak')}</h3>
         <p className="mt-1.5 flex-1 text-xs leading-relaxed text-[var(--text-secondary)]">
           {t('The product is built and published by Ahmed Ebrahim, who is also the contact for the legal documents.')}
         </p>

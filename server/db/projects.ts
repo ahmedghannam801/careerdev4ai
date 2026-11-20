@@ -7,6 +7,11 @@
 // Supabase user id, never a client-supplied value.
 import { getSupabaseServer } from './supabase';
 import type { ProjectLifecycleStatus } from '../../shared/projectLifecycle.ts';
+import {
+  collapseDuplicateProjects as collapseDuplicateProjectRows,
+  hasProjectIdentity,
+  projectIdentity as sharedProjectIdentity,
+} from '../../shared/projectIdentity.ts';
 
 /**
  * The status of a project.
@@ -95,6 +100,17 @@ interface ProjectRow {
 
 const SELECT_COLUMNS =
   'id, title, goal, description, difficulty, status, repository_url, demo_url, documentation, tasks, deliverables, created_at, completed_at, category, role, responsibilities, start_date, is_featured, include_in_portfolio, thumbnail_url, screenshots';
+
+/**
+ * The identity of a project.
+ *
+ * The rule itself lives in `shared/projectIdentity.ts`, because it is used on
+ * both sides of the write: it stops the second row being written, and it
+ * collapses the rows that are already there.
+ */
+function projectIdentity(title: string | null | undefined, role: string | null | undefined): string {
+  return sharedProjectIdentity(title, role);
+}
 
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
@@ -197,7 +213,7 @@ export async function listProjects(profileId: string): Promise<ProjectDTO[]> {
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false });
   if (error) throw error;
-  const rows = (data ?? []) as ProjectRow[];
+  const rows = collapseDuplicateProjectRows((data ?? []) as ProjectRow[]);
   const skillMap = await skillsForProjects(rows.map((r) => r.id));
   return rows.map((row) => toDTO(row, skillMap.get(row.id) ?? []));
 }
@@ -223,6 +239,37 @@ export async function createProject(
   profileId: string,
   input: CreateProjectInput
 ): Promise<ProjectDTO> {
+  /*
+   * ONE PROJECT, ONE ROW.
+   *
+   * The platform has more than one way to start a project: the Projects view,
+   * the Profile page and a recommendation the candidate acts on. When each of
+   * them wrote its own row, the same project ended up in the list two or
+   * three times — the duplicate information the candidate saw.
+   *
+   * The duplication was created HERE, in the write path, not in the reading
+   * of the list. So the fix is here too: a project that is already on file is
+   * updated instead of being written a second time. Nothing is deleted, the
+   * existing row keeps its id — and therefore its evidence, its links and
+   * its history — and the candidate's work is added to it.
+   */
+  const identity = projectIdentity(input.title, input.role);
+  const hasIdentity = hasProjectIdentity(identity);
+  if (hasIdentity) {
+    const { data: existingRows, error: lookupError } = await getSupabaseServer()
+      .from('projects')
+      .select(SELECT_COLUMNS)
+      .eq('profile_id', profileId);
+    if (lookupError) throw lookupError;
+    const existing = ((existingRows ?? []) as ProjectRow[]).find(
+      (row) => projectIdentity(row.title, row.role) === identity
+    );
+    if (existing) {
+      const updated = await updateProject(profileId, existing.id, input);
+      if (updated) return updated;
+    }
+  }
+
   const { data, error } = await getSupabaseServer()
     .from('projects')
     .insert({

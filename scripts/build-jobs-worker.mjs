@@ -46,8 +46,8 @@ await build({
   legalComments: 'none',
   banner: {
     js: [
-      "import { createRequire as __careerpilotCreateRequire } from 'node:module';",
-      "const require = __careerpilotCreateRequire('/worker.js');",
+      "import { createRequire as __roadmapakCreateRequire } from 'node:module';",
+      "const require = __roadmapakCreateRequire('/worker.js');",
     ].join('\n'),
   },
   logLevel: 'warning',

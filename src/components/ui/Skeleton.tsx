@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * CareerPilot AI — skeleton placeholder.
+ * Roadmapak AI — skeleton placeholder.
  *
  * Shown while a panel's content is still arriving. A skeleton keeps the
  * layout stable, so nothing jumps when the real content replaces it, and it

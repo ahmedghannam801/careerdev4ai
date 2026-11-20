@@ -1,10 +1,10 @@
 // Canonical OpenRouter Configuration and Client Manager
-// Single source of truth for OpenRouter API configuration and calls across CareerDev4AI.
+// Single source of truth for OpenRouter API configuration and calls across Roadmapak.
 
 export const CANONICAL_OPENROUTER_MODEL = 'openrouter/free';
 export const OPENROUTER_API_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-export const APP_REFERER = 'https://careerdev4ai.pages.dev';
-export const APP_TITLE = 'CareerDev4AI';
+export const APP_REFERER = 'https://roadmapak.pages.dev';
+export const APP_TITLE = 'Roadmapak';
 
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';

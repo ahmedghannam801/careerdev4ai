@@ -39,13 +39,13 @@ import { uploadPortfolioAttachment } from '../../lib/coreApi';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { PROFILE_SECTIONS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
-import { CareerPilotAvatar, AvatarSelector } from '../ui/CareerPilotAvatars';
+import { RoadmapakAvatar, AvatarSelector } from '../ui/RoadmapakAvatars';
 import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { CareerGoalRolePanel } from '../career/CareerGoalRolePanel';
 import { MembershipPanel } from '../subscription/MembershipPanel';
-import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
+import { PlanIdentityFrame } from '../subscription/PlanIdentityFrame';
 
 export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const {
@@ -66,7 +66,6 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     careerIdentity,
     identity,
     subscription,
-    settings,
     t
   } = useCareer();
 
@@ -701,10 +700,28 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
             <div className="relative group">
-              <CareerPilotAvatar
-                avatarId={profile.avatarUrl}
-                className="w-24 h-24 rounded-2xl border-2 border-[var(--border-subtle)] shadow-xs group-hover:border-[var(--accent-primary)] transition-colors cursor-pointer"
-              />
+              {/*
+                The premium treatment.
+
+                The highest tier is framed AROUND the photo, in the tier's own
+                colour. The separate badge that used to sit beside the name is
+                gone: the frame says it, without a second indicator next to
+                the candidate's face, and a candidate on any other tier sees
+                the photo exactly as it was.
+
+                The tier is read from the plan the server resolved, so the
+                frame can never claim a plan the candidate does not hold.
+              */}
+              <PlanIdentityFrame
+                planCode={subscription?.planCode ?? 'free'}
+                variant="premium"
+                label={t('Your membership frames your profile photo')}
+              >
+                <RoadmapakAvatar
+                  avatarId={profile.avatarUrl}
+                  className="w-24 h-24 rounded-2xl border-2 border-[var(--border-subtle)] shadow-xs group-hover:border-[var(--accent-primary)] transition-colors cursor-pointer"
+                />
+              </PlanIdentityFrame>
               <button
                 type="button"
                 onClick={() => {
@@ -712,8 +729,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   setAvatarModalOpen(true);
                 }}
                 className="absolute -bottom-2 -end-2 p-1.5 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] shadow-xs transition-colors"
-                title={t('Choose CareerRa Avatar')}
-                aria-label={t('Choose CareerRa Avatar')}
+                title={t('Choose Roadmapak Avatar')}
+                aria-label={t('Choose Roadmapak Avatar')}
               >
                 <Smile className="w-3.5 h-3.5" />
               </button>
@@ -740,15 +757,12 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   {profile.isPublic ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                   {profile.isPublic ? 'Public Profile' : 'Private'}
                 </span>
-                {/* The tier, beside the name. It is drawn from the plan the
-                    server resolved, so it cannot say a plan the candidate does
-                    not hold, and its colour is the tier's own. */}
-                <PlanIdentityBadge
-                  planCode={subscription?.planCode ?? 'free'}
-                  variant="solid"
-                  size="sm"
-                  language={settings.language}
-                />
+                {/*
+                  The plan badge that used to sit here is gone. The top tier
+                  is carried by the frame around the photo, and the plan the
+                  candidate actually holds is named in the membership panel
+                  further down this page.
+                */}
               </div>
 
               <p className="text-sm font-medium text-[var(--color-primary-text)]">
@@ -1913,14 +1927,14 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         </div>
       )}
 
-      {/* MODAL: Choose CareerPilot Avatar */}
+      {/* MODAL: Choose Roadmapak Avatar */}
       {avatarModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-main)] rounded-2xl border border-[var(--border-subtle)] shadow-xl w-full max-w-2xl p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div>
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  {t('Choose Your CareerRa Avatar')}
+                  {t('Choose Your Roadmapak Avatar')}
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   {t('Select a curated illustrated avatar that represents your professional profile.')}
@@ -2224,7 +2238,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             <div className="p-6 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] space-y-6">
               {/* Header Preview */}
               <div className="flex items-center gap-5">
-                <CareerPilotAvatar
+                <RoadmapakAvatar
                   avatarId={profile.avatarUrl}
                   className="w-20 h-20 rounded-2xl border border-[var(--border-subtle)]"
                 />

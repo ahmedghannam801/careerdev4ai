@@ -1,6 +1,6 @@
 ---
 name: browser-automation-testing
-description: Governs end-to-end testing, Playwright automation, screenshot capture, user flow verification, and network failure detection for CareerDev4AI.
+description: Governs end-to-end testing, Playwright automation, screenshot capture, user flow verification, and network failure detection for Roadmapak.
 ---
 
 # Browser Automation Testing Skill
@@ -10,14 +10,14 @@ This skill governs end-to-end (E2E) browser testing, automated screenshot captur
 ## When to Use
 
 Activate this skill when:
-- Writing or running automated browser tests against CareerDev4AI.
+- Writing or running automated browser tests against Roadmapak.
 - Capturing screenshots across responsive breakpoints (Desktop, Tablet, Mobile).
 - Testing critical user conversion flows: Landing Page CTA -> Onboarding -> Profile -> Dashboard.
 - Auditing navigation links, anchor destinations, and modal interactions.
 - Detecting unhandled browser console errors or failed network requests (4xx/5xx).
 - Performing automated visual regression testing.
 
-## Browser Automation Standards for CareerDev4AI
+## Browser Automation Standards for Roadmapak
 
 1. **Clean Test Server Lifecycle**:
    - Always run tests against an isolated, predictable local server (e.g. `tests/server-harness.mjs` or preview server).

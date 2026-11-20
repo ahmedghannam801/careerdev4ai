@@ -4,7 +4,7 @@ import type { HTMLMotionProps, Transition } from 'motion/react';
 import { AlertCircle, Check, Loader2 } from 'lucide-react';
 
 /**
- * Careerra — shape morphing through UI states.
+ * Roadmapak — shape morphing through UI states.
  * ---------------------------------------------------------------------------
  * The rest of the motion system moves content around. This file changes the
  * SHAPE of a thing while it changes state: a disc becomes a pill, a rounded

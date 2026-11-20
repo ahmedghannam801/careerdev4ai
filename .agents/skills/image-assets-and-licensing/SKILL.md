@@ -1,11 +1,11 @@
 ---
 name: image-assets-and-licensing
-description: Governs real photography sourcing, stock photo licensing verification, asset optimization (WebP/AVIF), responsive delivery, and legal compliance for CareerDev4AI.
+description: Governs real photography sourcing, stock photo licensing verification, asset optimization (WebP/AVIF), responsive delivery, and legal compliance for Roadmapak.
 ---
 
 # Image Assets & Licensing Skill
 
-This skill governs the sourcing, licensing verification, performance optimization, and responsive delivery of all photographic and graphic assets in CareerDev4AI.
+This skill governs the sourcing, licensing verification, performance optimization, and responsive delivery of all photographic and graphic assets in Roadmapak.
 
 ## When to Use
 
@@ -27,7 +27,7 @@ Activate this skill when:
 2. **Strict Prohibitions**:
    - **NEVER use AI-generated human images**: AI faces often feature uncanny artifacts, abnormal fingers/hair, and convey an inauthentic, untrustworthy impression for a career platform.
    - **NEVER use watermarked images**: Stock images with watermarks or unauthorized previews are strictly forbidden.
-   - **NEVER imply false endorsement**: Stock photo subjects must never be represented as real specific CareerDev4AI employees, users, or verified testimonials unless explicitly contracted.
+   - **NEVER imply false endorsement**: Stock photo subjects must never be represented as real specific Roadmapak employees, users, or verified testimonials unless explicitly contracted.
    - **NEVER use unstable random URLs**: Avoid direct hotlinking to volatile external URLs (`https://source.unsplash.com/random...`). Always persist optimized local assets or stable immutable CDN endpoints.
 
 3. **Required Asset Documentation**:

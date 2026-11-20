@@ -34,6 +34,7 @@ import {
   type EntitlementFeature,
   type SubscriptionPlanCode,
 } from '../../../shared/subscriptions';
+import { PlanIdentityFrame } from './PlanIdentityFrame';
 
 /** How much of the panel is shown. */
 export type MembershipPanelVariant = 'card' | 'row';
@@ -267,16 +268,42 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
       )}
 
       <div className="grid grid-cols-2 gap-px bg-[var(--border-subtle)] border-t border-[var(--border-subtle)]">
-        <div className="bg-[var(--surface-main)] px-4 py-3">
-          <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-            {t('AI credits left')}
-          </div>
-          <div className="mt-0.5 text-sm font-bold text-[var(--text-primary)]">
-            {remaining}
-            <span className="text-[11px] font-medium text-[var(--text-muted)]">
-              {' / '}{allocation}
-            </span>
-          </div>
+        {/*
+          The credits.
+
+          The balance is framed in the plan's own colour, in the same way the
+          profile photo is framed for the top tier, so the two read as one
+          language. The frame says WHICH plan the credits belong to; the
+          number inside says how many are left.
+
+          The number is the platform's own balance: the remaining credits of
+          the cycle and the cycle's allocation. Nothing here is a default or
+          a guess — a candidate with no credits sees zero, and that is the
+          truth about their account.
+        */}
+        <div className="bg-[var(--surface-main)] p-4">
+          <PlanIdentityFrame
+            planCode={subscription?.planCode ?? 'free'}
+            variant="always"
+            shape="pill"
+            className="w-full"
+            label={t('Your AI credits')}
+          >
+            <div className="flex items-center gap-2 rounded-full bg-[var(--surface-main)] px-3 py-2">
+              <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} aria-hidden="true" />
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  {t('AI credits left')}
+                </div>
+                <div className="text-sm font-bold text-[var(--text-primary)]">
+                  {remaining}
+                  <span className="text-[11px] font-medium text-[var(--text-muted)]">
+                    {' / '}{allocation}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </PlanIdentityFrame>
         </div>
         <div className="bg-[var(--surface-main)] px-4 py-3">
           <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">

@@ -1,7 +1,7 @@
 /**
  * Comprehensive Interactive Product Tour Configuration
  *
- * 10 Chapters, 47 Steps covering the entire CareerRa platform:
+ * 10 Chapters, 47 Steps covering the entire Roadmapak platform:
  * DISCOVER → LEARN → PRACTICE → PROVE → BUILD → APPLY → INTERVIEW → GROW
  */
 
@@ -43,7 +43,7 @@ export const TOUR_CHAPTERS: TourChapter[] = [
         view: 'dashboard',
         target: '[data-tour="brand-logo"]',
         fallbackTarget: 'aside',
-        title: 'Welcome to CareerRa',
+        title: 'Welcome to Roadmapak',
         body: 'Your comprehensive, Egypt-first Career Super App. We connect your entire journey: Discover, Learn, Practice, Prove, Build, Apply, Interview, and Grow — 100% free with zero paywalls.',
         example: 'Explore roadmaps, assess skills, build tailored CVs, and practice interviews all in one unified workspace.',
       },
@@ -210,7 +210,7 @@ export const TOUR_CHAPTERS: TourChapter[] = [
         target: '[data-tour="career-recommendations-list"]',
         fallbackTarget: '#main-content',
         title: 'Tailored Career Recommendations',
-        body: 'CareerRa generates tailored suggestions based on your career stage — whether you are a student building fundamentals or a switcher leveraging transferable skills.',
+        body: 'Roadmapak generates tailored suggestions based on your career stage — whether you are a student building fundamentals or a switcher leveraging transferable skills.',
         example: 'Students receive internship-focused tips; switchers get transition bridge roadmaps.',
       },
       {
@@ -283,7 +283,7 @@ export const TOUR_CHAPTERS: TourChapter[] = [
         target: '[data-tour="roadmap-integrations-panel"]',
         fallbackTarget: '#main-content',
         title: 'Connected Platform Progress',
-        body: 'Everything in CareerRa connects together. Completing a recommended course or submitting a project automatically updates your roadmap and closes related skill gaps.',
+        body: 'Everything in Roadmapak connects together. Completing a recommended course or submitting a project automatically updates your roadmap and closes related skill gaps.',
         example: 'No duplicate tracking — one finished project updates your skills, roadmap, and CV simultaneously.',
       },
     ],
@@ -380,7 +380,7 @@ export const TOUR_CHAPTERS: TourChapter[] = [
         fallbackTarget: '#main-content',
         title: 'Honest 1–5 Proficiency Rating',
         body: 'Rate your real-world capability: 1 (Novice), 2 (Learner), 3 (Practitioner), 4 (Advanced), 5 (Expert). Accurate ratings generate realistic roadmaps.',
-        example: 'Be honest: a rating of 2 tells CareerRa to give you beginner-friendly learning tasks.',
+        example: 'Be honest: a rating of 2 tells Roadmapak to give you beginner-friendly learning tasks.',
       },
       {
         id: 'skills-assessments',

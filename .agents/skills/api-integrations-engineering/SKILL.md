@@ -1,11 +1,11 @@
 ---
 name: api-integrations-engineering
-description: Governs third-party API integrations, OAuth scopes, rate limiting, retries, data normalization, and honest provider capabilities for CareerDev4AI.
+description: Governs third-party API integrations, OAuth scopes, rate limiting, retries, data normalization, and honest provider capabilities for Roadmapak.
 ---
 
 # API Integrations Engineering Skill
 
-This skill governs all external API integrations, third-party authentication protocols, job search adapters, educational catalog feeds, and AI model communication in CareerDev4AI.
+This skill governs all external API integrations, third-party authentication protocols, job search adapters, educational catalog feeds, and AI model communication in Roadmapak.
 
 ## When to Use
 
@@ -13,14 +13,14 @@ Activate this skill when:
 - Connecting or updating external APIs (Google Gemini API, OpenRouter, JSearch, LinkedIn OAuth).
 - Handling API authentication, token exchange, authorization headers, and environment variables.
 - Implementing rate limiting, exponential backoff, and circuit breaker patterns.
-- Normalizing external data structures into CareerDev4AI canonical models.
+- Normalizing external data structures into Roadmapak canonical models.
 - Auditing third-party permissions and ensuring honest representation of integration capabilities.
 
 ## Principles of Honest Integrations
 
 1. **Strict OAuth & Permissions Honesty**:
    - Inspect approved developer scopes before claiming or implementing functionality.
-   - For example: CareerDev4AI's LinkedIn app scopes are `openid email profile`. This permits sign-in with LinkedIn, but does NOT grant access to LinkedIn Talent Solutions or direct Job Listing APIs.
+   - For example: Roadmapak's LinkedIn app scopes are `openid email profile`. This permits sign-in with LinkedIn, but does NOT grant access to LinkedIn Talent Solutions or direct Job Listing APIs.
    - **Never scrape unauthorized services**: Do not use headless browser automation or unauthorized proxies to scrape external platforms.
    - Provide clean, verified deep-links or search entrypoints with explicit query parameters when direct APIs are not approved.
 

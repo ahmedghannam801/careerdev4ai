@@ -22,7 +22,7 @@ import { resolveRoleDefinition } from '../../shared/careerRoles.ts';
 import { normalizeSkillName } from '../../shared/skillGap.ts';
 
 const PROJECT_REF = 'ciihprsfdojzvjnqgbxl';
-const TOKEN_FILE = path.join(os.tmpdir(), 'careerpilot-supabase-token.txt');
+const TOKEN_FILE = path.join(os.tmpdir(), 'roadmapak-supabase-token.txt');
 
 let token = '';
 function auth(): string {

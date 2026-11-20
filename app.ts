@@ -1,5 +1,5 @@
 /**
- * The CareerDev4AI API, as a framework-level Express application.
+ * The Roadmapak API, as a framework-level Express application.
  *
  * The module builds the app and registers every route; it deliberately does
  * NOT open a port, load `.env`, or serve static assets. Those are entry-point
@@ -435,6 +435,19 @@ import {
   deleteInterviewSession,
   INTERVIEW_TYPES,
 } from './server/db/interviewSessions.ts';
+import {
+  listLiveInterviewSessions,
+  createLiveInterviewSession,
+  deleteLiveInterviewSession,
+} from './server/db/liveInterviews.ts';
+import {
+  createLiveInterviewGrant,
+  evaluateLiveTranscript,
+  LIVE_INTERVIEW_TYPES,
+  LIVE_INTERVIEW_LANGUAGES,
+  LIVE_INTERVIEW_STYLES,
+  type LiveInterviewEvaluation,
+} from './server/interviews/live.ts';
 import {
   listActivities,
   createActivity,
@@ -2145,8 +2158,8 @@ app.post('/api/copilot', requireAuth, (req: Request, res: Response, next) => {
       return modelUnavailable(res);
     }
 
-    const systemInstruction = `You are CareerDev4AI Copilot, an AI career advisor that works across every career domain — technology, engineering, data, design, product, business, operations, finance, marketing, sales, people and HR, healthcare, education, and legal.
-You are given the user's real career state below, read from their CareerDev4AI account.
+    const systemInstruction = `You are Roadmapak Copilot, an AI career advisor that works across every career domain — technology, engineering, data, design, product, business, operations, finance, marketing, sales, people and HR, healthcare, education, and legal.
+You are given the user's real career state below, read from their Roadmapak account.
 The user is currently looking at the "${activeView}" screen of the app.
 
 ${contextBlock}
@@ -5672,6 +5685,156 @@ app.get('/api/interviews', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// ---- Live voice interviews (Gemini Live API) ----
+//
+// The routes are registered BEFORE `/api/interviews/:id`, because `:id` would
+// otherwise swallow the word "live" and try to read it as a session id.
+//
+// THE CREDENTIAL NEVER LEAVES THE SERVER
+// The Gemini key stays here. The browser is handed an ephemeral token that
+// can open exactly one live session, is bound to the model and to the
+// interviewer's brief, and expires. The key is never sent to the client and
+// never appears in the built bundle.
+//
+// THE TRANSCRIPT IS THE RECORD
+// Only words are stored. The audio goes from the browser straight to Google
+// and is not kept by the platform.
+app.post('/api/interviews/live/session', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const type = str(body.type, 30);
+    if (!type || !LIVE_INTERVIEW_TYPES.includes(type as (typeof LIVE_INTERVIEW_TYPES)[number])) {
+      return res.status(400).json({ error: 'Invalid interview type' });
+    }
+    const language = str(body.language, 10) ?? 'en';
+    if (!LIVE_INTERVIEW_LANGUAGES.includes(language as (typeof LIVE_INTERVIEW_LANGUAGES)[number])) {
+      return res.status(400).json({ error: 'Invalid language' });
+    }
+    const style = str(body.style, 20) ?? 'natural';
+    if (!LIVE_INTERVIEW_STYLES.includes(style as (typeof LIVE_INTERVIEW_STYLES)[number])) {
+      return res.status(400).json({ error: 'Invalid interviewer style' });
+    }
+
+    // The candidate's own record decides what the interview is about. The
+    // client may name a posting, but it cannot invent the candidate's track.
+    const context = await loadAiCareerContext(req.authUser!.id).catch(() => null);
+    const roleTitle = str(body.roleTitle, 200) ?? context?.targetRoleTitle ?? '';
+    const skills = (context?.currentSkills ?? []).map((skill) => skill.name).slice(0, 12);
+
+    const grant = await createLiveInterviewGrant({
+      roleTitle,
+      domain: context?.targetRoleDomain ?? context?.targetRole?.category ?? null,
+      track: context?.targetRole?.domainId ?? null,
+      experienceLevel: context?.experienceLevel ?? null,
+      skills,
+      jobDescription: str(body.jobDescription, 8000),
+      type: type as (typeof LIVE_INTERVIEW_TYPES)[number],
+      language: language as (typeof LIVE_INTERVIEW_LANGUAGES)[number],
+      style: style as (typeof LIVE_INTERVIEW_STYLES)[number],
+    });
+
+    return res.json({ success: true, grant });
+  } catch (error) {
+    console.error('Failed to start a live interview session:', error);
+    return res.status(500).json({ error: 'The live interviewer could not be started.' });
+  }
+});
+
+app.post('/api/interviews/live/complete', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const type = str(body.type, 30) ?? 'mixed';
+    const language = str(body.language, 10) ?? 'en';
+    const turns: unknown[] = Array.isArray(body.transcript) ? body.transcript : [];
+    const transcript = turns
+      .filter((turn): turn is Record<string, unknown> => typeof turn === 'object' && turn !== null)
+      .map((turn) => ({
+        speaker: turn.speaker === 'candidate' ? ('candidate' as const) : ('interviewer' as const),
+        text: typeof turn.text === 'string' ? turn.text.trim().slice(0, 5000) : '',
+      }))
+      .filter((turn) => turn.text.length > 0)
+      .slice(0, 200);
+
+    if (transcript.length === 0) {
+      return res.status(400).json({ error: 'The interview transcript is empty.' });
+    }
+
+    const context = await loadAiCareerContext(req.authUser!.id).catch(() => null);
+    const roleTitle = str(body.roleTitle, 200) ?? context?.targetRoleTitle ?? '';
+
+    // The report is written from the transcript. If the report cannot be
+    // written, the transcript is still saved: the candidate keeps their
+    // conversation, and the report is retried separately.
+    let evaluation: LiveInterviewEvaluation | null = null;
+    let evaluationError: string | null = null;
+    try {
+      evaluation = await evaluateLiveTranscript(
+        {
+          roleTitle,
+          domain: context?.targetRoleDomain ?? context?.targetRole?.category ?? null,
+          track: context?.targetRole?.domainId ?? null,
+          experienceLevel: context?.experienceLevel ?? null,
+          skills: (context?.currentSkills ?? []).map((skill) => skill.name).slice(0, 12),
+          jobDescription: str(body.jobDescription, 8000),
+          type: (LIVE_INTERVIEW_TYPES.includes(type as (typeof LIVE_INTERVIEW_TYPES)[number])
+            ? type
+            : 'mixed') as (typeof LIVE_INTERVIEW_TYPES)[number],
+          language: (LIVE_INTERVIEW_LANGUAGES.includes(
+            language as (typeof LIVE_INTERVIEW_LANGUAGES)[number]
+          )
+            ? language
+            : 'en') as (typeof LIVE_INTERVIEW_LANGUAGES)[number],
+        },
+        transcript
+      );
+    } catch (error) {
+      console.error('Failed to evaluate the live interview:', error);
+      evaluationError = 'The report could not be written, but the transcript was saved.';
+    }
+
+    const session = await createLiveInterviewSession(req.authUser!.id, {
+      interviewType: type,
+      language,
+      targetRole: roleTitle,
+      jobId: str(body.jobId, 120),
+      status: 'completed',
+      transcript,
+      evaluation,
+      durationSeconds:
+        typeof body.durationSeconds === 'number' && Number.isFinite(body.durationSeconds)
+          ? Math.max(0, Math.min(7200, Math.round(body.durationSeconds)))
+          : null,
+    });
+
+    return res.status(201).json({ success: true, session, evaluation, evaluationError });
+  } catch (error) {
+    console.error('Failed to save the live interview:', error);
+    return res.status(500).json({ error: 'Failed to save the live interview' });
+  }
+});
+
+app.get('/api/interviews/live', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const sessions = await listLiveInterviewSessions(req.authUser!.id);
+    return res.json({ success: true, sessions });
+  } catch (error) {
+    console.error('Failed to list live interview sessions:', error);
+    return res.status(500).json({ error: 'Failed to load live interview sessions' });
+  }
+});
+
+app.delete('/api/interviews/live/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const deleted = await deleteLiveInterviewSession(req.authUser!.id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Live interview session not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete live interview session:', error);
+    return res.status(500).json({ error: 'Failed to delete live interview session' });
+  }
+});
+
 app.get('/api/interviews/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
@@ -7291,7 +7454,7 @@ app.post(
     if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 320) {
       return res.status(503).json({ error: 'Email test recipient is not configured.' });
     }
-    const idempotencyKey = `careerdev4ai-test/${req.authUser!.id}/${Math.floor(Date.now() / 300_000)}`;
+    const idempotencyKey = `roadmapak-test/${req.authUser!.id}/${Math.floor(Date.now() / 300_000)}`;
     const result = await sendTestEmail(recipient, idempotencyKey);
     if (result.ok) return res.status(200).json({ success: true, messageId: result.id });
     if (result.status === null) {

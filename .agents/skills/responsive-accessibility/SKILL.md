@@ -5,7 +5,7 @@ description: Enforces responsive design across mobile/tablet/desktop viewports, 
 
 # Responsive & Accessibility Skill
 
-This skill guarantees that CareerDev4AI delivers an inclusive, accessible, and responsive experience across all screen sizes (mobile, tablet, desktop) and assistive technologies.
+This skill guarantees that Roadmapak delivers an inclusive, accessible, and responsive experience across all screen sizes (mobile, tablet, desktop) and assistive technologies.
 
 ## When to Use
 

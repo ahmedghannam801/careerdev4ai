@@ -1,12 +1,12 @@
-# CareerDev4AI — Permanent Project & Agent Instructions
+# Roadmapak — Permanent Project & Agent Instructions
 
-This document establishes the authoritative architecture, product guidelines, engineering standards, security rules, and deployment procedures for CareerDev4AI.
+This document establishes the authoritative architecture, product guidelines, engineering standards, security rules, and deployment procedures for Roadmapak.
 
 ---
 
 ## 1. Product Identity & Core Mission
 
-- **Product Name**: CareerDev4AI
+- **Product Name**: Roadmapak
 - **Mission**: Comprehensive, Egypt-first Career Super App serving university students, fresh graduates, job seekers, working professionals, career switchers, and freelancers across Egypt and the MENA region.
 - **The Professional Journey**: `DISCOVER → LEARN → PRACTICE → PROVE → BUILD → APPLY → INTERVIEW → GROW`
 - **Business Model**: Completely **100% Free**. Never introduce paywalls, subscriptions, paid tiers, or fake limitations.
@@ -91,5 +91,5 @@ This document establishes the authoritative architecture, product guidelines, en
    - Push to `main` branch: `git push origin main`.
 4. **Deploy**:
    - Deploy to Cloudflare Pages: `npm run cf:deploy`.
-   - Verify live production status at `https://careerdev4ai.pages.dev/api/health`.
+   - Verify live production status at `https://roadmapak.pages.dev/api/health`.
 

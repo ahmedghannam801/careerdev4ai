@@ -849,7 +849,7 @@ interface CareerContextType {
   toggleBookmarkJob: (jobId: string) => void;
   applications: JobApplication[];
   addApplication: (application: Omit<JobApplication, 'id' | 'lastUpdated'>) => Promise<boolean>;
-  updateApplicationStage: (id: string, stage: ApplicationStage) => void;
+  updateApplicationStage: (id: string, stage: ApplicationStage) => Promise<boolean>;
   updateApplicationNotes: (id: string, notes: string, nextAction?: string, nextActionDate?: string) => void;
   deleteApplication: (id: string) => void;
 
@@ -6260,17 +6260,28 @@ Skills: ${activeCV.skillsList.join(', ')}
    * activity feed and reported to the candidate, so "My Career", "Progress"
    * and "Recent Activity" all tell the same story about where the
    * application stands.
+   *
+   * THE MOVE IS OPTIMISTIC, AND IT IS ROLLED BACK
+   * The card is moved on screen straight away, because a pipeline the
+   * candidate has to wait for is a pipeline they stop trusting. The write
+   * still has to succeed: when it does not, the card goes back to the stage
+   * the database still holds and the failure is reported. The caller is told
+   * which of the two happened, so it can say so.
    */
-  const updateApplicationStage = async (id: string, stage: ApplicationStage) => {
+  const updateApplicationStage = async (id: string, stage: ApplicationStage): Promise<boolean> => {
     const application = applications.find((entry) => entry.id === id);
-    const previousStage = application?.stage;
+    if (!application) return false;
+    const previousStage = application.stage;
+    if (previousStage === stage) return true;
+
+    // The card moves now. The write follows.
+    setApplications(prev => prev.map(a => (a.id === id ? { ...a, stage } : a)));
+
     try {
       const dto = await patchJobApplication(id, { stage });
       setApplications(prev => prev.map(a => (a.id === id ? toJobApplication(dto) : a)));
 
       // A move that changes nothing is not an event worth reporting.
-      if (!application || previousStage === stage) return;
-
       void logActivity({
         actionType: 'applied_job',
         title: `Application moved to ${stage}`,
@@ -6280,8 +6291,14 @@ Skills: ${activeCV.skillsList.join(', ')}
         relatedObject: application.id,
         linkView: 'applications',
       });
+      return true;
     } catch (error) {
       console.error('Failed to update application stage:', error);
+      // The database still holds the old stage, so the screen goes back to it.
+      setApplications(prev =>
+        prev.map(a => (a.id === id ? { ...a, stage: previousStage } : a))
+      );
+      return false;
     }
   };
 
@@ -6613,7 +6630,7 @@ Skills: ${activeCV.skillsList.join(', ')}
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullGraph, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `careerpilot_data_${profile.name.toLowerCase().replace(/\s+/g, '_')}.json`);
+    downloadAnchor.setAttribute("download", `roadmapak_data_${profile.name.toLowerCase().replace(/\s+/g, '_')}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -6622,7 +6639,7 @@ Skills: ${activeCV.skillsList.join(', ')}
   const resetAllData = () => {
     // B.4 finding L-1: `localStorage.clear()` also wiped the Supabase auth
     // session, so "reset my data" silently signed the user out. Only the
-    // CareerPilot cache keys are removed; the auth session is left alone.
+    // Roadmapak cache keys are removed; the auth session is left alone.
     for (const key of [
       'careerpilot_profile',
       'careerpilot_target_role',

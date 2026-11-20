@@ -65,4 +65,21 @@ export const applicationsAr: Record<string, string> = {
   'Linked Cover Letter': 'خطاب التقديم المرتبط',
   'Linked': 'مرتبط',
   'No saved cover letters yet': 'لا توجد خطابات تقديم محفوظة بعد',
+
+  // The pipeline overview and the drag-and-drop board
+  'Total Applications': 'إجمالي الطلبات',
+  'Interviews': 'المقابلات',
+  'Pending Responses': 'بانتظار الرد',
+  'Offers': 'العروض',
+  'Application activity': 'نشاط التقديم',
+  'Applications by the month they were sent, over the last six months.':
+    'الطلبات حسب الشهر الذي تم فيها التقديم، خلال آخر ستة أشهر.',
+  'Application moved': 'تم نقل الطلب',
+  'at': 'في',
+  'is now': 'الآن في مرحلة',
+  'The application could not be moved': 'تعذّر نقل الطلب',
+  'The stage was not saved, so the application stayed where it was.':
+    'لم يتم حفظ المرحلة، لذلك ظل الطلب في مكانه.',
+  'drag to another stage, or use the stage menu':
+    'اسحب إلى مرحلة أخرى، أو استخدم قائمة المرحلة',
 };

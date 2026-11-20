@@ -1,11 +1,11 @@
 ---
 name: security-review
-description: Enforces application security, secret detection, input sanitization, XSS/CSRF prevention, authentication boundaries, and compliance for CareerDev4AI.
+description: Enforces application security, secret detection, input sanitization, XSS/CSRF prevention, authentication boundaries, and compliance for Roadmapak.
 ---
 
 # Security Review Skill
 
-This skill governs threat modeling, vulnerability prevention, secret detection, access control verification, and secure coding practices across CareerDev4AI.
+This skill governs threat modeling, vulnerability prevention, secret detection, access control verification, and secure coding practices across Roadmapak.
 
 ## When to Use
 
@@ -16,7 +16,7 @@ Activate this skill when:
 - Sanitizing user input to prevent Cross-Site Scripting (XSS) and SQL Injection.
 - Reviewing Cloudflare Worker headers, CORS configurations, and rate limiting policies.
 
-## CareerDev4AI Security Tenets
+## Roadmapak Security Tenets
 
 1. **Zero Secret Leakage**:
    - Never commit API keys, database passwords, or JWT secrets to Git.
@@ -39,7 +39,7 @@ Activate this skill when:
      - `X-Content-Type-Options: nosniff`
      - `X-Frame-Options: DENY`
      - `Referrer-Policy: strict-origin-when-cross-origin`
-   - Restrict CORS origins to trusted domains (`careerdev4ai.pages.dev` and local development).
+   - Restrict CORS origins to trusted domains (`roadmapak.pages.dev` and local development).
 
 ## Step-by-Step Security Review Workflow
 

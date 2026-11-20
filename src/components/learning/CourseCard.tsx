@@ -502,16 +502,48 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
         {showActions && (
           <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
-            {onStart && !isCompleted && (
-              <button
-                type="button"
+            {/*
+              The primary action OPENS the course.
+
+              It used to only write "in_progress" to the database, which meant
+              the learner pressed the button, the card changed its label to
+              "Continue", and nothing else happened: the course never opened.
+              The resource link that did work was a small text link in the
+              corner of the card, so the one control the candidate aimed at was
+              the one control that did not take them to the course.
+
+              The button is an anchor when the catalogue records a verified
+              absolute http(s) source, so it opens the real course (in a new
+              tab, because a learning resource lives on the provider's site),
+              marks the course as started, and still behaves like a link for
+              the keyboard and for "open in new tab".
+
+              A course with no verified source gets no dead button: the label
+              says so instead, and the learner is not sent to an empty page.
+            */}
+            {onStart && !isCompleted && url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={() => onStart(course.id, recommendation?.reason)}
                 className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-primary)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)] hover:opacity-90"
               >
                 <PlayCircle className="h-3.5 w-3.5 shrink-0" />
-                {t(isInProgress ? 'Continue' : 'Start Learning')}
+                {t(isInProgress ? 'Continue Learning' : 'Start Learning')}
+                <ExternalLink className="h-3 w-3 shrink-0" />
+              </a>
+            ) : onStart && !isCompleted ? (
+              <button
+                type="button"
+                onClick={() => onStart(course.id, recommendation?.reason)}
+                title={t('No verified course link is attached to this course yet.')}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
+              >
+                <PlayCircle className="h-3.5 w-3.5 shrink-0" />
+                {t(isInProgress ? 'Continue Learning' : 'Start Learning')}
               </button>
-            )}
+            ) : null}
             {onComplete && !isCompleted && (
               <button
                 type="button"
@@ -558,7 +590,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                 {t('Remove')}
               </button>
             )}
-            {url && (
+            {url && !(onStart && !isCompleted) ? (
               <a
                 href={url}
                 target="_blank"
@@ -568,7 +600,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                 {course.resourceType ? t(resourceCta(course.resourceType)) : t('Open resource')}
                 <ExternalLink className="h-3 w-3 shrink-0" />
               </a>
-            )}
+            ) : null}
           </div>
         )}
       </div>

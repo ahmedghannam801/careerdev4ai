@@ -5,7 +5,7 @@ import { useMotionVariants, MOTION_EASE } from '../../lib/motion';
 import { useCareer } from '../../context/CareerContext';
 
 /**
- * CareerPilot AI — the landing-page journey visual.
+ * Roadmapak AI — the landing-page journey visual.
  *
  * A vertical career path that shows the shape of the product: direction →
  * skill gaps → roadmap → learning → projects → evidence → CV → opportunity.
@@ -121,7 +121,7 @@ export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({
       <motion.ol
         variants={stagger}
         className="relative mt-4 space-y-0"
-        aria-label={t('The CareerRa journey')}
+        aria-label={t('The Roadmapak journey')}
       >
         {/* Progress rail: the connecting line behind the nodes. */}
         <svg

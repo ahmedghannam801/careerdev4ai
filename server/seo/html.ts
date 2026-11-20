@@ -278,7 +278,7 @@ function renderHead(page: PublicPage): string {
     <meta property="og:image" content="${escapeHtml(ogImage)}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="The CareerDev4AI logo: an orange orbital arrow mark with a white orbit and star." />
+    <meta property="og:image:alt" content="The Roadmapak logo: a rounded-square orange monogram with a white forward-sweeping ribbon." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${escapeHtml(page.title)}" />
     <meta name="twitter:description" content="${escapeHtml(page.description)}" />

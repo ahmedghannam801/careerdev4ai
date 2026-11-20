@@ -92,7 +92,7 @@ export const ConsentGate: React.FC = () => {
             </h1>
             <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
               {t(
-                'CareerRa keeps your career record, your CVs and your applications on your own account. To use it, please accept the Terms & Conditions and the Privacy Policy.'
+                'Roadmapak keeps your career record, your CVs and your applications on your own account. To use it, please accept the Terms & Conditions and the Privacy Policy.'
               )}
             </p>
           </div>

@@ -115,7 +115,7 @@ export const ProductPreview: React.FC = () => {
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-[11px] text-[var(--text-muted)]">
           <Map className="h-3 w-3 shrink-0" />
-          <span className="truncate font-mono">careerdev4ai.pages.dev/{domainLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}</span>
+          <span className="truncate font-mono">roadmapak.pages.dev/{domainLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}</span>
         </div>
         <span className="hidden shrink-0 rounded-full border border-[var(--color-ai-border)] bg-[var(--color-ai-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-ai-text)] sm:inline">
           {t('Live preview')}
@@ -301,7 +301,7 @@ export const ProductPreview: React.FC = () => {
       <div className="flex items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface-secondary)]/40 px-4 py-2.5 text-[10px] leading-snug text-[var(--text-muted)]">
         <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
         <span>
-          {t('Generated live by the CareerRa planning engine from the role catalogue — not a mock-up.')}
+          {t('Generated live by the Roadmapak planning engine from the role catalogue — not a mock-up.')}
         </span>
       </div>
     </div>

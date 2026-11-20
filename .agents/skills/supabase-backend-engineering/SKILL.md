@@ -1,11 +1,11 @@
 ---
 name: supabase-backend-engineering
-description: Governs PostgreSQL schema design, Supabase Auth, Row Level Security (RLS), migrations, and safe database operations for CareerDev4AI.
+description: Governs PostgreSQL schema design, Supabase Auth, Row Level Security (RLS), migrations, and safe database operations for Roadmapak.
 ---
 
 # Supabase Backend Engineering Skill
 
-This skill governs database architecture, schema migrations, Row Level Security (RLS) policies, authentication, storage security, and query performance in Supabase PostgreSQL for CareerDev4AI.
+This skill governs database architecture, schema migrations, Row Level Security (RLS) policies, authentication, storage security, and query performance in Supabase PostgreSQL for Roadmapak.
 
 ## When to Use
 
@@ -17,7 +17,7 @@ Activate this skill when:
 - Querying data via Supabase JS client (`@supabase/supabase-js`) or server database modules (`server/db/`).
 - Ensuring database operations are strictly backward-compatible.
 
-## Core Database Rules for CareerDev4AI
+## Core Database Rules for Roadmapak
 
 1. **Non-Negotiable Safety Directives**:
    - **NEVER drop production tables or databases**.

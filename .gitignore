@@ -22,6 +22,17 @@ local_db/
 .wrangler/
 .tmp-qa/
 
+# The screenshots and the report the QA scripts in the repository root write
+# when they sweep the built site. The scripts are the source and are tracked;
+# what they produce is an artifact of one run and is not.
+.qa/
+
+# The raw output of a test run.
+.test-output.txt
+
+# A temporary upload fixture a test run leaves behind.
+tests/.tmp-job-description-upload/
+
 # The output of the Playwright end-to-end run (never shipped).
 test-results/
 playwright-report/
@@ -34,6 +45,10 @@ samples/
 
 # The bundle of the background-job Worker (built by scripts/build-jobs-worker.mjs).
 dist-jobs/
+
+# The redirect-only deployment of the predecessor origin
+# (built by scripts/build-legacy-redirect.mjs).
+dist-legacy-redirect/
 
 # The secrets file the background-job Worker's secrets are uploaded from.
 # It holds live credentials and must never be committed.

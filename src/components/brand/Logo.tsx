@@ -1,9 +1,9 @@
 import React from 'react';
-import iconSrc from '../../assets/brand/careerpilot-icon.png';
-import logoSrc from '../../assets/brand/careerpilot-logo.png';
+import iconSrc from '../../assets/brand/roadmapak-icon.png';
+import logoSrc from '../../assets/brand/roadmapak-logo.png';
 
 /**
- * CareerPilot AI brand assets.
+ * Roadmapak brand assets.
  *
  * Both variants come from the official artwork. Nothing here redraws,
  * recolours or re-letters the logo — the component only chooses which approved
@@ -32,13 +32,13 @@ interface LogoProps {
 }
 
 /**
- * The single place the CareerRa logo is rendered.
+ * The single place the Roadmapak logo is rendered.
  *
  * The mark is transparent and fully saturated, so it reads on both the light
  * and the dark theme without any treatment. The artwork itself is never altered.
  */
 export const Logo: React.FC<LogoProps> = ({ variant = 'icon', className = '', alt }) => {
-  const label = alt ?? 'CareerRa';
+  const label = alt ?? 'Roadmapak';
 
   if (variant === 'full') {
     return (

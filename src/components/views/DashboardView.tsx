@@ -21,6 +21,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { buildRouteHash } from '../../lib/routing';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { computeCareerMetrics, cvReadinessFromVersions, toMetricSkills, type CareerJourneyStage } from '../../../shared/careerMetrics';
 import { EmptyState } from '../ui/EmptyState';
@@ -92,6 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     cvVersions,
     learningRecommendations,
     learningItems,
+    learningCatalog,
     evidenceItems,
     interviewSessions,
     visibleNotifications,
@@ -135,6 +137,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   const completedLearningCount = useMemo(
     () => learningItems.filter((item) => item.status === 'completed').length,
     [learningItems]
+  );
+
+  /**
+   * Opens a section of the application.
+   *
+   * The URL is the source of truth for which view is open, so a statistic
+   * that navigates does it through the hash — including the filters that
+   * belong to the destination. "Learning → in progress" is one address, so
+   * the link can be shared, bookmarked and refreshed.
+   */
+  const goTo = (route: string, params?: Record<string, string>) => {
+    window.location.hash = buildRouteHash(route, params);
+  };
+
+  /** The learning counters, counted from the candidate's own records. */
+  const learningCounts = useMemo(
+    () => ({
+      recommended: learningRecommendations.length,
+      saved: learningItems.filter((item) => item.status === 'saved').length,
+      inProgress: learningItems.filter((item) => item.status === 'in_progress').length,
+      completed: completedLearningCount,
+    }),
+    [learningRecommendations.length, learningItems, completedLearningCount]
   );
 
   /* --------------------------------------------------------------------
@@ -475,6 +500,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             hint={readinessLabel}
             metrics={metrics}
             tone="primary"
+            onNavigate={() => goTo('progress')}
+            navigateLabel="Open your career progress"
           />
           <MetricCard
             metricId="skillsMastered"
@@ -483,6 +510,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             hint={`${metrics.skillsMastered} ${t('mastered')} · ${metrics.skillsClaimedOnly} ${t('self-reported only')}`}
             metrics={metrics}
             tone="success"
+            onNavigate={() => goTo('skills')}
+            navigateLabel="Open your skills"
           />
           <MetricCard
             metricId="roadmapCompletion"
@@ -491,6 +520,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             hint={t('steps done')}
             metrics={metrics}
             tone="warning"
+            onNavigate={() => goTo('roadmap')}
+            navigateLabel="Open your roadmap"
           />
         </AnimatedList>
 
@@ -832,21 +863,98 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 practised. */}
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
               {[
-                { label: t('Evidence artifacts'), value: `${evidenceItems.length}` },
-                { label: t('Projects'), value: `${projects.length}` },
-                { label: t('Certifications'), value: `${certificationCount}` },
-                { label: t('Mock interviews'), value: `${interviewSessions.length}` },
+                {
+                  label: t('Evidence artifacts'),
+                  value: `${evidenceItems.length}`,
+                  destination: 'evidence',
+                },
+                { label: t('Projects'), value: `${projects.length}`, destination: 'projects' },
+                {
+                  label: t('Certifications'),
+                  value: `${certificationCount}`,
+                  destination: 'profile',
+                  params: { section: 'certifications' },
+                },
+                {
+                  label: t('Mock interviews'),
+                  value: `${interviewSessions.length}`,
+                  destination: 'interviews',
+                },
               ].map((metric) => (
-                <div
+                <button
                   key={metric.label}
-                  className="rounded-xl border border-[var(--border-subtle)] p-3"
+                  type="button"
+                  onClick={() => goTo(metric.destination, metric.params)}
+                  className="group rounded-xl border border-[var(--border-subtle)] p-3 text-start transition-colors hover:border-[var(--accent-primary)] focus-visible:border-[var(--accent-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40"
                 >
-                  <div className="text-[10px] text-[var(--text-secondary)]">{metric.label}</div>
+                  <div className="flex items-start justify-between gap-1 text-[10px] text-[var(--text-secondary)]">
+                    {metric.label}
+                    <ArrowRight className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" />
+                  </div>
                   <div className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--text-primary)]">
                     {metric.value}
                   </div>
-                </div>
+                </button>
               ))}
+            </div>
+
+            {/* Learning progress.
+                The five counters are the ones the candidate can act on, and
+                each one opens the learning hub on the tab that holds it. */}
+            <div className="rounded-xl border border-[var(--border-subtle)] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                  {t('Learning progress')}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goTo('learning')}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--color-primary-text)] hover:underline"
+                >
+                  {t('Open learning hub')}
+                  <ArrowRight className="h-3 w-3 rtl:rotate-180" />
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {[
+                  {
+                    label: t('Recommended'),
+                    value: learningCounts.recommended,
+                    tab: 'recommended',
+                  },
+                  { label: t('Saved'), value: learningCounts.saved, tab: 'saved' },
+                  {
+                    label: t('In Progress'),
+                    value: learningCounts.inProgress,
+                    tab: 'in_progress',
+                  },
+                  {
+                    label: t('Completed'),
+                    value: learningCounts.completed,
+                    tab: 'completed',
+                  },
+                  {
+                    label: t('Explore Catalog'),
+                    value: learningCatalog.length,
+                    tab: 'catalog',
+                  },
+                ].map((card) => (
+                  <button
+                    key={card.tab}
+                    type="button"
+                    onClick={() => goTo('learning', { tab: card.tab })}
+                    className="group rounded-xl border border-[var(--border-subtle)] p-3 text-start transition-colors hover:border-[var(--accent-primary)] focus-visible:border-[var(--accent-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40"
+                  >
+                    <div className="flex items-start justify-between gap-1 text-[10px] text-[var(--text-secondary)]">
+                      {card.label}
+                      <ArrowRight className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" />
+                    </div>
+                    <div className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--text-primary)]">
+                      {card.value}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Career health + milestones */}

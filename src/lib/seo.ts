@@ -23,7 +23,7 @@
  * link and a bookmark are all distinguishable.
  */
 
-const SITE_ORIGIN = 'https://careerdev4ai.pages.dev';
+const SITE_ORIGIN = 'https://roadmapak.pages.dev';
 
 /**
  * The canonical address of the home page.
@@ -35,7 +35,7 @@ const SITE_ORIGIN = 'https://careerdev4ai.pages.dev';
 const SITE_URL = `${SITE_ORIGIN}/`;
 
 /** The name of the product, used in the document metadata. */
-const SITE_NAME = 'CareerRa';
+const SITE_NAME = 'Roadmapak';
 
 /**
  * The other written forms of the same name.
@@ -45,9 +45,9 @@ const SITE_NAME = 'CareerRa';
  * person actually typed.
  */
 const SITE_ALTERNATE_NAMES = [
-  'CareerRa',
-  'CareerRa AI',
-  'CareerRa Career Platform',
+  'Roadmapak',
+  'Roadmapak AI',
+  'Roadmapak Career Platform',
 ];
 
 /** The image used for link previews. */
@@ -75,19 +75,19 @@ export interface RouteMeta {
  */
 const VIEW_META: Record<string, { title: string; description: string }> = {
   landing: {
-    title: `CareerRa — Turn Your Ambition Into a Career Plan`,
+    title: `Roadmapak — Turn Your Ambition Into a Career Plan`,
     description:
-      'CareerRa is an AI-powered career operating system for students and young professionals: goals, skills, roadmaps, CVs, job applications, interview practice and volunteering opportunities in one bilingual workspace.',
+      'Roadmapak is an AI-powered career operating system for students and young professionals: goals, skills, roadmaps, CVs, job applications, interview practice and volunteering opportunities in one bilingual workspace.',
   },
   onboarding: {
     title: `Set up your career plan | ${SITE_NAME}`,
     description:
-      'Tell CareerRa the role you are aiming at, the experience you have and the time you have, and build a career plan around it.',
+      'Tell Roadmapak the role you are aiming at, the experience you have and the time you have, and build a career plan around it.',
   },
   dashboard: {
     title: `Dashboard | ${SITE_NAME}`,
     description:
-      'Your CareerRa dashboard: where your plan stands, what is next, and how your skills, roadmap and applications are progressing.',
+      'Your Roadmapak dashboard: where your plan stands, what is next, and how your skills, roadmap and applications are progressing.',
   },
   'my-career': {
     title: `My career | ${SITE_NAME}`,
@@ -97,7 +97,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   roles: {
     title: `Choose your career | ${SITE_NAME}`,
     description:
-      'Pick the career role you are aiming at from the CareerRa catalogue, and make every later step answer to it.',
+      'Pick the career role you are aiming at from the Roadmapak catalogue, and make every later step answer to it.',
   },
   analysis: {
     title: `Career analysis | ${SITE_NAME}`,
@@ -167,7 +167,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   profile: {
     title: `Profile | ${SITE_NAME}`,
     description:
-      'Your CareerRa profile: your experience, your education, your skills and the work you have done.',
+      'Your Roadmapak profile: your experience, your education, your skills and the work you have done.',
   },
   activity: {
     title: `Activity | ${SITE_NAME}`,
@@ -187,7 +187,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   admin: {
     title: `Administration | ${SITE_NAME}`,
     description:
-      'The CareerRa administration centre: users, catalogue, communications and analytics.',
+      'The Roadmapak administration centre: users, catalogue, communications and analytics.',
   },
   referrals: {
     title: `Referrals | ${SITE_NAME}`,
@@ -200,7 +200,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
 const PUBLIC_PROFILE_META = {
   title: `Career profile | ${SITE_NAME}`,
   description:
-    'A public CareerRa profile: the experience, education, skills and projects behind the career.',
+    'A public Roadmapak profile: the experience, education, skills and projects behind the career.',
 };
 
 /**
@@ -219,7 +219,7 @@ export function routeMetaFor(
   const title = entry?.title ?? `${SITE_NAME}`;
   const description =
     entry?.description ??
-    'CareerRa is an AI-powered career operating system: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.';
+    'Roadmapak is an AI-powered career operating system: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.';
 
   // The public landing page and a public profile may be indexed. Everything
   // else is behind authentication.

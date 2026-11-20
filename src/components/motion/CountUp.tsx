@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
 
 /**
- * CareerPilot AI — animated number readout.
+ * Roadmapak AI — animated number readout.
  *
  * Stat values reveal by counting up to their real value rather than snapping
  * into place, which reads as a value changing rather than a page loading.

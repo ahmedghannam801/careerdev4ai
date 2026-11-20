@@ -72,7 +72,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       {isOpen && (
         <motion.div
           role="dialog"
-          aria-label={t('CareerRa Copilot')}
+          aria-label={t('Roadmapak Copilot')}
           data-lenis-prevent
           className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl sm:w-[440px]"
           variants={settings.language === 'ar' ? drawerLeftVariants(reduced) : drawerVariants(reduced)}
@@ -87,7 +87,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
             <AiMascot className="h-9 w-7 object-contain" alt="" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerRa Copilot')}</div>
+            <div className="text-sm font-semibold text-[var(--text-primary)]">{t('Roadmapak Copilot')}</div>
             <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
               {/*
                 The presence of the assistant, as a shape. It is a quiet mark
@@ -140,7 +140,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
         {copilotMessages.length === 0 && (
           <div className="flex flex-col items-center px-6 py-8 text-center">
             <AiMascot className="mb-3 h-24 w-16 object-contain" state="idle" alt="" />
-            <p className="text-sm font-medium text-[var(--text-primary)]">{t('CareerRa Copilot')}</p>
+            <p className="text-sm font-medium text-[var(--text-primary)]">{t('Roadmapak Copilot')}</p>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">{t('copilotPlaceholder')}</p>
           </div>
         )}
@@ -211,7 +211,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
             */}
             <MorphingOrb state="thinking" size={28} className="w-7 h-7" />
             <span className="flex items-center gap-2">
-              <span aria-live="polite">{t('CareerRa is analyzing your graph')}</span>
+              <span aria-live="polite">{t('Roadmapak is analyzing your graph')}</span>
               <span className="flex items-center gap-0.5" aria-hidden="true">
                 {[0, 1, 2].map((dot) => (
                   <motion.span

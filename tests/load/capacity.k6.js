@@ -38,7 +38,13 @@ function validateTarget() {
   if (parsed.protocol !== 'https:' || host !== expectedHost) {
     throw new Error('Refusing to run: require HTTPS and an exact STAGING_HOST match.');
   }
-  if (host === 'careerdev4ai.pages.dev' || host.endsWith('.supabase.co')) {
+  // Both production origins are refused: the current one and the predecessor
+  // that is still serving during the domain migration.
+  if (
+    host === 'roadmapak.pages.dev' ||
+    host === 'careerdev4ai.pages.dev' ||
+    host.endsWith('.supabase.co')
+  ) {
     throw new Error('Refusing known production/API hostnames.');
   }
   if (!Object.prototype.hasOwnProperty.call(STAGES, stage)) {
@@ -64,7 +70,7 @@ export const options = {
     authenticated_api_latency: ['p(95)<1000'],
     api_429_count: ['count<100'],
   },
-  userAgent: 'CareerDev4AI-staging-capacity-test/k6',
+  userAgent: 'Roadmapak-staging-capacity-test/k6',
 };
 
 const endpoints = [

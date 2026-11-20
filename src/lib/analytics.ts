@@ -44,7 +44,7 @@ function configuredMeasurementId(): string {
 }
 
 /**
- * The measurement id of the CareerDev4AI property.
+ * The measurement id of the Roadmapak property.
  *
  * The value may be replaced with `VITE_GA_MEASUREMENT_ID`. The id is public by
  * design — Google requires it in the page source for the tag to work — so it

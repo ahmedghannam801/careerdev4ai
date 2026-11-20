@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const PROJECT = 'careerdev4ai';
+const PROJECT = 'roadmapak';
 const ACCOUNT =
   process.env.CLOUDFLARE_ACCOUNT_ID ?? '2609c1a7921f6c50f1edd82e93bff1a8';
 
@@ -86,7 +86,7 @@ const OPTIONAL_EMAIL_SECRET_KEYS = ['RESEND_API_KEY', 'RESEND_TEST_RECIPIENT'];
  * inside the browser bundle — and they are plain text so the build can read
  * them.
  */
-const PLAIN_KEYS = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'OPENROUTER_MODEL'];
+const PLAIN_KEYS = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'OPENROUTER_MODEL', 'SITE_ORIGIN'];
 
 /**
  * The variables the BUILD needs, as opposed to the variables the deployed

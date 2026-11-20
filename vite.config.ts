@@ -72,6 +72,19 @@ export default defineConfig(() => {
               if (id.includes('lucide-react')) {
                 return 'vendor-icons';
               }
+              // The Gemini Live SDK is loaded with a dynamic `import()` inside
+              // the interview client, so a candidate who never runs a spoken
+              // interview should never download it.
+              //
+              // `manualChunks` overrides the automatic dynamic-import split: if
+              // this package fell through to the `vendor-other` catch-all it
+              // would be merged into a chunk that the entry point imports
+              // statically, and `index.html` would modulepreload it for every
+              // visitor. It gets its own chunk so the dynamic import stays
+              // dynamic.
+              if (id.includes('@google/genai')) {
+                return 'vendor-genai';
+              }
               return 'vendor-other';
             }
           },

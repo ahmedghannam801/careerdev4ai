@@ -1,11 +1,11 @@
 ---
 name: react-typescript-engineering
-description: Enforces React 19 best practices, strict TypeScript correctness, component architecture, hooks discipline, and performance optimizations for CareerDev4AI.
+description: Enforces React 19 best practices, strict TypeScript correctness, component architecture, hooks discipline, and performance optimizations for Roadmapak.
 ---
 
 # React & TypeScript Engineering Skill
 
-This skill governs component architecture, state management patterns, React 19 capabilities, and strict TypeScript compliance across CareerDev4AI.
+This skill governs component architecture, state management patterns, React 19 capabilities, and strict TypeScript compliance across Roadmapak.
 
 ## When to Use
 

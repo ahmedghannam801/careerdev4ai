@@ -258,7 +258,7 @@ export const ExperienceCard: React.FC<ExperienceCardProps> = ({
                 </a>
                 <p className="text-[10px] leading-relaxed text-[var(--text-muted)]">
                   {t(
-                    'This link is stored as self-reported. Forage and CareerRa have not verified it.'
+                    'This link is stored as self-reported. Forage and Roadmapak have not verified it.'
                   )}
                 </p>
                 {certificate.status === 'self_reported' && (

@@ -32,6 +32,20 @@ export interface MetricCardProps {
   metrics: CareerMetrics;
   /** The accent used for the icon chip. */
   tone?: 'primary' | 'success' | 'warning';
+  /**
+   * Where the card goes when it is pressed.
+   *
+   * A metric the candidate cannot act on is a number they can only stare at.
+   * Every card that has a real destination opens it: the skills that were
+   * mastered open the Skills Center, the roadmap progress opens the roadmap,
+   * and the readiness opens the page that explains it.
+   *
+   * When there is no destination the card is NOT a button. A control that
+   * does nothing is worse than a plain number.
+   */
+  onNavigate?: () => void;
+  /** The accessible name of the navigation action. */
+  navigateLabel?: string;
 }
 
 const TONE_CLASSES = {
@@ -50,6 +64,8 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   hint,
   metrics,
   tone = 'primary',
+  onNavigate,
+  navigateLabel,
 }) => {
   const { t } = useCareer();
   const [open, setOpen] = useState(false);
@@ -75,35 +91,56 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     };
   }, [open]);
 
+  const body = (
+    <>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+        {label}
+      </div>
+      <div className="mt-1.5 font-mono text-2xl font-bold tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+      {hint ? (
+        <div className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">{hint}</div>
+      ) : null}
+    </>
+  );
+
   return (
     // The glow is clipped to the card, except for the popover: the
     // explanation opens BELOW the card, so the card must not clip it.
     <SpotlightCard ref={containerRef} className="relative" overflow="visible">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-label={t('How is this calculated?')}
-        className="group w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 text-start shadow-xs transition-colors hover:border-[var(--border-strong)]"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-            {label}
-          </span>
-          <span
-            className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border ${TONE_CLASSES[tone]}`}
-            aria-hidden="true"
+      <div className="relative">
+        {onNavigate ? (
+          <button
+            type="button"
+            onClick={onNavigate}
+            aria-label={navigateLabel ? t(navigateLabel) : undefined}
+            className="group w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 text-start shadow-xs transition-colors hover:border-[var(--border-strong)] focus-visible:border-[var(--accent-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40"
           >
-            <HelpCircle className="h-3.5 w-3.5" />
-          </span>
-        </div>
-        <div className="mt-1.5 font-mono text-2xl font-bold tabular-nums text-[var(--text-primary)]">
-          {value}
-        </div>
-        {hint ? (
-          <div className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-muted)]">{hint}</div>
-        ) : null}
-      </button>
+            {body}
+          </button>
+        ) : (
+          <div className="w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 text-start shadow-xs">
+            {body}
+          </div>
+        )}
+
+        {/*
+          The explanation is its own control, on top of the card, so the card
+          itself can stay a navigation action. It is a sibling of the
+          navigation button rather than a child of it: a button inside a
+          button is not valid HTML and is a trap for the keyboard.
+        */}
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-label={t('How is this calculated?')}
+          className={`absolute end-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-lg border transition-colors ${TONE_CLASSES[tone]}`}
+        >
+          <HelpCircle className="h-3.5 w-3.5" />
+        </button>
+      </div>
 
       {open ? (
         <div

@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const PROD_URL = 'https://careerdev4ai.pages.dev';
+const PROD_URL = 'https://roadmapak.pages.dev';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -18,7 +18,7 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
 
 async function main() {
   console.log('================================================================================');
-  console.log('     CareerDev4AI — Real Production Smoke Tests & Verification');
+  console.log('     Roadmapak — Real Production Smoke Tests & Verification');
   console.log('     Target URL:', PROD_URL);
   console.log('================================================================================\n');
 
@@ -42,7 +42,7 @@ async function main() {
     const res = await fetch(PROD_URL);
     const html = await res.text();
     const hasRoot = html.includes('id="root"');
-    const hasTitle = html.includes('CareerDev4AI');
+    const hasTitle = html.includes('Roadmapak');
     check('2. Homepage & SPA Shell', res.status === 200 && hasRoot && hasTitle, `HTTP ${res.status}, HTML size: ${html.length} bytes`);
   } catch (err) {
     check('2. Homepage & SPA Shell', false, err.message);

@@ -1,5 +1,5 @@
 /**
- * The public identity of CareerDev4AI, and the one place that knows the
+ * The public identity of Roadmapak, and the one place that knows the
  * production origin.
  *
  * Every canonical URL, Open Graph URL, sitemap entry and IndexNow payload is
@@ -12,23 +12,23 @@
  * the production domain the project ships on.
  */
 
-const DEFAULT_SITE_ORIGIN = 'https://careerdev4ai.pages.dev';
+const DEFAULT_SITE_ORIGIN = 'https://roadmapak.pages.dev';
 
-export const SITE_NAME = 'CareerRa';
+export const SITE_NAME = 'Roadmapak';
 
 /**
  * The other written forms of the name, for the `alternateName` property.
  *
- * A search engine that has seen "CareerRa" in a query needs to be able to
+ * A search engine that has seen "Roadmapak" in a query needs to be able to
  * match it to this site. The list holds only spellings of the same product —
  * never a different product, and never a name the site does not use. The
  * canonical name is included as well: it is the exact string a search engine
  * should attach to this site when the two schema blocks are reconciled.
  */
 export const SITE_ALTERNATE_NAMES = [
-  'CareerRa',
-  'CareerRa AI',
-  'CareerRa Career Platform',
+  'Roadmapak',
+  'Roadmapak AI',
+  'Roadmapak Career Platform',
 ] as const;
 
 /** The one-line description of the product, used where no better one exists. */
@@ -40,7 +40,7 @@ export const SITE_AUTHOR = 'Ahmed Ebrahim';
 /** The organisation behind the product. Used in the Organization schema. */
 export const SITE_ORGANIZATION = {
   name: SITE_NAME,
-  legalName: 'CareerRa',
+  legalName: 'Roadmapak',
   url: DEFAULT_SITE_ORIGIN,
   logo: `${DEFAULT_SITE_ORIGIN}/brand/icon-512.png`,
   sameAs: [] as string[],

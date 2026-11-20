@@ -568,8 +568,8 @@ export function buildPdf(
   if (metadata.author) infoEntries.push(`/Author ${literal(metadata.author)}`);
   if (metadata.subject) infoEntries.push(`/Subject ${literal(metadata.subject)}`);
   infoEntries.push(
-    `/Creator ${literal(metadata.creator ?? 'CareerRa CV Studio')}`,
-    '/Producer (CareerRa)'
+    `/Creator ${literal(metadata.creator ?? 'Roadmapak CV Studio')}`,
+    '/Producer (Roadmapak)'
   );
   const infoId = store.add(`<< ${infoEntries.join(' ')} >>`);
 

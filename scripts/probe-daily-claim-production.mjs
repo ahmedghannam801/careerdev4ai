@@ -34,7 +34,7 @@ function loadEnv() {
 }
 
 const env = loadEnv();
-const BASE = (process.argv[2] ?? 'https://careerdev4ai.pages.dev').replace(/\/$/, '');
+const BASE = (process.argv[2] ?? 'https://roadmapak.pages.dev').replace(/\/$/, '');
 const run = `claim${Date.now().toString(36)}`;
 const email = `cd4-${run}@example.invalid`;
 const password = 'Pr0be!Passw0rd!23';

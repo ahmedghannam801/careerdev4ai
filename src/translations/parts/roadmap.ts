@@ -93,8 +93,8 @@ export const roadmapAr: Record<string, string> = {
   'Job Preparation': 'التحضير للعمل',
   'YOUR PLAN, ONE STAGE AT A TIME': 'خطتك، مرحلة واحدة في كل مرة',
   'No roadmap yet': 'لا توجد خارطة طريق بعد',
-  'Choose a target role and CareerRa will build a staged plan from your real skill gaps.':
-    'اختر دورًا مستهدفًا وسيبني CareerRa خطة مرحلية من فجوات مهاراتك الفعلية.',
+  'Choose a target role and Roadmapak will build a staged plan from your real skill gaps.':
+    'اختر دورًا مستهدفًا وسيبني Roadmapak خطة مرحلية من فجوات مهاراتك الفعلية.',
   'Choose a target role': 'اختر دورًا مستهدفًا',
   'Where you are, what comes next, and why each step is here.':
     'أين أنت، وما التالي، ولماذا كل خطوة هنا.',

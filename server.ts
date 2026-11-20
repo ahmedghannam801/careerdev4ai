@@ -96,7 +96,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`CareerDev4AI Server running on port ${PORT}`);
+    console.log(`Roadmapak Server running on port ${PORT}`);
   });
 }
 

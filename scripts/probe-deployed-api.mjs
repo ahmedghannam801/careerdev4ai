@@ -24,7 +24,7 @@ function loadEnv() {
 }
 
 const env = loadEnv();
-const BASE = process.argv[2] ?? 'https://preview.careerdev4ai.pages.dev';
+const BASE = process.argv[2] ?? 'https://preview.roadmapak.pages.dev';
 const run = `probe${Date.now().toString(36)}`;
 const email = `cd4-${run}@example.invalid`;
 const password = 'Pr0be!Passw0rd!23';

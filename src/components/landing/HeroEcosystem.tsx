@@ -28,7 +28,7 @@ import { floatingStyle, smoothScale, staggerReveal, useFloatingInView } from '..
  * HeroEcosystem — the hero's Career Ecosystem.
  *
  * The landing page used to open on a decorative 3D architectural render with
- * two cards floating over it. That image says nothing about what CareerRa
+ * two cards floating over it. That image says nothing about what Roadmapak
  * does, and a visitor cannot tell from it whether the product is real.
  *
  * This replaces it with the product itself. The centre panel is a workspace
@@ -251,7 +251,7 @@ export const HeroEcosystem: React.FC = () => {
                 <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--surface-main)] px-2 py-1 text-[9px] text-[var(--text-muted)]">
                   <Map className="h-2.5 w-2.5 shrink-0" />
                   <span className="truncate font-mono">
-                    careerdev4ai.pages.dev/{domainLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}
+                    roadmapak.pages.dev/{domainLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}
                   </span>
                 </div>
               </div>

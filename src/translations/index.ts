@@ -3,7 +3,7 @@ export type Language = 'en' | 'ar';
 export const translations = {
   en: {
     // Brand
-    brandName: 'CareerRa',
+    brandName: 'Roadmapak',
     brandTagline: 'Personal Career Operating System',
 
     // Notifications that the server writes with a key of their own. The key
@@ -159,7 +159,7 @@ export const translations = {
 
     // Landing
     heroTitle: 'Build a career, not just a CV.',
-    heroSubtitle: 'CareerRa connects your goals, skills, learning, projects, CV, applications, and interviews into one personalized career operating system.',
+    heroSubtitle: 'Roadmapak connects your goals, skills, learning, projects, CV, applications, and interviews into one personalized career operating system.',
     heroCTA: 'Start Your Career Journey',
     heroSecondaryCTA: 'Explore Target Roles',
     howItWorksTitle: 'One Connected Career Graph',
@@ -167,7 +167,7 @@ export const translations = {
   },
   ar: {
     // Brand
-    brandName: 'CareerRa',
+    brandName: 'Roadmapak',
     brandTagline: 'نظام تشغيل المسار المهني الذكي',
 
     // Notifications that the server writes with a key of their own.
@@ -321,7 +321,7 @@ export const translations = {
 
     // Landing
     heroTitle: 'ابنِ مساراً مهنياً حقيقياً، وليس مجرد سيرة ذاتية.',
-    heroSubtitle: 'يربط CareerRa أهدافك ومهاراتك ومشاريعك وسيرتك الذاتية وطلباتك ومقابلاتك في نظام تشغيل مهني شخصي متكامل.',
+    heroSubtitle: 'يربط Roadmapak أهدافك ومهاراتك ومشاريعك وسيرتك الذاتية وطلباتك ومقابلاتك في نظام تشغيل مهني شخصي متكامل.',
     heroCTA: 'ابدأ رحلتك المهنية الآن',
     heroSecondaryCTA: 'استكشف الأدوار المستهدفة',
     howItWorksTitle: 'شبكة مهنية ذكية مترابطة',

@@ -19,7 +19,7 @@ permissions:
 # The integration suite shares tables in its designated Supabase test project.
 # A single constant serializes this workflow across branches and PRs.
 concurrency:
-  group: careerdev4ai-ci-global
+  group: roadmapak-ci-global
   cancel-in-progress: false
 
 jobs:

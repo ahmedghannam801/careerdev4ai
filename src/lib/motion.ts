@@ -1,5 +1,5 @@
 /**
- * CareerPilot AI — shared motion system.
+ * Roadmapak AI — shared motion system.
  * ---------------------------------------------------------------------------
  * One place for every duration, easing curve and entrance variant in the
  * product. Nothing in the app hard-codes a timing value, so the whole interface

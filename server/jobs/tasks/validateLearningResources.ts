@@ -43,7 +43,7 @@ async function checkLink(url: string): Promise<'reachable' | 'broken' | 'unknown
       method: 'HEAD',
       redirect: 'follow',
       signal: controller.signal,
-      headers: { 'User-Agent': 'CareerDev4AI catalogue check' },
+      headers: { 'User-Agent': 'Roadmapak catalogue check' },
     });
 
     // Some servers answer HEAD with a method error. A GET is the fallback.
@@ -52,7 +52,7 @@ async function checkLink(url: string): Promise<'reachable' | 'broken' | 'unknown
         method: 'GET',
         redirect: 'follow',
         signal: controller.signal,
-        headers: { 'User-Agent': 'CareerDev4AI catalogue check' },
+        headers: { 'User-Agent': 'Roadmapak catalogue check' },
       });
     }
 

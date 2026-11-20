@@ -1,11 +1,11 @@
 ---
 name: frontend-design
-description: Guides premium SaaS visual design, layout composition, typography hierarchy, spacing systems, and brand consistency for CareerDev4AI.
+description: Guides premium SaaS visual design, layout composition, typography hierarchy, spacing systems, and brand consistency for Roadmapak.
 ---
 
 # Frontend Design Skill
 
-This skill defines the visual design standards and execution rules for CareerDev4AI's user interfaces. It ensures every screen feels like a world-class, professional product rather than a generic or AI-generated prototype.
+This skill defines the visual design standards and execution rules for Roadmapak's user interfaces. It ensures every screen feels like a world-class, professional product rather than a generic or AI-generated prototype.
 
 ## When to Use
 
@@ -16,7 +16,7 @@ Activate this skill when:
 - Implementing design tokens, color palettes, and surface elevations.
 - Auditing UI quality to eliminate generic AI design clichés (e.g. random floating cards, disconnected gradients, crowded cards).
 
-## Core Design Philosophy for CareerDev4AI
+## Core Design Philosophy for Roadmapak
 
 1. **Brand Identity Anchors**:
    - **Primary Brand Color**: Terracotta `#B94736` (`var(--color-primary)`). Used for key actions, primary buttons, and hero focal points.

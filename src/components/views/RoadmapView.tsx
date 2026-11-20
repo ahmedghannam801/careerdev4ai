@@ -622,7 +622,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           <Flag className="mx-auto h-6 w-6 text-[var(--text-muted)]" />
           <p className="text-sm font-semibold text-[var(--text-primary)]">{t('No roadmap yet')}</p>
           <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            {t('Choose a target role and CareerRa will build a staged plan from your real skill gaps.')}
+            {t('Choose a target role and Roadmapak will build a staged plan from your real skill gaps.')}
           </p>
           {onNavigate && (
             <button

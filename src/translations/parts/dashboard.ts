@@ -185,4 +185,12 @@ export const dashboardAr: Record<string, string> = {
   'Learning': 'التعلّم',
   'Projects': 'المشاريع',
   'Apply': 'التقديم',
+
+  // The dashboard statistics that open a section
+  'Learning progress': 'تقدم التعلّم',
+  'Open learning hub': 'افتح مركز التعلّم',
+  'Explore Catalog': 'تصفّح الكتالوج',
+  'Open your career progress': 'افتح تقدم مسارك المهني',
+  'Open your skills': 'افتح مهاراتك',
+  'Open your roadmap': 'افتح خارطة طريقك',
 };

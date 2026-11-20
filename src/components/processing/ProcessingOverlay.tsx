@@ -26,6 +26,7 @@ import { AlertTriangle, CheckCircle2, Clock, Loader2, RefreshCw, X } from 'lucid
 import { useCareer } from '../../context/CareerContext';
 import { backdropVariants, dialogVariants, useMotionVariants } from '../../lib/motion';
 import { useDismissOnEscape, useScrollLock } from '../../lib/overlay';
+import { MascotLoader } from './MascotLoader';
 import type { ProcessingOperationView } from './processingTypes';
 
 export interface ProcessingOverlayProps {
@@ -228,6 +229,13 @@ export const ProcessingPanel: React.FC<ProcessingOverlayProps & { modal?: boolea
 
       {busy ? (
         <div className="mt-6 space-y-4" role="status" aria-live="polite">
+          {/*
+            The platform's own mascot carries the wait. It is the same
+            component the inline surface uses, so a candidate sees one
+            consistent face whether the work is big or small.
+          */}
+          <MascotLoader size="sm" />
+
           <ProgressBar progress={operation.progress} reduced={reduced} rtl={settings.language === 'ar'} />
 
           {operation.progress !== null ? (
@@ -238,9 +246,6 @@ export const ProcessingPanel: React.FC<ProcessingOverlayProps & { modal?: boolea
 
           <StageList operation={operation} t={t} />
 
-          <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
-            {t('Your request is being processed. Please keep this page open.')}
-          </p>
           <p className="text-[11px] text-[var(--text-muted)]">
             {t('This can take up to about 20 seconds.')}
           </p>

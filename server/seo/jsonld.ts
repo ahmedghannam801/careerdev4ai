@@ -44,7 +44,7 @@ export function organizationSchema(): Record<string, unknown> {
     },
     image: ogImageUrl(),
     description:
-      'CareerRa is an AI-powered career development platform for students and young professionals: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.',
+      'Roadmapak is an AI-powered career development platform for students and young professionals: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.',
   };
 }
 

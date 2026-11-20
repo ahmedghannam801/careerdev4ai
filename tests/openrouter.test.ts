@@ -177,7 +177,7 @@ describe('Controlled Provider Fallback Simulation', () => {
     // skips the test instead of failing it.
     const response = await liveProviderCall(t, () =>
       universalAi.models.generateContent({
-        contents: 'Say "CareerDev4AI ready" in 3 words.',
+        contents: 'Say "Roadmapak ready" in 3 words.',
       })
     );
     if (!response) return;
@@ -255,7 +255,7 @@ describe('Real OpenRouter API Integration (Controlled Credential Verification)',
           {
             role: 'user',
             content:
-              'Return valid JSON only matching schema: {"platform": "CareerDev4AI", "active": true}',
+              'Return valid JSON only matching schema: {"platform": "Roadmapak", "active": true}',
           },
         ],
         model: 'openrouter/free',

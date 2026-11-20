@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 
 /**
- * CareerPilot AI — animated progress indicator.
+ * Roadmapak AI — animated progress indicator.
  *
  * The fill grows from its previous value to the new one instead of jumping,
  * so a progress bar reads as a value that moved. When the value changes

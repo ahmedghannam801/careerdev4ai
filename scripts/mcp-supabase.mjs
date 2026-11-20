@@ -11,7 +11,7 @@
  * Token resolution order:
  *   1. SUPABASE_ACCESS_TOKEN already in the environment
  *   2. SUPABASE_ACCESS_TOKEN from the local .env file (gitignored)
- *   3. %TEMP%\careerpilot-supabase-token.txt (written by read-db-credential.ps1)
+ *   3. %TEMP%\roadmapak-supabase-token.txt (written by read-db-credential.ps1)
  *   4. scripts/read-db-credential.ps1 (reads the Windows Credential Manager)
  *
  * Project ref resolution order:
@@ -27,7 +27,7 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const envFile = path.join(repoRoot, '.env');
-const tokenFile = path.join(tmpdir(), 'careerpilot-supabase-token.txt');
+const tokenFile = path.join(tmpdir(), 'roadmapak-supabase-token.txt');
 
 function readEnvFile() {
   if (!existsSync(envFile)) return {};

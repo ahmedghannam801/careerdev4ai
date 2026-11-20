@@ -21,6 +21,7 @@ import {
 } from '../../data/interviewBank';
 import { Reveal } from '../motion/Motion';
 import { CareerImage } from '../ui/CareerImage';
+import { LiveInterviewPanel } from '../interviews/LiveInterviewPanel';
 import { computeInterviewReadiness } from '../../../shared/interviewReadiness';
 import { cvReadinessFromVersions, roleReadinessFromSkills } from '../../../shared/careerMetrics';
 
@@ -262,6 +263,15 @@ export const InterviewsView: React.FC = () => {
 
   return (
     <Reveal className="space-y-8">
+      {/*
+        The live voice interview.
+
+        It sits above the written mock interview because it is the fuller
+        experience: the interviewer speaks, the candidate answers out loud,
+        and the transcript is written from what was actually said.
+      */}
+      <LiveInterviewPanel roleTitle={targetRole?.title ?? ''} />
+
       <div className="flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 md:flex-row md:items-center">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">

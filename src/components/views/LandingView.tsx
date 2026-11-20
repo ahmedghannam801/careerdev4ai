@@ -31,7 +31,7 @@ const ProductShowcase = lazy(() =>
  * The roles showcased on the landing page.
  *
  * One role per career domain, so the first thing a visitor sees is that
- * CareerPilot is not only for developers.
+ * Roadmapak is not only for developers.
  */
 const FEATURED_ROLES = (() => {
   const seen = new Set<string>();
@@ -142,10 +142,10 @@ const navLinks = [
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--surface-main)]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <a href="/" className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90" aria-label={t('CareerRa')}>
+          <a href="/" className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90" aria-label={t('Roadmapak')}>
             <Logo variant="icon" className="h-8 w-8 shrink-0" alt="" />
             <span className="hidden shrink-0 whitespace-nowrap text-base font-semibold tracking-tight text-[var(--text-primary)] sm:inline">
-              {t('CareerRa')}
+              {t('Roadmapak')}
             </span>
           </a>
 
@@ -239,7 +239,7 @@ const navLinks = [
 
               <Reveal delay={0.12}>
                 <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
-                  {t('CareerRa helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.')}
+                  {t('Roadmapak helps you discover where you\u2019re going, what you\u2019re missing, and what to do next \u2014 from your first skill to your next opportunity.')}
                 </p>
               </Reveal>
 
@@ -257,7 +257,7 @@ const navLinks = [
                     href="#showcase"
                     className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-secondary)] active:translate-y-0 active:scale-[0.98]"
                   >
-                    {t('Explore Careerra')}
+                    {t('Explore Roadmapak')}
                   </a>
                 </div>
               </Reveal>
@@ -333,7 +333,7 @@ const navLinks = [
                 {t('Seven stages from ambition to readiness.')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                {t('Scroll through the path your career actually takes inside CareerRa.')}
+                {t('Scroll through the path your career actually takes inside Roadmapak.')}
               </p>
             </div>
           </Reveal>
@@ -506,7 +506,7 @@ const navLinks = [
                   {t('Guidance grounded in your career, not generic advice.')}
                 </h2>
                 <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
-                  CareerRa recommends based on the goals you set, the skills you have,
+                  Roadmapak recommends based on the goals you set, the skills you have,
                   the progress you have made and the courses you have taken — and it shows
                   its reasoning, so you can judge the advice for yourself.
                 </p>
@@ -540,7 +540,7 @@ const navLinks = [
                 {t('Tailored for every career stage')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                CareerRa adapts its priorities, recommendations and roadmaps to where
+                Roadmapak adapts its priorities, recommendations and roadmaps to where
                 you are starting from.
               </p>
             </div>
@@ -893,7 +893,7 @@ const navLinks = [
           <Logo variant="full" className="h-10 w-auto self-start sm:h-12" />
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div>
-              <span>© 2026 CareerRa. Personal Career Operating System.</span>
+              <span>© 2026 Roadmapak. Personal Career Operating System.</span>
               <span className="mx-2 text-[var(--border-subtle)]">·</span>
               <span>
                 Developed by{' '}

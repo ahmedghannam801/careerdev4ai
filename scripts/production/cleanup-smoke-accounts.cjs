@@ -26,7 +26,7 @@ function envValue(name) {
 
 const SUPABASE_URL = envValue('SUPABASE_URL');
 const SERVICE_ROLE_KEY = envValue('SUPABASE_SERVICE_ROLE_KEY');
-const TOKEN_FILE = path.join(os.tmpdir(), 'careerpilot-supabase-token.txt');
+const TOKEN_FILE = path.join(os.tmpdir(), 'roadmapak-supabase-token.txt');
 
 async function managementQuery(sql) {
   const token = fs.readFileSync(TOKEN_FILE, 'utf8').trim();

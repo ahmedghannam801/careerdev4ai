@@ -1,4 +1,4 @@
-# CareerDev4AI
+# Roadmapak
 #
 # The public pages - the home page, the career catalogue, the learning
 # catalogue and the volunteering catalogue - are open to every crawler.
@@ -13,4 +13,4 @@ Disallow: /api/
 Disallow: /admin
 
 # Sitemaps
-Sitemap: https://careerdev4ai.pages.dev/sitemap.xml
+Sitemap: https://roadmapak.pages.dev/sitemap.xml

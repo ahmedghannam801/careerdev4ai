@@ -5,7 +5,7 @@ import { withRuntimeEnv } from '../server/runtimeEnv.ts';
 
 test('test email is branded, responsive, plain-text, and escapes recipient markup', () => {
   const message = buildTestEmail('owner+<test>@example.com');
-  assert.equal(message.from, 'CareerRa <onboarding@resend.dev>');
+  assert.equal(message.from, 'Roadmapak <onboarding@resend.dev>');
   assert.deepEqual(message.to, ['owner+<test>@example.com']);
   assert.match(message.html, /#FF5A36/);
   assert.match(message.html, /name="viewport"/);
@@ -35,13 +35,13 @@ test('Resend call uses request-scoped credentials and returns only a valid messa
   try {
     const result = await withRuntimeEnv(
       { RESEND_API_KEY: 'test-only-secret', RESEND_TEST_RECIPIENT: 'owner@example.com' },
-      () => sendTestEmail('owner@example.com', 'careerdev4ai-test/user/123')
+      () => sendTestEmail('owner@example.com', 'roadmapak-test/user/123')
     );
     assert.deepEqual(result, { ok: true, id: 're_test-message_123' });
     assert.equal(authorization, 'Bearer test-only-secret');
-    assert.equal(idempotencyKey, 'careerdev4ai-test/user/123');
+    assert.equal(idempotencyKey, 'roadmapak-test/user/123');
     assert.deepEqual(requestBody?.to, ['owner@example.com']);
-    assert.equal(requestBody?.from, 'CareerRa <onboarding@resend.dev>');
+    assert.equal(requestBody?.from, 'Roadmapak <onboarding@resend.dev>');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -53,7 +53,7 @@ test('Resend failures do not expose the provider response body', async () => {
   try {
     const result = await withRuntimeEnv(
       { RESEND_API_KEY: 'test-only-secret' },
-      () => sendTestEmail('owner@example.com', 'careerdev4ai-test/user/123')
+      () => sendTestEmail('owner@example.com', 'roadmapak-test/user/123')
     );
     assert.deepEqual(result, { ok: false, status: 401 });
     assert.equal(JSON.stringify(result).includes('sensitive'), false);

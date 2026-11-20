@@ -102,7 +102,7 @@ describe('Subscription lookup keys', () => {
   test('round-trips every plan, including one with an underscore', () => {
     for (const plan of ['student', 'pro', 'career_plus']) {
       for (const cycle of ['monthly', 'annual'] as const) {
-        const parsed = parseSubscriptionLookupKey(`careerdev4ai_${plan}_${cycle}`);
+        const parsed = parseSubscriptionLookupKey(`roadmapak_${plan}_${cycle}`);
         assert.deepEqual(parsed, { planCode: plan, billingCycle: cycle });
       }
     }
