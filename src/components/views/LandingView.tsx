@@ -1,19 +1,31 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ArrowRight, CheckCircle2, Sparkles, ArrowUpRight, Target, Route, GraduationCap, FileBadge2, Menu, X, Languages } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Sparkles, ArrowUpRight, Menu, X, Languages } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { TARGET_ROLES } from '../../data/rolesData';
 import { PUBLIC_PATHS, OPERATOR_LINKEDIN_URL } from '../../../shared/contact.ts';
 import { Logo } from '../brand/Logo';
 import { CareerJourneyVisual } from '../brand/CareerJourneyVisual';
-import { HeroVisual3D } from '../landing/HeroVisual3D';
+import { HeroEcosystem } from '../landing/HeroEcosystem';
+import { JourneyScrollStory } from '../landing/JourneyScrollStory';
+import { ScrollProgress } from '../landing/ScrollProgress';
 import { CareerImage } from '../ui/CareerImage';
 import { ProductPreview } from '../landing/ProductPreview';
 import { FeatureGrid } from '../landing/FeatureGrid';
 import { TrustSection } from '../landing/TrustSection';
 import { FaqSection } from '../landing/FaqSection';
 import { ContactSection } from '../landing/ContactSection';
-import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { Reveal, RevealText, Stagger, StaggerItem } from '../motion/Motion';
+
+/**
+ * The product showcase is the heaviest thing on the page and it sits well
+ * below the fold, so it is loaded on demand rather than carried by the
+ * first paint. The placeholder keeps the section's height stable so the
+ * page does not jump when the panel arrives.
+ */
+const ProductShowcase = lazy(() =>
+  import('../landing/ProductShowcase').then((module) => ({ default: module.ProductShowcase }))
+);
 
 /**
  * The roles showcased on the landing page.
@@ -79,40 +91,6 @@ const CAREER_CHAIN = (t: Translate) => [
   t('Opportunities'),
 ];
 
-/** How it works, in the order a career actually unfolds. */
-const HOW_IT_WORKS = (t: Translate) => [
-  {
-    icon: Target,
-    title: t('Discover your direction'),
-    body: t('Set the role you are working towards and get a concrete picture of what that role demands.'),
-  },
-  {
-    icon: Sparkles,
-    title: t('Identify your skill gaps'),
-    body: t('Compare where you are against the benchmark and see exactly which gaps will hold you back.'),
-  },
-  {
-    icon: Route,
-    title: t('Follow your personalized roadmap'),
-    body: t('A phased plan that recalculates as you learn, so the next step is always the right one.'),
-  },
-  {
-    icon: GraduationCap,
-    title: t('Build evidence and projects'),
-    body: t('Turn skills into finished work you can point a hiring manager at.'),
-  },
-  {
-    icon: FileBadge2,
-    title: t('Strengthen your CV'),
-    body: t('Rewrite, version and target your CV against the role you are applying for.'),
-  },
-  {
-    icon: ArrowUpRight,
-    title: t('Move toward real opportunities'),
-    body: t('Track applications, prepare for interviews, and keep your momentum visible.'),
-  },
-];
-
 /** What the AI actually does — and what it deliberately does not claim. */
 const AI_PROMISES = (t: Translate) => [
   {
@@ -140,6 +118,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStartOnboarding, onE
 // so the gap would never be reported.
 const navLinks = [
     { href: '#how-it-works', label: t('How It Works') },
+    { href: '#showcase', label: t('The product') },
     { href: '#preview', label: t('Preview') },
     { href: '#features', label: t('Features') },
     { href: '#ai-guidance', label: t('AI Guidance') },
@@ -152,13 +131,14 @@ const navLinks = [
   // Arabic rather than an English page inside an Arabic frame.
   const fragmentationPoints = FRAGMENTATION_POINTS(t);
   const careerChain = CAREER_CHAIN(t);
-  const howItWorks = HOW_IT_WORKS(t);
   const aiPromises = AI_PROMISES(t);
 
   const closeMobileNav = () => setMobileNavOpen(false);
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)]">
+      <ScrollProgress />
+
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--surface-main)]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
@@ -172,7 +152,7 @@ const navLinks = [
           {/* The full navigation needs room. Below the large breakpoint the
               seven links do not fit beside the logo and the call to action,
               so the panel menu carries them instead. */}
-          <nav className="hidden min-w-0 items-center gap-5 text-sm font-medium text-[var(--text-secondary)] lg:flex xl:gap-6">
+          <nav className="hidden min-w-0 items-center gap-5 text-sm font-medium text-[var(--text-secondary)] xl:flex xl:gap-6">
             {navLinks.map((link) => (
               <a
                 key={link.href}
@@ -190,7 +170,7 @@ const navLinks = [
               aria-expanded={mobileNavOpen}
               aria-controls="landing-mobile-nav"
               aria-label={mobileNavOpen ? t('Close menu') : t('Open menu')}
-              className="rounded-lg border border-[var(--color-border)] p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-secondary)] hover:text-[var(--text-primary)] lg:hidden"
+              className="rounded-lg border border-[var(--color-border)] p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-secondary)] hover:text-[var(--text-primary)] xl:hidden"
             >
               {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
@@ -213,7 +193,7 @@ const navLinks = [
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: reduced ? 0 : -8 }}
               transition={{ duration: reduced ? 0.01 : 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="border-t border-[var(--color-border)] bg-[var(--surface-main)] px-6 py-3 lg:hidden"
+              className="border-t border-[var(--color-border)] bg-[var(--surface-main)] px-6 py-3 xl:hidden"
             >
               <nav className="flex flex-col">
                 {navLinks.map((link) => (
@@ -248,9 +228,13 @@ const navLinks = [
               </Reveal>
 
               <Reveal delay={0.06}>
-                <h1 className="mt-5 text-balance text-3xl font-bold leading-[1.12] tracking-tight text-[var(--text-primary)] sm:text-4xl md:text-5xl lg:text-[3.25rem]">
-                  {t('Turn Your Ambition Into a Career Plan.')}
-                </h1>
+                <RevealText
+                  as="h1"
+                  onMount
+                  delay={0.12}
+                  className="mt-5 text-balance text-3xl font-bold leading-[1.12] tracking-tight text-[var(--text-primary)] sm:text-4xl md:text-5xl lg:text-[3.25rem]"
+                  text={t('Turn Your Ambition Into a Career Plan.')}
+                />
               </Reveal>
 
               <Reveal delay={0.12}>
@@ -270,10 +254,10 @@ const navLinks = [
                   </button>
 
                   <a
-                    href="#how-it-works"
+                    href="#showcase"
                     className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3.5 text-sm font-medium text-[var(--text-primary)] transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-secondary)] active:translate-y-0 active:scale-[0.98]"
                   >
-                    {t('Explore How It Works')}
+                    {t('Explore Careerra')}
                   </a>
                 </div>
               </Reveal>
@@ -296,10 +280,10 @@ const navLinks = [
               </Reveal>
             </div>
 
-            {/* Hero visual — 3D card stack (desktop) / 2×2 grid (mobile) */}
+            {/* Hero visual — the Career Ecosystem (desktop 3D composition / stacked cards on mobile) */}
             <div className="lg:col-span-6 xl:col-span-6">
               <Reveal delay={0.3} distance="soft">
-                <HeroVisual3D />
+                <HeroEcosystem />
               </Reveal>
             </div>
           </div>
@@ -337,19 +321,19 @@ const navLinks = [
         </div>
       </section>
 
-      {/* Solution + How It Works */}
+      {/* The career journey, told as the visitor scrolls */}
       <section id="how-it-works" className="scroll-mt-24 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]/40 px-6 py-20">
         <div className="mx-auto max-w-7xl">
           <Reveal>
             <div className="mx-auto max-w-2xl text-center">
               <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                {t('How it works')}
+                {t('Your career journey')}
               </div>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                {t('CareerRa brings the journey together.')}
+                {t('Seven stages from ambition to readiness.')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                {t('One connected path instead of eight disconnected tools.')}
+                {t('Scroll through the path your career actually takes inside CareerRa.')}
               </p>
             </div>
           </Reveal>
@@ -373,50 +357,38 @@ const navLinks = [
             </div>
           </Reveal>
 
-          <Stagger inView gap={0.09} className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {howItWorks.map((step, index) => {
-              const Icon = step.icon;
-              return (
-                <StaggerItem key={step.title}>
-                  <div className="group h-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-md">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-surface)] text-[var(--color-primary-text)] transition-transform duration-200 group-hover:scale-105">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="font-mono text-[11px] font-bold text-[var(--text-muted)]">
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
-                    </div>
-                    <h3 className="mt-4 text-base font-bold text-[var(--text-primary)]">{step.title}</h3>
-                    <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">{step.body}</p>
-                  </div>
-                </StaggerItem>
-              );
-            })}
-          </Stagger>
+          <div className="mt-14">
+            <JourneyScrollStory />
+          </div>
         </div>
       </section>
 
-      {/* Career Journey Visual */}
+      {/* The platform's own pipeline — the system the journey runs on */}
       <section id="journey" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">
         <div className="mx-auto max-w-7xl">
           <Reveal>
             <div className="mx-auto max-w-2xl text-center">
               <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-                {t('Career Journey')}
+                {t('The connected system')}
               </div>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-                {t('From direction to destination.')}
+                {t('Eight stages the platform keeps in step.')}
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                {t('A step-by-step path that connects your ambition to concrete evidence and career momentum.')}
+                {t(
+                  'Direction, skill gaps, roadmap, learning, projects, evidence, CV and opportunities — each one feeding the next.',
+                )}
               </p>
             </div>
           </Reveal>
 
           <Reveal delay={0.1} distance="soft">
             <div className="mx-auto mt-12 max-w-3xl">
-              <CareerJourneyVisual />
+              <CareerJourneyVisual
+                heading={t('The connected system')}
+                subtitle={t('The order the platform performs its work in.')}
+                badge={t('8 Stages')}
+              />
             </div>
           </Reveal>
         </div>
@@ -749,6 +721,41 @@ const navLinks = [
           <Reveal delay={0.08} distance="soft">
             <div className="mx-auto mt-10 max-w-4xl">
               <ProductPreview />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* The real product — the five areas, shown as the product itself */}
+      <section id="showcase" className="scroll-mt-24 border-b border-[var(--color-border)] px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
+                {t('The product')}
+              </div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t('Five areas, one career.')}
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t(
+                  'Each of these is the real interface of the signed-in product, running the real engines behind it — not an illustration of what might be.',
+                )}
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.08} distance="soft">
+            <div className="mt-10">
+              <Suspense
+                fallback={
+                  <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-20 text-center text-sm text-[var(--text-muted)]">
+                    {t('Loading the product…')}
+                  </div>
+                }
+              >
+                <ProductShowcase />
+              </Suspense>
             </div>
           </Reveal>
         </div>

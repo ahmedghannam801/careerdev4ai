@@ -82,6 +82,8 @@ export const jobsAr: Record<string, string> = {
   'This posting gives no application link.':
     'لا يذكر هذا الإعلان أي رابط للتقديم.',
   'Track application': 'تتبّع الطلب',
+  'Tracking…': 'جارٍ التتبّع…',
+  'Preparing…': 'جارٍ التحضير…',
   'Tracked in your applications': 'تم تسجيله ضمن طلباتك',
   'This application could not be saved. Try again.':
     'تعذّر حفظ هذا الطلب. حاول مرة أخرى.',

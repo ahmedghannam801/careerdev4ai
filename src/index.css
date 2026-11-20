@@ -681,6 +681,63 @@
   }
 
   /* ------------------------------------------------------------------
+   * Floating surfaces
+   * ------------------------------------------------------------------
+   * A surface that hovers very slightly above the page. The drift is a CSS
+   * animation rather than a JavaScript loop, so it costs nothing on the
+   * main thread, and `cp-float-paused` holds it still while the surface is
+   * off screen — nothing on this page moves when nobody is looking at it.
+   */
+  @keyframes cp-float {
+    0%,
+    100% {
+      transform: translate3d(0, calc(var(--cp-float-amplitude, 7px) * -1), 0);
+    }
+    50% {
+      transform: translate3d(0, var(--cp-float-amplitude, 7px), 0);
+    }
+  }
+
+  .cp-float-paused {
+    animation-play-state: paused;
+  }
+
+  /* ------------------------------------------------------------------
+   * Connection line
+   * ------------------------------------------------------------------
+   * The hairline that ties the hero's product surfaces together. It is drawn
+   * as a gradient rather than as an SVG so that it follows the border radius
+   * of whatever it is drawn between, and it fades at both ends so that it
+   * reads as a connection rather than as a stray line.
+   */
+  .cp-connection {
+    background-image: linear-gradient(
+      to right,
+      transparent 0%,
+      color-mix(in srgb, var(--color-primary) 45%, transparent) 22%,
+      color-mix(in srgb, var(--color-primary) 45%, transparent) 78%,
+      transparent 100%
+    );
+  }
+
+  .cp-connection-vertical {
+    background-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--color-primary) 45%, transparent) 22%,
+      color-mix(in srgb, var(--color-primary) 45%, transparent) 78%,
+      transparent 100%
+    );
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cp-float,
+    [style*='cp-float'] {
+      animation: none !important;
+    }
+  }
+
+  /* ------------------------------------------------------------------
    * Toast layer
    * -----------------------------------------------------------------
    * A toast arrives from below and settles. The movement is short on

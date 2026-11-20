@@ -44,9 +44,31 @@ export interface CareerJourneyVisualProps {
     completedKeys: string[];
     activeKey?: string;
   };
+  /**
+   * The heading of the public panel.
+   *
+   * The panel describes the platform's own pipeline — the order the product
+   * performs its work in — so a page that also tells the visitor's own
+   * journey needs to say which of the two it is looking at. The default is
+   * the visitor-facing one.
+   */
+  heading?: string;
+  /**
+   * The line under the heading of the public panel.
+   */
+  subtitle?: string;
+  /**
+   * The badge in the corner of the public panel.
+   */
+  badge?: string;
 }
 
-export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({ userState }) => {
+export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({
+  userState,
+  heading,
+  subtitle,
+  badge,
+}) => {
   const { reduced, stagger, staggerItem, entrance } = useMotionVariants();
   const { t } = useCareer();
 
@@ -75,18 +97,18 @@ export const CareerJourneyVisual: React.FC<CareerJourneyVisualProps> = ({ userSt
         <div>
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
             <Target className="w-3.5 h-3.5" />
-            <span>{t('Your Career Journey')}</span>
+            <span>{heading ?? t('Your Career Journey')}</span>
           </div>
           <p className="mt-1 text-xs text-[var(--text-secondary)]">
             {isPublic
-              ? 'One unified path. Eight connected stages.'
+              ? (subtitle ?? 'One unified path. Eight connected stages.')
               : `${completedCount} of ${JOURNEY.length} stages completed`}
           </p>
         </div>
 
         {isPublic ? (
           <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-2.5 py-1 text-[10px] font-semibold text-[var(--text-secondary)]">
-            8 Stages
+            {badge ?? '8 Stages'}
           </span>
         ) : (
           <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-2.5 py-1 font-mono text-[10px] font-bold text-[var(--color-primary-text)]">

@@ -23,6 +23,8 @@
  *     asks for reduced motion, while status/loading feedback is preserved.
  */
 
+import { useEffect, useState } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import { useReducedMotion } from 'motion/react';
 import type { Transition, Variants } from 'motion/react';
 
@@ -138,6 +140,219 @@ export const staggerItemVariants = (reduced = false): Variants => ({
       : { duration: MOTION_DURATION.micro, ease: MOTION_EASE.out },
   },
 });
+
+/* -------------------------------------------------------------------------- */
+/* Landing motion presets                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The named presets the landing page is built from.
+ *
+ * The variants above are the general vocabulary of the product. These are the
+ * eight shapes the public page actually uses, given names so that a section
+ * declares *what it wants to do* rather than re-deriving the numbers:
+ *
+ *   fadeUp           a block rises into place as it comes into view
+ *   staggerReveal    a group of blocks arrives one after another
+ *   smoothScale      a surface settles in by growing very slightly
+ *   floatingMotion   a surface breathes, very slowly, while it is on screen
+ *   cardHover        a card lifts by a hair and gains a border
+ *   scrollReveal     a block is revealed by the act of scrolling to it
+ *   textReveal       a heading arrives word by word
+ *   sectionTransition a whole section crossfades into the next
+ *
+ * They are all built on `opacity` and `transform`, so none of them can
+ * trigger a layout pass, and every one of them collapses to an instant,
+ * unmoving state when the visitor asks for reduced motion.
+ */
+
+/** A block that rises into place. The default entrance for a section body. */
+export const fadeUp = (reduced = false, distance = 24, delay = 0): Variants =>
+  buildEntrance(reduced, distance, delay);
+
+/**
+ * A surface that settles in by growing slightly.
+ *
+ * Used for panels that should feel like they were always there and were
+ * simply not yet lit — a product card, a preview window — rather than for
+ * things that arrive from somewhere.
+ */
+export const smoothScale = (reduced = false, delay = 0): Variants => ({
+  hidden: {
+    opacity: 0,
+    scale: reduced ? 1 : 0.96,
+    y: reduced ? 0 : 10,
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: reduced
+      ? { duration: 0.01 }
+      : { duration: MOTION_DURATION.entrance, delay, ease: MOTION_EASE.out },
+  },
+});
+
+/**
+ * A group whose children arrive one after another.
+ *
+ * The gap is the interval between two children, not a delay before the first
+ * one, so the first card is never late.
+ */
+export const staggerReveal = (reduced = false, gap = 0.08, delay = 0): Variants =>
+  staggerContainer(reduced, gap, delay);
+
+/**
+ * A block that is revealed by the act of scrolling to it.
+ *
+ * The difference from `fadeUp` is the trigger rather than the shape: this one
+ * is for content whose whole point is that the reader arrives at it. The
+ * `viewport` option below is what makes that real.
+ */
+export const scrollReveal = (reduced = false, distance = 32): Variants => ({
+  hidden: { opacity: 0, y: reduced ? 0 : distance },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: reduced
+      ? { duration: 0.01 }
+      : { duration: MOTION_DURATION.entrance, ease: MOTION_EASE.out },
+  },
+});
+
+/**
+ * A heading that arrives word by word.
+ *
+ * Each word is clipped by the line box it sits in and slides up from under
+ * it, so the text appears to be uncovered rather than to fade in. The
+ * duration is deliberately long relative to the number of words: a heading
+ * that resolves in a fifth of a second reads as a flicker.
+ */
+export const textReveal = (reduced = false, gap = 0.055): Variants => ({
+  hidden: { opacity: 0, y: reduced ? 0 : '110%' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: reduced
+      ? { duration: 0.01, delay: 0 }
+      : { duration: 0.62, ease: MOTION_EASE.out },
+  },
+});
+
+/**
+ * The word container for a `textReveal` heading.
+ *
+ * `staggerChildren` is the gap between two words and `delayChildren` is the
+ * pause before the first one starts.
+ */
+export const textRevealContainer = (reduced = false, gap = 0.055, delay = 0): Variants => ({
+  hidden: {},
+  visible: {
+    transition: reduced
+      ? { staggerChildren: 0, delayChildren: 0 }
+      : { staggerChildren: gap, delayChildren: delay },
+  },
+});
+
+/**
+ * A whole section handing over to the next one.
+ *
+ * A crossfade rather than a slide: two adjacent sections that slide past
+ * each other read as two pages, and this page is one continuous document.
+ */
+export const sectionTransition = (reduced = false): Variants => ({
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: reduced
+      ? { duration: 0.01 }
+      : { duration: MOTION_DURATION.entrance, ease: MOTION_EASE.out },
+  },
+});
+
+/**
+ * The hover treatment of a card.
+ *
+ * A card lifts by two pixels and gains a hair of border emphasis. It never
+ * scales: a grid of scaling cards visibly jumps around as the pointer crosses
+ * it, which reads as sloppiness rather than as depth.
+ */
+export const cardHover = (reduced = false) =>
+  reduced
+    ? {}
+    : {
+        y: -2,
+        transition: { duration: MOTION_DURATION.ui, ease: MOTION_EASE.out },
+      };
+
+/* -------------------------------------------------------------------------- */
+/* Floating                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The drift of a floating surface.
+ *
+ * A single, slow, small oscillation. The amplitude is measured in pixels
+ * because a percentage would scale with the element, and a large card would
+ * then swing much further than a small one.
+ *
+ * The animation is driven by CSS rather than by a JavaScript loop, so it
+ * costs nothing per frame on the main thread and it can be paused while the
+ * element is off screen — see `useFloatingInView`.
+ */
+export const FLOATING_KEYFRAMES = 'cp-float';
+
+/** The durations of the float, in seconds. Longer is calmer. */
+export const FLOATING_DURATION = 7.5;
+
+/**
+ * Builds the inline style of a floating surface.
+ *
+ * `phase` offsets the cycle so that two surfaces floating together do not
+ * move as one object. It is expressed as a negative delay, which is the only
+ * way to start a CSS animation part-way through its cycle.
+ */
+export const floatingStyle = (
+  reduced = false,
+  phase = 0,
+  amplitude = 7,
+  duration = FLOATING_DURATION,
+): CSSProperties => {
+  if (reduced) return {};
+  return {
+    animation: `${FLOATING_KEYFRAMES} ${duration}s ease-in-out ${-phase}s infinite`,
+    '--cp-float-amplitude': `${amplitude}px`,
+  } as CSSProperties;
+};
+
+/**
+ * Keeps a floating surface still while it is off screen.
+ *
+ * The brief for this page is that nothing moves when nobody is looking at it.
+ * An IntersectionObserver toggles a single class, and the class pauses the
+ * CSS animation — so an off-screen card costs no frames at all, rather than
+ * being animated invisibly.
+ */
+export const useFloatingInView = (ref: RefObject<HTMLElement | null>) => {
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => setInView(entries.some((entry) => entry.isIntersecting)),
+      { rootMargin: '120px 0px' }
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return inView;
+};
 
 /* -------------------------------------------------------------------------- */
 /* Hooks                                                                      */

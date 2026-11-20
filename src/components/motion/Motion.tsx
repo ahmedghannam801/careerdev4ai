@@ -5,6 +5,8 @@ import {
   entranceSoftVariants,
   staggerContainer,
   staggerItemVariants,
+  textReveal,
+  textRevealContainer,
 } from '../../lib/motion';
 
 /**
@@ -219,5 +221,97 @@ export const HoverLift: React.FC<HTMLMotionProps<'div'>> = ({ children, ...rest 
     >
       {children}
     </motion.div>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* Kinetic type                                                               */
+/* -------------------------------------------------------------------------- */
+
+interface RevealTextProps {
+  /** The text to reveal. It is split on whitespace. */
+  text: string;
+  /** The element the text is rendered in. */
+  as?: 'h1' | 'h2' | 'h3' | 'p' | 'span';
+  /** The classes of the element. */
+  className?: string;
+  /** Seconds between two words. */
+  gap?: number;
+  /** Seconds before the first word starts. */
+  delay?: number;
+  /** Reveal as soon as the element mounts rather than when it scrolls into view. */
+  onMount?: boolean;
+}
+
+/**
+ * A headline that arrives word by word.
+ *
+ * Each word is clipped by the line box it sits in and slides up from under
+ * it, so the text looks uncovered rather than faded in. It is used for the
+ * one headline on the page that has to carry the first impression; the rest
+ * of the page uses the calmer `Reveal`.
+ *
+ * The full sentence is exposed to assistive technology as one string and the
+ * animated words are hidden from it, so a screen reader announces the
+ * headline as a sentence rather than as a list of fragments.
+ */
+export const RevealText: React.FC<RevealTextProps> = ({
+  text,
+  as: Tag = 'span',
+  className = '',
+  gap = 0.055,
+  delay = 0,
+  onMount = false,
+}) => {
+  const reduced = useReducedMotion() ?? false;
+  const words = text.split(/\s+/).filter(Boolean);
+
+  const container = textRevealContainer(reduced, gap, delay);
+  const word = textReveal(reduced);
+
+  const inner = (
+    <span className="inline">
+      {words.map((entry, index) => (
+        <span
+          key={`${entry}-${index}`}
+          className="inline-block overflow-hidden align-bottom pb-[0.14em] -mb-[0.14em]"
+        >
+          <motion.span variants={word} className="inline-block">
+            {entry}
+            {index < words.length - 1 ? '\u00A0' : ''}
+          </motion.span>
+        </span>
+      ))}
+    </span>
+  );
+
+  if (onMount) {
+    return (
+      <Tag className={className}>
+        <span className="sr-only">{text}</span>
+        <span aria-hidden="true">
+          <motion.span variants={container} initial="hidden" animate="visible" className="inline">
+            {inner}
+          </motion.span>
+        </span>
+      </Tag>
+    );
+  }
+
+  return (
+    <Tag className={className}>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        <motion.span
+          variants={container}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-60px 0px -60px 0px' }}
+          className="inline"
+        >
+          {inner}
+        </motion.span>
+      </span>
+    </Tag>
   );
 };

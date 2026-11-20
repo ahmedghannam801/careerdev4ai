@@ -32,6 +32,7 @@ import type { JobMatchBreakdown } from '../../../shared/jobMatching';
 import { JOB_SOURCE_LABELS } from '../../../shared/jobs';
 import { SpotlightCard } from '../react-bits/SpotlightCard';
 import { CareerImage } from '../ui/CareerImage';
+import { MorphingButton } from '../motion/Morph';
 
 interface LiveJobCardProps {
   item: MatchedJob;
@@ -389,28 +390,29 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
           </span>
         )}
 
-        <button
-          type="button"
-          onClick={() => onToggleBookmark(job.id)}
+        {/*
+          The save button morphs as the vacancy is saved: the bookmark opens
+          into a disc with a tick in it, and the label changes underneath it
+          without the button moving.
+        */}
+        <MorphingButton
+          variant="secondary"
+          state={bookmarked ? 'success' : 'idle'}
+          icon={<Bookmark className="h-3.5 w-3.5" />}
+          label={t('Save')}
+          successLabel={t('Saved')}
           aria-pressed={bookmarked}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[11px] font-semibold text-[var(--color-primary-text)] transition-colors hover:bg-[var(--accent-surface)]"
-        >
-          {bookmarked ? (
-            <BookmarkCheck className="h-3.5 w-3.5" />
-          ) : (
-            <Bookmark className="h-3.5 w-3.5" />
-          )}
-          <span>{bookmarked ? t('Saved') : t('Save')}</span>
-        </button>
+          onClick={() => onToggleBookmark(job.id)}
+        />
 
-        <button
-          type="button"
-          onClick={() => onTrackApplication(item)}
+        <MorphingButton
+          variant="secondary"
+          state={tracking ? 'loading' : 'idle'}
+          label={t('Track application')}
+          loadingLabel={t('Tracking…')}
           disabled={tracking}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40"
-        >
-          <span>{t('Track application')}</span>
-        </button>
+          onClick={() => onTrackApplication(item)}
+        />
 
         {/* The comparison is offered only where the screen offers one, so the
             card does not show a button that would do nothing. */}
@@ -426,9 +428,12 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={() => onCreateTailoredCv(item)}
+        <MorphingButton
+          variant="secondary"
+          state={tailoring ? 'loading' : 'idle'}
+          icon={<FileText className="h-3.5 w-3.5" />}
+          label={t('Create Tailored CV')}
+          loadingLabel={t('Preparing…')}
           disabled={!hasDescription || tailoring}
           aria-describedby={hasDescription ? undefined : tailorReasonId}
           aria-label={t('Create a tailored CV for {title}').replace('{title}', job.title)}
@@ -437,11 +442,8 @@ export const LiveJobCard: React.FC<LiveJobCardProps> = ({
               ? undefined
               : t('This posting gives no description, so there is nothing to tailor a CV from.')
           }
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-[11px] font-semibold text-[var(--color-primary-text)] transition-colors hover:bg-[var(--accent-surface)] disabled:opacity-40 disabled:hover:bg-transparent"
-        >
-          <FileText className="h-3.5 w-3.5" />
-          <span>{t('Create Tailored CV')}</span>
-        </button>
+          onClick={() => onCreateTailoredCv(item)}
+        />
       </footer>
     </SpotlightCard>
   );

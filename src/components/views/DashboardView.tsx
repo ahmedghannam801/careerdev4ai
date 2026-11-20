@@ -32,6 +32,8 @@ import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 import { AnimatedList } from '../react-bits/AnimatedList';
+import { Stagger, StaggerItem } from '../motion/Motion';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { AiMascot } from '../copilot/AiMascot';
 
 interface DashboardViewProps {
@@ -101,6 +103,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   } = useCareer();
 
   const [showDetails, setShowDetails] = useState(false);
+
+  /**
+   * Whether the visitor has asked for less movement.
+   *
+   * The panels on this page open and close; when motion is reduced they open
+   * and close instantly, which is the same information without the travel.
+   */
+  const reduced = useReducedMotion() ?? false;
 
   // A critical announcement is the one communication that may step in front of
   // the dashboard. It is derived from the real inbox (and respects the device's
@@ -647,62 +657,63 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           <LayoutGrid className="h-3 w-3" />
           <h2 id="dashboard-quick-access">{t('Quick access')}</h2>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <Stagger inView gap={0.06} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {[
             {
               view: 'skills',
               label: t('My Skills'),
               icon: Zap,
-              badge: `${metrics.gaps.length}`,
+              badge: metrics.gaps.length,
             },
             {
               view: 'roadmap',
               label: t('My Roadmap'),
               icon: TrendingUp,
-              badge: `${metrics.roadmapTotal}`,
+              badge: metrics.roadmapTotal,
             },
             {
               view: 'projects',
               label: t('My Projects'),
               icon: FolderGit2,
-              badge: `${projects.length}`,
+              badge: projects.length,
             },
             {
               view: 'cv-studio',
               label: t('My CV'),
               icon: FileText,
-              badge: `${cvVersions.length}`,
+              badge: cvVersions.length,
             },
             {
               view: 'applications',
               label: t('Applications'),
               icon: Briefcase,
-              badge: `${activeApplications.length}`,
+              badge: activeApplications.length,
             },
           ].map((shortcut) => (
-            <button
-              key={shortcut.view}
-              type="button"
-              onClick={() => onNavigate(shortcut.view)}
-              className="flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-3 text-start shadow-xs transition-colors hover:border-[var(--accent-primary)]"
-            >
-              <span
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]"
-                aria-hidden="true"
+            <StaggerItem key={shortcut.view}>
+              <button
+                type="button"
+                onClick={() => onNavigate(shortcut.view)}
+                className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-3 text-start shadow-xs transition-colors hover:border-[var(--accent-primary)]"
               >
-                <shortcut.icon className="h-4 w-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-semibold text-[var(--text-primary)]">
-                  {shortcut.label}
+                <span
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-surface)] text-[var(--color-primary-text)]"
+                  aria-hidden="true"
+                >
+                  <shortcut.icon className="h-4 w-4" />
                 </span>
-                <span className="block font-mono text-[10px] tabular-nums text-[var(--text-muted)]">
-                  {shortcut.badge}
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-semibold text-[var(--text-primary)]">
+                    {shortcut.label}
+                  </span>
+                  <span className="block font-mono text-[10px] tabular-nums text-[var(--text-muted)]">
+                    <AnimatedCounter value={shortcut.badge} duration={0.5} />
+                  </span>
                 </span>
-              </span>
-            </button>
+              </button>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </section>
 
       {/* A permanent, quiet route to the feedback form. It is not an
@@ -726,13 +737,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               {t('Career health, milestones, weekly review and today’s actions')}
             </div>
           </div>
-          <ChevronDown
-            className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform ${showDetails ? 'rotate-180' : ''}`}
-          />
+          <motion.div
+            className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </motion.div>
         </button>
 
-        {showDetails && (
-          <div className="space-y-5 border-t border-[var(--border-subtle)] p-5">
+        {/*
+          The detail opens rather than appearing. The panel is measured as it
+          opens, so the content below it slides down instead of jumping.
+        */}
+        <AnimatePresence initial={false}>
+          {showDetails && (
+            <motion.div
+              key="dashboard-more-detail"
+              initial={reduced ? false : { height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={reduced ? undefined : { height: 0, opacity: 0 }}
+              transition={
+                reduced
+                  ? { duration: 0 }
+                  : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }
+              }
+              className="overflow-hidden"
+            >
+              <div className="space-y-5 border-t border-[var(--border-subtle)] p-5">
             {/* Today's actions */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -966,8 +997,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 {t('Interview practice')}
               </button>
             </div>
-          </div>
-        )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

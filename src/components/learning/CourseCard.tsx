@@ -34,6 +34,7 @@ import {
   BookMarked,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { AnimatedProgress } from '../motion/AnimatedProgress';
 import { WhyWeRecommend } from '../ui/WhyWeRecommend';
 import { learningActionUrl } from '../../../shared/learningLinks';
 import {
@@ -462,12 +463,17 @@ export const CourseCard: React.FC<CourseCardProps> = ({
               <span>{t('Progress')}</span>
               <span>{item?.progressPercent ?? 0}%</span>
             </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
-              <div
-                className="h-full rounded-full bg-[var(--color-progress-strong)] transition-all"
-                style={{ width: `${item?.progressPercent ?? 0}%` }}
-              />
-            </div>
+            {/*
+              The bar grows to the real figure rather than jumping to it, so a
+              learner who moves the slider sees the course they are working on
+              respond to what they did.
+            */}
+            <AnimatedProgress
+              value={item?.progressPercent ?? 0}
+              label={`${t('Progress for')} ${course.title}`}
+              className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-progress-track)]"
+              fillClassName="bg-[var(--color-progress-strong)]"
+            />
             {isInProgress && onProgress && onProgressDraft && (
               <div className="mt-2 flex items-center gap-2">
                 <input

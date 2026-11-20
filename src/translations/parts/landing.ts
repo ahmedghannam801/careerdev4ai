@@ -306,4 +306,40 @@ export const landingAr: Record<string, string> = {
   'Hero 3D': 'Hero 3D',
   'Career Opportunities': 'Career Opportunities',
   'Professional Growth': 'Professional Growth',
+
+  // ---- The career journey, told as the visitor scrolls ------------------
+  'Your career journey': 'مسارك المهني',
+  'Seven stages from ambition to readiness.': 'سبع مراحل من الطموح إلى الجاهزية.',
+  'Scroll through the path your career actually takes inside CareerRa.':
+    'تابع المسار الذي يسلكه مسارك المهني فعليًا داخل CareerRa.',
+  'Discover Your Direction': 'اكتشف اتجاهك',
+  'Build Your Profile': 'ابنِ ملفك المهني',
+  'Identify Your Skills': 'حدّد مهاراتك',
+  'Follow Your Roadmap': 'اتبع خارطة طريقك',
+  'Build Real Experience': 'ابنِ خبرة حقيقية',
+  'Discover Opportunities': 'اكتشف الفرص',
+  'Become Career Ready': 'كن جاهزًا للمهنة',
+
+  // ---- The platform's own pipeline -------------------------------------
+  'The connected system': 'النظام المترابط',
+  'Eight stages the platform keeps in step.': 'ثماني مراحل تُبقيها المنصة على المسار نفسه.',
+  'Direction, skill gaps, roadmap, learning, projects, evidence, CV and opportunities — each one feeding the next.':
+    'الاتجاه، فجوات المهارات، خارطة الطريق، التعلّم، المشاريع، الإثباتات، السيرة الذاتية والفرص — كل واحدة تُغذّي التي تليها.',
+  'The order the platform performs its work in.': 'الترتيب الذي تعمل به المنصة.',
+  '8 Stages': '8 مراحل',
+
+  // ---- The product showcase ---------------------------------------------
+  'The product': 'المنتج',
+  'Explore Careerra': 'استكشف CareerRa',
+  'Five areas, one career.': 'خمسة مجالات، مسار مهني واحد.',
+  'Each of these is the real interface of the signed-in product, running the real engines behind it — not an illustration of what might be.':
+    'كل واحد منها هو واجهة المنتج الحقيقي بعد تسجيل الدخول، يعمل بالمحرّكات الحقيقية خلفه — وليس رسمًا لما قد يكون.',
+  'AI Career Assistant': 'المساعد المهني الذكي',
+  'Loading the product…': 'جارٍ تحميل المنتج…',
+  'The measurement of this document. The editor shows the advice it holds next to the section each piece of advice is about, so the two cannot drift apart: they come from the same report.':
+    'قياس هذه الوثيقة. يعرض المحرّر الملاحظات التي يحملها بجانب القسم الذي تتعلق به كل ملاحظة، فلا ينفصل الاثنان: يأتيان من التقرير نفسه.',
+  'Live vacancies from the boards the platform reads, with internships included, filtered by the kind of opening you are aiming at.':
+    'وظائف حقيقية من اللوحات التي تقرأها المنصة، وتشمل التدريبات، مصفّاة حسب نوع الوظيفة التي تستهدفه.',
+  'The preview starts with no recorded skills, so this is where every journey begins.':
+    'تبدأ المعاينة دون أي مهارة مسجّلة، فهنا تبدأ كل رحلة.',
 };

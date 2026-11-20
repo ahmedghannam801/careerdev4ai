@@ -30,6 +30,7 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CareerGoalRolePanel } from '../career/CareerGoalRolePanel';
 import { SUPPORT_EMAIL } from '../../../shared/contact.ts';
 import { CONTACT_PHONE } from '../../../shared/paymentAccounts.ts';
@@ -77,6 +78,14 @@ export const SettingsView: React.FC = () => {
   const { markOpened } = useFeedback();
 
   const [activeTab, setActiveTab] = useRouteParam<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface' | 'about'>('tab', SETTINGS_TABS, 'account');
+
+  /**
+   * Whether the visitor has asked for less movement.
+   *
+   * The tab highlight travels and the panels dissolve into one another; when
+   * motion is reduced they change instantly, which carries the same meaning.
+   */
+  const reduced = useReducedMotion() ?? false;
 
   // Change Password state
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -359,18 +368,54 @@ export const SettingsView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+              aria-current={isActive ? 'page' : undefined}
+              className={`relative px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
                 isActive
-                  ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] shadow-2xs'
+                  ? 'text-[var(--color-primary-text)]'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
+              {/*
+                The highlight travels between the tabs rather than jumping, so
+                the settings area reads as one place the reader is moving
+                around in.
+              */}
+              {isActive && (
+                <motion.span
+                  aria-hidden="true"
+                  layoutId="settings-tab-highlight"
+                  className="absolute inset-0 rounded-lg bg-[var(--accent-surface)] shadow-2xs"
+                  transition={
+                    reduced
+                      ? { duration: 0 }
+                      : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }
+                  }
+                />
+              )}
+              <Icon className="relative w-3.5 h-3.5" />
+              <span className="relative">{tab.label}</span>
             </button>
           );
         })}
       </div>
+
+      {/*
+        The panel changes by dissolving into the next one rather than being
+        swapped for it. The reader keeps their place in the page, and the
+        content below the settings area does not jump.
+      */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={activeTab}
+          initial={reduced ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduced ? undefined : { opacity: 0, y: -6 }}
+          transition={
+            reduced
+              ? { duration: 0 }
+              : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
+          }
+        >
 
       {/* TAB 1: ACCOUNT */}
       {activeTab === 'account' && (
@@ -984,6 +1029,8 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* MODAL: Change Password */}
       {changePasswordOpen && (

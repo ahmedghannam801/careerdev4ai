@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   BarChart3,
   Briefcase,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { useCareer } from '../../context/CareerContext';
+import { cardHover } from '../../lib/motion';
 
 /**
  * The capabilities section of the landing page.
@@ -21,10 +23,10 @@ import { useCareer } from '../../context/CareerContext';
  * product, and names the in-app area where it lives, so a visitor can map
  * the promise onto the real navigation once they are inside.
  *
- * Nothing here advertises a feature that does not exist. The platform has
- * no live vacancy feed — it does not invent one — so the entry that talks
- * about opportunities is about matching a CV against a job description the
- * candidate brings, which is what the product genuinely does.
+ * Nothing here advertises a feature that does not exist. The platform does
+ * read live vacancies — the boards it reads are named in the product's own
+ * jobs contract — and it also matches a CV against a job description the
+ * candidate brings, which is the other half of the same job of work.
  */
 
 interface Feature {
@@ -41,6 +43,7 @@ interface Feature {
 
 export const FeatureGrid: React.FC = () => {
   const { t } = useCareer();
+  const reduced = useReducedMotion() ?? false;
 
   // The copy is translated here, as literal translation calls, rather than
   // through a call over the data array. The localisation audit only reads
@@ -114,6 +117,14 @@ export const FeatureGrid: React.FC = () => {
       area: t('Applications'),
     },
     {
+      icon: Briefcase,
+      title: t('Live Jobs & Internships'),
+      body: t(
+        'Live vacancies from the boards the platform reads, with internships included, filtered by the kind of opening you are aiming at.'
+      ),
+      area: t('navJobs'),
+    },
+    {
       icon: MessageSquareQuote,
       title: t('Interview Preparation'),
       body: t(
@@ -138,12 +149,13 @@ export const FeatureGrid: React.FC = () => {
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map(({ icon: Icon, title, body, area, ai }) => (
-          <article
+          <motion.article
             key={title}
-            className="group flex h-full flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-card)]"
+            whileHover={cardHover(reduced)}
+            className="group flex h-full flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,box-shadow] duration-200 hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-card)]"
           >
             <span
-              className={`cp-icon-tile flex h-9 w-9 items-center justify-center rounded-xl ${
+              className={`cp-icon-tile flex h-9 w-9 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105 ${
                 ai
                   ? 'bg-[var(--color-ai-surface)] text-[var(--color-ai-text)]'
                   : 'bg-[var(--color-accent-surface)] text-[var(--color-primary-text)]'
@@ -165,7 +177,7 @@ export const FeatureGrid: React.FC = () => {
                 </span>
               )}
             </div>
-          </article>
+          </motion.article>
         ))}
       </div>
 

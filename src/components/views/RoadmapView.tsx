@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   BookOpen,
   Calendar,
+  Check,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -38,6 +39,9 @@ import {
 } from '../../../shared/learningResources';
 import { RoadmapTaskStatus } from '../../types/career';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
+import { MorphingMilestone } from '../motion/Morph';
+import type { MilestoneMorphState } from '../motion/Morph';
+import { Stagger, StaggerItem } from '../motion/Motion';
 import { CareerImage } from '../ui/CareerImage';
 import { TimeBreakdown } from '../ui/TimeBreakdown';
 import { RoadmapTreeView } from '../roadmap/RoadmapTreeView';
@@ -103,6 +107,26 @@ const STATUS_OPTIONS: RoadmapTaskStatus[] = [
   'skipped',
   'blocked',
 ];
+
+/**
+ * The shape a step of the plan takes, read from the step's own status.
+ *
+ * The shape IS the state: a closed square means the step is blocked, an open
+ * ring means it is waiting to be started, a disc that breathes means it is
+ * under way, and a closed disc means it is done. A skipped step is neither
+ * done nor blocked, so it keeps the open ring of a step that has not started
+ * — it is never dressed up as finished.
+ *
+ * Nothing here decides the state; it only draws the state the product is
+ * really in.
+ */
+const MILESTONE_STATE: Record<RoadmapTaskStatus, MilestoneMorphState> = {
+  not_started: 'available',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  skipped: 'available',
+  blocked: 'locked',
+};
 
 /**
  * The switcher between the two views of the plan.
@@ -1080,8 +1104,9 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* The stages, in order. */}
-      <div data-tour="roadmap-phases" className="relative space-y-4">
+      {/* The stages, in order. They arrive one after another instead of all at
+          once, so the plan reads as a sequence rather than as a wall. */}
+      <Stagger data-tour="roadmap-phases" gap={0.08} className="relative space-y-4">
         <div className="absolute start-[15px] top-3 bottom-3 hidden w-px bg-[var(--border-subtle)] sm:block" aria-hidden="true" />
         {stages.map((stage, index) => {
           const isOpen = expanded.includes(stage.id);
@@ -1093,26 +1118,27 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           const hasMore = visibleTasks.length > limited.length;
 
           return (
-            <React.Fragment key={stage.id}>
+            <StaggerItem key={stage.id} className="space-y-4">
               {index === projectsInsertIndex && projectsSection}
               <section
                 id={`stage-${stage.id}`}
                 className="relative scroll-mt-24 sm:ps-10"
               >
-              <div
-                className={`absolute start-0 top-5 hidden h-8 w-8 items-center justify-center rounded-full border sm:flex ${
-                  stage.complete
-                    ? 'border-[var(--color-success-strong)]/40 bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
-                    : isCurrent
-                      ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-                      : 'border-[var(--border-subtle)] bg-[var(--surface-main)] text-[var(--text-muted)]'
-                }`}
-              >
-                {stage.complete ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <span className="font-mono text-xs font-bold">{index + 1}</span>
-                )}
+              {/* The stage node, drawn as the shape of where the plan has got
+                  to: a closed disc for a stage that is done, a disc that
+                  breathes for the stage being worked on, and an open ring for
+                  the ones still ahead. The stage number stays inside it. */}
+              <div className="absolute start-0 top-5 hidden items-center justify-center sm:flex">
+                <MorphingMilestone
+                  state={stage.complete ? 'completed' : isCurrent ? 'in_progress' : 'available'}
+                  size={32}
+                >
+                  {stage.complete ? (
+                    <Check className="h-4 w-4" strokeWidth={3} />
+                  ) : (
+                    <span className="font-mono text-xs font-bold">{index + 1}</span>
+                  )}
+                </MorphingMilestone>
               </div>
 
               <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-xs">
@@ -1219,7 +1245,10 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                         {t('No actions match this filter in this stage.')}
                       </p>
                     ) : (
-                      <div className="space-y-2.5">
+                      <Stagger gap={0.06} className="space-y-2.5">
+                        {/* The actions of the stage, one after another. They
+                            cascade in when the stage is opened, so the list is
+                            read as a sequence of steps. */}
                         {limited.map((task, taskIndex) => {
                           const options = learningOptionsForTask(task);
                           const primary =
@@ -1234,276 +1263,285 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                               : t('Start Learning');
 
                           return (
-                            <article
-                              key={task.id}
-                              data-guide={taskIndex === 0 && index === 0 ? 'roadmap-task' : undefined}
-                              className={`rounded-2xl border bg-[var(--surface-main)] p-4 sm:p-5 ${
-                                isCompleted
-                                  ? 'border-[var(--color-success-strong)]/30'
-                                  : task.id === nextTask?.id
-                                    ? 'border-[var(--accent-primary)]/40 shadow-xs'
-                                    : 'border-[var(--border-subtle)]'
-                              }`}
-                            >
-                              {/* WHAT: the one thing this step is about. */}
-                              <div className="min-w-0">
-                                <div className={SECTION_LABEL_CLASS}>{t('LEARN THIS')}</div>
-                                <h3
-                                  className={`mt-1 text-base font-bold leading-snug ${
-                                    isCompleted
-                                      ? 'text-[var(--text-secondary)]'
-                                      : 'text-[var(--text-primary)]'
-                                  }`}
-                                >
-                                  {task.title}
-                                </h3>
-                                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                  {task.skillName && (
-                                    <span className="rounded-full bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-primary-text)]">
-                                      {task.skillName}
-                                    </span>
-                                  )}
-                                  {task.priority && task.priority !== 'sufficient' && (
-                                    <span
-                                      className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                                        PRIORITY_CLASS[task.priority] ?? PRIORITY_CLASS.low
-                                      }`}
-                                    >
-                                      {t(task.priority)}
-                                    </span>
-                                  )}
-                                  {isCompleted && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success-surface)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-success-strong)]">
-                                      <CheckCircle2 className="h-2.5 w-2.5" />
-                                      {t('completed')}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* WHY: one concise reason tied to the target role. */}
-                              {task.rationale && (
-                                <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
-                                  <div className={SECTION_LABEL_CLASS}>{t('WHY THIS MATTERS')}</div>
-                                  <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
-                                    {task.rationale}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* START: the primary action opens the real source. */}
-                              {primary ? (
-                                <div className="mt-3 rounded-xl border border-[var(--border-subtle)] p-3">
-                                  <div className={`${SECTION_LABEL_CLASS} flex items-center gap-1`}>
-                                    <BookOpen className="h-3 w-3" />
-                                    {t('RESOURCE')}
-                                  </div>
-                                  <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-semibold leading-snug text-[var(--text-primary)]">
-                                        {primary.course.title}
-                                      </p>
-                                      <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--text-muted)]">
-                                        <span>{primary.course.provider}</span>
-                                        {primary.course.language && (
-                                          <span>· {t(primary.course.language)}</span>
-                                        )}
-                                        {primary.course.format && (
-                                          <span>
-                                            ·{' '}
-                                            {t(
-                                              primary.course.format
-                                                .replace('_', ' ')
-                                                .replace(/^\w/, (letter) => letter.toUpperCase())
-                                            )}
-                                          </span>
-                                        )}
-                                        {primary.course.durationHours ? (
-                                          <span>· {primary.course.durationHours}h</span>
-                                        ) : null}
-                                        {primary.rec && (
-                                          <span className="rounded-full bg-[var(--accent-primary)]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--color-primary-text)]">
-                                            {Math.round(primary.rec.score)}% {t('match')}
-                                          </span>
-                                        )}
-                                      </p>
-                                    </div>
-                                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                      <a
-                                        href={primary.course.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={() => {
-                                          void startLearningCourse(
-                                            primary.course.id,
-                                            primary.rec?.reason
-                                          );
-                                          if (!isCompleted) {
-                                            updateTaskStatus(task.id, 'in_progress');
-                                          }
-                                        }}
-                                        className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[var(--accent-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-xs transition-opacity hover:opacity-90"
-                                      >
-                                        {ctaLabel}
-                                        <ArrowUpRight className="h-4 w-4" />
-                                      </a>
-                                      {!item && (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            void saveLearningCourse(
-                                              primary.course.id,
-                                              primary.rec?.reason
-                                            )
-                                          }
-                                          className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                                        >
-                                          {t('Save')}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {secondary.length > 0 && (
-                                    <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
-                                      <div className="text-[10px] text-[var(--text-muted)]">
-                                        {t('More resources')}
-                                      </div>
-                                      <div className="mt-1 flex flex-col gap-1">
-                                        {secondary.map(({ course }) =>
-                                          isSafeExternalUrl(course.url) ? (
-                                            <a
-                                              key={course.id}
-                                              href={course.url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="inline-flex min-w-0 items-center gap-1 text-[11px] text-[var(--color-primary-text)] hover:underline"
-                                            >
-                                              <ExternalLink className="h-3 w-3 shrink-0" />
-                                              <span className="truncate">{course.title}</span>
-                                              <span className="shrink-0 text-[var(--text-muted)]">
-                                                · {course.provider}
-                                              </span>
-                                            </a>
-                                          ) : (
-                                            <span
-                                              key={course.id}
-                                              className="text-[11px] text-[var(--text-muted)]"
-                                            >
-                                              {course.title} · {course.provider}
-                                            </span>
-                                          )
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="mt-3 rounded-xl border border-dashed border-[var(--border-subtle)] p-3 text-[11px] text-[var(--text-muted)]">
-                                  {t('No verified resource link is attached to this step yet.')}
-                                </div>
-                              )}
-
-                              {/* OUTCOME: what the user will be able to do. */}
-                              {task.description && (
-                                <div className="mt-3">
-                                  <div className={SECTION_LABEL_CLASS}>{t('OUTCOME')}</div>
-                                  <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
-                                    {task.description}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Secondary details and a subordinate status control. */}
-                              <div className="mt-4 flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-3 sm:flex-row sm:items-center sm:justify-between">
-                                <details className="group min-w-0">
-                                  <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] [&::-webkit-details-marker]:hidden">
-                                    <ChevronDown className="h-3 w-3 shrink-0 transition-transform group-open:rotate-180" />
-                                    <span>
-                                      {t('Details')} · {task.estimatedHours}h
-                                      {task.difficulty ? ` · ${t(task.difficulty)}` : ''}
-                                    </span>
-                                  </summary>
-                                  <div className="mt-2 space-y-1.5 text-[11px] text-[var(--text-secondary)]">
-                                    {task.deadline && (
-                                      <p className="inline-flex items-center gap-1.5">
-                                        <Calendar className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />
-                                        {t('Due')} {task.deadline}
-                                      </p>
-                                    )}
-                                    {task.prerequisites && task.prerequisites.length > 0 && (
-                                      <p className="flex items-start gap-1.5">
-                                        <GitBranch className="mt-0.5 h-3 w-3 shrink-0 text-[var(--text-muted)]" />
-                                        <span>
-                                          <span className="font-semibold">
-                                            {t('Prerequisites')}:{' '}
-                                          </span>
-                                          {task.prerequisites.join(' → ')}
-                                        </span>
-                                      </p>
-                                    )}
-                                    {task.projectTitles && task.projectTitles.length > 0 && (
-                                      <div className="flex items-start gap-1.5">
-                                        <FolderGit2 className="mt-0.5 h-3 w-3 shrink-0 text-[var(--text-muted)]" />
-                                        <span>
-                                          <span className="font-semibold">
-                                            {t('Recommended projects')}:{' '}
-                                          </span>
-                                          {task.projectTitles.join(' · ')}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </details>
-
-                                <div className="flex shrink-0 items-center gap-2">
-                                  <label
-                                    className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]"
-                                    htmlFor={`status-${task.id}`}
-                                  >
-                                    {t('Status')}
-                                  </label>
-                                  <select
-                                    id={`status-${task.id}`}
-                                    data-tour={taskIndex === 0 && index === 0 ? "roadmap-task-checkbox" : undefined}
-                                    value={task.status}
-                                    onChange={(event) => {
-                                      const nextStatus = event.target.value as RoadmapTaskStatus;
-                                      updateTaskStatus(task.id, nextStatus);
-                                      // Confirm the change. A status the
-                                      // candidate set has to be visibly
-                                      // accepted, and the step title is what
-                                      // makes the confirmation specific
-                                      // rather than a generic "saved".
-                                      showToast({
-                                        variant: nextStatus === 'completed' ? 'success' : 'info',
-                                        title:
-                                          nextStatus === 'completed'
-                                            ? t('Step completed.')
-                                            : t('Step updated.'),
-                                        description: task.title,
-                                      });
-                                    }}
-                                    className={`rounded-lg border px-2 py-1 text-[11px] font-medium capitalize ${
-                                      task.status === 'completed'
-                                        ? 'border-[var(--color-success-strong)]/30 bg-[var(--color-success-surface)] text-[var(--color-success-strong)]'
-                                        : task.status === 'in_progress'
-                                          ? 'border-[var(--accent-primary)]/40 bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
-                                          : 'border-[var(--border-subtle)] bg-[var(--surface-main)] text-[var(--text-secondary)]'
+                            <StaggerItem key={task.id}>
+                              <article
+                                data-guide={taskIndex === 0 && index === 0 ? 'roadmap-task' : undefined}
+                                className={`rounded-2xl border bg-[var(--surface-main)] p-4 sm:p-5 ${
+                                  isCompleted
+                                    ? 'border-[var(--color-success-strong)]/30'
+                                    : task.id === nextTask?.id
+                                      ? 'border-[var(--accent-primary)]/40 shadow-xs'
+                                      : 'border-[var(--border-subtle)]'
+                                }`}
+                              >
+                                {/* WHAT: the one thing this step is about. */}
+                                <div className="min-w-0">
+                                  <div className={SECTION_LABEL_CLASS}>{t('LEARN THIS')}</div>
+                                  <h3
+                                    className={`mt-1 text-base font-bold leading-snug ${
+                                      isCompleted
+                                        ? 'text-[var(--text-secondary)]'
+                                        : 'text-[var(--text-primary)]'
                                     }`}
                                   >
-                                    {STATUS_OPTIONS.map((status) => (
-                                      <option key={status} value={status}>
-                                        {t(status.replace('_', ' '))}
-                                      </option>
-                                    ))}
-                                  </select>
+                                    {task.title}
+                                  </h3>
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                    {task.skillName && (
+                                      <span className="rounded-full bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-primary-text)]">
+                                        {task.skillName}
+                                      </span>
+                                    )}
+                                    {task.priority && task.priority !== 'sufficient' && (
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                                          PRIORITY_CLASS[task.priority] ?? PRIORITY_CLASS.low
+                                        }`}
+                                      >
+                                        {t(task.priority)}
+                                      </span>
+                                    )}
+                                    {isCompleted && (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success-surface)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--color-success-strong)]">
+                                        <CheckCircle2 className="h-2.5 w-2.5" />
+                                        {t('completed')}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </article>
+
+                                {/* WHY: one concise reason tied to the target role. */}
+                                {task.rationale && (
+                                  <div className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3">
+                                    <div className={SECTION_LABEL_CLASS}>{t('WHY THIS MATTERS')}</div>
+                                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                                      {task.rationale}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* START: the primary action opens the real source. */}
+                                {primary ? (
+                                  <div className="mt-3 rounded-xl border border-[var(--border-subtle)] p-3">
+                                    <div className={`${SECTION_LABEL_CLASS} flex items-center gap-1`}>
+                                      <BookOpen className="h-3 w-3" />
+                                      {t('RESOURCE')}
+                                    </div>
+                                    <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold leading-snug text-[var(--text-primary)]">
+                                          {primary.course.title}
+                                        </p>
+                                        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[var(--text-muted)]">
+                                          <span>{primary.course.provider}</span>
+                                          {primary.course.language && (
+                                            <span>· {t(primary.course.language)}</span>
+                                          )}
+                                          {primary.course.format && (
+                                            <span>
+                                              ·{' '}
+                                              {t(
+                                                primary.course.format
+                                                  .replace('_', ' ')
+                                                  .replace(/^\w/, (letter) => letter.toUpperCase())
+                                              )}
+                                            </span>
+                                          )}
+                                          {primary.course.durationHours ? (
+                                            <span>· {primary.course.durationHours}h</span>
+                                          ) : null}
+                                          {primary.rec && (
+                                            <span className="rounded-full bg-[var(--accent-primary)]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--color-primary-text)]">
+                                              {Math.round(primary.rec.score)}% {t('match')}
+                                            </span>
+                                          )}
+                                        </p>
+                                      </div>
+                                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                        <a
+                                          href={primary.course.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={() => {
+                                            void startLearningCourse(
+                                              primary.course.id,
+                                              primary.rec?.reason
+                                            );
+                                            if (!isCompleted) {
+                                              updateTaskStatus(task.id, 'in_progress');
+                                            }
+                                          }}
+                                          className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[var(--accent-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-on-primary)] shadow-xs transition-opacity hover:opacity-90"
+                                        >
+                                          {ctaLabel}
+                                          <ArrowUpRight className="h-4 w-4" />
+                                        </a>
+                                        {!item && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              void saveLearningCourse(
+                                                primary.course.id,
+                                                primary.rec?.reason
+                                              )
+                                            }
+                                            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                          >
+                                            {t('Save')}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {secondary.length > 0 && (
+                                      <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
+                                        <div className="text-[10px] text-[var(--text-muted)]">
+                                          {t('More resources')}
+                                        </div>
+                                        <div className="mt-1 flex flex-col gap-1">
+                                          {secondary.map(({ course }) =>
+                                            isSafeExternalUrl(course.url) ? (
+                                              <a
+                                                key={course.id}
+                                                href={course.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex min-w-0 items-center gap-1 text-[11px] text-[var(--color-primary-text)] hover:underline"
+                                              >
+                                                <ExternalLink className="h-3 w-3 shrink-0" />
+                                                <span className="truncate">{course.title}</span>
+                                                <span className="shrink-0 text-[var(--text-muted)]">
+                                                  · {course.provider}
+                                                </span>
+                                              </a>
+                                            ) : (
+                                              <span
+                                                key={course.id}
+                                                className="text-[11px] text-[var(--text-muted)]"
+                                              >
+                                                {course.title} · {course.provider}
+                                              </span>
+                                            )
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="mt-3 rounded-xl border border-dashed border-[var(--border-subtle)] p-3 text-[11px] text-[var(--text-muted)]">
+                                    {t('No verified resource link is attached to this step yet.')}
+                                  </div>
+                                )}
+
+                                {/* OUTCOME: what the user will be able to do. */}
+                                {task.description && (
+                                  <div className="mt-3">
+                                    <div className={SECTION_LABEL_CLASS}>{t('OUTCOME')}</div>
+                                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+                                      {task.description}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Secondary details and a subordinate status control. */}
+                                <div className="mt-4 flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-3 sm:flex-row sm:items-center sm:justify-between">
+                                  <details className="group min-w-0">
+                                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] [&::-webkit-details-marker]:hidden">
+                                      <ChevronDown className="h-3 w-3 shrink-0 transition-transform group-open:rotate-180" />
+                                      <span>
+                                        {t('Details')} · {task.estimatedHours}h
+                                        {task.difficulty ? ` · ${t(task.difficulty)}` : ''}
+                                      </span>
+                                    </summary>
+                                    <div className="mt-2 space-y-1.5 text-[11px] text-[var(--text-secondary)]">
+                                      {task.deadline && (
+                                        <p className="inline-flex items-center gap-1.5">
+                                          <Calendar className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />
+                                          {t('Due')} {task.deadline}
+                                        </p>
+                                      )}
+                                      {task.prerequisites && task.prerequisites.length > 0 && (
+                                        <p className="flex items-start gap-1.5">
+                                          <GitBranch className="mt-0.5 h-3 w-3 shrink-0 text-[var(--text-muted)]" />
+                                          <span>
+                                            <span className="font-semibold">
+                                              {t('Prerequisites')}:{' '}
+                                            </span>
+                                            {task.prerequisites.join(' → ')}
+                                          </span>
+                                        </p>
+                                      )}
+                                      {task.projectTitles && task.projectTitles.length > 0 && (
+                                        <div className="flex items-start gap-1.5">
+                                          <FolderGit2 className="mt-0.5 h-3 w-3 shrink-0 text-[var(--text-muted)]" />
+                                          <span>
+                                            <span className="font-semibold">
+                                              {t('Recommended projects')}:{' '}
+                                            </span>
+                                            {task.projectTitles.join(' · ')}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </details>
+
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <label
+                                      className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                                      htmlFor={`status-${task.id}`}
+                                    >
+                                      {t('Status')}
+                                    </label>
+                                    {/* The state of this step, drawn as a shape.
+                                        The node is the state: a closed square for
+                                        a blocked step, an open ring for one that
+                                        is waiting, a disc that breathes for one
+                                        under way, and a filled disc for one that
+                                        is done. The word beside it is there for
+                                        anyone who cannot see the shape, and it
+                                        is the same word the status menu shows. */}
+                                    <MorphingMilestone state={MILESTONE_STATE[task.status]} size={18}>
+                                      {task.status === 'completed' ? (
+                                        <Check className="h-3 w-3" strokeWidth={3} />
+                                      ) : null}
+                                    </MorphingMilestone>
+                                    <span className="sr-only">{t(task.status.replace('_', ' '))}</span>
+                                    <select
+                                      id={`status-${task.id}`}
+                                      data-tour={taskIndex === 0 && index === 0 ? "roadmap-task-checkbox" : undefined}
+                                      value={task.status}
+                                      onChange={(event) => {
+                                        const nextStatus = event.target.value as RoadmapTaskStatus;
+                                        updateTaskStatus(task.id, nextStatus);
+                                        // Confirm the change. A status the
+                                        // candidate set has to be visibly
+                                        // accepted, and the step title is what
+                                        // makes the confirmation specific
+                                        // rather than a generic "saved".
+                                        showToast({
+                                          variant: nextStatus === 'completed' ? 'success' : 'info',
+                                          title:
+                                            nextStatus === 'completed'
+                                              ? t('Step completed.')
+                                              : t('Step updated.'),
+                                          description: task.title,
+                                        });
+                                      }}
+                                      className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2 py-1 text-[11px] font-medium capitalize text-[var(--text-secondary)]"
+                                    >
+                                      {STATUS_OPTIONS.map((status) => (
+                                        <option key={status} value={status}>
+                                          {t(status.replace('_', ' '))}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              </article>
+                            </StaggerItem>
                           );
                         })}
-                      </div>
+                      </Stagger>
                     )}
 
                     {hasMore && (
@@ -1660,7 +1698,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                 )}
               </div>
               </section>
-            </React.Fragment>
+            </StaggerItem>
           );
         })}
 
@@ -1714,7 +1752,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
             </div>
           </div>
         </section>
-      </div>
+      </Stagger>
       </>
       )}
     </div>

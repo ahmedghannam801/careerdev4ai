@@ -37,7 +37,7 @@ This document establishes the authoritative architecture, product guidelines, en
 
 - `src/`: Client application code.
   - `components/views/`: Primary views (`LandingView`, `DashboardView`, `CVStudioView`, `SkillAssessmentView`, etc.).
-  - `components/landing/`: Landing page modular sections (`HeroVisual3D`, `ProductPreview`, `FeatureGrid`, etc.).
+  - `components/landing/`: Landing page modular sections (`HeroEcosystem`, `JourneyScrollStory`, `ProductShowcase`, `ProductPreview`, `FeatureGrid`, etc.).
   - `context/`: `CareerContext.tsx` authoritative single source of truth for user profile, roadmaps, goals, and localization.
   - `translations/`: Modular translation dictionary parts (`landing.ts`, `skills.ts`, `jobs.ts`, etc.).
 - `server/`: Server API handlers, database access layers (`server/db/`), queue transport, and AI endpoints.

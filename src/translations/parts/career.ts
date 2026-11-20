@@ -121,6 +121,8 @@ export const careerAr: Record<string, string> = {
   'Terms': 'الشروط',
   'English / العربية': 'English / العربية',
   'CareerRa is analyzing your graph': 'يحلّل CareerRa رسمك البياني',
+  'Sending…': 'جارٍ الإرسال…',
+  'Sent': 'تم الإرسال',
   "Today's Next Step": 'خطوتك التالية اليوم',
   'No records yet': 'لا توجد سجلات بعد',
   'All': 'الكل',

@@ -29,6 +29,10 @@ import { generateRoadmapPlan } from '../shared/roadmapGenerator.ts';
 import { computeSkillGaps, toRoleSkillRequirements } from '../shared/skillGap.ts';
 import { SUPPORT_EMAIL, OPERATOR_LINKEDIN_URL, PUBLIC_PATHS } from '../shared/contact.ts';
 import { AR_STRINGS } from '../src/translations/sourceStrings.ts';
+import { translations } from '../src/translations/index.ts';
+
+/** The product's own names, in Arabic. The other half of the catalogue. */
+const LEGACY_ARABIC = (translations.ar ?? {}) as Record<string, string>;
 
 const SRC = join(import.meta.dirname, '..', 'src');
 
@@ -196,12 +200,22 @@ describe('the new public copy', () => {
   it('is fully translated, so the Arabic interface has no English left behind', () => {
     // Every literal translation call in the new public components has to
     // resolve to an Arabic entry.
+    //
+    // There are two Arabic catalogues. The source-string catalogue holds the
+    // English sentence and its Arabic beside it; the legacy catalogue holds
+    // the product's own names — the navigation labels that have been in the
+    // product since before the source-string catalogue existed. A component
+    // may use either, and what matters is that the call resolves to Arabic
+    // rather than falling back to the English it was given.
     const files = [
       join(SRC, 'components', 'landing', 'ProductPreview.tsx'),
       join(SRC, 'components', 'landing', 'FeatureGrid.tsx'),
       join(SRC, 'components', 'landing', 'TrustSection.tsx'),
       join(SRC, 'components', 'landing', 'FaqSection.tsx'),
       join(SRC, 'components', 'landing', 'ContactSection.tsx'),
+      join(SRC, 'components', 'landing', 'HeroEcosystem.tsx'),
+      join(SRC, 'components', 'landing', 'JourneyScrollStory.tsx'),
+      join(SRC, 'components', 'landing', 'ProductShowcase.tsx'),
       join(SRC, 'components', 'career', 'RecentActivityPanel.tsx'),
       join(SRC, 'components', 'copilot', 'EvidencePanel.tsx'),
     ];
@@ -212,9 +226,15 @@ describe('the new public copy', () => {
       for (const match of text.matchAll(pattern)) {
         const source = match[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
         if (!source) continue;
+        const arabic = AR_STRINGS[source] ?? LEGACY_ARABIC[source];
         assert.ok(
-          AR_STRINGS[source],
+          arabic,
           `"${source}" has no Arabic translation (in ${file.split(/[\\/]/).slice(-2).join('/')})`
+        );
+        assert.notEqual(
+          arabic.trim(),
+          '',
+          `"${source}" has an empty Arabic translation (in ${file.split(/[\\/]/).slice(-2).join('/')})`
         );
       }
     }

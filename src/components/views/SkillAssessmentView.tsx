@@ -4,7 +4,6 @@ import {
   XCircle,
   Award,
   Clock,
-  ArrowRight,
   RotateCcw,
   BookOpen,
   ShieldCheck,
@@ -27,6 +26,13 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { useToast } from '../toast/ToastProvider';
 import { CareerImage } from '../ui/CareerImage';
+import {
+  MorphBox,
+  MorphingButton,
+  MorphingMilestone,
+  type MorphButtonState,
+} from '../motion/Morph';
+import { Stagger, StaggerItem } from '../motion/Motion';
 import { getSpecificIndustryVisual } from '../../lib/imageAssets';
 import { hasPracticalEvidence } from '../../../shared/skillEvidence';
 import {
@@ -934,6 +940,38 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
     });
     const scorePct = Math.round((score / totalQ) * 100);
 
+    /**
+     * The state of the primary action, read from the product.
+     *
+     * The question is open, the result is being written, the write really
+     * landed, or the write really failed. There is no timer anywhere near
+     * this: a control that shows "saved" shows it because the skill profile
+     * holds the result, and one that shows the danger colour shows it
+     * because the write did not happen.
+     */
+    const primaryActionState: MorphButtonState = !isFinished
+      ? 'idle'
+      : syncState === 'saving'
+        ? 'loading'
+        : syncState === 'saved'
+          ? 'success'
+          : syncState === 'failed'
+            ? 'error'
+            : 'idle';
+
+    /**
+     * The state of one question in the progress row.
+     *
+     * A question the candidate has answered is done. The question in front of
+     * them is under way. Every other question is still open. This is read
+     * from the answers that were actually given.
+     */
+    const milestoneStateFor = (index: number): 'completed' | 'in_progress' | 'available' => {
+      if (selectedAnswers[index] !== undefined) return 'completed';
+      if (index === currentQuestionIndex) return 'in_progress';
+      return 'available';
+    };
+
     return (
       <div className="mx-auto max-w-4xl space-y-6 pb-12">
         {/* Top navigation & banner */}
@@ -1049,13 +1087,29 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
         {!isFinished ? (
           /* Question card */
           <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm sm:p-8">
-            <div className="flex items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
               <span>
                 {selectedCategory.title} · {selectedCategory.level}
               </span>
-              <span>
-                {answeredCount} of {totalQ} {t('answered')}
-              </span>
+              {/* The progress of the check, drawn as shapes.
+                  One node per question: a closed disc where the candidate has
+                  answered, a disc that breathes on the question in front of
+                  them, an open ring for every question still to come. The
+                  number beside them is the real one — the answers given over
+                  the questions asked — so the row and the count can never
+                  disagree. */}
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1" aria-hidden="true">
+                  {selectedCategory.questions.map((q, idx) => (
+                    <MorphingMilestone key={q.id} size={14} state={milestoneStateFor(idx)}>
+                      <span className="text-[9px] font-bold leading-none">{idx + 1}</span>
+                    </MorphingMilestone>
+                  ))}
+                </span>
+                <span>
+                  {answeredCount} of {totalQ} {t('answered')}
+                </span>
+              </div>
             </div>
 
             <h3 className="mt-4 text-base font-bold text-[var(--text-primary)] sm:text-lg">
@@ -1077,15 +1131,34 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                         : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--text-primary)]'
                     }`}
                   >
-                    <span
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold ${
-                        isSelected
-                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-on-primary)]'
-                          : 'border-[var(--color-border)] text-[var(--text-muted)]'
-                      }`}
+                    {/* The mark that says which option is chosen.
+                        It is an open rounded square while the option is
+                        open, and a filled circle once it is chosen, so the
+                        choice is carried by the shape of the mark and not
+                        only by the colour of a border. It says nothing
+                        about whether the answer is right: that is only
+                        known once the check is finished. */}
+                    <MorphBox
+                      hidden={false}
+                      shape={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: isSelected ? 10 : 7,
+                        backgroundColor: isSelected ? 'var(--color-primary)' : 'transparent',
+                        borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                        borderWidth: 1,
+                      }}
                     >
-                      {String.fromCharCode(65 + oIdx)}
-                    </span>
+                      <span
+                        className={`text-[11px] font-bold leading-none transition-colors ${
+                          isSelected
+                            ? 'text-[var(--color-on-primary)]'
+                            : 'text-[var(--text-muted)]'
+                        }`}
+                      >
+                        {String.fromCharCode(65 + oIdx)}
+                      </span>
+                    </MorphBox>
                     <span className="flex-1">{opt}</span>
                   </button>
                 );
@@ -1103,22 +1176,28 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                 {t('Previous')}
               </button>
 
-              <button
-                type="button"
+              {/* The primary action.
+                  Its state is the state of the assessment itself: the
+                  question is open, and the control is simply waiting. It
+                  never says "saved" or "failed" on its own — those belong
+                  to the write, and the write reports them where it
+                  happens. */}
+              <MorphingButton
+                state={primaryActionState}
+                label={currentQuestionIndex === totalQ - 1 ? t('Finish & Score') : t('Next Question')}
                 onClick={handleNext}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-5 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-sm transition-transform hover:bg-[var(--color-primary-hover)] active:scale-95"
-              >
-                <span>
-                  {currentQuestionIndex === totalQ - 1 ? t('Finish & Score') : t('Next Question')}
-                </span>
-                <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
-              </button>
+              />
             </div>
           </div>
         ) : (
-          /* Assessment Results */
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm sm:p-8">
+          /* Assessment Results
+             The result arrives as two blocks that settle into place one
+             after the other. The score itself is not animated: it is the
+             number the check computed, and a number that counted up to
+             itself would be telling the candidate something the interface
+             does not know yet. */
+          <Stagger className="space-y-6" gap={0.08}>
+            <StaggerItem className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm sm:p-8">
               <div className="flex flex-col items-center text-center">
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--color-accent-surface)] text-[var(--color-primary-text)]">
                   <Award className="h-7 w-7" />
@@ -1234,22 +1313,24 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
 
                 {/* Actions */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                  {/* The secondary control. The save already happened; this
+                  {/* The save, as a shape.
+                      The save already happened on its own; this control
                       re-runs it when the first write failed or when the
-                      candidate wants to be certain. */}
-                  <button
-                    type="button"
-                    disabled={syncState === 'saving'}
+                      candidate wants to be certain. It reports the state of
+                      that write: a ring turning while it runs, a disc with a
+                      tick once the profile really holds the result, and the
+                      same disc in the danger colour when the write failed.
+                      Nothing here is on a timer — every state is the one the
+                      product is actually in. */}
+                  <MorphingButton
+                    state={primaryActionState}
+                    variant="secondary"
+                    label={t('Re-sync skill profile')}
+                    loadingLabel={t('Saving to your skill profile…')}
+                    successLabel={t('Saved to your skill profile')}
+                    errorLabel={t('The assessment could not be saved')}
                     onClick={handleApplyToSkillProfile}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-2.5 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--color-border-strong)] hover:text-[var(--text-primary)] disabled:opacity-60"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    <span>
-                      {syncState === 'failed'
-                        ? t('Re-sync skill profile')
-                        : t('Re-sync skill profile')}
-                    </span>
-                  </button>
+                  />
 
                   <button
                     type="button"
@@ -1282,10 +1363,10 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                   </p>
                 )}
               </div>
-            </div>
+            </StaggerItem>
 
             {/* Answer breakdown */}
-            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+            <StaggerItem className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
               <h4 className="text-sm font-bold text-[var(--text-primary)]">
                 {t('Detailed Question Breakdown & Explanations')}
               </h4>
@@ -1330,8 +1411,8 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                   );
                 })}
               </div>
-            </div>
-          </div>
+            </StaggerItem>
+          </Stagger>
         )}
       </div>
     );

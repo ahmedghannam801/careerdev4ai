@@ -4,6 +4,7 @@ import { X, Send, User, ArrowRight, Lightbulb } from 'lucide-react';
 import { AiMascot } from './AiMascot';
 import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
+import { MorphingButton, MorphingOrb } from '../motion/Morph';
 import { AiResponse } from './AiResponse';
 import { EvidencePanel } from './EvidencePanel';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
@@ -14,11 +15,31 @@ interface CopilotDrawerProps {
   onNavigate: (view: string) => void;
 }
 
+/** How long the confirmation of a sent message stays on the button. */
+const SENT_FLASH_MS = 1600;
+
 export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, onNavigate }) => {
   const { copilotMessages, sendCopilotMessage, isCopilotTyping, targetRole, analysis, settings, identity, t} = useCareer();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion() ?? false;
+
+  /**
+   * Whether the last message has just gone out.
+   *
+   * This is presentation only. The message has genuinely been handed to the
+   * assistant by the time this is set — it is set after `sendCopilotMessage`
+   * has run — so the tick on the button is a report of something that
+   * happened, not a claim that something is about to.
+   */
+  const [justSent, setJustSent] = useState(false);
+  const sentTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (sentTimerRef.current !== null) window.clearTimeout(sentTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -30,8 +51,21 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
     const q = (textToSend || input).trim();
     if (!q || isCopilotTyping) return;
     setInput('');
+    setJustSent(false);
     await sendCopilotMessage(q);
+    setJustSent(true);
+    if (sentTimerRef.current !== null) window.clearTimeout(sentTimerRef.current);
+    sentTimerRef.current = window.setTimeout(() => setJustSent(false), SENT_FLASH_MS);
   };
+
+  /**
+   * The state of the send button.
+   *
+   * It is read from what the assistant is really doing: the button is working
+   * while the assistant is typing, and it reports that the message went out
+   * for the moment after it did.
+   */
+  const sendState = isCopilotTyping ? 'loading' : justSent ? 'success' : 'idle';
 
   return (
     <AnimatePresence>
@@ -54,7 +88,18 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           </div>
           <div>
             <div className="text-sm font-semibold text-[var(--text-primary)]">{t('CareerRa Copilot')}</div>
-            <div className="text-xs text-[var(--text-secondary)]">{t('Advisor for')} {targetRole?.title ?? ''}</div>
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+              {/*
+                The presence of the assistant, as a shape. It is a quiet mark
+                when the assistant is idle and opens into a lit disc while it
+                is working, so the drawer says who is thinking without saying
+                anything in words.
+              */}
+              <MorphingOrb state={isCopilotTyping ? 'thinking' : 'idle'} size={12} />
+              <span className="truncate">
+                {t('Advisor for')} {targetRole?.title ?? ''}
+              </span>
+            </div>
           </div>
         </div>
         <button
@@ -152,10 +197,19 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
         ))}
 
         {isCopilotTyping && (
-          <div className="flex gap-3 items-center text-xs text-[var(--text-muted)]">
-            <div className="w-7 h-7 shrink-0 flex items-center justify-center">
-              <AiMascot className="h-7 w-5 object-contain" state="thinking" alt="" />
-            </div>
+          <motion.div
+            className="flex gap-3 items-center text-xs text-[var(--text-muted)]"
+            initial={reduced ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduced ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {/*
+              The assistant, while it is working. It opens out of the small
+              mark in the header into a lit disc with a travelling edge, which
+              is what makes the drawer feel like it is answering rather than
+              like it has stalled.
+            */}
+            <MorphingOrb state="thinking" size={28} className="w-7 h-7" />
             <span className="flex items-center gap-2">
               <span aria-live="polite">{t('CareerRa is analyzing your graph')}</span>
               <span className="flex items-center gap-0.5" aria-hidden="true">
@@ -174,7 +228,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
                 ))}
               </span>
             </span>
-          </div>
+          </motion.div>
         )}
         <div ref={messagesEndRef} />
         </motion.div>
@@ -222,13 +276,18 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
             className="flex-1 bg-[var(--surface-secondary)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)]"
             disabled={isCopilotTyping}
           />
-          <button
+          <MorphingButton
             type="submit"
+            iconOnly
+            icon={<Send className="h-4 w-4" />}
+            state={sendState}
+            label={t('Send')}
+            loadingLabel={t('Sending…')}
+            successLabel={t('Sent')}
+            variant="primary"
+            className="rounded-lg"
             disabled={!input.trim() || isCopilotTyping}
-            className="p-2 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] disabled:opacity-50 transition-colors"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+          />
         </form>
       </div>
         </motion.div>
