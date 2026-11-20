@@ -142,6 +142,71 @@ async function preflightAiCredential() {
   } catch {
     console.log('[pages-secrets] the Gemini credential works.');
   }
+
+  await checkLiveCredential(key);
+}
+
+/**
+ * Checks that the credential can still mint a Live session credential.
+ *
+ * Reading the models above proves the key answers ordinary requests. It does
+ * NOT prove the key can start a live interview: minting a Live credential
+ * goes through the token service, which requires the service account bound to
+ * the key to be active. A key can therefore serve every text feature and
+ * still be refused by the Live API with
+ * `ACCOUNT_STATE_INVALID — the bound service account is deleted or disabled`.
+ *
+ * That is a warning rather than a block: the credential is usable for
+ * everything else, and refusing to upload it would be worse than uploading it
+ * with this one feature clearly reported as broken.
+ *
+ * The token is requested, checked and thrown away. It is never printed and
+ * never used.
+ */
+async function checkLiveCredential(key) {
+  const endpoint = 'https://generativelanguage.googleapis.com/v1beta/auth_tokens';
+  const inMinutes = (minutes) => new Date(Date.now() + minutes * 60 * 1000).toISOString();
+
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uses: 1,
+        expireTime: inMinutes(30),
+        newSessionExpireTime: inMinutes(10),
+        liveConnectConstraints: {
+          model: 'models/gemini-3.8-live',
+          config: { responseModalities: ['AUDIO'] },
+        },
+      }),
+    });
+  } catch (error) {
+    console.warn(
+      `[pages-secrets] WARNING: the live interviewer could not be checked (${error?.message ?? error}).`
+    );
+    return;
+  }
+
+  if (!response.ok) {
+    let detail = '';
+    try {
+      detail = (await response.json())?.error?.message ?? '';
+    } catch {
+      // The body is not JSON; the status alone is enough to report.
+    }
+    console.warn(
+      `[pages-secrets] WARNING: the credential cannot mint a live session credential` +
+        ` (HTTP ${response.status}).${detail ? ` ${detail}` : ''}`
+    );
+    console.warn(
+      '[pages-secrets] The spoken interview will not start until the service account bound to the key is active again.'
+    );
+    return;
+  }
+
+  console.log('[pages-secrets] the credential can start a live interview.');
 }
 
 await preflightAiCredential();

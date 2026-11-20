@@ -1,9 +1,15 @@
 # Roadmapak — Platform Enhancement Report
 
 Repository: `D:/Saas/careerpilot-ai`
-Branch: `main` · Base commit: `616251c feat(motion): a shape-morphing motion system for Careerra`
-Production: `https://roadmapak.pages.dev/` · Supabase project `ciihprsfdojzvjnqgbxl`
+Branch: `main` · Commit: `c3bbf52` (pushed to `origin/main`, was `616251c`)
+Production: `https://roadmapak.pages.dev/` · Deployment `7f5594d7-9899-4514-b659-0c4dc3939da8`
+Supabase project `ciihprsfdojzvjnqgbxl`
 Date: 2026-11-20
+
+> **State in one line:** the work is implemented, tested, committed, pushed and deployed;
+> every feature except the spoken interview is live and verified, and the spoken
+> interview is blocked by a Google-side account state that no code change can reach
+> (§H.1).
 
 ---
 
@@ -156,22 +162,40 @@ is Google's recommended production pattern for the Live API
   candidate starts a spoken interview**, so candidates who never take one never download
   the 372 KB chunk (§18).
 
-**Credential status — read this before deploying.** The Gemini key in the local `.env`
-is **dead**: every call returns
-`401 UNAUTHENTICATED / ACCOUNT_STATE_INVALID — "The bound service account is deleted or
-disabled. The service account bound to the API key must be active."` This affects ordinary
-text generation exactly as it affects Live token minting, so it is a credential problem,
-not a Live problem. It was re-tested and is persistent, not transient.
+**Credential status — read this before deploying.** Two different problems, found by
+testing, not by reading the code:
 
-The **deployed** production app is not affected in the way it first appears: its AI
-features work end to end (verified against `https://roadmapak.pages.dev/` — a throwaway
-candidate's CV analysis returned a measured score of 72, the streaming route returned 18
-stage events with the same result, and the history read the record back). The reason is
-that `server/ai/provider.ts` falls back from Gemini to OpenRouter *silently* on any
-provider error, and OpenRouter's free tier is currently exhausted
-(`429 free-models-per-day`, remaining 0) — so the fallback could not have served those
-requests. The production requests were therefore served by **Gemini**, and the production
-Pages secret is healthy.
+1. **The local `.env` key is dead for everything.** Every call returns
+   `401 UNAUTHENTICATED / ACCOUNT_STATE_INVALID — "The bound service account is deleted or
+   disabled. The service account bound to the API key must be active."` This affects
+   ordinary text generation exactly as it affects Live token minting.
+
+2. **The production key works for text but cannot start a live interview.** The deployed
+   site's CV analysis succeeds end to end (a measured score of 72, the streaming route
+   returning 18 stage events with the same result, the history reading the record back),
+   and `GET /api/health` reports `gemini: true`. But the deployed worker log for
+   `POST /api/interviews/live/session` records:
+
+   ```
+   ApiError: {"error":{"code":401,
+     "message":"The bound service account is deleted or disabled. The service account
+                 bound to the API key must be active.",
+     "status":"UNAUTHENTICATED",
+     "details":[{"reason":"ACCOUNT_STATE_INVALID",
+       "metadata":{"method":"google.ai.generativelanguage.v1beta.AuthTokenService.CreateToken"}}]}}
+   ```
+
+   So the live interview cannot start in production either. **This is not a code defect
+   and it cannot be fixed in the repository.** Minting a Live credential goes through the
+   token service, which requires the service account bound to the key to be active; a key
+   can serve every text feature and still be refused there.
+
+Why production still looks healthy: `server/ai/provider.ts` falls back from Gemini to
+OpenRouter *silently* on any provider error, so a broken Gemini key does not announce
+itself. The fallback could not have served the successful production requests either,
+because OpenRouter's free tier is exhausted (`429 free-models-per-day`, remaining 0) —
+so those requests were genuinely served by Gemini. The production text path is healthy;
+only the Live token path is refused.
 
 Two consequences follow:
 
@@ -183,6 +207,9 @@ Two consequences follow:
    validates the credential before uploading and refuses to continue if it does not
    answer. Verified — `node scripts/set-pages-secrets.mjs roadmapak --check` reports the
    failure and uploads nothing.
+
+The same script also *warns* when a credential can serve text but cannot mint a live
+credential, because that is a failure the text check cannot see.
 
 ---
 
@@ -197,8 +224,12 @@ Two consequences follow:
 | Bundle auth | `scripts/verify-bundle-auth-config.mjs` (part of build) | public Supabase config + all 4 sign-in methods present |
 | Lazy-chunk check | `dist/index.html` modulepreload list | `vendor-genai` **absent** — confirmed not eagerly loaded |
 | Production DB | `scripts/verify-live-interview-table.mts` | table, 12 columns, 0 audio columns, RLS on, 4 owner policies, 0 rows |
-| Production AI | `scripts/verify-analyzer-production.mjs` | end-to-end pass against the deployed site (throwaway identity removed) |
-| Live grant | `scripts/production/verify-live-interview-grant.mts` | **fails** — 401 `ACCOUNT_STATE_INVALID` (dead local credential) |
+| Production AI | `scripts/verify-analyzer-production.mjs` | end-to-end pass against the deployed site, before and after the release (throwaway identity removed) |
+| Live grant, local | `scripts/production/verify-live-interview-grant.mts` | **fails** — 401 `ACCOUNT_STATE_INVALID` (dead local credential) |
+| Live grant, production | `scripts/production/verify-live-interview-production.mjs` | signed in on the deployed site, accepted the terms, and the server answered **500**; the worker log shows the same `ACCOUNT_STATE_INVALID` (throwaway identity removed) |
+| Live routes deployed | `curl` against the four new routes | all four answer **401** — present and gated behind authentication |
+| Credential guard | `node scripts/set-pages-secrets.mjs roadmapak --check` | detects the dead credential and uploads nothing |
+| `auth_tokens` payload shape | direct REST call | reaches `v1beta.AuthTokenService.CreateToken` and is refused on the **credential**, not on a malformed request — the payload is accepted |
 
 The 5 skipped tests are live-provider tests that skip themselves when the provider cannot
 serve a request; they are not failures.
@@ -210,12 +241,15 @@ and API-version corrections.
 
 ## F. Git
 
-- **Nothing has been committed and nothing has been pushed.** No commit was authorised.
-- Branch `main`, base commit `616251c`.
-- The working tree carries the whole rebrand plus this task's work as **uncommitted
-  changes**: 13 files changed in this task's scope (`1163 insertions(+), 452 deletions(-)`)
-  and 13 new files, on top of a large pre-existing rebrand diff that predates this task.
-- New files created for this task:
+- **Committed and pushed.** Commit `c3bbf52 feat(roadmapak): rebrand the platform and make
+  its key surfaces real`, pushed to `origin/main` (`616251c..c3bbf52`). The working tree
+  is clean.
+- The commit carries the Roadmapak rebrand *and* this task's enhancements together,
+  because the two are interleaved inside the same files (a single file may hold a rename
+  and a behavioural change at once). Splitting them would have required hunk-level
+  staging of the same files; one commit that describes both honestly was the safer
+  choice.
+- **209 files** changed: 7247 insertions, 1597 deletions, and 14 new files:
 
 ```
 src/components/processing/MascotLoader.tsx
@@ -231,55 +265,87 @@ tests/live-interview.test.ts
 tests/interactive-surfaces.test.ts
 scripts/verify-live-interview-table.mts
 scripts/production/verify-live-interview-grant.mts
+scripts/production/verify-live-interview-production.mjs
 scripts/production/probe-openrouter-usage.mts
 ```
 
-- Because the rebrand diff and this task's diff are mixed in the same tree, a commit
-  should stage this task's files deliberately rather than `git add -A`.
+- The QA artifacts were deliberately **not** committed: `.qa/` (2.6 MB of screenshots from
+  one sweep), `.test-output.txt` (a raw test dump) and `tests/.tmp-job-description-upload/`
+  (a fixture a test run left behind) are now in `.gitignore`. The QA *scripts* that
+  produce them are tracked.
+- Before the commit, the staged content was scanned for credentials — Google API keys,
+  OpenRouter keys, Stripe secrets, GitHub tokens and Supabase service-role JWTs. All
+  clean. The only file whose name matched was `scripts/set-pages-secrets.mjs`, which reads
+  `.env` at run time and contains no credential.
 
 ---
 
 ## G. Deployment
 
-- **The application has not been deployed.** No deployment was authorised, so
-  `https://roadmapak.pages.dev/` is still serving the **pre-change build**.
-- The **only** production change made in this task was the additive database migration
-  (a new table), which was applied because the feature requires it and it touches nothing
-  that already exists.
-- The build output in `dist/` is current and verified, so deployment is a single
-  `npm run cf:deploy` (`vite build` + `wrangler pages deploy dist --project-name roadmapak
-  --branch main`) away.
-- **Do not run `scripts/set-pages-secrets.mjs` before fixing the local key** — see §D.
+- **Deployed to production.** `npm run cf:deploy` (rebuild + `wrangler pages deploy`),
+  deployment `7f5594d7-9899-4514-b659-0c4dc3939da8`, source `c3bbf52`, branch `main`.
+  `https://roadmapak.pages.dev/` now serves the new build.
+- The Pages **secrets were not touched** — `cf:deploy` does not upload them, and
+  `set-pages-secrets.mjs` was deliberately not run (see §D).
+- Verified on the deployed site after the release:
+
+| Check | Result |
+|---|---|
+| `GET /` | 200, serving the new entry chunk `index-ODivVMFX.js`; the old chunk is no longer referenced |
+| `vendor-genai` in the modulepreload list | **absent** — the Live SDK is not eagerly loaded |
+| `GET /assets/vendor-genai-iae3_4Db.js` | 200, 380 607 bytes — served on demand |
+| `GET /api/health` | 200, `modelConfigured: true`, `modelName: gemini-3.1-flash-lite`, `gemini: true` |
+| `GET /api/interviews/live` | 401 (route present, auth required) |
+| `POST /api/interviews/live/session` | 401 (route present, auth required) |
+| `POST /api/interviews/live/complete` | 401 (route present, auth required) |
+| `DELETE /api/interviews/live/:id` | 401 (route present, auth required) |
+| `GET /brand/roadmapak-ai-mascot.webp` | 200, `image/webp`, 13 362 bytes |
+| `GET /favicon.svg`, `GET /site.webmanifest` | 200 |
+| Production AI end to end | score 72, 18 stream events, history read back, throwaway identity removed |
+
+- The one thing that does **not** work on the deployed site is
+  `POST /api/interviews/live/session` for a signed-in candidate: it answers `500` with
+  `{"error":"The live interviewer could not be started."}` because the credential cannot
+  mint a Live session credential (§D). The route degrades cleanly — a clear message, no
+  crash, no partial data — and the cause is in Google's account state, not in this code.
 
 ---
 
 ## H. Remaining Issues
 
-1. **The local Gemini credential is dead — this blocks the Live feature end to end.**
-   `401 UNAUTHENTICATED / ACCOUNT_STATE_INVALID: "The bound service account is deleted or
-   disabled."` It affects ordinary text generation too, so it is a platform-side action:
-   the service account bound to the key must be reactivated, or the key replaced in
-   `.env` with a working one. Until then the Live grant cannot be minted, locally or in
-   production, and the Live feature cannot be verified in a browser.
-   *Action:* reactivate the service account (or rotate the key), then
-   `npx tsx scripts/production/verify-live-interview-grant.mts` — it must print
-   `the session credential was issued`, `model: gemini-3.8-live`, `api version: v1beta`.
-   The production Pages secret is believed healthy and must **not** be overwritten until
-   the local key is confirmed working.
+1. **The Google account state blocks the spoken interview — in production as well as
+   locally. This is the one thing the repository cannot fix.**
+   Both credentials are refused by the token service with
+   `ACCOUNT_STATE_INVALID — "The bound service account is deleted or disabled."`, so a
+   Live session cannot be opened. The production key still serves every text feature
+   (§D), which is why the platform looks healthy from the outside.
+   *Action:* reactivate the service account bound to the Gemini key (or bind a live one
+   to a new key) on the Google side. Nothing in this codebase changes as a result — the
+   route, the grant, the model and the API version are all in place and verified as far
+   as they can be without a credential.
+   *Then:* `npx tsx scripts/production/verify-live-interview-grant.mts` must print
+   `the session credential was issued`, `model: gemini-3.8-live`, `api version: v1beta`,
+   and `node scripts/production/verify-live-interview-production.mjs` must print
+   `the live session credential was issued on the deployed site`.
+   *Until then, do not run `scripts/set-pages-secrets.mjs` with the current `.env`* — it
+   would replace a working production secret with a dead one. The guard blocks it, but
+   the local key should be repaired first regardless.
 
 2. **The SDK may warn about the API version.** The installed `@google/genai` (v2.31.0)
    predates the current Live API and prints "the SDK's ephemeral token support is
    experimental" when the version is not `v1alpha`. Current Google documentation is
    explicit that ephemeral tokens are issued and spent on **`v1beta`**, which is what this
-   code does. *If* token minting fails with an unsupported-version error once the
-   credential is fixed, the single remedy is to change `LIVE_API_VERSION` in
-   `server/ai/geminiConfig.ts` to `'v1alpha'` — it is defined in one place and both sides
-   read it, so the change is one line.
+   code does, and the request was confirmed to reach
+   `v1beta.AuthTokenService.CreateToken`. *If* token minting fails with an
+   unsupported-version error once the credential is fixed, the single remedy is to change
+   `LIVE_API_VERSION` in `server/ai/geminiConfig.ts` to `'v1alpha'` — it is defined in
+   one place and both sides read it, so the change is one line.
 
-3. **No browser or end-to-end verification of the spoken flow.** A signed-in candidate, a
-   working microphone, and a working Gemini Live credential are all required. The
-   transport, the transcript collector, the barge-in behaviour and the persistence path are
-   covered by unit tests, but the actual conversation has not been heard.
+3. **The spoken conversation has not been heard.** The transport, the transcript
+   collector, the barge-in behaviour and the persistence path are covered by unit tests
+   and the credential path is verified as far as it can be without a working key, but no
+   live session has ever been opened end to end. That needs a working credential, a
+   signed-in candidate and a microphone.
 
 4. **The DB-backed suite cannot run.** `npm test` needs the disposable Supabase test
    project in `.env.test` (`yqiuzbwaqfrvhynkobpu`), which does not resolve. This is
