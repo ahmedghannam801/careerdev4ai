@@ -100,6 +100,105 @@ test.describe('the daily credit allowance', () => {
     assert.equal(secondRow.balance, firstRow.balance, 'the balance did not double');
   });
 
+  test('is granted once even when the claims arrive at the same time', async () => {
+    await clearCredits(user.id);
+
+    // Ten claims, all issued at the same moment. The database has to make
+    // them one grant.
+    //
+    // The claim takes the account's advisory lock, so the calls are
+    // serialised; the first one creates the bucket and the other nine find
+    // it and grant nothing. The unique constraint on the bucket and on the
+    // idempotency key are the proof that a second one cannot pay out even
+    // if the lock were not there.
+    const attempts = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        admin.rpc('claim_daily_credits', {
+          p_profile_id: user.id,
+          p_amount: DAILY_CREDIT_ALLOWANCE,
+        })
+      )
+    );
+
+    for (const attempt of attempts) {
+      assert.equal(attempt.error, null, attempt.error?.message);
+    }
+
+    const rows = attempts.map(
+      (attempt) => attempt.data as { granted: number; balance: number }
+    );
+    const paid = rows.filter((row) => row.granted === DAILY_CREDIT_ALLOWANCE);
+    assert.equal(paid.length, 1, 'exactly one claim paid out');
+    assert.equal(
+      rows.filter((row) => row.granted === 0).length,
+      attempts.length - 1,
+      'every other claim granted nothing'
+    );
+
+    // The balance is one allowance, not ten.
+    const balance = await runningBalance(user.id);
+    assert.equal(balance, DAILY_CREDIT_ALLOWANCE, 'the account was paid once');
+
+    // And there is one bucket, not ten.
+    const { data: buckets, error: bucketError } = await admin
+      .from('daily_credit_grants')
+      .select('id, granted_amount, remaining')
+      .eq('profile_id', user.id);
+    assert.equal(bucketError, null, bucketError?.message);
+    assert.equal((buckets ?? []).length, 1, 'there is one bucket');
+    assert.equal(
+      (buckets ?? [])[0]?.granted_amount,
+      DAILY_CREDIT_ALLOWANCE,
+      'the bucket holds one allowance'
+    );
+  });
+
+  test('the entitlement of a plan is granted once even when the requests arrive at the same time', async () => {
+    await clearCredits(user.id);
+
+    // The entitlement is what a paid plan promises: it arrives without the
+    // candidate claiming anything. It has to be exactly as idempotent as
+    // the claim is.
+    //
+    // This test needs the migration that introduces the entitlement, so the
+    // test project has to be up to date with the repository's migrations —
+    // the same step production needs before the feature is switched on.
+    const attempts = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        admin.rpc('ensure_daily_credit_entitlement', { p_profile_id: user.id })
+      )
+    );
+
+    for (const attempt of attempts) {
+      assert.equal(
+        attempt.error,
+        null,
+        `the entitlement function has to exist: ${attempt.error?.message}`
+      );
+    }
+
+    const rows = attempts.map(
+      (attempt) => attempt.data as { granted: number; entitled: boolean }
+    );
+    const paid = rows.filter((row) => row.granted > 0);
+    assert.equal(paid.length, 1, 'exactly one request granted the entitlement');
+    assert.equal(
+      rows.filter((row) => row.entitled === true).length,
+      attempts.length,
+      'every request knows the account is entitled'
+    );
+
+    const balance = await runningBalance(user.id);
+    assert.equal(balance, DAILY_CREDIT_ALLOWANCE, 'the account was paid once');
+
+    const { data: buckets, error: bucketError } = await admin
+      .from('daily_credit_grants')
+      .select('id')
+      .eq('profile_id', user.id);
+    assert.equal(bucketError, null, bucketError?.message);
+    assert.equal((buckets ?? []).length, 1, 'there is one bucket');
+  });
+
   test('is spent before the general balance, and a replay is refused', async () => {
     await clearCredits(user.id);
 

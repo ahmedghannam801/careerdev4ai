@@ -210,6 +210,8 @@ export async function readDailyCreditState(
     daily_allowance?: number;
     expires_at?: string;
     claimed_today?: boolean;
+    plan_code?: string | null;
+    entitled?: boolean;
   } | null;
 
   if (!result) return null;
@@ -220,6 +222,49 @@ export async function readDailyCreditState(
     resetAt: result.expires_at ?? new Date(Date.now() + 86_400_000).toISOString(),
     // TRUE as soon as today's bucket exists, whether or not any of it is left.
     claimedToday: result.claimed_today === true,
+    // The plan the allowance is read from, and whether it is an entitlement
+    // that arrives without a claim. The interface needs both to tell the free
+    // reward and the plan's daily allowance apart.
+    planCode: result.plan_code ?? null,
+    entitled: result.entitled === true,
+  };
+}
+
+/**
+ * Ensures the account's daily ENTITLEMENT is in place.
+ *
+ * The entitlement is what a PAID PLAN promises: a daily allowance that
+ * arrives whether or not the candidate does anything. The scheduled sweep
+ * grants it to every account with an active subscription, so a subscriber
+ * receives the day even if the application is never opened.
+ *
+ * This read path exists for the same promise with a shorter delay: the
+ * candidate opens the application, and the allowance is already there
+ * instead of being up to one schedule interval away. The grant is idempotent
+ * per account per Africa/Cairo day, so the two paths cannot double up.
+ *
+ * A failure here must never stop the balance from being reported. The sweep
+ * will pick the account up, and the balance the candidate is shown is the
+ * balance the ledger holds — which is the truth even when the entitlement
+ * has not been granted yet.
+ */
+export async function ensureDailyCreditEntitlement(
+  profileId: string
+): Promise<{ entitled: boolean; granted: number }> {
+  const { data, error } = await getSupabaseServer().rpc('ensure_daily_credit_entitlement', {
+    p_profile_id: profileId,
+  });
+
+  if (error) {
+    console.error('Failed to ensure the daily credit entitlement:', error.message);
+    return { entitled: false, granted: 0 };
+  }
+
+  const result = data as { entitled?: boolean; granted?: number } | null;
+
+  return {
+    entitled: result?.entitled === true,
+    granted: result?.granted ?? 0,
   };
 }
 
@@ -230,11 +275,29 @@ export async function readDailyCreditState(
 export async function getCreditBalance(profileId: string): Promise<CreditBalanceDTO> {
   const supabase = getSupabaseServer();
 
+  // 0. The daily entitlement of a paid plan.
+  //
+  //    The entitlement is granted by the scheduled sweep as well, so this is
+  //    not the only way it arrives — it is the way it arrives IMMEDIATELY for
+  //    the candidate who is looking at the screen. The grant is idempotent
+  //    per account per day, so the two paths agree.
+  //
+  //    It happens before the balance is read, so the number that is reported
+  //    is the number that includes the day's entitlement.
+  await ensureDailyCreditEntitlement(profileId);
+
   // 1. Get latest ledger entry
   //
-  // The tie-break on the id matters: the database reads the balance with
-  // `created_at DESC, id DESC`, and a reader that ordered the rows any other
-  // way could report a balance the ledger does not hold.
+  //    The order is `created_at DESC, id DESC`, the same order the database
+  //    reads the balance with. The database stamps every ledger row with a
+  //    moment that is strictly later than the row before it (the
+  //    `ai_credit_ledger_stamp` trigger), so this order names the LAST
+  //    operation without any ambiguity — even when one transaction wrote
+  //    more than one row, which is what the daily claim does when it expires
+  //    yesterday's leftovers and grants today's allowance at once.
+  //
+  //    A reader that ordered the rows any other way could report a balance
+  //    the ledger does not hold.
   const { data: latest, error: ledgerError } = await supabase
     .from('ai_credit_ledger')
     .select(LEDGER_COLUMNS)

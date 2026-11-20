@@ -263,9 +263,8 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   // The phase the PDF export is in, so a slow phone says "Drawing page 3"
   // rather than showing an unresponsive button.
   const [pdfPhase, setPdfPhase] = useState<'fonts' | 'pages' | 'writing' | null>(null);
-  // The paper itself, so the PDF raster is taken from the exact element that
-  // is on the screen rather than from a re-render that could differ by a font
-  // or a breakpoint.
+  // The paper itself, so the preview can be measured and printed from the
+  // exact element that is on the screen.
   const paperFrameRef = useRef<HTMLDivElement | null>(null);
 
   /**
@@ -296,36 +295,17 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const [mobilePane, setMobilePane] = useState<'edit' | 'preview'>('edit');
 
   /**
-   * Waits for the paper to have drawn the newest document.
-   *
-   * The sheet follows the document on a short delay, so a burst of typing
-   * redraws it once instead of once per character. An export that starts
-   * inside that delay must not capture the previous sheet: this waits for the
-   * pending redraw to land before anything is read from the page. The delay
-   * is short and the authorisation request already spans it, so in practice
-   * this returns on the first frame.
-   */
-  const waitForPaperToSettle = async (frame: HTMLDivElement | null): Promise<void> => {
-    if (!frame) return;
-    const started = performance.now();
-    while (frame.dataset.cvPreviewPending === 'true') {
-      if (performance.now() - started > 1200) return;
-      await new Promise<void>((resolve) => {
-        if (typeof requestAnimationFrame === 'undefined') setTimeout(resolve, 16);
-        else requestAnimationFrame(() => resolve());
-      });
-    }
-  };
-
-  /**
    * Downloads the CV as a PDF.
    *
-   * The file is generated in the browser from the real paper: no print
-   * dialog, no new tab and no redirect. The server still decides whether
-   * this candidate may export the template, so the paper is drawn only after
-   * the authorisation route says yes. The document is the one in the
-   * preview: same template, same fonts, same colours, same Arabic shaping,
-   * same page order.
+   * The file is generated in the browser from the same layout plan the paper
+   * on the screen is drawn from: no print dialog, no new tab and no
+   * redirect. The server still decides whether this candidate may export the
+   * template, so the paper is drawn only after the authorisation route says
+   * yes. The document is the one in the preview: same template, same fonts,
+   * same colours, same Arabic shaping, same page order.
+   *
+   * The file is a real document — text that can be selected and searched,
+   * vector rules, embedded fonts — not a picture of the paper.
    *
    * The writer is loaded on demand: it is only needed by this button, so a
    * candidate who never exports does not download it.
@@ -342,19 +322,12 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
         return;
       }
 
-      await waitForPaperToSettle(paperFrameRef.current);
-
-      const paper = paperFrameRef.current?.querySelector<HTMLElement>('[data-cv-print]')
-        || document.querySelector<HTMLElement>('[data-cv-print]');
-      if (!paper) {
-        setExportError(t('Open the document editor to export the CV.'));
-        return;
-      }
-
       const name = activeCV.fullName?.trim() || 'CV';
       const { downloadCvPdf } = await import('../../lib/cvPdfExport');
       await downloadCvPdf({
-        paper,
+        cv: activeCV,
+        template: studioTemplate,
+        language: settings.resumeLanguage,
         title: `${name} — CV`,
         author: name,
         onProgress: setPdfPhase,

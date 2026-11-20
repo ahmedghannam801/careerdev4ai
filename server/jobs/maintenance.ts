@@ -13,6 +13,18 @@ export interface MaintenanceSweepOutcome {
   dailyCreditsExpired: number;
   dailyCreditsSkipped: number;
   dailyCreditsFailed: number;
+  /**
+   * How many accounts the daily ENTITLEMENT reached.
+   *
+   * The entitlement is what a PAID plan promises, so it is granted by the
+   * sweep and not by the candidate. The free reward is a different thing and
+   * is still claimed by hand — see the note on the expiry sweep below.
+   */
+  dailyEntitlementsGranted: number;
+  /** How many accounts were entitled to the day's allowance. */
+  dailyEntitlementsEligible: number;
+  /** How many accounts the sweep could not reach this time. */
+  dailyEntitlementsFailed: number;
 }
 
 /**
@@ -26,6 +38,9 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
   let dailyCreditsExpired = 0;
   let dailyCreditsSkipped = 0;
   let dailyCreditsFailed = 0;
+  let dailyEntitlementsGranted = 0;
+  let dailyEntitlementsEligible = 0;
+  let dailyEntitlementsFailed = 0;
 
   try {
     const { data, error } = await supabase.rpc('expire_subscriptions');
@@ -49,10 +64,38 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
     console.error('Failed to run expire_temporary_access:', err);
   }
 
+  // The daily ENTITLEMENT of a paid plan.
+  //
+  // A plan promises its account a daily allowance, and a promise that only
+  // arrives when the account happens to open the application is not a
+  // promise. The sweep grants it, for every account that has an active
+  // subscription, on the same day, without anybody asking.
+  //
+  // The grant is idempotent — one bucket per account per Africa/Cairo day —
+  // so the sweep may run as often as the scheduler likes, and an account
+  // that was missed by one run is picked up by the next one.
+  try {
+    const { data, error } = await supabase.rpc('grant_daily_entitlements_to_all');
+    if (error) {
+      console.error('Error in grant_daily_entitlements_to_all RPC:', error);
+    } else if (data) {
+      const outcome = data as {
+        granted?: number;
+        eligible?: number;
+        failed?: number;
+      };
+      dailyEntitlementsGranted = Number(outcome?.granted ?? 0);
+      dailyEntitlementsEligible = Number(outcome?.eligible ?? 0);
+      dailyEntitlementsFailed = Number(outcome?.failed ?? 0);
+    }
+  } catch (err) {
+    console.error('Failed to run grant_daily_entitlements_to_all:', err);
+  }
+
   // The daily free-token allowance.
   //
-  // The allowance is CLAIMED by the candidate, so a sweep must not grant it:
-  // a reward that arrives on its own is not the reward the claim button
+  // The FREE reward is CLAIMED by the candidate, so a sweep must not grant
+  // it: a reward that arrives on its own is not the reward the claim button
   // promises. `grant_daily_credits_to_all` therefore grants nothing and
   // reports that it is a manual claim.
   //
@@ -83,6 +126,9 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
     dailyCreditsExpired,
     dailyCreditsSkipped,
     dailyCreditsFailed,
+    dailyEntitlementsGranted,
+    dailyEntitlementsEligible,
+    dailyEntitlementsFailed,
   };
 }
 

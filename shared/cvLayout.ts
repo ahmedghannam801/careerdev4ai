@@ -127,22 +127,56 @@ export interface CvFontFace {
   css: string;
   /** The Word font used in the exported file. */
   word: string;
+  /**
+   * The family the PDF export embeds.
+   *
+   * The PDF cannot ask the reader's machine for a font, so it carries its
+   * own. The three families are the ones the platform ships, and the face
+   * named first in the CSS stack is the face that is embedded — so the paper
+   * and the file are set in the same typeface.
+   */
+  family: 'sans' | 'serif' | 'mono';
 }
 
+/**
+ * The sans face.
+ *
+ * The stack leads with the face the PDF embeds, so the preview and the
+ * export are set in the same letters. `Inter` and the system faces stay in
+ * the stack as the fallbacks for a browser that has not loaded the webfont.
+ */
 const CV_SANS_FACE: CvFontFace = {
-  css: 'Inter, ui-sans-serif, system-ui, sans-serif',
+  css: "'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, sans-serif",
   word: 'Calibri',
+  family: 'sans',
 };
 
+/**
+ * The serif face.
+ *
+ * Gelasio is metrically compatible with Georgia, so a document set in it
+ * breaks its lines in the same places a document set in Georgia does, and
+ * the Word export — which uses Georgia itself — keeps the same shape.
+ */
 const CV_SERIF_FACE: CvFontFace = {
-  css: 'Georgia, "Times New Roman", serif',
+  css: "Gelasio, Georgia, 'Times New Roman', serif",
   word: 'Georgia',
+  family: 'serif',
 };
 
 const CV_MONO_FACE: CvFontFace = {
-  css: 'ui-monospace, "SFMono-Regular", Menlo, monospace',
+  css: "'Roboto Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace",
   word: 'Courier New',
+  family: 'mono',
 };
+
+/**
+ * The Arabic face.
+ *
+ * A right-to-left document is set in this face, in the PDF and in Word, so
+ * the Arabic of the export is the Arabic of the paper.
+ */
+export const CV_ARABIC_FACE = 'IBM Plex Sans Arabic';
 
 /**
  * The typeface a template's typography asks for.
@@ -657,6 +691,16 @@ export interface CvLayoutSpec {
   asideFirst: boolean;
   /** Whether the body reads across two columns. */
   twoColumn: boolean;
+  /**
+   * Whether the document reads from right to left.
+   *
+   * The direction is a property of the DOCUMENT, not of the template: the
+   * same template is printed in Arabic and in English, and the Arabic paper
+   * is the same design read the other way round. Every renderer needs it —
+   * the preview sets it on the page, the PDF mirrors the page, and Word
+   * writes the paragraphs with the right direction.
+   */
+  rtl: boolean;
 }
 
 /**
@@ -747,6 +791,9 @@ function buildSpec(
     density: structure.density,
     accentPosition: structure.accentPosition,
     showIcons: structure.showIcons,
+    // The direction is the document's, and the document is built after this
+    // one; the plan sets it once the language is known.
+    rtl: false,
 
     metrics,
     columns: cvColumnMetrics(structure.density),
@@ -797,6 +844,9 @@ export function buildCvLayoutPlan(options: {
   const candidateOrder = normalizeCandidateOrder(cv.sectionOrder);
   const sectionOrder = resolveCvSectionOrder(template.structure.sectionOrder, candidateOrder);
   const spec = buildSpec(template, sectionOrder, cv.layout);
+  // The direction belongs to the document. It is decided once, here, so that
+  // the preview, the PDF and the Word file all read the same way round.
+  spec.rtl = document.rtl;
 
   const ordered = orderCvSections(document.sections, sectionOrder);
   const hidden = new Set(spec.hiddenSections);

@@ -272,17 +272,31 @@ export default {
     try {
       // The outcome is recorded in the heartbeat, not only in the log.
       //
-      // The daily free-token allowance is CLAIMED by the candidate, so this
-      // sweep does not grant it — it expires yesterday's leftovers, which is
-      // the half that has to happen whether or not anybody claims today. The
-      // heartbeat says how many tokens were expired, so the API can tell the
-      // candidate the truth.
+      // The sweep does two different things with the daily allowance:
+      //
+      //   * It GRANTS the entitlement of a paid plan. A plan promises its
+      //     account a daily allowance, and the promise has to hold for an
+      //     account that never opens the application. The grant is
+      //     idempotent per account per day, so running it every five
+      //     minutes is harmless and a missed run is picked up by the next.
+      //
+      //   * It EXPIRES yesterday's leftovers, which is the half that has to
+      //     happen whether or not anybody claims today.
+      //
+      // The FREE reward is a third thing and is still claimed by the
+      // candidate, so this sweep does not grant it.
+      //
+      // The heartbeat says how many accounts were reached and how many tokens
+      // were expired, so the API can tell the candidate the truth.
       const maintenance = await runSubscriptionMaintenanceSweeps();
       sweep.subscriptionsExpired = maintenance.expiredSubscriptions;
       sweep.temporaryAccessExpired = maintenance.expiredTemporaryAccess;
       sweep.dailyCreditsExpired = maintenance.dailyCreditsExpired;
       sweep.dailyCreditsSkipped = maintenance.dailyCreditsSkipped;
       sweep.dailyCreditsFailed = maintenance.dailyCreditsFailed;
+      sweep.dailyEntitlementsGranted = maintenance.dailyEntitlementsGranted;
+      sweep.dailyEntitlementsEligible = maintenance.dailyEntitlementsEligible;
+      sweep.dailyEntitlementsFailed = maintenance.dailyEntitlementsFailed;
     } catch (error) {
       console.error('The subscription maintenance sweep failed:', error);
     }

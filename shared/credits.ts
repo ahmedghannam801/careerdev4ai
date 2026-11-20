@@ -155,6 +155,20 @@ export interface CreditLedgerDTO {
  * the daily allowance builds towards a premium template (5 tokens). The
  * allowance is still far below the cheapest paid plan (25 credits for 99 EGP)
  * and it never unlocks a paid-only entitlement.
+ *
+ * THE FREE ALLOWANCE IS NOT THE PLAN'S DAILY ALLOWANCE.
+ *
+ * A paid plan may promise a daily allowance of its own. That one is an
+ * ENTITLEMENT: it is granted to every account with an active subscription,
+ * without anybody claiming anything, by the scheduled sweep and by the
+ * balance read. Its size lives in the database, in the
+ * `subscription_plans.daily_ai_credits` column, and the database resolves it
+ * per account through `careerpilot_daily_credit_allowance(p_profile_id)`.
+ *
+ * The constant below is the FREE reward only. It is the floor of every
+ * account's daily allowance and the ceiling of what the free reward gives:
+ * a plan can raise its account's allowance and can never take the free
+ * allowance away.
  */
 export const DAILY_CREDIT_ALLOWANCE = 2;
 
@@ -185,6 +199,20 @@ export interface DailyCreditState {
    * tokens has still claimed today.
    */
   claimedToday: boolean;
+  /**
+   * The plan the allowance is read from, when the account has one.
+   *
+   * `null` means the account is on the free reward. It is what lets the
+   * interface tell the two apart: the FREE reward is claimed by hand, while a
+   * PLAN's daily allowance is an entitlement that arrives on its own.
+   */
+  planCode?: string | null;
+  /**
+   * Whether the account holds a plan with a daily entitlement.
+   *
+   * TRUE means the account's allowance was granted for it, without a claim.
+   */
+  entitled?: boolean;
 }
 
 export interface CreditBalanceDTO {
