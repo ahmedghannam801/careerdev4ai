@@ -49,7 +49,12 @@ const page = await browser.newPage({ viewport: { width: 1100, height: 1500 } });
 try {
   await page.goto(`http://127.0.0.1:${port}/document.pdf`, { waitUntil: 'load' });
   // The viewer paints after the file arrives; give it a moment to do so.
-  await page.waitForTimeout(2500);
+  //
+  // The wait is generous because a file whose pages are pictures takes
+  // longer to paint than a file whose pages are text: the picture has to
+  // be decoded before the page can be shown, and a blank photograph of the
+  // document is worse than no photograph at all.
+  await page.waitForTimeout(8000);
   await page.screenshot({ path: output });
   console.log(`wrote ${output}`);
 } finally {
