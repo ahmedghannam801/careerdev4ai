@@ -134,8 +134,9 @@ walked in one page like a user would. What that covered:
 | | |
 |---|---|
 | Branch | `main` (pushed to `origin/main`) |
-| Commits | `2c7d28f` brand assets from the official lockup · `7845991` progress/applications/interviews/CV · `4d59cfe` stop the pre-session guide request · `5ec45a4` timeline months in the reader's language · `cf2b1c2` this report |
-| Deployed commit | `5ec45a4` (recorded by Cloudflare on the production deployment) |
+| Code commits | `2c7d28f` brand assets from the official lockup · `7845991` progress/applications/interviews/CV · `4d59cfe` stop the pre-session guide request · `5ec45a4` timeline months in the reader's language |
+| Documentation commit | the report you are reading; it changes only this file, so the bundle is byte-for-byte the build of `5ec45a4` |
+| Deployed commit | `5ec45a4` |
 | Not committed by me | The membership/badge work another agent is editing in the same working tree (`shared/planIdentity.ts`, `src/components/layout/AppShell.tsx`, `src/components/subscription/*`, `src/components/views/{DashboardView,PricingView}.tsx`, `src/index.css`, `src/translations/parts/subscriptions.ts`, `tests/plan-identity.test.ts`, `tests/vitest/MembershipPanel.test.tsx`). It was left untouched, and the build was produced from a clean worktree at my commit so none of their unfinished work reached production. |
 
 The build that was deployed is compiled from that commit alone, not from the dirty working tree: a
