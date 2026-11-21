@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, Clock, Flag, Gauge, Layers, Target, TrendingUp } from 'lucide-react';
+import { useCareer } from '../../context/CareerContext';
 
 /**
  * The heading of the career roadmap.
@@ -62,6 +63,7 @@ interface RoadmapCommandCenterProps {
  * visible, so "0%" reads as an empty plan rather than a missing number.
  */
 const ProgressRing: React.FC<{ value: number; size?: number }> = ({ value, size = 116 }) => {
+  const { t } = useCareer();
   const stroke = 9;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -72,7 +74,7 @@ const ProgressRing: React.FC<{ value: number; size?: number }> = ({ value, size 
       className="relative shrink-0"
       style={{ width: size, height: size }}
       role="img"
-      aria-label={`${clamped}% of the roadmap complete`}
+      aria-label={`${clamped}% ${t('of the roadmap complete')}`}
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
         <circle
@@ -101,7 +103,7 @@ const ProgressRing: React.FC<{ value: number; size?: number }> = ({ value, size 
           {clamped}%
         </span>
         <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-          complete
+          {t('complete')}
         </span>
       </div>
     </div>
@@ -146,6 +148,7 @@ export const RoadmapCommandCenter: React.FC<RoadmapCommandCenterProps> = ({
   isEnrolled,
   onEnroll,
 }) => {
+  const { t } = useCareer();
   const biggestGap = gaps[0] ?? null;
 
   return (
@@ -174,42 +177,42 @@ export const RoadmapCommandCenter: React.FC<RoadmapCommandCenterProps> = ({
             {jobReady ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success-surface)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-success-strong)]">
                 <Flag className="h-3 w-3" />
-                Job ready
+                {t('Job ready')}
               </span>
             ) : null}
           </div>
 
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-            Personal Career Roadmap
+            {t('Personal Career Roadmap')}
           </h1>
           <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[var(--text-secondary)]">
-            Where you are, what comes next, and why each step is here.
+            {t('Where you are, what comes next, and why each step is here.')}
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Fact
               icon={<Layers className="h-3 w-3" />}
-              label="Stage"
+              label={t('Stage')}
               value={stageLabel ? `${stageNumber} / ${stageCount}` : `${stageCount}`}
-              detail={stageLabel ?? 'All stages'}
+              detail={stageLabel ?? t('All stages')}
             />
             <Fact
               icon={<Gauge className="h-3 w-3" />}
-              label="Actions"
+              label={t('Actions')}
               value={`${completedTasks} / ${totalTasks}`}
-              detail={`${totalTasks - completedTasks} remaining`}
+              detail={`${totalTasks - completedTasks} ${t('remaining')}`}
             />
             <Fact
               icon={<Clock className="h-3 w-3" />}
-              label="Estimated effort"
+              label={t('Estimated effort')}
               value={`${totalHours}h`}
-              detail="Across the whole plan"
+              detail={t('Across the whole plan')}
             />
             <Fact
               icon={<TrendingUp className="h-3 w-3" />}
-              label="Open gaps"
+              label={t('Open gaps')}
               value={`${gaps.length}`}
-              detail={biggestGap ? `${biggestGap.name} is biggest` : 'None — targets met'}
+              detail={biggestGap ? `${biggestGap.name} ${t('is biggest')}` : t('None — targets met')}
             />
           </div>
 
@@ -237,7 +240,7 @@ export const RoadmapCommandCenter: React.FC<RoadmapCommandCenterProps> = ({
                   onClick={onCloseGap}
                   className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-[var(--color-primary-text)] underline-offset-2 hover:underline"
                 >
-                  Close gaps
+                  {t('Close gaps')}
                   <ArrowRight className="h-3 w-3 rtl:rotate-180" />
                 </button>
               ) : null}
@@ -250,10 +253,10 @@ export const RoadmapCommandCenter: React.FC<RoadmapCommandCenterProps> = ({
 
           <div className="min-w-0 flex-1 rounded-2xl border border-[var(--accent-primary)]/35 bg-[var(--color-primary-surface)]/70 p-3.5 lg:w-[17rem] lg:flex-none">
             <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
-              Your next step
+              {t('Your next step')}
             </div>
             <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-[var(--text-primary)]">
-              {nextTaskTitle ?? 'Every action in the plan is complete.'}
+              {nextTaskTitle ?? t('Every action in the plan is complete.')}
             </p>
             {nextStageLabel ? (
               <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">{nextStageLabel}</p>
@@ -264,7 +267,7 @@ export const RoadmapCommandCenter: React.FC<RoadmapCommandCenterProps> = ({
                 onClick={onOpenStage}
                 className="mt-2.5 inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--color-primary-hover)]"
               >
-                Open this stage
+                {t('Open this stage')}
                 <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
               </button>
             ) : null}
@@ -276,7 +279,7 @@ export const RoadmapCommandCenter: React.FC<RoadmapCommandCenterProps> = ({
               onClick={onEnroll}
               className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-primary-text)] hover:bg-[var(--color-primary-surface)]"
             >
-              Enroll in this plan
+              {t('Enroll in this plan')}
             </button>
           ) : null}
         </div>

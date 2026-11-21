@@ -377,4 +377,7 @@ export const roadmapAr: Record<string, string> = {
   'remaining': 'متبقية',
   'All stages': 'كل المراحل',
   'complete': 'مكتمل',
+  'is biggest': 'هي الأكبر',
+  'of the roadmap complete': 'من خارطة الطريق مكتمل',
+  'Every action in the plan is complete.': 'كل إجراء في الخطة مكتمل.',
 };
