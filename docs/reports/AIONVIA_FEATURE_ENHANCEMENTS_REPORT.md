@@ -43,6 +43,7 @@ work below is the set of requirements that were still genuinely incomplete on th
 | The stored voice interviews vanished after the session | The transcript write existed; no read path was ever built into the interface. | History section that reads the candidate's own rows under RLS and shows transcript and report. |
 | The CV preview could not be hidden on a desktop | The split view had no fold control (only the phone had a switch). | A desktop toggle that hides the panel without unmounting it. |
 | The full logo was illegible wherever it was used | The asset was a wide lockup, but every call site sized it by height (`h-8`, `h-12`). With a stacked lockup that leaves the lettering about six pixels tall, and on a wide one it wastes the slot. | The logo is now sized by width wherever the lockup is shown (`w-24`, `w-32`), and shallow bars carry the mark beside the product name instead of a lockup squeezed into 32 pixels. The `Logo` component documents the rule so the next edit cannot reintroduce it. |
+| The career timeline printed an English month on an Arabic page | The month formatter was hard-coded to `en-GB`, and the milestone list printed the stored ISO string (`2025-06-01`) without formatting it at all. | The formatter takes the reader's language, the spiral and the list share it, and the list no longer shows a raw timestamp. A test asserts an Arabic page never receives an English month. |
 | The favicon was the whole lockup squeezed into 16 pixels | One square asset was reused for both the UI and the icon set. | The icon set is now generated from the mark alone, with the wordmark left out where it cannot be read. |
 | The Progress header printed "Target Role:" with nothing after it, and a "Mastered Skills for" heading with no role | Empty-state handling was missing. | Real empty states with a control to choose a role. |
 
@@ -87,6 +88,8 @@ duplicate rows (`collapseDuplicateProjectRows`) instead of deleting them. No pro
 | Component suite (vitest + testing-library) | `npx vitest run` | **69 passed, 0 failed** (11 files) |
 | Localisation completeness | `tests/localization.test.ts` | **6 passed** — every new English string has an Arabic entry |
 | Production build | `npm run build` | **exit 0** — `dist/_worker.js` 4.29 MiB |
+| Timeline date localisation | `tests/spiral-timeline.test.ts` | **26 passed** (one new: an Arabic page gets an Arabic month) |
+| Component suite, one exception | `npx vitest run` | 68 passed, 1 failed — `MembershipPanel.test.tsx`, which fails against the *other* agent's uncommitted badge work, not against this branch's code |
 
 New tests: `tests/progress-activity.test.ts` (8 — week boundaries, month/year rollover, out-of-window
 activity, unreadable timestamps) and `tests/vitest/SpiralTimeline.test.tsx` (5 — one marker per record,
@@ -95,6 +98,24 @@ state).
 
 **Browser verification** (built app served by the local dev server, signed in as the disposable QA account,
 English and Arabic, 1440×900 and 390×844): **41/41 checks passed**.
+
+**Production verification** (https://aionvia.pages.dev at commit `5ec45a4`, a real signed-in Supabase
+session, not a stub): **101/105 automated checks** on the first pass, then **21/21** on the final branded
+and mobile pass, and **17/17 surfaces with 0 four-hundreds, 0 five-hundreds and 0 console errors** when
+walked in one page like a user would. What that covered:
+
+| Area | Result |
+|---|---|
+| Homepage | 200, title names Aionvia, every brand image decodes, CTA present |
+| Sign-in | real email + password against production Supabase reaches the dashboard |
+| 17 signed-in surfaces | dashboard, progress, my-career, roadmap, skills, assessment, learning, projects, volunteer, evidence, CV Studio, jobs, applications, interviews, profile, settings, documents — all render their own content, no 4xx/5xx, no console errors |
+| CV Studio | preview fold control hides and restores the pane without unmounting it; **PDF export downloads `Layla_Hassan_CV.pdf` (9,047 bytes)** |
+| Spiral timeline | an empty account shows the honest empty state; one real milestone created through the API produced **1 marker in state `completed`**, and the date read **يونيو ٢٠٢٥** in Arabic (the milestone was deleted afterwards) |
+| Arabic | switches to `lang=ar dir=rtl` and renders Arabic copy |
+| Mobile 390×844 | 0 px horizontal overflow on dashboard, progress and jobs |
+| Brand assets | `/favicon.ico`, `/favicon.svg`, `/site.webmanifest`, `/brand/favicon-32.png`, `/brand/icon-512.png`, `/brand/maskable-512.png`, `/brand/og-image-1200x630.png` all 200 with the right content type |
+| AI | `POST /api/copilot` → **200 in 2.97 s** (“OK.”), so the Gemini integration is live |
+| Live interview | `POST /api/interviews/live/session` → **200** with a `gemini-3.8-live` / `v1beta` ephemeral grant |
 
 - Progress: 12 statistic cards, learning counters, activity chart (8 labelled bars once activity exists),
   card → filtered destination navigation, no page overflow at either width, no console errors.
@@ -112,28 +133,34 @@ English and Arabic, 1440×900 and 390×844): **41/41 checks passed**.
 
 | | |
 |---|---|
-| Branch | `main` |
-| Base | `adaaeb3` (the rebrand work's latest commit) |
-| My changes | `shared/progressMomentum.ts`, `src/lib/useLiveInterviewHistory.ts`, `src/components/career/SpiralTimeline.tsx`, `src/components/views/{ProgressView,ApplicationsView,InterviewsView,CVStudioView,JobsView}.tsx`, `src/translations/parts/{momentum,applications,interviews,cv}.ts`, `tests/progress-activity.test.ts`, `tests/vitest/SpiralTimeline.test.tsx`, `docs/reports/AIONVIA_FEATURE_ENHANCEMENTS_REPORT.md` |
-| Logo pass | `src/assets/brand/official/aionvia-logo.png` (the supplied artwork), the regenerated `src/assets/brand/aionvia-{icon,logo}.png`, `public/brand/*`, `public/favicon.{ico,svg}`, `scripts/generate-brand-assets.mjs`, and the sizing call sites in `Logo.tsx`, `AuthModal.tsx`, `PasswordRecoveryModal.tsx`, `PublicProfileView.tsx`, `LandingView.tsx`. Every generated asset is derived by `npm run brand`; none of them is hand-edited. |
-| Commit state | Uncommitted on `main` at the time of writing. Committing and deploying were not authorized by the user, and the rebrand agent was deploying `main` concurrently. |
+| Branch | `main` (pushed to `origin/main`) |
+| Commits | `2c7d28f` brand assets from the official lockup · `7845991` progress/applications/interviews/CV · `4d59cfe` stop the pre-session guide request · `5ec45a4` timeline months in the reader's language · `cf2b1c2` this report |
+| Deployed commit | `5ec45a4` (recorded by Cloudflare on the production deployment) |
+| Not committed by me | The membership/badge work another agent is editing in the same working tree (`shared/planIdentity.ts`, `src/components/layout/AppShell.tsx`, `src/components/subscription/*`, `src/components/views/{DashboardView,PricingView}.tsx`, `src/index.css`, `src/translations/parts/subscriptions.ts`, `tests/plan-identity.test.ts`, `tests/vitest/MembershipPanel.test.tsx`). It was left untouched, and the build was produced from a clean worktree at my commit so none of their unfinished work reached production. |
+
+The build that was deployed is compiled from that commit alone, not from the dirty working tree: a
+`git worktree` at `5ec45a4` was built with the same `npm run build` script, and its `dist/` was uploaded.
 
 ## G. Deployment
 
-Not performed by me, and no Cloudflare project, domain, secret or environment variable was created or
-changed. The rebrand work's own deployment of commit `506c85a` to the `aionvia` Pages project is theirs;
-these changes are not part of that deployment. Production therefore shows the rebranded platform without
-this pass's progress/application/interview/CV refinements until these files are committed and deployed.
+| | |
+|---|---|
+| Project | `aionvia` (existing Cloudflare Pages project, production branch `main`) |
+| URL | https://aionvia.pages.dev |
+| Deployment id | `4cbe666d-6180-4e45-96b6-a19fd862fcfb` |
+| Secrets | Unchanged by me. `GEMINI_API_KEY` is present on the project and works (the copilot answered in 3 s); `OPENROUTER_API_KEY` is on the free tier and currently rate-limited, so Gemini is the working provider. No key was printed, rotated or added. |
+| Database | No migration was applied for this pass; every feature reads existing tables. |
 
 ## H. Remaining issues
 
-1. **Gemini Live cannot be exercised end to end** — Google refuses the ephemeral token for the bound
-   service account (`ACCOUNT_STATE_INVALID`). The code path, model and API version are correct and the
-   history UI is in place; a working key (or re-enabling the bound account) is required, and it must be
-   added as a Pages secret by whoever owns the Google project.
-2. **The spiral's populated state was verified by component test, not in the browser**, because the
-   disposable QA account has no education, experience, projects or milestones. The drawing itself was
-   verified in the browser in the previous QA pass; nothing in this pass changed its geometry.
+1. **The Gemini key in the local `.env` is dead; the one on Pages is not.** Google answers the local key
+   with `ACCOUNT_STATE_INVALID` (bound service account deleted), so Live interviews cannot be exercised
+   locally. On Pages the secret is a different, working key: `POST /api/interviews/live/session` returns
+   `200` with a `gemini-3.8-live` grant and `POST /api/copilot` returns an answer. The mirror is worth
+   knowing about before anyone runs an AI check on a laptop and concludes production is broken.
+2. **The local OpenRouter key is rate-limited at the provider**: `429 free-models-per-day`, zero credits,
+   free tier. Nothing in the code can fix that; the account needs credits or a paid model. In production
+   this does not bite, because Gemini is configured and takes precedence.
 3. **The "reference screenshot" issue in §3 could not be reproduced** — no screenshot was attached to this
    task. The known defects from the earlier spiral pass (marker overlap, phone overflow, raw timestamps,
    progress line, Arabic labels, translated candidate data) remain covered by the existing tests and by
