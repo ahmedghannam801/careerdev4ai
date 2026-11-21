@@ -126,6 +126,10 @@ export const ROUTE_ALIASES: Readonly<
   Record<string, { route: string; params?: Record<string, string> }>
 > = {
   'cv-analyzer': { route: 'cv-studio', params: { tab: 'ats' } },
+  // Referrals are no longer a page of their own. The old address still works
+  // and lands on the referrals section inside the profile, which is where the
+  // referral link, its counters and the history now live.
+  referrals: { route: 'profile', params: { section: 'referrals' } },
   // The certifications live in the profile, but they are one of the things a
   // candidate collects rather than one of the things they set about
   // themselves. The Portfolio pillar links to them directly.
@@ -423,6 +427,7 @@ export const DOCUMENT_TYPE_FILTERS = [
 /** The tabs of the settings page. */
 export const SETTINGS_TABS = [
   'account',
+  'subscription',
   'security',
   'privacy',
   'ai',
@@ -471,6 +476,7 @@ export const PROFILE_SECTIONS = [
   'volunteering',
   'languages',
   'links',
+  'referrals',
 ] as const;
 
 /**

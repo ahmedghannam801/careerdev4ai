@@ -28,6 +28,7 @@ import type {
 } from '../../types/learning';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
+import { TabButtons } from '../ui/TabButtons';
 import { CourseCard } from '../learning/CourseCard';
 import { LEARNING_TABS } from '../../lib/routing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
@@ -618,22 +619,13 @@ export const LearningCenterView: React.FC = () => {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] pb-2">
-        {tabs.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            onClick={() => setTab(entry.id)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === entry.id
-                ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            {t(entry.label)} <span className="text-[11px] opacity-70">{entry.count}</span>
-          </button>
-        ))}
-      </div>
+      <TabButtons
+        ariaLabel={t('Learning Hub sections')}
+        tabs={tabs.map((entry) => ({ ...entry, label: t(entry.label) }))}
+        value={tab}
+        onChange={setTab}
+        idPrefix="learning-tab"
+      />
 
       <section data-tour="learning-search-filters" className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
         <div className="flex flex-wrap items-center gap-3">

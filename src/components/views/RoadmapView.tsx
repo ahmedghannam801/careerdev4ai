@@ -43,6 +43,7 @@ import type { MilestoneMorphState } from '../motion/Morph';
 import { Stagger, StaggerItem } from '../motion/Motion';
 import { TimeBreakdown } from '../ui/TimeBreakdown';
 import { RoadmapTreeView } from '../roadmap/RoadmapTreeView';
+import { TabButtons, tabButtonClassName } from '../ui/TabButtons';
 import { RoadmapCommandCenter } from '../roadmap/RoadmapCommandCenter';
 import { useToast } from '../toast/ToastProvider';
 
@@ -139,40 +140,25 @@ const RoadmapViewSwitcher: React.FC<{
   onChange: (mode: RoadmapViewMode) => void;
   t: (source: string) => string;
 }> = ({ mode, onChange, t }) => (
-  <div
-    role="tablist"
-    aria-label={t('View mode')}
-    className="inline-flex flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-1"
-  >
-    <button
-      type="button"
-      role="tab"
-      aria-selected={mode === 'tree'}
-      onClick={() => onChange('tree')}
-      className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
-        mode === 'tree'
-          ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-      }`}
-    >
-      <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
-      {t('Interactive Tree View (roadmap.sh Style)')}
-    </button>
-    <button
-      type="button"
-      role="tab"
-      aria-selected={mode === 'guided'}
-      onClick={() => onChange('guided')}
-      className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors ${
-        mode === 'guided'
-          ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-      }`}
-    >
-      <Compass className="h-3.5 w-3.5" aria-hidden="true" />
-      {t('Guided Stages View (Classic Card Journey)')}
-    </button>
-  </div>
+  <TabButtons
+    ariaLabel={t('View mode')}
+    tabs={[
+      {
+        id: 'tree',
+        label: t('Interactive Tree View (roadmap.sh Style)'),
+        icon: GitBranch,
+      },
+      {
+        id: 'guided',
+        label: t('Guided Stages View (Classic Card Journey)'),
+        icon: Compass,
+      },
+    ]}
+    value={mode}
+    onChange={onChange}
+    size="sm"
+    idPrefix="roadmap-view-tab"
+  />
 );
 
 /**
@@ -1037,7 +1023,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
 
       {/* A light filter. The timeline stays intact; the filter only hides
           actions, so the stage progress never lies. */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('Filter roadmap actions')}>
         <span className="me-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           {t('Show')}
         </span>
@@ -1045,12 +1031,9 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           <button
             key={status}
             type="button"
+            aria-pressed={statusFilter === status}
             onClick={() => setStatusFilter(status)}
-            className={`rounded-lg px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${
-              statusFilter === status
-                ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-                : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
+            className={`${tabButtonClassName(statusFilter === status, 'sm')} capitalize`}
           >
             {status === 'all' ? t('All actions') : t(status.replace('_', ' '))}
           </button>

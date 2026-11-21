@@ -11,10 +11,17 @@
  * the server, and the only thing this module keeps is the TEXT.
  *
  * THE TURN-TAKING IS THE MODEL'S
- * Gemini decides when the candidate has finished speaking and when it is
- * model's turn to talk. This module does not interrupt it and does not
- * interrupt the candidate: when the model is interrupted, the playback queue
- * is dropped, which is what makes a real conversation possible.
+ * Gemini decides when the candidate has finished speaking and when it is the
+ * model's turn to talk. When the model is interrupted, the playback queue is
+ * dropped, which is what makes a real conversation possible.
+ *
+ * THE AUDIO CONTEXTS ARE CREATED ON THE CLICK
+ * Browsers only let a page start audio while it has the user's activation.
+ * `prepare()` is therefore called synchronously from the Start button, before
+ * any network request. Creating the contexts later, after the token had been
+ * fetched, left them suspended and produced a silent interview: the
+ * microphone streamed nothing and the interviewer's voice was queued into a
+ * context that was never running.
  */
 
 import type { GoogleGenAI } from '@google/genai/web';
@@ -43,28 +50,99 @@ export interface LiveInterviewClientCallbacks {
   onError: (error: Error) => void;
 }
 
+/** The AudioContext constructor, including Safari's prefixed name. */
+function audioContextCtor(): typeof AudioContext | null {
+  return (
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext ??
+    null
+  );
+}
+
+/**
+ * Creates an AudioContext at the preferred rate, or at the browser's own rate
+ * when it refuses that rate. Safari and some Firefox builds do not accept
+ * every rate, and a refused rate must not end the interview.
+ */
+function createAudioContext(preferredRate: number): AudioContext {
+  const Ctor = audioContextCtor();
+  if (!Ctor) throw new Error('This browser cannot play or capture audio.');
+  try {
+    return new Ctor({ sampleRate: preferredRate });
+  } catch {
+    return new Ctor();
+  }
+}
+
 /**
  * The worklet that turns the microphone into the bytes the API expects.
  *
  * It runs on the audio thread: it takes the float samples the browser gives
- * it and writes 16-bit little-endian PCM, which is the format the Live API
- * takes. It is registered from an inline source, so there is no extra file to
- * ship and no extra request to make.
+ * it, resamples them to the 16 kHz the Live API expects when the context runs
+ * at another rate, and writes 16-bit little-endian PCM. It is registered from
+ * an inline source, so there is no extra file to ship and no extra request to
+ * make.
  */
 const PCM_WORKLET_SOURCE = `
 class Pcm16Processor extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    const settings = (options && options.processorOptions) || {};
+    this.inputRate = settings.inputSampleRate || sampleRate;
+    this.targetRate = settings.targetSampleRate || 16000;
+    this.ratio = this.inputRate / this.targetRate;
+    this.pending = new Float32Array(0);
+    this.readAt = 0;
+  }
+
+  post(samples) {
+    if (!samples || samples.length === 0) return;
+    const buffer = new ArrayBuffer(samples.length * 2);
+    const view = new DataView(buffer);
+    for (let i = 0; i < samples.length; i += 1) {
+      const sample = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    }
+    this.port.postMessage(buffer, [buffer]);
+  }
+
   process(inputs) {
     const input = inputs[0];
     if (!input || input.length === 0) return true;
     const channel = input[0];
     if (!channel) return true;
-    const buffer = new ArrayBuffer(channel.length * 2);
-    const view = new DataView(buffer);
-    for (let i = 0; i < channel.length; i += 1) {
-      const sample = Math.max(-1, Math.min(1, channel[i]));
-      view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+
+    // The common case: the browser gave us exactly the rate the API wants.
+    if (Math.abs(this.ratio - 1) < 0.0001) {
+      this.post(channel);
+      return true;
     }
-    this.port.postMessage(buffer, [buffer]);
+
+    // Append the new samples to whatever was left from the previous block.
+    const merged = new Float32Array(this.pending.length + channel.length);
+    merged.set(this.pending);
+    merged.set(channel, this.pending.length);
+    this.pending = merged;
+
+    const output = [];
+    while (this.readAt + 1 < this.pending.length) {
+      const index = Math.floor(this.readAt);
+      const fraction = this.readAt - index;
+      output.push(
+        this.pending[index] * (1 - fraction) + this.pending[index + 1] * fraction
+      );
+      this.readAt += this.ratio;
+    }
+
+    // Keep only the part that has not been consumed yet, so the buffer does
+    // not grow for the length of the interview.
+    const consumed = Math.floor(this.readAt);
+    if (consumed > 0) {
+      this.pending = this.pending.slice(consumed);
+      this.readAt -= consumed;
+    }
+
+    if (output.length > 0) this.post(Float32Array.from(output));
     return true;
   }
 }
@@ -74,15 +152,20 @@ registerProcessor('pcm16-processor', Pcm16Processor);
 /**
  * Collects the transcript as it arrives.
  *
- * The API sends the transcription of a turn in pieces, and marks the end of
- * one with `finished`. The collector holds the pieces of the turn in progress
- * and hands over one whole turn at a time, so the interface never shows a
- * half sentence that is about to change.
+ * The API sends the transcription of a turn in pieces. A piece may be marked
+ * `finished`, but many Live messages only mark the end of a turn with
+ * `turnComplete`, so the collector can close every open turn when the turn is
+ * over. Without that, the transcript stayed empty until the candidate pressed
+ * End, which made a working interview look broken.
  */
-class TranscriptCollector {
+export class TranscriptCollector {
   private pending = new Map<'interviewer' | 'candidate', string>();
 
-  add(speaker: 'interviewer' | 'candidate', text: string, finished?: boolean): LiveTranscriptTurn | null {
+  add(
+    speaker: 'interviewer' | 'candidate',
+    text: string,
+    finished?: boolean
+  ): LiveTranscriptTurn | null {
     const current = `${this.pending.get(speaker) ?? ''}${text}`.trim();
     if (!finished) {
       this.pending.set(speaker, current);
@@ -93,8 +176,8 @@ class TranscriptCollector {
     return { speaker, text: current, at: new Date().toISOString() };
   }
 
-  /** The turn that is still open when the conversation ends. */
-  flush(): LiveTranscriptTurn[] {
+  /** Closes every open turn at the end of a model turn. */
+  finishAll(): LiveTranscriptTurn[] {
     const turns: LiveTranscriptTurn[] = [];
     for (const [speaker, text] of this.pending) {
       if (text.trim()) {
@@ -103,6 +186,11 @@ class TranscriptCollector {
     }
     this.pending.clear();
     return turns;
+  }
+
+  /** The turn that is still open when the conversation ends. */
+  flush(): LiveTranscriptTurn[] {
+    return this.finishAll();
   }
 }
 
@@ -135,11 +223,10 @@ function encodePcm16(buffer: ArrayBuffer): string {
 /**
  * The live interview, as the browser sees it.
  *
- * `start()` asks for the microphone and opens the session; `stop()` closes
- * everything and hands back the transcript.
+ * `prepare()` is called from the click, `start(grant)` opens the session, and
+ * `stop()` closes everything and hands back the transcript.
  */
 export class LiveInterviewClient {
-  private readonly grant: LiveInterviewGrant;
   private readonly callbacks: LiveInterviewClientCallbacks;
 
   private ai: GoogleGenAI | null = null;
@@ -155,12 +242,11 @@ export class LiveInterviewClient {
   private nextPlayAt = 0;
   private readonly scheduled: AudioBufferSourceNode[] = [];
   private stopped = false;
+  private active = false;
+  private disconnectHandled = false;
+  private prepared = false;
 
-  constructor(
-    grant: LiveInterviewGrant,
-    callbacks: LiveInterviewClientCallbacks
-  ) {
-    this.grant = grant;
+  constructor(callbacks: LiveInterviewClientCallbacks) {
     this.callbacks = callbacks;
   }
 
@@ -169,13 +255,48 @@ export class LiveInterviewClient {
     return [...this.turns];
   }
 
+  /** Whether a session is open or opening. */
+  get isActive(): boolean {
+    return this.active;
+  }
+
+  /**
+   * Creates the audio contexts while the page still has the click's user
+   * activation. This method is deliberately synchronous and must be called
+   * before the first `await` in the Start handler.
+   */
+  prepare(): void {
+    if (this.prepared) {
+      void this.resumeContexts();
+      return;
+    }
+    this.prepared = true;
+
+    this.inputContext = createAudioContext(INPUT_SAMPLE_RATE);
+    this.outputContext = createAudioContext(OUTPUT_SAMPLE_RATE);
+    void this.resumeContexts();
+  }
+
+  private async resumeContexts(): Promise<void> {
+    for (const context of [this.inputContext, this.outputContext]) {
+      if (!context) continue;
+      if (context.state === 'suspended') {
+        await context.resume().catch(() => undefined);
+      }
+    }
+  }
+
   /**
    * Opens the session.
    *
    * The microphone is requested first: a candidate who refuses it is told so
    * plainly, rather than being left looking at a silent interview.
    */
-  async start(): Promise<void> {
+  async start(grant: LiveInterviewGrant): Promise<void> {
+    if (this.active) throw new Error('An interview is already running.');
+
+    this.stopped = false;
+    this.disconnectHandled = false;
     this.callbacks.onState('connecting');
 
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -204,11 +325,20 @@ export class LiveInterviewClient {
       throw new Error('The microphone could not be opened.');
     }
 
+    // A microphone that is unplugged or revoked mid-interview must close the
+    // session instead of leaving the candidate talking into nothing.
+    this.stream.getAudioTracks().forEach((track) => {
+      track.addEventListener('ended', () => {
+        if (this.stopped) return;
+        this.callbacks.onError(new Error('The microphone stopped. The interview was ended.'));
+        void this.handleConnectionLost();
+      });
+    });
+
+    if (!this.prepared) this.prepare();
+
     try {
       await this.startCapture();
-      // The playback context is opened up front: a context that is created
-      // in the middle of the first answer would make the interviewer's
-      // first words arrive late.
       await this.primePlayback();
 
       // The ephemeral token is used as the credential. It opens one session
@@ -224,12 +354,12 @@ export class LiveInterviewClient {
       // interview never downloads it.
       const { GoogleGenAI, Modality } = await import('@google/genai/web');
       this.ai = new GoogleGenAI({
-        apiKey: this.grant.token,
-        httpOptions: { apiVersion: this.grant.apiVersion },
+        apiKey: grant.token,
+        httpOptions: { apiVersion: grant.apiVersion },
       });
 
       this.session = await this.ai.live.connect({
-        model: this.grant.model,
+        model: grant.model,
         config: {
           responseModalities: [Modality.AUDIO],
           inputAudioTranscription: {},
@@ -237,17 +367,18 @@ export class LiveInterviewClient {
         },
         callbacks: {
           onopen: () => {
+            this.active = true;
             this.callbacks.onState('listening');
           },
           onmessage: (message) => {
             this.handleMessage(message);
           },
-          onerror: (event) => {
+          onerror: () => {
             this.callbacks.onError(new Error('The live connection failed.'));
             this.callbacks.onState('error');
           },
           onclose: () => {
-            if (!this.stopped) this.callbacks.onState('closed');
+            void this.handleConnectionLost();
           },
         },
       });
@@ -259,10 +390,13 @@ export class LiveInterviewClient {
 
   /** Stops the interview and closes everything it opened. */
   async stop(): Promise<LiveTranscriptTurn[]> {
+    const wasStopped = this.stopped;
     this.stopped = true;
+
+    // The open turn is part of the conversation. It is recorded before the
+    // session is closed, so pressing End never loses the last sentence.
     for (const turn of this.collector.flush()) {
-      this.turns.push(turn);
-      this.callbacks.onTranscript(turn);
+      this.pushTurn(turn);
     }
 
     try {
@@ -271,10 +405,37 @@ export class LiveInterviewClient {
       // The session may already be gone. Nothing is lost by it.
     }
     this.session = null;
+    this.active = false;
 
     await this.releaseMedia();
-    this.callbacks.onState('closed');
+
+    // A stop that was already in progress (for example from the unmount
+    // cleanup) must not announce a second closed state.
+    if (!wasStopped) this.callbacks.onState('closed');
     return this.transcript;
+  }
+
+  /**
+   * The connection ended without the candidate pressing End: a network drop,
+   * a browser sleep, or the model closing the socket. The last transcript
+   * pieces are kept, the microphone is released, and the interface is told.
+   * It is not reconnected automatically: the token is single-use, so a
+   * reconnect would need a fresh credential and a new session.
+   */
+  private async handleConnectionLost(): Promise<void> {
+    if (this.stopped || this.disconnectHandled) return;
+    this.disconnectHandled = true;
+    this.active = false;
+
+    for (const turn of this.collector.flush()) {
+      this.pushTurn(turn);
+    }
+    this.session = null;
+    await this.releaseMedia();
+    this.callbacks.onState('closed');
+    this.callbacks.onError(
+      new Error('The live connection ended. Your transcript up to that point is kept.')
+    );
   }
 
   /** Releases the microphone, the audio contexts and the worklet. */
@@ -301,23 +462,25 @@ export class LiveInterviewClient {
       await this.outputContext.close().catch(() => undefined);
       this.outputContext = null;
     }
+    this.prepared = false;
   }
 
   /**
    * Starts streaming the microphone.
    *
-   * The capture context runs at the rate the Live API expects, so the
-   * browser resamples for us and the worklet only has to pack the samples.
+   * When the browser honours the requested 16 kHz rate the worklet only packs
+   * samples. When it does not, the worklet resamples from the context's own
+   * rate, so a browser that refuses 16 kHz still gets a working interview
+   * rather than a stream the API cannot read.
    */
   private async startCapture(): Promise<void> {
-    const AudioContextCtor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextCtor) throw new Error('This browser cannot capture audio.');
     if (!this.stream) throw new Error('The microphone is not open.');
+    if (!this.inputContext) this.inputContext = createAudioContext(INPUT_SAMPLE_RATE);
+    const inputContext = this.inputContext;
 
-    const inputContext = new AudioContextCtor({ sampleRate: INPUT_SAMPLE_RATE });
-    this.inputContext = inputContext;
+    if (inputContext.state === 'suspended') {
+      await inputContext.resume().catch(() => undefined);
+    }
 
     if (!inputContext.audioWorklet) {
       await inputContext.close().catch(() => undefined);
@@ -336,7 +499,12 @@ export class LiveInterviewClient {
 
     const source = inputContext.createMediaStreamSource(this.stream);
     this.source = source;
-    const worklet = new AudioWorkletNode(inputContext, 'pcm16-processor');
+    const worklet = new AudioWorkletNode(inputContext, 'pcm16-processor', {
+      processorOptions: {
+        inputSampleRate: inputContext.sampleRate,
+        targetSampleRate: INPUT_SAMPLE_RATE,
+      },
+    });
     this.worklet = worklet;
     worklet.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
       this.sendAudio(event.data);
@@ -418,6 +586,12 @@ export class LiveInterviewClient {
     }
 
     if (content.turnComplete) {
+      // The Live API often marks a turn complete without marking the last
+      // transcription piece as `finished`. Closing the open turns here makes
+      // the transcript appear as the conversation happens.
+      for (const turn of this.collector.finishAll()) {
+        this.pushTurn(turn);
+      }
       this.callbacks.onState('listening');
     }
   }
@@ -432,6 +606,12 @@ export class LiveInterviewClient {
   private playAudio(base64: string): void {
     if (!this.outputContext) return;
     const context = this.outputContext;
+    if (context.state === 'suspended') {
+      // Some browsers suspend the context again after a long silence. The
+      // gesture that started the interview already unlocked audio, so this
+      // resume is allowed; it is best-effort and the chunk is still queued.
+      void context.resume().catch(() => undefined);
+    }
     const samples = decodePcm16(base64);
     const buffer = context.createBuffer(1, samples.length, OUTPUT_SAMPLE_RATE);
     const channel = buffer.getChannelData(0);
@@ -462,16 +642,23 @@ export class LiveInterviewClient {
     if (this.outputContext) this.nextPlayAt = this.outputContext.currentTime;
   }
 
-  /** Prepares the context the interviewer's voice is played back through. */
+  /**
+   * Prepares the context the interviewer's voice is played back through.
+   *
+   * The context is normally created in `prepare()` on the click. This method
+   * only creates one as a fallback and refuses to continue when the browser
+   * has blocked playback outright, because a silent interview is a worse
+   * outcome than a clear error.
+   */
   async primePlayback(): Promise<void> {
-    if (this.outputContext) return;
-    const AudioContextCtor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextCtor) return;
-    this.outputContext = new AudioContextCtor({ sampleRate: OUTPUT_SAMPLE_RATE });
+    if (!this.outputContext) this.outputContext = createAudioContext(OUTPUT_SAMPLE_RATE);
     if (this.outputContext.state === 'suspended') {
       await this.outputContext.resume().catch(() => undefined);
+    }
+    if (this.outputContext.state === 'suspended') {
+      throw new Error(
+        'The browser blocked audio playback. Start the interview again and allow sound for this page.'
+      );
     }
   }
 }

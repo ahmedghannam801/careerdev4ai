@@ -17,6 +17,7 @@ import { ROLE_DEFINITION_LIST } from '../../../shared/careerRoles.ts';
 import { generateRoadmapPlan } from '../../../shared/roadmapGenerator.ts';
 import { computeSkillGaps, toRoleSkillRequirements } from '../../../shared/skillGap.ts';
 import { getCareerDomainLabel } from '../../../shared/careerDomains.ts';
+import { TabButtons } from '../ui/TabButtons';
 
 /**
  * The landing page's product preview.
@@ -159,30 +160,15 @@ export const ProductPreview: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-[var(--color-border)] px-3 pt-2" role="tablist" aria-label={t('Product preview')}>
-        {TABS.map(({ id, label, icon: Icon }) => {
-          const active = tab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              id={`preview-tab-${id}`}
-              aria-selected={active}
-              aria-controls={`preview-panel-${id}`}
-              onClick={() => setTab(id)}
-              className={`inline-flex items-center gap-1.5 rounded-t-lg border-b-2 px-3 py-2 text-xs font-semibold transition-colors ${
-                active
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary-text)]'
-                  : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              <span>{label}</span>
-            </button>
-          );
-        })}
-      </div>
+      <TabButtons
+        ariaLabel={t('Product preview')}
+        tabs={TABS}
+        value={tab}
+        onChange={setTab}
+        size="sm"
+        idPrefix="preview-tab"
+        className="mx-3 mt-2"
+      />
 
       {/* Panels */}
       <div className="min-h-[280px] bg-[var(--color-surface)] p-4">

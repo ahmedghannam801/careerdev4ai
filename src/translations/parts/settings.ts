@@ -7,6 +7,16 @@
 
 export const settingsAr: Record<string, string> = {
   'User Workspace & Controls': 'مساحة عمل المستخدم والتحكم',
+  'Account': 'الحساب',
+  'Subscription': 'الاشتراك',
+  'Security': 'الأمان',
+  'Privacy Center': 'مركز الخصوصية',
+  'AI Preferences': 'تفضيلات الذكاء الاصطناعي',
+  'Notifications': 'الإشعارات',
+  'Localization & Theme': 'اللغة والمظهر',
+  'About & Developer': 'حول والمطوّر',
+  'Your plan, its renewal date and the tokens it includes are read from your subscription. Changing or cancelling a plan happens on the pricing page.':
+    'خطتك وتاريخ تجديدها والرموز التي تتضمنها تُقرأ من اشتراكك. تغيير الخطة أو إلغاؤها يتم من صفحة الأسعار.',
   'Account, Security & Preferences': 'الحساب والأمان والتفضيلات',
   'Export All Career Data': 'تصدير كل بيانات المسار المهني',
   'Account Overview': 'نظرة عامة على الحساب',

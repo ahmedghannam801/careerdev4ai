@@ -45,6 +45,7 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { useAdminAccess } from '../../lib/useAdminAccess';
 import { AdminAccessDenied } from '../admin/AdminRouteGuard';
+import { TabButtons } from '../ui/TabButtons';
 import { AnnouncementsPanel } from '../admin/AnnouncementsPanel';
 import { TrafficAnalyticsPanel } from '../admin/TrafficAnalyticsPanel';
 import { AdminSubscriptionsPanel } from '../admin/AdminSubscriptionsPanel';
@@ -1336,24 +1337,15 @@ export const AdminCenterView: React.FC = () => {
             {admin.permissions.length} {t('permissions')}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {tabs.map((entry) => {
-            const Icon = entry.icon;
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                onClick={() => setTab(entry.id)}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                  tab === entry.id
-                    ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-                    : 'border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" /> {entry.label}
-              </button>
-            );
-          })}
+        <div className="flex max-w-full flex-wrap items-center gap-1.5">
+          <TabButtons
+            ariaLabel={t('Admin Center sections')}
+            tabs={tabs}
+            value={tab}
+            onChange={setTab}
+            size="sm"
+            idPrefix="admin-tab"
+          />
         </div>
       </div>
 

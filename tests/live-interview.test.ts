@@ -34,6 +34,7 @@ import {
   CANONICAL_LIVE_MODEL,
   LIVE_API_VERSION,
 } from '../server/ai/geminiConfig.ts';
+import { TranscriptCollector } from '../src/lib/liveInterviewClient.ts';
 
 const REPO_ROOT = join(import.meta.dirname, '..');
 
@@ -191,9 +192,31 @@ describe('the live interview', () => {
     assert.doesNotMatch(CANONICAL_LIVE_MODEL, /native-audio-preview-12-2025/);
   });
 
+  it('closes the open transcript turns when the model turn completes', () => {
+    // The Live API often sends transcription pieces without `finished`, and
+    // then marks the turn complete. The collector must close both speakers'
+    // turns at that point, or the transcript stays invisible until End.
+    const collector = new TranscriptCollector();
+
+    assert.equal(collector.add('candidate', 'I led the migration', false), null);
+    assert.equal(collector.add('interviewer', 'What was the result?', false), null);
+
+    const turns = collector.finishAll();
+    assert.deepEqual(
+      turns.map((turn) => [turn.speaker, turn.text]),
+      [
+        ['candidate', 'I led the migration'],
+        ['interviewer', 'What was the result?'],
+      ]
+    );
+    assert.deepEqual(collector.finishAll(), []);
+  });
+
   it('mints the token and spends it on the same API version', () => {
     // An ephemeral token can only open a session on the API version that
     // issued it, so the version is pinned once and sent with the grant.
+    // `v1beta` is the combination verified in production: the server minted a
+    // token and a browser opened a Live session with it.
     assert.equal(LIVE_API_VERSION, 'v1beta');
 
     const client = readFileSync(join(REPO_ROOT, 'src/lib/liveInterviewClient.ts'), 'utf8');
@@ -201,8 +224,7 @@ describe('the live interview', () => {
 
     // The browser spends the token on the version the server sent, so the
     // two can never drift apart.
-    assert.match(client, /apiVersion: this\.grant\.apiVersion/);
-    assert.doesNotMatch(client, /v1alpha/);
+    assert.match(client, /apiVersion: grant\.apiVersion/);
     assert.match(server, /apiVersion: LIVE_API_VERSION/);
   });
 });

@@ -21,6 +21,7 @@ import { useCareer } from '../../context/CareerContext';
 import { ExperienceCard, experienceReasonText } from '../experiences/ExperienceCard';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
+import { TabButtons } from '../ui/TabButtons';
 import {
   EXPERIENCE_TABS,
   type ExperienceTab,
@@ -435,23 +436,13 @@ export const ExperienceHubView: React.FC = () => {
         {t('Progress and certificate links are self-reported.')}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] pb-2">
-        {tabs.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            onClick={() => setTab(entry.id)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === entry.id
-                ? 'bg-[var(--color-accent-surface)] text-[var(--color-primary-text)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            {t(entry.label)}{' '}
-            <span className="text-[11px] opacity-70">{entry.count}</span>
-          </button>
-        ))}
-      </div>
+      <TabButtons
+        ariaLabel={t('Career Experience Hub sections')}
+        tabs={tabs.map((entry) => ({ ...entry, label: t(entry.label) }))}
+        value={tab}
+        onChange={setTab}
+        idPrefix="experience-tab"
+      />
 
       {tab === 'recommended' && (
         <section className="space-y-5">

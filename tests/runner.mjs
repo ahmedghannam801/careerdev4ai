@@ -287,6 +287,10 @@ async function main() {
     // colour of its own, that the catalogue's own plan codes map onto them,
     // and that the palette lives in the stylesheet rather than in the code.
     // Pure.
+    // The live interview needs the microphone. A Permissions-Policy that
+    // disables it makes the browser refuse before the page can ask, so the
+    // header is part of the feature. Pure.
+    join(TESTS_DIR, 'permissions-policy.test.ts'),
     join(TESTS_DIR, 'plan-identity.test.ts'),
     // The official opportunity sources: that a deadline is read only when the
     // source published one, that a month is recorded as a month, that the

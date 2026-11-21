@@ -80,20 +80,23 @@ test.describe('the career target', () => {
     );
   });
 
-  test('the Profile page and the Settings page share one career-target component', () => {
+  test('the career target lives in the Profile, in one component, not duplicated in Settings', () => {
     const profile = readRepoFile('src/components/views/ProfileView.tsx');
     const settings = readRepoFile('src/components/views/SettingsView.tsx');
 
-    for (const [name, source] of [
-      ['ProfileView', profile],
-      ['SettingsView', settings],
-    ] as const) {
-      assert.match(
-        source,
-        /<CareerGoalRolePanel/,
-        `${name} must mount the shared career-target panel`
-      );
-    }
+    // The target role is part of the candidate's professional identity, so
+    // the Profile owns it. Settings used to mount the same panel as well,
+    // which made two places claim the same field.
+    assert.match(
+      profile,
+      /<CareerGoalRolePanel/,
+      'ProfileView must mount the shared career-target panel'
+    );
+    assert.doesNotMatch(
+      settings,
+      /<CareerGoalRolePanel/,
+      'SettingsView must not duplicate the career-target panel'
+    );
   });
 
   test('the shared panel writes through the one writer, not through its own API calls', () => {

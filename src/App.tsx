@@ -433,7 +433,7 @@ function AppRoutes() {
       case 'referrals':
         return <ReferralsView />;
       case 'settings':
-        return <SettingsView />;
+        return <SettingsView onNavigate={navigateTo} />;
       case 'admin':
         // The administrative surface is mounted only for a verified
         // administrator. The guard asks the server who the caller is, so a

@@ -37,15 +37,29 @@ import {
 } from '../../types/career';
 import { uploadPortfolioAttachment } from '../../lib/coreApi';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
-import { PROFILE_SECTIONS } from '../../lib/routing';
+import { PROFILE_SECTIONS, buildRouteHash } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { AionviaAvatar, AvatarSelector } from '../ui/AionviaAvatars';
 import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
+import { tabButtonClassName } from '../ui/TabButtons';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { CareerGoalRolePanel } from '../career/CareerGoalRolePanel';
-import { MembershipPanel } from '../subscription/MembershipPanel';
 import { PlanIdentityFrame } from '../subscription/PlanIdentityFrame';
+import { ReferralPanel } from '../referral/ReferralPanel';
+
+/** The sections of the profile, in the order they are read. */
+const PROFILE_SECTION_LINKS: Array<{ id: (typeof PROFILE_SECTIONS)[number]; label: string }> = [
+  { id: 'top', label: 'Overview' },
+  { id: 'summary', label: 'Summary' },
+  { id: 'experience', label: 'Experience' },
+  { id: 'education', label: 'Education' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'certifications', label: 'Certifications' },
+  { id: 'languages', label: 'Languages' },
+  { id: 'links', label: 'Links' },
+  { id: 'referrals', label: 'Referrals' },
+];
 
 export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const {
@@ -56,7 +70,6 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     projects,
     applications,
     suggestAiSummary,
-    validateUsername,
     aiPreferences,
     privacyPreferences,
     volunteerExperiences,
@@ -94,8 +107,6 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   const [aiSummaryDraft, setAiSummaryDraft] = useState('');
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [usernameCheckMessage, setUsernameCheckMessage] = useState('');
-  const [isUsernameValid, setIsUsernameValid] = useState<boolean | null>(null);
 
   // B.4: a rejected write must be visible. `updateProfile` throws when the
   // backend refuses the change, so every handler below catches it, keeps its
@@ -209,19 +220,6 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
-  };
-
-  const handleUsernameChange = async (val: string) => {
-    const clean = val.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-    setBasicForm(prev => ({ ...prev, username: clean }));
-    if (clean.length < 3) {
-      setUsernameCheckMessage('Username must be at least 3 characters');
-      setIsUsernameValid(false);
-      return;
-    }
-    const res = await validateUsername(clean);
-    setIsUsernameValid(res.available);
-    setUsernameCheckMessage(res.message);
   };
 
   const handleSaveBasic = async () => {
@@ -720,6 +718,27 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         </div>
       )}
 
+      {/* The profile's own sections. They are links, not buttons, because
+          each one is a destination: the address changes so a refresh or a
+          shared link lands on the same part of the profile. */}
+      <nav aria-label={t('Profile sections')} className="-mx-1">
+        <div className="flex flex-wrap items-center gap-1.5 px-1">
+          {PROFILE_SECTION_LINKS.map((entry) => {
+            const active = section === entry.id;
+            return (
+              <a
+                key={entry.id}
+                href={buildRouteHash('profile', entry.id === 'top' ? {} : { section: entry.id })}
+                aria-current={active ? 'location' : undefined}
+                className={tabButtonClassName(active, 'sm')}
+              >
+                {t(entry.label)}
+              </a>
+            );
+          })}
+        </div>
+      </nav>
+
       {/* Top Profile Header Card */}
       <div data-tour="profile-card" className="p-6 sm:p-8 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs relative overflow-hidden">
         {/* Subtle accent backdrop */}
@@ -785,7 +804,7 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                   profile.isPublic ? 'bg-[var(--color-success-surface)] text-[var(--color-success-strong)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
                 }`}>
                   {profile.isPublic ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                  {profile.isPublic ? 'Public Profile' : 'Private'}
+                  {t(profile.isPublic ? 'Public Profile' : 'Private')}
                 </span>
                 {/*
                   The plan badge that used to sit here is gone. The top tier
@@ -871,12 +890,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           </div>
         </div>
 
-        {/* The membership, beside the profile it belongs to.
-            The candidate sees here what they are on, what they have left, and
-            the way forward — without hunting for the pricing page. */}
-        <div className="mt-6 relative z-10">
-          <MembershipPanel onManagePlan={() => onNavigate('pricing')} />
-        </div>
+        {/* The plan itself is managed in Settings. Only the frame that
+            belongs to the profile photo stays here. */}
 
         {/* Profile Completeness Bar & Missing Checklist */}
         <div className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
@@ -1795,6 +1810,25 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         </div>
       </div>
 
+      {/* Referrals live here now, not in the sidebar. The panel is unchanged:
+          the same server-issued link, the same counters and the same history. */}
+      <div id="profile-referrals" className="scroll-mt-24 space-y-3">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-surface)] text-[var(--color-primary-text)]">
+            <Share2 className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div>
+            <h2 className="text-base font-bold text-[var(--text-primary)]">
+              {t('Referrals')}
+            </h2>
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+              {t('Invite a friend and keep track of every referral from your profile.')}
+            </p>
+          </div>
+        </div>
+        <ReferralPanel />
+      </div>
+
       {/* MODAL: Edit Basic Information */}
       {editBasicOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1879,41 +1913,6 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
                     value={basicForm.timezone}
                     onChange={(e) => setBasicForm(prev => ({ ...prev, timezone: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                  />
-                </div>
-              </div>
-
-              {/* Username & Privacy */}
-              <div className="p-4 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-3">
-                <div>
-                  <label className="font-semibold text-[var(--text-primary)] block mb-1">
-                    Profile Username (Public URL: /profile/{basicForm.username || 'username'})
-                  </label>
-                  <input
-                    type="text"
-                    value={basicForm.username}
-                    onChange={(e) => handleUsernameChange(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[var(--surface-main)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono"
-                  />
-                  {usernameCheckMessage && (
-                    <p className={`text-[11px] mt-1 ${isUsernameValid ? 'text-[var(--color-success-strong)]' : 'text-[var(--color-warning)]'}`}>
-                      {usernameCheckMessage}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <div>
-                    <div className="font-semibold text-[var(--text-primary)]">{t('Public Profile Visibility')}</div>
-                    <div className="text-[11px] text-[var(--text-muted)]">
-                      Allow employers and peers to view your public profile page. Private notes and applications are never exposed.
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={basicForm.isPublic}
-                    onChange={(e) => setBasicForm(prev => ({ ...prev, isPublic: e.target.checked }))}
-                    className="w-4 h-4 accent-[var(--accent-primary)] rounded cursor-pointer"
                   />
                 </div>
               </div>

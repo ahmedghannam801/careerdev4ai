@@ -19,6 +19,7 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { VolunteerExperience } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { VolunteerOpportunities } from '../volunteer/VolunteerOpportunities';
+import { TabButtons } from '../ui/TabButtons';
 
 /**
  * The Volunteer page.
@@ -261,30 +262,21 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
 
       {/* The two halves of the page: what you can apply to, and what you
           have already done. */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2">
-        <button
-          type="button"
-          onClick={() => setTab('opportunities')}
-          className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
-            tab === 'opportunities'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {t('Opportunities')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('record')}
-          className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
-            tab === 'record'
-              ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          {t('My activities')} ({volunteerExperiences.length})
-        </button>
-      </div>
+      <TabButtons
+        ariaLabel={t('Volunteering sections')}
+        tabs={[
+          { id: 'opportunities', label: t('Opportunities') },
+          {
+            id: 'record',
+            label: t('My activities'),
+            count: volunteerExperiences.length,
+          },
+        ]}
+        value={tab}
+        onChange={setTab}
+        size="sm"
+        idPrefix="volunteer-tab"
+      />
 
       {tab === 'opportunities' ? (
         <VolunteerOpportunities onRecordStint={() => { setTab('record'); openAdd(); }} />

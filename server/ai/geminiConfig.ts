@@ -99,11 +99,12 @@ export const ai = {
 /**
  * The client that mints Live API session credentials.
  *
- * Ephemeral tokens are requested from the `auth_tokens` endpoint, and they
- * are only usable against the `v1beta` version of the API: a token issued by
- * one API version cannot open a session on another. The token is issued here
- * and spent by the browser against the same version, which is why the version
- * is pinned in one place and read by both sides.
+ * Ephemeral tokens are requested from the `auth_tokens` endpoint. The
+ * installed SDK's documentation mentions v1alpha, but the production
+ * `auth_tokens` endpoint accepted `v1beta`, minted a token, and the browser
+ * opened a live session with it. The version is pinned here and sent with the
+ * grant so the server and the browser cannot drift apart. Changing it without
+ * testing a real token would break the one combination that is known to work.
  *
  * This client asks for that API version explicitly. It is a separate client
  * from the text-generation one on purpose: the version and the headers of

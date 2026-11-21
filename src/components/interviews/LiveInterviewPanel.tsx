@@ -77,6 +77,8 @@ export const LiveInterviewPanel: React.FC<LiveInterviewPanelProps> = ({
   const [busy, setBusy] = useState(false);
 
   const clientRef = useRef<LiveInterviewClient | null>(null);
+  const startingRef = useRef(false);
+  const stoppingRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const startedAtRef = useRef<number>(0);
 
@@ -98,11 +100,29 @@ export const LiveInterviewPanel: React.FC<LiveInterviewPanelProps> = ({
   );
 
   const handleStart = useCallback(async () => {
+    // A double click can arrive before React has re-rendered the disabled
+    // button. The ref is the guard that keeps one interview to one session.
+    if (startingRef.current || clientRef.current) return;
+    startingRef.current = true;
+
     setError(null);
     setTurns([]);
     setEvaluation(null);
     setBusy(true);
+
+    const client = new LiveInterviewClient({
+      onState: (next) => setState(next),
+      onTranscript: (turn) => setTurns((prev) => [...prev, turn]),
+      onError: (failure) => setError(failure.message),
+    });
+    clientRef.current = client;
+
     try {
+      // The audio contexts are created while the click still counts as a
+      // user gesture. Doing this after the network request left them
+      // suspended on browsers with a strict autoplay policy.
+      client.prepare();
+
       const grant = await startLiveInterview({
         type,
         language,
@@ -111,34 +131,31 @@ export const LiveInterviewPanel: React.FC<LiveInterviewPanelProps> = ({
         jobId: jobId ?? undefined,
       });
 
-      const client = new LiveInterviewClient(grant, {
-        onState: (next) => setState(next),
-        onTranscript: (turn) => setTurns((prev) => [...prev, turn]),
-        onError: (failure) => setError(failure.message),
-      });
-      clientRef.current = client;
       startedAtRef.current = Date.now();
-      await client.start();
+      await client.start(grant);
     } catch (failure) {
+      await client.stop().catch(() => undefined);
+      if (clientRef.current === client) clientRef.current = null;
       setState('error');
       setError(
         failure instanceof Error
           ? failure.message
           : t('The live interviewer could not be started.')
       );
-      clientRef.current = null;
     } finally {
+      startingRef.current = false;
       setBusy(false);
     }
   }, [type, language, roleTitle, jobDescription, jobId, t]);
 
   const handleStop = useCallback(async () => {
     const client = clientRef.current;
-    if (!client) return;
+    if (!client || stoppingRef.current) return;
+    stoppingRef.current = true;
     setBusy(true);
     try {
       const transcript = await client.stop();
-      clientRef.current = null;
+      if (clientRef.current === client) clientRef.current = null;
       setState('closed');
 
       if (transcript.length === 0) {
@@ -162,9 +179,45 @@ export const LiveInterviewPanel: React.FC<LiveInterviewPanelProps> = ({
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t('The interview could not be saved.'));
     } finally {
+      stoppingRef.current = false;
       setBusy(false);
     }
   }, [type, language, roleTitle, jobDescription, jobId, onCompleted, t]);
+
+  /** Returns the panel to the setup screen for a fresh session. */
+  const handleRestart = useCallback(() => {
+    clientRef.current = null;
+    setState('idle');
+    setError(null);
+    setEvaluation(null);
+    setTurns([]);
+  }, []);
+
+  /** Saves a transcript whose connection ended before the report was written. */
+  const handleSaveTranscript = useCallback(async () => {
+    if (turns.length === 0 || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const durationSeconds = Math.round((Date.now() - startedAtRef.current) / 1000);
+      const result = await completeLiveInterview({
+        type,
+        language,
+        roleTitle,
+        jobDescription: jobDescription ?? undefined,
+        jobId: jobId ?? undefined,
+        transcript: turns,
+        durationSeconds,
+      });
+      setEvaluation(result.evaluation);
+      if (result.evaluationError) setError(result.evaluationError);
+      onCompleted?.(result.evaluation);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : t('The interview could not be saved.'));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, turns, type, language, roleTitle, jobDescription, jobId, onCompleted, t]);
 
   const live = state === 'connecting' || state === 'listening' || state === 'speaking';
   const speaking = state === 'speaking';
@@ -430,10 +483,32 @@ export const LiveInterviewPanel: React.FC<LiveInterviewPanelProps> = ({
         </div>
       ) : null}
 
-      {state === 'closed' && !evaluation && !error ? (
-        <p className="mt-3 text-xs text-[var(--text-secondary)]">
-          {t('The interview is over. Start another one whenever you like.')}
-        </p>
+      {state === 'closed' && !live ? (
+        <div className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[var(--text-secondary)]">
+            {t('The interview is over. Start another one whenever you like.')}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {turns.length > 0 && !evaluation ? (
+              <button
+                type="button"
+                onClick={() => void handleSaveTranscript()}
+                disabled={busy}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-4 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-secondary)] disabled:opacity-60"
+              >
+                {t('Save transcript & get report')}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleRestart}
+              className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-90"
+            >
+              <Mic className="h-3.5 w-3.5" />
+              {t('Start another interview')}
+            </button>
+          </div>
+        </div>
       ) : null}
     </section>
   );

@@ -19,7 +19,8 @@ import {
   Linkedin,
   Github,
   ExternalLink,
-  MessageSquare
+  MessageSquare,
+  CreditCard
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useFeedback } from '../../context/FeedbackContext';
@@ -30,8 +31,8 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { CareerGoalRolePanel } from '../career/CareerGoalRolePanel';
+import { TabButtons } from '../ui/TabButtons';
+import { MembershipPanel } from '../subscription/MembershipPanel';
 import { SUPPORT_EMAIL } from '../../../shared/contact.ts';
 import { CONTACT_PHONE } from '../../../shared/paymentAccounts.ts';
 
@@ -58,7 +59,9 @@ const getClientLabel = (): string => {
   return `${browser} / ${os}`;
 };
 
-export const SettingsView: React.FC = () => {
+export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = ({
+  onNavigate,
+}) => {
   const {
     profile,
     identity,
@@ -77,15 +80,9 @@ export const SettingsView: React.FC = () => {
   // reachable even after the dashboard card has been dismissed.
   const { markOpened } = useFeedback();
 
-  const [activeTab, setActiveTab] = useRouteParam<'account' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface' | 'about'>('tab', SETTINGS_TABS, 'account');
-
-  /**
-   * Whether the visitor has asked for less movement.
-   *
-   * The tab highlight travels and the panels dissolve into one another; when
-   * motion is reduced they change instantly, which carries the same meaning.
-   */
-  const reduced = useReducedMotion() ?? false;
+  const [activeTab, setActiveTab] = useRouteParam<
+    'account' | 'subscription' | 'security' | 'privacy' | 'ai' | 'notifications' | 'interface' | 'about'
+  >('tab', SETTINGS_TABS, 'account');
 
   // Change Password state
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -321,17 +318,6 @@ export const SettingsView: React.FC = () => {
         </button>
       </div>
 
-      {/* THE CAREER TARGET — first, because it is what the rest of the
-          platform measures the candidate against. It sits above the tabs so
-          it is visible whichever tab is open, and it is the SAME component
-          the Profile page mounts, so the two can never disagree. */}
-      <CareerGoalRolePanel
-        headingId="settings-career-target"
-        description={t(
-          'Your target role, career track and experience level. Your roadmap, skill gaps, learning plan and job matches are all measured against this — change it here and the whole platform follows.'
-        )}
-      />
-
       <div data-tour="tour-help-revisit" className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-[var(--text-primary)]">{t('Getting started')}</div>
@@ -352,70 +338,24 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* Settings Navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2 text-xs font-semibold">
-        {[
-          { id: 'account', label: 'Account', icon: User },
-          { id: 'security', label: 'Security', icon: Shield },
-          { id: 'privacy', label: 'Privacy Center', icon: Lock },
-          { id: 'ai', label: 'AI Preferences', icon: Sparkles },
-          { id: 'notifications', label: 'Notifications', icon: Bell },
-          { id: 'interface', label: 'Localization & Theme', icon: Globe },
-          { id: 'about', label: 'About & Developer', icon: Info },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              aria-current={isActive ? 'page' : undefined}
-              className={`relative px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                isActive
-                  ? 'text-[var(--color-primary-text)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]'
-              }`}
-            >
-              {/*
-                The highlight travels between the tabs rather than jumping, so
-                the settings area reads as one place the reader is moving
-                around in.
-              */}
-              {isActive && (
-                <motion.span
-                  aria-hidden="true"
-                  layoutId="settings-tab-highlight"
-                  className="absolute inset-0 rounded-lg bg-[var(--accent-surface)] shadow-2xs"
-                  transition={
-                    reduced
-                      ? { duration: 0 }
-                      : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }
-                  }
-                />
-              )}
-              <Icon className="relative w-3.5 h-3.5" />
-              <span className="relative">{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      <TabButtons
+        ariaLabel={t('Settings sections')}
+        tabs={[
+          { id: 'account', label: t('Account'), icon: User },
+          { id: 'subscription', label: t('Subscription'), icon: CreditCard },
+          { id: 'security', label: t('Security'), icon: Shield },
+          { id: 'privacy', label: t('Privacy Center'), icon: Lock },
+          { id: 'ai', label: t('AI Preferences'), icon: Sparkles },
+          { id: 'notifications', label: t('Notifications'), icon: Bell },
+          { id: 'interface', label: t('Localization & Theme'), icon: Globe },
+          { id: 'about', label: t('About & Developer'), icon: Info },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+        idPrefix="settings-tab"
+      />
 
-      {/*
-        The panel changes by dissolving into the next one rather than being
-        swapped for it. The reader keeps their place in the page, and the
-        content below the settings area does not jump.
-      */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={activeTab}
-          initial={reduced ? false : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reduced ? undefined : { opacity: 0, y: -6 }}
-          transition={
-            reduced
-              ? { duration: 0 }
-              : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
-          }
-        >
+      <div className="space-y-6">
 
       {/* TAB 1: ACCOUNT */}
       {activeTab === 'account' && (
@@ -506,7 +446,19 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: SECURITY */}
+      {/* TAB 2: SUBSCRIPTION */}
+      {activeTab === 'subscription' && (
+        <div className="space-y-4">
+          <MembershipPanel onManagePlan={() => onNavigate?.('pricing')} />
+          <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+            {t(
+              'Your plan, its renewal date and the tokens it includes are read from your subscription. Changing or cancelling a plan happens on the pricing page.'
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* TAB 3: SECURITY */}
       {activeTab === 'security' && (
         <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
@@ -1029,8 +981,7 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
-        </motion.div>
-      </AnimatePresence>
+      </div>
 
       {/* MODAL: Change Password */}
       {changePasswordOpen && (

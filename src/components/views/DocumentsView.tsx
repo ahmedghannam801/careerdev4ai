@@ -19,6 +19,7 @@ import { useAIProcessing } from '../../lib/useAIProcessing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
+import { TabButtons, tabButtonClassName } from '../ui/TabButtons';
 
 export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { 
@@ -159,61 +160,33 @@ export const DocumentsView: React.FC<{ onNavigate: (view: string) => void }> = (
       </div>
 
       {/* Workspace Tabs */}
-      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2 text-xs font-semibold">
-        <button
-          onClick={() => setActiveTab('documents')}
-          className={`px-3.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-            activeTab === 'documents'
-              ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>{t('All Documents')} ({documents.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('cv-versions')}
-          className={`px-3.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-            activeTab === 'cv-versions'
-              ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>{t('CV Versions')} ({cvVersions.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('cover-letters')}
-          className={`px-3.5 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-            activeTab === 'cover-letters'
-              ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-[var(--color-primary-text)]" />
-          <span>{t('Cover Letter Studio')} ({coverLetters.length})</span>
-        </button>
-      </div>
+      <TabButtons
+        ariaLabel={t('Document workspace sections')}
+        tabs={[
+          { id: 'documents', label: t('All Documents'), count: documents.length, icon: FileText },
+          { id: 'cv-versions', label: t('CV Versions'), count: cvVersions.length, icon: Layers },
+          { id: 'cover-letters', label: t('Cover Letter Studio'), count: coverLetters.length, icon: Sparkles },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+        idPrefix="documents-tab"
+      />
 
       {/* TAB 1: ALL DOCUMENTS */}
       {activeTab === 'documents' && (
         <div className="space-y-4">
           {/* Filter Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-[var(--surface-main)] border border-[var(--border-subtle)] text-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('Filter by type')}>
               <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               <span className="text-[var(--text-secondary)] font-medium">{t('Filter by Type:')}</span>
               {(['all', 'cv', 'cover_letter', 'certificate', 'portfolio'] as const).map(type => (
                 <button
                   key={type}
+                  type="button"
+                  aria-pressed={docTypeFilter === type}
                   onClick={() => setDocTypeFilter(type)}
-                  className={`px-2.5 py-1 rounded-md font-medium transition-colors capitalize ${
-                    docTypeFilter === type
-                      ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-                      : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
+                  className={`${tabButtonClassName(docTypeFilter === type, 'sm')} capitalize`}
                 >
                   {type.replace('_', ' ')}
                 </button>

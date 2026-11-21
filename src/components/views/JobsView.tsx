@@ -536,51 +536,6 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* What this screen is, and what it is not. */}
-      <div className="flex items-start gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5">
-        <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-primary-text)]" />
-        <div className="space-y-1 text-xs text-[var(--text-secondary)]">
-          <p className="font-semibold text-[var(--text-primary)]">
-            {t('These are live openings, not courses and not curated programmes.')}
-          </p>
-          <p>
-            {t(
-              'The platform does not edit these postings, so the employer’s own page is where you read the full description and apply. Saving a vacancy here keeps it in your account, and tracking an application records it in your applications.'
-            )}
-          </p>
-        </div>
-      </div>
-
-      {/* The boards behind the postings.
-          Four of them are fetched by the provider, and every posting below
-          names the one it came from. The fifth, Wonderin.ai, matches roles
-          inside the candidate's own account and publishes no feed, so it is
-          offered as a place to search rather than pretended at. The sixth is
-          the set of companies' own applicant-tracking systems, which are read
-          from the vendors' public endpoints. */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 shadow-xs">
-        <div>
-          <span className="text-xs font-bold text-[var(--text-primary)]">
-            {t('The boards behind these postings')}
-          </span>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
-            {t(
-              'Every posting below was fetched from these boards by the job provider, and each card names the board it came from.'
-            )}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {(['google_jobs', 'indeed', 'ziprecruiter', 'handshake', 'company_careers'] as const).map((source) => (
-            <span
-              key={source}
-              className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] bg-[var(--surface-secondary)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--text-primary)]"
-            >
-              {JOB_SOURCE_LABELS[source]}
-            </span>
-          ))}
-        </div>
-      </div>
-
       {/* LinkedIn Authorized External Search Entry */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 shadow-xs">
         <div className="flex items-center gap-3">
@@ -1020,6 +975,52 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           {tailorNotice.text}
         </p>
       )}
+
+      {/* The footer explains the listings after the reader has seen them.
+          It stays secondary: smaller type, a quiet surface and the board
+          badges. The provider integrations and every employer link above are
+          untouched. */}
+      <footer
+        className="mt-4 space-y-4 border-t border-[var(--border-subtle)] pt-5"
+        aria-labelledby="jobs-source-heading"
+      >
+        <div className="flex items-start gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-4">
+          <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+          <div className="space-y-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">
+              {t('These are live openings, not courses and not curated programmes.')}
+            </p>
+            <p>
+              {t(
+                'The platform does not edit these postings, so the employer’s own page is where you read the full description and apply. Saving a vacancy here keeps it in your account, and tracking an application records it in your applications.'
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-4">
+          <h2 id="jobs-source-heading" className="text-xs font-bold text-[var(--text-primary)]">
+            {t('The boards behind these postings')}
+          </h2>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+            {t(
+              'Every posting above was fetched from these boards by the job provider, and each card names the board it came from.'
+            )}
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {(
+              ['google_jobs', 'indeed', 'ziprecruiter', 'handshake', 'company_careers'] as const
+            ).map((board) => (
+              <span
+                key={board}
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] bg-[var(--surface-secondary)] px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]"
+              >
+                {JOB_SOURCE_LABELS[board]}
+              </span>
+            ))}
+          </div>
+        </div>
+      </footer>
 
       {/* Attribution: these postings are not the platform's own. */}
       {source && (

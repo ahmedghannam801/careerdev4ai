@@ -6,6 +6,18 @@
  */
 
 export const commonAr: Record<string, string> = {
+  'Save transcript & get report': 'احفظ النص واحصل على التقرير',
+  'Start another interview': 'ابدأ مقابلة أخرى',
+  'Admin Center sections': 'أقسام مركز الإدارة',
+  'Document workspace sections': 'أقسام مساحة المستندات',
+  'Filter by type': 'التصفية حسب النوع',
+  'Career Experience Hub sections': 'أقسام مركز الخبرة المهنية',
+  'Every posting above was fetched from these boards by the job provider, and each card names the board it came from.':
+    'كل إعلان أعلاه تم جلبه من هذه اللوحات بواسطة مزوّد الوظائف، وكل بطاقة تذكر اللوحة التي جاء منها.',
+  'Learning Hub sections': 'أقسام مركز التعلّم',
+  'Filter roadmap actions': 'تصفية إجراءات خارطة الطريق',
+  'Settings sections': 'أقسام الإعدادات',
+  'Volunteering sections': 'أقسام التطوّع',
   // Actions
   'Save': 'حفظ',
   'Save changes': 'حفظ التغييرات',

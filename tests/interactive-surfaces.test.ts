@@ -157,7 +157,12 @@ describe('the profile header', () => {
   it('shows the top tier to nobody else', () => {
     const frame = read('src/components/subscription/PlanIdentityFrame.tsx');
     assert.match(frame, /const TOP_TIER: PlanIdentityTier = 'ultra'/);
-    assert.match(frame, /if \(variant === 'premium' && tier !== TOP_TIER\)/);
+    // The premium frame is withdrawn for an expired or inactive plan too:
+    // the frame says the top tier is in force, and an ended plan is not.
+    assert.match(
+      frame,
+      /variant === 'premium' &&\s*\(display\.tier !== TOP_TIER \|\| display\.isExpired \|\| display\.isInactive\)/
+    );
   });
 });
 

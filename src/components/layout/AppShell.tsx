@@ -23,7 +23,6 @@ import {
   Target,
   User,
   Activity,
-  Users,
   FolderClosed,
   MoreHorizontal,
   LogOut,
@@ -193,7 +192,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       items: [
         { id: 'profile', label: t('My Profile'), icon: User },
         { id: 'settings', label: t('navSettings'), icon: Settings },
-        { id: 'referrals', label: t('Referrals'), icon: Users },
         { id: 'activity', label: t('Recent Activity'), icon: Activity },
       ],
     },

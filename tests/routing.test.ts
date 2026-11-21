@@ -78,6 +78,14 @@ describe('a route that has moved inside another view', () => {
     assert.equal(buildRouteHash(alias.route, alias.params), '#/cv-studio?tab=ats');
   });
 
+  it('resolves referrals to the profile section that owns them', () => {
+    const alias = resolveRouteAlias('referrals');
+    assert.ok(alias);
+    assert.equal(alias.route, 'profile');
+    assert.equal(alias.params.section, 'referrals');
+    assert.equal(buildRouteHash(alias.route, alias.params), '#/profile?section=referrals');
+  });
+
   it('is still a route the application knows', () => {
     // The alias is resolved, not removed: the link is in shared CVs, in
     // support messages and in browser history. The address is recognised so
