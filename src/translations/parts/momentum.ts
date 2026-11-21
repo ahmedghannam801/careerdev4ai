@@ -62,4 +62,57 @@ export const momentumAr: Record<string, string> = {
   'Skill level saved.': 'تم حفظ مستوى المهارة.',
   '{skill} is now rated {level}/5. Your roadmap was rebuilt from it.':
     'تقييّم {skill} أصبح الآن {level}/5. أُعيد بناء خارطة الطريق بناءً عليه.',
+
+  // ---- The Progress Dashboard --------------------------------------------
+  // The page states its own rule: every figure comes from a stored record and
+  // every card opens the section it counts.
+  'This page is built only from your own records. Every card opens the section it counts.':
+    'هذه الصفحة مبنية من سجلاتك وحدها. كل بطاقة تفتح القسم الذي تُحصيه.',
+  'Open roadmap': 'افتح خارطة الطريق',
+  'No target role selected yet.': 'لم تختر وظيفة مستهدفة بعد.',
+  'tasks remaining': 'مهام متبقية',
+  'Career readiness': 'جاهزية المسار المهني',
+  'from your skills and CV': 'من مهاراتك وسيرتك الذاتية',
+
+  // The accessible names of the cards' navigation actions.
+  'open your skills': 'افتح مهاراتك',
+  'open the roadmap stages': 'افتح مراحل خارطة الطريق',
+  'open your projects': 'افتح مشاريعك',
+  'see how it is calculated': 'اعرف كيف يُحسب',
+  'open the interview history': 'افتح سجل المقابلات',
+  'open the live jobs board': 'افتح لوحة الوظائف',
+  'open the application list': 'افتح قائمة الطلبات',
+  'open your certificates': 'افتح شهاداتك',
+  'open your evidence': 'افتح أدلتك',
+
+  // Learning, counted by status.
+  'Learning at a glance': 'التعلّم في لمحة',
+  'Each count opens the Learning Hub already filtered to it.':
+    'كل رقم يفتح مركز التعلّم مفلترًا عليه.',
+  'Average progress of started courses': 'متوسط تقدّم الدورات التي بدأتها',
+  'Resume where you left off': 'أكمل من حيث توقفت',
+  'Your course in progress': 'دورتك قيد التقدّم',
+  'No course in progress right now.': 'لا توجد دورة قيد التقدّم الآن.',
+
+  // The pipeline and the proof.
+  'Saved jobs': 'وظائف محفوظة',
+  'Opportunities you kept to review': 'فرص احتفظت بها للمراجعة',
+  'tracked in total': 'إجمالي ما تتابعه',
+  'applications that reached an offer': 'طلبات وصلت إلى عرض عمل',
+  'recorded on your profile': 'مسجّلة في ملفك',
+  'Evidence records': 'سجلات الأدلة',
+  'artifacts that prove a skill': 'أعمال تثبت مهارة',
+
+  // The weekly activity chart.
+  'Weekly activity': 'النشاط الأسبوعي',
+  'Recorded actions per week, last 8 weeks.': 'الإجراءات المسجّلة كل أسبوع، آخر 8 أسابيع.',
+  'actions in 8 weeks': 'إجراء في 8 أسابيع',
+  'Nothing recorded yet. Your activity appears here as soon as you act.':
+    'لا يوجد نشاط مسجّل بعد. سيظهر هنا بمجرد أن تبدأ.',
+  'Week of': 'أسبوع',
+  'this week': 'هذا الأسبوع',
+
+  // The two lists that close the page.
+  'View all skills': 'عرض كل المهارات',
+  'View all evidence': 'عرض كل الأدلة',
 };

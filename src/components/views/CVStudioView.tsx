@@ -9,6 +9,7 @@ import {
   Trash2,
   PenLine,
   Eye,
+  EyeOff,
   ArrowLeft,
   LayoutTemplate,
   Database,
@@ -294,6 +295,16 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
    * split view.
    */
   const [mobilePane, setMobilePane] = useState<'edit' | 'preview'>('edit');
+  /**
+   * Whether the preview is beside the editor on a wide screen.
+   *
+   * The candidate may want the full width for the form — an employer asks for
+   * a long description, or the editor is being read on a narrow laptop. The
+   * preview can therefore be folded away and brought back; on a phone the
+   * pane switch does the same job. The preview is never unmounted, so folding
+   * it hides the paper without losing the scroll position inside it.
+   */
+  const [desktopPreviewVisible, setDesktopPreviewVisible] = useState(true);
 
   /**
    * Downloads the CV as a PDF.
@@ -664,10 +675,26 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                 to the preview. */}
             <div
               data-cv-pane="edit"
-              className={`space-y-4 lg:col-span-5 lg:block ${
-                mobilePane === 'preview' ? 'hidden' : ''
-              }`}
+              className={`space-y-4 lg:block ${
+                desktopPreviewVisible ? 'lg:col-span-5' : 'lg:col-span-12'
+              } ${mobilePane === 'preview' ? 'hidden' : ''}`}
             >
+              <div className="hidden justify-end lg:flex">
+                <button
+                  type="button"
+                  onClick={() => setDesktopPreviewVisible((visible) => !visible)}
+                  aria-pressed={!desktopPreviewVisible}
+                  aria-controls="cv-preview-pane"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40"
+                >
+                  {desktopPreviewVisible ? (
+                    <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {desktopPreviewVisible ? t('Hide preview') : t('Show preview')}
+                </button>
+              </div>
               <CvSaveStatusIndicator className="px-1" />
               <CvSectionEditor
                 cv={activeCV}
@@ -703,8 +730,11 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                 this into a full-screen sheet with its own back control; the
                 element stays the same, so its scroll position is kept. */}
             <div
+              id="cv-preview-pane"
               data-cv-pane="preview"
-              className={`space-y-4 lg:col-span-7 lg:block ${
+              className={`space-y-4 ${
+                desktopPreviewVisible ? 'lg:col-span-7 lg:block' : 'lg:hidden'
+              } ${
                 mobilePane === 'preview'
                   ? 'fixed inset-0 z-[70] flex flex-col bg-[var(--surface-main)] lg:static lg:z-auto lg:flex-none lg:bg-transparent'
                   : ''

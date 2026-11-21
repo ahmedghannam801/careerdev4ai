@@ -63,6 +63,7 @@ import {
 } from '../../../shared/jobs';
 import { todayIsoDate } from '../../../shared/dateRange';
 import { deriveCandidateBand, shouldFilterSeniorJob } from '../../../shared/jobMatching';
+import { MascotLoader } from '../processing/MascotLoader';
 
 type SortOrder = 'match' | 'newest';
 
@@ -831,13 +832,20 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Loading */}
+      {/* Loading.
+          A real search against the job provider is a meaningful wait, so it is
+          shown with the product's own mascot rather than a bare spinner. The
+          skeletons stay underneath: the mascot says the search is running and
+          the skeletons say what is about to arrive. */}
       {loading && (
         <div role="status" className="space-y-3">
-          <p className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            {t('Searching live job boards…')}
-          </p>
+          <div className="flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-4 py-3">
+            <MascotLoader size="sm" showMessage={false} />
+            <p className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin motion-reduce:hidden" />
+              {t('Searching live job boards…')}
+            </p>
+          </div>
           {[0, 1, 2].map((index) => (
             <div
               key={index}

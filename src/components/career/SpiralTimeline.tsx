@@ -208,6 +208,8 @@ export const SpiralTimeline: React.FC<SpiralTimelineProps> = ({ milestones, t })
                 <motion.button
                   key={entry.id}
                   type="button"
+                  data-spiral-marker
+                  data-spiral-state={entry.state}
                   onClick={() => toggle(entry.id)}
                   aria-pressed={isSelected}
                   aria-label={`${t(entry.label)}: ${entry.title}. ${t(SPIRAL_STATE_LABELS[entry.state])}.`}

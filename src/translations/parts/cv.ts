@@ -508,4 +508,8 @@ export const cvAr: Record<string, string> = {
   '{count} things to fix before you send this': '{count} أشياء لإصلاحها قبل إرسال هذا',
   'You can still export. These are what a recruiter or an ATS is most likely to mark down.': 'يمكنك التصدير رغم ذلك. هذه أكثر ما قد يأخذه عليك مسؤول التوظيف أو نظام التتبع.',
   'Fix': 'أصلح',
+
+  // Folding the preview away on a wide screen
+  'Hide preview': 'أخفِ المعاينة',
+  'Show preview': 'أظهر المعاينة',
 };

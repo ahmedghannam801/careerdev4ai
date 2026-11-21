@@ -79,4 +79,13 @@ export const interviewsAr: Record<string, string> = {
   'English': 'الإنجليزية',
   'Arabic': 'العربية',
   'Egyptian Arabic': 'العامية المصرية',
+
+  // The stored voice interview history
+  'Voice interview history': 'سجل المقابلات الصوتية',
+  'Transcripts only — no audio was recorded.': 'النصوص فقط — لم يُسجَّل أي صوت.',
+  'No voice interview has been completed yet. Start one above and its transcript and report will appear here.':
+    'لم تُكمل أي مقابلة صوتية بعد. ابدأ واحدة من الأعلى وسيظهر نصّها وتقريرها هنا.',
+  'No report': 'لا يوجد تقرير',
+  'Transcript': 'النص الكامل',
+  'interviews completed': 'مقابلة مكتملة',
 };

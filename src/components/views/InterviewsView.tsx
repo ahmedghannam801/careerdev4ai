@@ -4,9 +4,11 @@ import {
   ArrowRight,
   BrainCircuit,
   CheckCircle2,
+  ChevronDown,
   History,
   HelpCircle,
   MessageSquare,
+  Mic,
   RotateCcw,
   Sparkles,
   Target,
@@ -22,6 +24,7 @@ import {
 import { Reveal } from '../motion/Motion';
 import { CareerImage } from '../ui/CareerImage';
 import { LiveInterviewPanel } from '../interviews/LiveInterviewPanel';
+import { useLiveInterviewHistory } from '../../lib/useLiveInterviewHistory';
 import { computeInterviewReadiness } from '../../../shared/interviewReadiness';
 import { cvReadinessFromVersions, roleReadinessFromSkills } from '../../../shared/careerMetrics';
 
@@ -42,6 +45,37 @@ interface AnsweredQuestion {
   question: string;
   stage: 'behavioral' | 'technical';
   score: number | null;
+}
+
+/** The labels of the stored interview types. */
+const LIVE_TYPE_LABELS: Record<string, string> = {
+  hr: 'HR',
+  technical: 'Technical',
+  role: 'Role-based',
+  behavioral: 'Behavioral',
+  mixed: 'Mixed',
+};
+
+/** The labels of the languages a stored interview was held in. */
+const LIVE_LANGUAGE_LABELS: Record<string, string> = {
+  en: 'English',
+  ar: 'Arabic',
+  'ar-eg': 'Egyptian Arabic',
+};
+
+/** A duration in seconds as `m:ss`. */
+function formatDuration(seconds: number | null): string | null {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return null;
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+}
+
+/** A stored ISO timestamp as a local date, or null when it cannot be read. */
+function formatInterviewDate(value: string | null): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export const InterviewsView: React.FC = () => {
@@ -72,6 +106,12 @@ export const InterviewsView: React.FC = () => {
   // Set when the feedback was produced but the session could not be written to
   // the candidate's history, so the record is never implied to exist.
   const [sessionSaveError, setSessionSaveError] = useState<string | null>(null);
+
+  // The live voice interviews the candidate has already completed. The list is
+  // read from the same table the Progress Dashboard counts, through a shared
+  // cache, so the two pages cannot disagree and neither pays for a second
+  // request.
+  const liveHistory = useLiveInterviewHistory();
 
   const completedTraining = useMemo(() => {
     const courseById = new Map(learningCatalog.map((course) => [course.id, course]));
@@ -270,7 +310,200 @@ export const InterviewsView: React.FC = () => {
         experience: the interviewer speaks, the candidate answers out loud,
         and the transcript is written from what was actually said.
       */}
-      <LiveInterviewPanel roleTitle={targetRole?.title ?? ''} />
+      <LiveInterviewPanel
+        roleTitle={targetRole?.title ?? ''}
+        onCompleted={() => {
+          // A finished conversation is a stored one, so the history is read
+          // again rather than guessed at.
+          void liveHistory.refresh();
+        }}
+      />
+
+      {/*
+        THE VOICE INTERVIEW HISTORY.
+
+        Every completed conversation is here, in the order the server returned
+        it. A row opens to the transcript that was kept and the report written
+        from it. Nothing is stored but the words — the audio was never kept, so
+        there is none to play back.
+      */}
+      <section
+        aria-labelledby="voice-interview-history"
+        className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5"
+        data-live-interview-history
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2
+              id="voice-interview-history"
+              className="flex items-center gap-2 text-base font-bold text-[var(--text-primary)]"
+            >
+              <Mic className="h-4 w-4 text-[var(--color-primary-text)]" />
+              {t('Voice interview history')}
+              <span className="font-mono text-xs font-semibold text-[var(--text-muted)]">
+                ({liveHistory.sessions.length})
+              </span>
+            </h2>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {t('Transcripts only — no audio was recorded.')}
+            </p>
+          </div>
+        </div>
+
+        {liveHistory.isLoading && liveHistory.sessions.length === 0 ? (
+          <div className="mt-3 space-y-2" aria-busy="true">
+            {[0, 1].map((key) => (
+              <div
+                key={key}
+                className="h-14 animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50"
+              />
+            ))}
+          </div>
+        ) : liveHistory.error ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger-surface)]/40 p-3">
+            <p className="text-[11px] text-[var(--color-danger)]">{t(liveHistory.error)}</p>
+            <button
+              type="button"
+              onClick={() => void liveHistory.refresh()}
+              className="rounded-lg border border-[var(--color-danger)]/40 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-danger)]"
+            >
+              {t('Try again')}
+            </button>
+          </div>
+        ) : liveHistory.sessions.length === 0 ? (
+          <p className="mt-3 rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-xs text-[var(--text-secondary)]">
+            {t('No voice interview has been completed yet. Start one above and its transcript and report will appear here.')}
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {liveHistory.sessions.map((session) => {
+              const score = session.evaluation?.score;
+              const date = formatInterviewDate(session.completedAt ?? session.createdAt);
+              const duration = formatDuration(session.durationSeconds);
+              const typeLabel = LIVE_TYPE_LABELS[session.interviewType] ?? session.interviewType;
+              const languageLabel = LIVE_LANGUAGE_LABELS[session.language] ?? session.language;
+              const evaluation = session.evaluation;
+
+              return (
+                <details
+                  key={session.id}
+                  className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30"
+                >
+                  <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 p-3 [&::-webkit-details-marker]:hidden">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-[var(--text-primary)]">
+                        {t(typeLabel)}
+                        {session.targetRole ? ` · ${session.targetRole}` : ''}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-[var(--text-muted)]">
+                        {date ? <span>{date}</span> : null}
+                        <span>· {t(languageLabel)}</span>
+                        {duration ? <span>· {duration}</span> : null}
+                        <span>
+                          · {session.transcript.length} {t('turns')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {typeof score === 'number' ? (
+                        <span className="rounded bg-[var(--accent-surface)] px-1.5 py-0.5 font-mono text-[11px] font-bold text-[var(--color-primary-text)]">
+                          {score}/10
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[var(--text-muted)]">
+                          {t('No report')}
+                        </span>
+                      )}
+                      <ChevronDown
+                        aria-hidden="true"
+                        className="h-4 w-4 text-[var(--text-muted)] transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+                      />
+                    </div>
+                  </summary>
+
+                  <div className="space-y-3 border-t border-[var(--border-subtle)] p-3">
+                    {evaluation ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: t('Communication'), value: evaluation.communication },
+                          { label: t('Technical knowledge'), value: evaluation.technicalKnowledge },
+                          { label: t('Answer quality'), value: evaluation.answerQuality },
+                          { label: t('Problem solving'), value: evaluation.problemSolving },
+                          { label: t('Language fluency'), value: evaluation.languageFluency },
+                        ].map((dimension) => (
+                          <span
+                            key={dimension.label}
+                            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2 py-1 text-[10px] text-[var(--text-secondary)]"
+                          >
+                            {dimension.label}{' '}
+                            <strong className="font-mono text-[var(--text-primary)]">
+                              {dimension.value}/10
+                            </strong>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {session.transcript.length > 0 ? (
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          {t('Transcript')}
+                        </div>
+                        <ol className="mt-1.5 max-h-64 space-y-1.5 overflow-y-auto pe-1">
+                          {session.transcript.map((turn, index) => {
+                            const interviewer = turn.speaker === 'interviewer';
+                            return (
+                              <li
+                                key={`${session.id}-turn-${index}`}
+                                className={`rounded-lg border p-2 text-[11px] leading-relaxed ${
+                                  interviewer
+                                    ? 'border-[var(--border-subtle)] bg-[var(--surface-main)] text-[var(--text-primary)]'
+                                    : 'border-[var(--accent-primary)]/30 bg-[var(--accent-surface)]/40 text-[var(--text-primary)]'
+                                }`}
+                              >
+                                <div className="mb-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                                  {interviewer ? t('Interviewer') : t('You')}
+                                </div>
+                                {turn.text}
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </div>
+                    ) : null}
+
+                    {evaluation &&
+                    (evaluation.strengths.length > 0 ||
+                      evaluation.improvements.length > 0 ||
+                      evaluation.trainingPlan.length > 0) ? (
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {[
+                          { title: t('Strengths'), items: evaluation.strengths },
+                          { title: t('Areas to improve'), items: evaluation.improvements },
+                          { title: t('Recommended training plan'), items: evaluation.trainingPlan },
+                        ]
+                          .filter((group) => group.items.length > 0)
+                          .map((group) => (
+                            <div key={group.title} className="rounded-lg border border-[var(--border-subtle)] p-2">
+                              <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                                {group.title}
+                              </div>
+                              <ul className="mt-1 list-disc space-y-0.5 ps-3.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                                {group.items.map((item, index) => (
+                                  <li key={`${group.title}-${index}`}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <div className="flex flex-col justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 md:flex-row md:items-center">
         <div>

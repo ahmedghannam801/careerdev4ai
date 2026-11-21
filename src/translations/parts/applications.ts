@@ -82,4 +82,50 @@ export const applicationsAr: Record<string, string> = {
     'لم يتم حفظ المرحلة، لذلك ظل الطلب في مكانه.',
   'drag to another stage, or use the stage menu':
     'اسحب إلى مرحلة أخرى، أو استخدم قائمة المرحلة',
+
+  // The follow-up reminders
+  'Follow-up reminders': 'تذكيرات المتابعة',
+  'From the follow-up dates you set on your own applications.':
+    'من مواعيد المتابعة التي حدّدتها على طلباتك.',
+  'overdue': 'متأخرة',
+  'today': 'اليوم',
+  'coming up': 'قادمة',
+  'No follow-ups scheduled. Open an application and set a follow-up date to be reminded here.':
+    'لا توجد متابعات مجدولة. افتح طلبًا وحدّد موعد متابعة ليظهر تذكيره هنا.',
+  'Overdue': 'متأخرة',
+  'Today': 'اليوم',
+  'Mark done': 'تمّت',
+  'Follow-up cleared': 'تم مسح المتابعة',
+
+  // The conversion analytics
+  'Application-to-interview conversion': 'نسبة التحوّل من طلب إلى مقابلة',
+  'Confirm an application to measure this': 'أكّد طلبًا واحدًا لقياس هذا المؤشر',
+  'confirmed applications reached an interview': 'من الطلبات المؤكدة وصلت إلى مقابلة',
+  'Offer rate': 'نسبة عروض العمل',
+  'offers from': 'عرض عمل من',
+  'confirmed applications': 'طلبات مؤكدة',
+  'Awaiting a response': 'بانتظار رد',
+  'Applied or in screening, with no later stage recorded yet':
+    'تم التقديم أو قيد الفرز، ولم تُسجَّل مرحلة أحدث بعد',
+
+  // The list view's controls
+  'Search applications': 'ابحث في الطلبات',
+  'Search by role, company, place or note': 'ابحث بالوظيفة أو الشركة أو المكان أو الملاحظة',
+  'Sort by': 'ترتيب حسب',
+  'Last updated': 'آخر تحديث',
+  'Applied date': 'تاريخ التقديم',
+  'Company name': 'اسم الشركة',
+  'Clear filters': 'مسح عوامل التصفية',
+  'No application matches these filters.': 'لا يوجد طلب يطابق عوامل التصفية هذه.',
+
+  // Archiving and deleting
+  'Application archived': 'تمت أرشفة الطلب',
+  'The application could not be archived': 'تعذّرت أرشفة الطلب',
+  'It is kept under Withdrawn and can be moved back at any time.':
+    'محفوظ تحت «مسحوب» ويمكن إعادته إلى مرحلة أخرى في أي وقت.',
+  'Archive application': 'أرشف الطلب',
+  'Delete this application?': 'هل تريد حذف هذا الطلب؟',
+  'This removes the tracked application and its notes. If you only want it out of the active pipeline, archive it instead.':
+    'سيؤدي هذا إلى حذف الطلب المتتبَّع وملاحظاته. إن أردت إخراجه من المسار النشط فقط، فأرشِفه بدلًا من ذلك.',
+  'Application deleted': 'تم حذف الطلب',
 };

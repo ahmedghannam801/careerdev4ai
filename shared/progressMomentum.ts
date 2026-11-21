@@ -137,6 +137,79 @@ export function computeActivityStreak(
 }
 
 /**
+ * The Monday that starts the week `date` falls in, at local midnight.
+ *
+ * Weeks are measured from Monday rather than from Sunday or from the locale's
+ * own first day, because the answer has to be the same for every reader of a
+ * shared link and the same in the browser and in the tests. The date is built
+ * from the local calendar fields, so daylight saving cannot shift it into the
+ * previous day.
+ */
+export function startOfWeek(date: Date): Date {
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  // getDay(): Sunday is 0. Shift it so Monday is 0, then walk back.
+  const offset = (day.getDay() + 6) % 7;
+  day.setDate(day.getDate() - offset);
+  return day;
+}
+
+/** One week of the activity chart. */
+export interface ActivityWeekBucket {
+  /** The Monday that starts the week, as `YYYY-MM-DD`. */
+  start: string;
+  /** How many recorded activities happened in that week. */
+  count: number;
+  /** True for the week that contains `today`. */
+  isCurrent: boolean;
+}
+
+/**
+ * Counts the user's recorded activity into the last `weekCount` weeks.
+ *
+ * The buckets are returned oldest first and every week is present, including
+ * the weeks with no activity: a week in which nothing was recorded is a fact
+ * about the candidate's momentum, not a gap in the data, so it is drawn as an
+ * empty column rather than silently skipped. Activity older than the window,
+ * and activity with an unreadable timestamp, is left out of the count — it is
+ * not moved into the oldest week.
+ */
+export function weeklyActivityBuckets(
+  activities: readonly StreakActivity[],
+  weekCount = 8,
+  today: Date = new Date()
+): ActivityWeekBucket[] {
+  // A caller that passes nothing usable gets the default window, not a
+  // single column; a caller that asks for zero or fewer gets one week,
+  // because a chart with no bars answers nothing.
+  const span = Number.isFinite(weekCount) ? Math.max(1, Math.floor(weekCount)) : 8;
+  const currentWeekStart = startOfWeek(today);
+
+  const buckets: ActivityWeekBucket[] = [];
+  const byStart = new Map<string, ActivityWeekBucket>();
+
+  for (let step = span - 1; step >= 0; step -= 1) {
+    const start = new Date(currentWeekStart);
+    start.setDate(start.getDate() - step * 7);
+    const key = localDayKey(start);
+    if (!key) continue;
+    const bucket: ActivityWeekBucket = { start: key, count: 0, isCurrent: step === 0 };
+    buckets.push(bucket);
+    byStart.set(key, bucket);
+  }
+
+  for (const activity of activities) {
+    const day = localDayKey(activity.timestamp);
+    if (!day) continue;
+    const start = localDayKey(startOfWeek(new Date(`${day}T00:00:00`)));
+    if (!start) continue;
+    const bucket = byStart.get(start);
+    if (bucket) bucket.count += 1;
+  }
+
+  return buckets;
+}
+
+/**
  * A milestone the user recorded, placed on a timeline.
  *
  * The milestone itself is a fact the user entered. This helper only sorts
