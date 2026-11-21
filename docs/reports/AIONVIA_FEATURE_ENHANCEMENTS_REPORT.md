@@ -136,7 +136,7 @@ walked in one page like a user would. What that covered:
 | Branch | `main` (pushed to `origin/main`) |
 | Code commits | `2c7d28f` brand assets from the official lockup · `7845991` progress/applications/interviews/CV · `4d59cfe` stop the pre-session guide request · `5ec45a4` timeline months in the reader's language |
 | Documentation commit | the report you are reading; it changes only this file, so the bundle is byte-for-byte the build of `5ec45a4` |
-| Deployed commit | `5ec45a4` |
+| Deployed commit | `89f2617` — Cloudflare's record for deployment `16e02341`; the bundle is identical to `5ec45a4`, because the two commits after it change only this file (`index-CGqz53xF.js` before and after) |
 | Not committed by me | The membership/badge work another agent is editing in the same working tree (`shared/planIdentity.ts`, `src/components/layout/AppShell.tsx`, `src/components/subscription/*`, `src/components/views/{DashboardView,PricingView}.tsx`, `src/index.css`, `src/translations/parts/subscriptions.ts`, `tests/plan-identity.test.ts`, `tests/vitest/MembershipPanel.test.tsx`). It was left untouched, and the build was produced from a clean worktree at my commit so none of their unfinished work reached production. |
 
 The build that was deployed is compiled from that commit alone, not from the dirty working tree: a
@@ -148,7 +148,7 @@ The build that was deployed is compiled from that commit alone, not from the dir
 |---|---|
 | Project | `aionvia` (existing Cloudflare Pages project, production branch `main`) |
 | URL | https://aionvia.pages.dev |
-| Deployment id | `4cbe666d-6180-4e45-96b6-a19fd862fcfb` |
+| Deployment id | `16e02341-467a-40d1-84e5-054d13dff6de` (current production deployment) |
 | Secrets | Unchanged by me. `GEMINI_API_KEY` is present on the project and works (the copilot answered in 3 s); `OPENROUTER_API_KEY` is on the free tier and currently rate-limited, so Gemini is the working provider. No key was printed, rotated or added. |
 | Database | No migration was applied for this pass; every feature reads existing tables. |
 
