@@ -90,7 +90,7 @@ export const PasswordRecoveryModal: React.FC = () => {
             animate="visible"
             exit="exit"
           >
-        <Logo variant="full" className="h-10 sm:h-11 w-auto" />
+        <Logo variant="full" className="w-20 sm:w-24 h-auto" />
         <div className="flex items-center gap-2.5 border-b border-[var(--border-subtle)] pb-4">
           <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] text-[var(--color-on-primary)] flex items-center justify-center">
             <KeyRound className="w-4 h-4" />

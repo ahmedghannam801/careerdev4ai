@@ -890,7 +890,7 @@ const navLinks = [
       {/* Quiet Footer */}
       <footer className="border-t border-[var(--color-border)] px-6 py-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 text-xs text-[var(--text-muted)]">
-          <Logo variant="full" className="h-10 w-auto self-start sm:h-12" />
+          <Logo variant="full" className="w-28 h-auto self-start sm:w-32" />
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div>
               <span>© 2026 Aionvia. Personal Career Operating System.</span>

@@ -16,13 +16,15 @@ interface LogoProps {
    * `icon` — the official mark at icon size. Use it in favicons, app icons,
    *   collapsed navigation and any small slot.
    *
-   * `full` — the same official mark presented on its own at a larger size. Use
-   *   it on the landing page, the authentication screens, the footer and
-   *   anywhere the brand itself is the subject.
+   * `full` — the official lockup: the mark with the Aionvia lettering. Use it
+   *   on the landing page, the authentication screens, the footer and anywhere
+   *   the brand itself is the subject. Size it by WIDTH (`w-24`, `w-32`), not
+   *   by height: the lockup is stacked, so a height class alone would shrink
+   *   the lettering to a smudge.
    */
   variant?: LogoVariant;
   /**
-   * Sizing classes for the image, e.g. `h-8 w-8` for the icon or `h-12 w-auto`
+   * Sizing classes for the image, e.g. `h-8 w-8` for the icon or `w-24 h-auto`
    * for the larger variant. The aspect ratio of the asset is always preserved:
    * the image is rendered with `object-contain`, so it can never be stretched.
    */

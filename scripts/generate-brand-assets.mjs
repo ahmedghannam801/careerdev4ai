@@ -150,13 +150,103 @@ function artworkBounds(buffer, { width, height, channels }) {
   return { left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
+/** The bounding box of the opaque pixels inside one rectangular region. */
+function regionBounds(buffer, info, region) {
+  const { width, channels } = info;
+  let minX = region.left + region.width, minY = region.top + region.height;
+  let maxX = -1, maxY = -1;
+  for (let y = region.top; y < region.top + region.height; y++) {
+    for (let x = region.left; x < region.left + region.width; x++) {
+      if (buffer[(y * width + x) * channels + 3] === 0) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) throw new Error('Region is fully transparent');
+  return { left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+}
+
+/**
+ * Splits a stacked lockup into its two parts — the mark above, the wordmark
+ * below — without touching either.
+ *
+ * The official artwork is supplied as one image: the symbol sits above the
+ * lettering with a clear horizontal gap between them. An app icon and a
+ * favicon have to be the SYMBOL, because 16 pixels of script lettering is a
+ * smudge; the page and the social card want the whole lockup. The split is
+ * therefore read from the artwork itself: the widest empty horizontal band
+ * inside the middle of the image is the gap between the two parts.
+ *
+ * A single-piece mark has no such band, and is returned whole — nothing is
+ * ever cut through the artwork.
+ */
+function splitLockup(buffer, info) {
+  const bounds = artworkBounds(buffer, info);
+  const { width, channels } = info;
+
+  const occupied = new Array(bounds.height).fill(false);
+  for (let y = 0; y < bounds.height; y++) {
+    for (let x = 0; x < bounds.width; x++) {
+      if (buffer[((bounds.top + y) * width + bounds.left + x) * channels + 3] === 0) continue;
+      occupied[y] = true;
+      break;
+    }
+  }
+
+  const bands = [];
+  let start = null;
+  for (let y = 0; y < occupied.length; y++) {
+    if (!occupied[y]) {
+      if (start === null) start = y;
+    } else if (start !== null) {
+      bands.push({ start, end: y - 1, length: y - start });
+      start = null;
+    }
+  }
+
+  // Only a gap strictly inside the artwork separates two parts; a leading or
+  // trailing margin is just empty space and was already trimmed away.
+  const separators = bands.filter(
+    (band) => band.start > bounds.height * 0.12 && band.end < bounds.height * 0.88
+  );
+  if (separators.length === 0) return { symbol: bounds, lockup: bounds };
+
+  const separator = separators.sort((a, b) => b.length - a.length)[0];
+  const markRegion = {
+    left: bounds.left,
+    top: bounds.top,
+    width: bounds.width,
+    height: separator.start,
+  };
+  const symbol = regionBounds(buffer, info, markRegion);
+
+  return { symbol, lockup: bounds };
+}
+
+/** Crops a raw buffer to a region, as a PNG buffer of exactly that region. */
+async function cropRegion(raw, region) {
+  return sharp(raw.data, {
+    raw: { width: raw.info.width, height: raw.info.height, channels: 4 },
+  })
+    .extract({
+      left: region.left,
+      top: region.top,
+      width: region.width,
+      height: region.height,
+    })
+    .png()
+    .toBuffer();
+}
+
 /**
  * Places artwork on a square transparent canvas, scaled to fit `fill` of the
  * canvas and centred. The aspect ratio of the artwork is never changed.
  */
-async function squareCanvas(raw, fill, canvasSize) {
+async function squareCanvas(raw, fill, canvasSize, region = null) {
   const { data, info } = raw;
-  const bounds = artworkBounds(data, info);
+  const bounds = region ?? artworkBounds(data, info);
   const canvas = canvasSize;
 
   const scale = Math.min((canvas * fill) / bounds.width, (canvas * fill) / bounds.height);
@@ -206,18 +296,25 @@ async function build() {
   }
 
   /* ------------------------------------------------------------------ */
-  /* 1. Icon: prepare the art, trim, centre on a square canvas.           */
+  /* 1. Icon: the MARK of the lockup, trimmed and centred on a square.   */
   /* ------------------------------------------------------------------ */
   console.log('→ icon');
   const iconRaw = await prepareArtwork(OFFICIAL_LOGO);
-  const iconSquare = await squareCanvas(iconRaw, 0.94, 512);
+  const parts = splitLockup(iconRaw.data, iconRaw.info);
+  // The supplied artwork is a stacked lockup, so the icon takes the mark and
+  // keeps the wordmark out of it: 16 pixels of script lettering is a smudge.
+  const iconSquare = await squareCanvas(iconRaw, 0.84, 512, parts.symbol);
 
   // Bundled copy — imported by the React <Logo> component.
   await writeFile(path.join(BUNDLED_DIR, 'aionvia-icon.png'), iconSquare);
 
-  // Favicon / PWA set — served statically from /brand/.
+  // Favicon / PWA set — served statically from /brand/. The two smallest sizes
+  // are cut from a tighter fit: at 16 pixels the mark needs every pixel it has,
+  // and the white field would otherwise eat a third of them.
+  const iconTight = await squareCanvas(iconRaw, 0.97, 512, parts.symbol);
   for (const size of [16, 32, 192, 512]) {
-    await sharp(iconSquare)
+    const source = size <= 32 ? iconTight : iconSquare;
+    await sharp(source)
       .resize(size, size, { kernel: 'lanczos3' })
       .png(PNG_OUTPUT)
       .toFile(path.join(PUBLIC_BRAND_DIR, size === 512 ? 'icon-512.png' : `favicon-${size}.png`));
@@ -232,11 +329,11 @@ async function build() {
       .toFile(path.join(PUBLIC_BRAND_DIR, `apple-touch-icon-${size}.png`));
   }
 
-  // Maskable icon: the artwork sits inside the safe zone on an opaque tile.
-  const maskableArt = await sharp(iconRaw.data, {
-    raw: { width: iconRaw.info.width, height: iconRaw.info.height, channels: 4 },
-  })
-    .resize(430, 430, { kernel: 'lanczos3', fit: 'inside' })
+  // Maskable icon: the mark sits inside the 80% safe circle of an opaque tile,
+  // so a launcher that crops to a squircle or a circle never clips it.
+  const maskableSource = await cropRegion(iconRaw, parts.symbol);
+  const maskableArt = await sharp(maskableSource)
+    .resize(380, 380, { kernel: 'lanczos3', fit: 'inside' })
     .png()
     .toBuffer();
   await sharp({
@@ -248,26 +345,16 @@ async function build() {
     .toFile(path.join(PUBLIC_BRAND_DIR, 'maskable-512.png'));
 
   /* ------------------------------------------------------------------ */
-  /* 2. Large UI asset: prepare the art, trim, keep the artwork intact.   */
+  /* 2. Large UI asset: the whole lockup, artwork intact.                 */
   /* ------------------------------------------------------------------ */
   console.log('→ logo');
   const logoRaw = await prepareArtwork(OFFICIAL_LOGO);
-  const logoBounds = artworkBounds(logoRaw.data, logoRaw.info);
+  const logoBounds = parts.lockup;
 
   // The artwork is reproduced at its original scale; only the supplied outer
   // margin is replaced by a small, even transparent one so the mark can be
   // sized responsively without the whitespace dominating the box.
-  const cropped = await sharp(logoRaw.data, {
-    raw: { width: logoRaw.info.width, height: logoRaw.info.height, channels: 4 },
-  })
-    .extract({
-      left: logoBounds.left,
-      top: logoBounds.top,
-      width: logoBounds.width,
-      height: logoBounds.height,
-    })
-    .png()
-    .toBuffer();
+  const cropped = await cropRegion(logoRaw, logoBounds);
 
   const padX = Math.round(logoBounds.width * 0.02);
   const padY = Math.round(logoBounds.height * 0.06);

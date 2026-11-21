@@ -278,7 +278,10 @@ export const AuthModal: React.FC = () => {
 
           {/* Centered header */}
           <div className="flex flex-col items-center text-center gap-3 border-b border-[var(--border-subtle)] pb-4 pt-1">
-            <Logo variant="full" className="h-11 sm:h-12 w-auto mx-auto" />
+            {/* The official lockup is stacked: the mark above the Aionvia
+                lettering. It is sized by width so the lettering stays
+                readable at every breakpoint. */}
+            <Logo variant="full" className="w-24 sm:w-28 h-auto" />
             <div>
               <h3 className="font-bold text-base text-[var(--text-primary)]">
                 {mode === 'login' ? 'Sign in to Aionvia' : mode === 'register' ? 'Create Your Account' : 'Reset Password'}

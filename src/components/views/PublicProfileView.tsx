@@ -129,7 +129,14 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)]">
       <header className="border-b border-[var(--border-subtle)] bg-[var(--surface-main)]">
         <div className="max-w-4xl mx-auto px-5 py-3 flex items-center justify-between">
-          <Logo variant="full" className="h-8 sm:h-9 w-auto" />
+          {/* The header bar is shallow, so it carries the mark beside the
+              name rather than the full stacked lockup. */}
+          <div className="flex items-center gap-2">
+            <Logo variant="icon" className="h-8 w-8" alt="" />
+            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
+              {t('Aionvia')}
+            </span>
+          </div>
           <button
             onClick={onBack}
             className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline flex items-center gap-1.5"
