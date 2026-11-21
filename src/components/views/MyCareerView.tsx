@@ -5,11 +5,7 @@ import {
   Target, 
   CheckCircle2, 
   Clock, 
-  AlertTriangle, 
-  Award, 
-  FolderGit2, 
-  Briefcase, 
-  Calendar, 
+  AlertTriangle,
   Plus, 
   X, 
   ChevronRight,
@@ -22,6 +18,8 @@ import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { isSkillMastered } from '../../../shared/careerMetrics';
 import { MilestoneCategory, CareerGoal } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
+import { SpiralTimeline } from '../career/SpiralTimeline';
+import { buildSpiralMilestones } from '../../lib/spiralTimeline';
 
 /**
  * Plain-language rendering of the career goals the user can pick. Used so the
@@ -99,58 +97,19 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
   });
 
   // Unified Career Timeline Events
-  const timelineEvents = [
-    ...profile.education.map(e => ({
-      id: `timeline-edu-${e.id}`,
-      year: e.startDate.slice(0, 4) || '',
-      date: e.startDate,
-      type: t('Education'),
-      title: `${e.degree} in ${e.field}`,
-      subtitle: e.institution,
-      status: 'completed',
-      icon: Award
-    })),
-    ...profile.experiences.map(e => ({
-      id: `timeline-exp-${e.id}`,
-      year: e.startDate.slice(0, 4) || '',
-      date: e.startDate,
-      type: t('Experience'),
-      title: `${e.role} at ${e.company}`,
-      subtitle: e.employmentType,
-      status: e.isCurrent ? 'current' : 'completed',
-      icon: Briefcase
-    })),
-    ...profile.certifications.map(c => ({
-      id: `timeline-cert-${c.id}`,
-      year: c.issueDate.slice(0, 4) || '',
-      date: c.issueDate,
-      type: t('Certification'),
-      title: c.name,
-      subtitle: c.provider,
-      status: 'completed',
-      icon: Award
-    })),
-    ...projects.map(p => ({
-      id: `timeline-proj-${p.id}`,
-      year: p.createdAt.slice(0, 4) || '',
-      date: p.createdAt,
-      type: t('Project'),
-      title: p.title,
-      subtitle: p.difficulty,
-      status: p.status,
-      icon: FolderGit2
-    })),
-    ...applications.map(a => ({
-      id: `timeline-app-${a.id}`,
-      year: a.appliedDate?.slice(0, 4) || '',
-      date: a.appliedDate || a.lastUpdated,
-      type: t('Application'),
-      title: `${a.role} at ${a.company}`,
-      subtitle: `${t('Stage:')} ${t(a.stage.toUpperCase())}`,
-      status: a.stage,
-      icon: Calendar
-    }))
-  ].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  //
+  // The timeline is drawn as a spiral: the earliest record the candidate has
+  // sits at the centre and the newest one is furthest out, so the shape of
+  // the drawing is the shape of their career. Every milestone is a record
+  // they really have, and its state is read off that record's own status.
+  const spiralMilestones = buildSpiralMilestones({
+    education: profile.education,
+    experiences: profile.experiences,
+    certifications: profile.certifications,
+    projects,
+    applications,
+    milestones,
+  });
 
   // The ATS score of the newest CV snapshot, but only when it was produced
   // for the current target role. An old role's score is not current alignment.
@@ -664,7 +623,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
           </div>
         </div>
 
-        {/* Chronological Career Timeline */}
+        {/* The Spiral Career Timeline */}
         <div className="lg:col-span-2 p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
@@ -674,37 +633,13 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                   {t('Career Timeline')}
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {t('Chronological trail synthesized directly from verified career records.')}
+                  {t('Your career as a spiral: every verified record you own, from the earliest to the newest.')}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="relative ps-6 space-y-6 before:absolute before:start-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--border-subtle)]">
-            {timelineEvents.map((ev) => {
-              return (
-                <div key={ev.id} className="relative group">
-                  {/* Dot */}
-                  <div className="absolute -start-6 top-1 w-5 h-5 rounded-full bg-[var(--surface-main)] border-2 border-[var(--accent-primary)] flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)]" />
-                  </div>
-
-                  <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] group-hover:border-[var(--accent-primary)]/40 transition-colors space-y-1">
-                    <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
-                      <span>{t(ev.type)} • {ev.date}</span>
-                      <span className="font-semibold text-[var(--color-primary-text)] capitalize">{ev.status}</span>
-                    </div>
-                    <div className="text-xs font-bold text-[var(--text-primary)]">
-                      {ev.title}
-                    </div>
-                    <div className="text-xs text-[var(--text-secondary)]">
-                      {ev.subtitle}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <SpiralTimeline milestones={spiralMilestones} t={t} />
         </div>
       </div>
 

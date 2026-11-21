@@ -11,6 +11,7 @@ import {
   Trash2,
   Upload,
   Calendar,
+  Search,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { PROJECT_STATUS_FILTERS } from '../../lib/routing';
@@ -59,6 +60,11 @@ export const ProjectsView: React.FC = () => {
   );
   const [statusFilter, setStatusFilter] = useRouteParam<string>('status', PROJECT_STATUS_FILTERS, 'all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  // The search, the difficulty and the order are the candidate's own way of
+  // narrowing the list. They are read from the records, never from a preset.
+  const [projectSearch, setProjectSearch] = useState('');
+  const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
+  const [projectSort, setProjectSort] = useState<'recent' | 'title' | 'difficulty'>('recent');
   
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,11 +94,56 @@ export const ProjectsView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredProjects = projects.filter((p) => {
-    const matchesStatus = statusFilter === 'all' ? true : p.status === statusFilter;
-    const matchesCategory = categoryFilter === 'all' ? true : (p.category ?? 'personal') === categoryFilter;
-    return matchesStatus && matchesCategory;
-  });
+  const filteredProjects = useMemo(() => {
+    const term = projectSearch.trim().toLowerCase();
+    const matched = projects.filter((p) => {
+      const matchesStatus = statusFilter === 'all' ? true : p.status === statusFilter;
+      const matchesCategory =
+        categoryFilter === 'all' ? true : (p.category ?? 'personal') === categoryFilter;
+      const matchesDifficulty =
+        difficultyFilter === 'all' ? true : p.difficulty === difficultyFilter;
+      if (!matchesStatus || !matchesCategory || !matchesDifficulty) return false;
+      if (term) {
+        // The search reads what a candidate would remember the project by:
+        // its name, what it is for, the skills it uses and its own role in it.
+        const haystack = [
+          p.title,
+          p.goal ?? '',
+          p.description ?? '',
+          p.role ?? '',
+          (p.skills ?? []).join(' '),
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
+    });
+
+    // The order is the candidate's choice, and it is applied to what survived
+    // the filters rather than to the whole list.
+    const difficultyRank: Record<string, number> = {
+      Beginner: 0,
+      Intermediate: 1,
+      Advanced: 2,
+    };
+    return matched.sort((a, b) => {
+      if (projectSort === 'title') return a.title.localeCompare(b.title);
+      if (projectSort === 'difficulty') {
+        const difference =
+          (difficultyRank[a.difficulty] ?? 0) - (difficultyRank[b.difficulty] ?? 0);
+        if (difference !== 0) return difference;
+      }
+      return (b.createdAt ?? '').localeCompare(a.createdAt ?? '');
+    });
+  }, [
+    projects,
+    statusFilter,
+    categoryFilter,
+    difficultyFilter,
+    projectSearch,
+    projectSort,
+  ]);
 
   const volunteeringByProject = useMemo(() => {
     const map = new Map<string, { organization: string; role: string }[]>();
@@ -345,6 +396,56 @@ export const ProjectsView: React.FC = () => {
 
       {/* Filter Tabs: Status & Category */}
       <div className="space-y-3 pb-1">
+        {/* The search and the order. The search reads the candidate's own
+            records, so a project is found by anything they would remember it
+            by — its name, what it is for, or a skill it uses. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              size={14}
+              className="pointer-events-none absolute start-2.5 top-2.5 text-[var(--text-muted)]"
+            />
+            <input
+              value={projectSearch}
+              onChange={(event) => setProjectSearch(event.target.value)}
+              placeholder={t('Search your projects by name, goal or skill')}
+              aria-label={t('Search your projects by name, goal or skill')}
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] py-2 ps-8 pe-3 text-sm text-[var(--text-primary)]"
+            />
+          </div>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+            <span className="sr-only sm:not-sr-only">{t('Difficulty')}</span>
+            <select
+              value={difficultyFilter}
+              onChange={(event) => setDifficultyFilter(event.target.value)}
+              aria-label={t('Difficulty')}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2.5 py-2 text-xs font-medium text-[var(--text-primary)]"
+            >
+              <option value="all">{t('All difficulties')}</option>
+              {['Beginner', 'Intermediate', 'Advanced'].map((level) => (
+                <option key={level} value={level}>
+                  {t(level)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+            <span className="sr-only sm:not-sr-only">{t('Sort by')}</span>
+            <select
+              value={projectSort}
+              onChange={(event) =>
+                setProjectSort(event.target.value as 'recent' | 'title' | 'difficulty')
+              }
+              aria-label={t('Sort by')}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2.5 py-2 text-xs font-medium text-[var(--text-primary)]"
+            >
+              <option value="recent">{t('Most recent first')}</option>
+              <option value="title">{t('Name (A–Z)')}</option>
+              <option value="difficulty">{t('Difficulty')}</option>
+            </select>
+          </label>
+        </div>
+
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-semibold text-[var(--text-secondary)] me-2">{t('Status')}:</span>
           {['all', 'planned', 'in_progress', 'completed', 'published'].map((st) => (

@@ -22,6 +22,10 @@ local_db/
 .wrangler/
 .tmp-qa/
 
+# The local secrets file `wrangler pages dev` reads. It holds live
+# credentials and must never be committed.
+.dev.vars
+
 # The screenshots and the report the QA scripts in the repository root write
 # when they sweep the built site. The scripts are the source and are tracked;
 # what they produce is an artifact of one run and is not.

@@ -173,4 +173,15 @@ export const skillsAr: Record<string, string> = {
   'Level up': 'ارتقِ بالمستوى',
   'Maximum level reached': 'تم بلوغ أعلى مستوى',
   'Skill level': 'مستوى المهارة',
+
+  // The difficulty of a single question, and the per-difficulty result.
+  'One concept, one correct answer.': 'مفهوم واحد وإجابة واحدة صحيحة.',
+  'Applied reasoning in a realistic scenario.': 'تفكير تطبيقي في سيناريو واقعي.',
+  'Multiple concepts, trade-offs or execution-order diagnosis.':
+    'مفاهيم متعددة أو مقايضات أو تشخيص ترتيب التنفيذ.',
+  'Score by difficulty': 'النتيجة حسب مستوى الصعوبة',
+  'Every question carries a difficulty: Beginner (one concept, one correct answer), Intermediate (applied reasoning in a realistic scenario), Advanced (multiple concepts, trade-offs or execution-order diagnosis). Your result is broken down per difficulty, so a strong overall score cannot hide a weak advanced band.':
+    'يحمل كل سؤال مستوى صعوبة: مبتدئ (مفهوم واحد وإجابة واحدة صحيحة)، متوسط (تفكير تطبيقي في سيناريو واقعي)، متقدم (مفاهيم متعددة أو مقايضات أو تشخيص ترتيب التنفيذ). تُقسَّم نتيجتك حسب مستوى الصعوبة، حتى لا تُخفي النتيجة العامة القوية نقطة ضعف في المستوى المتقدم.',
+  'Your weakest band is {difficulty} ({percentage}%). It is the band to work on next.':
+    'أضعف مستوى لديك هو {difficulty} ({percentage}%). هذا هو المستوى الذي ينبغي أن تعمل عليه بعد ذلك.',
 };

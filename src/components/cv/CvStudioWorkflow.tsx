@@ -25,6 +25,7 @@
 
 import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
+import { Check } from 'lucide-react';
 import { MOTION_DURATION, MOTION_EASE } from '../../lib/motion';
 import {
   CV_STUDIO_STEPS,
@@ -73,6 +74,7 @@ export const CvStudioWorkflow: React.FC<CvStudioWorkflowProps> = ({
   return (
     <nav
       aria-label={t('CV Studio workflow')}
+      data-cv-steps
       className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3"
     >
       <ol className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
@@ -111,12 +113,24 @@ export const CvStudioWorkflow: React.FC<CvStudioWorkflowProps> = ({
                       : 'border-[var(--border-subtle)] text-[var(--text-muted)]'
                   }`}
                 >
-                  {index + 1}
+                  {/* A finished step is marked as finished. The number it
+                      carried is in the name of the step for anyone who needs
+                      it, and a tick is a faster read than a digit. */}
+                  {done ? (
+                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                  ) : (
+                    <span>{index + 1}</span>
+                  )}
                 </span>
                 <span className="relative">{labels[step.id]}</span>
               </button>
               {index < CV_STUDIO_STEPS.length - 1 && (
-                <span aria-hidden="true" className="h-px w-3 shrink-0 bg-[var(--border-subtle)]" />
+                <span
+                  aria-hidden="true"
+                  className={`h-0.5 w-3 shrink-0 rounded-full transition-colors ${
+                    done ? 'bg-[var(--accent-primary)]' : 'bg-[var(--border-subtle)]'
+                  }`}
+                />
               )}
             </li>
           );

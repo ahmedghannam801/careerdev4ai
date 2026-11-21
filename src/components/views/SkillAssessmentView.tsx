@@ -46,6 +46,15 @@ import {
   levelForAssessmentScore,
 } from '../../../shared/assessment';
 import { assessmentsForRole } from '../../../shared/roleAssessmentMatching';
+import {
+  ASSESSMENT_DIFFICULTY_RULE,
+  QUESTION_DIFFICULTY_DESCRIPTIONS,
+  QUESTION_DIFFICULTY_LABELS,
+  difficultyBreakdown,
+  difficultyPercentage,
+  weakestDifficulty,
+  type QuestionDifficulty,
+} from '../../lib/assessmentDifficulty';
 
 export interface AssessmentQuestion {
   id: string;
@@ -53,6 +62,15 @@ export interface AssessmentQuestion {
   options: string[];
   correctIndex: number;
   explanation: string;
+  /**
+   * How demanding this question is.
+   *
+   * The check used to report one number, so a candidate who answered the
+   * easy questions well and the hard ones badly scored exactly the same as
+   * the opposite. The difficulty travels with the question, so the badge
+   * the candidate reads and the breakdown in the result are the same fact.
+   */
+  difficulty: QuestionDifficulty;
 }
 
 export interface AssessmentCategory {
@@ -101,6 +119,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     questions: [
       {
         id: 'sql-1',
+        difficulty: 'Intermediate',
         prompt:
           'You run:\n\nSELECT dept, COUNT(*) AS n\nFROM employees\nWHERE n > 5\nGROUP BY dept;\n\nWhy does the database reject WHERE n > 5?',
         options: [
@@ -115,6 +134,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'sql-2',
+        difficulty: 'Intermediate',
         prompt:
           'An orders table has ties in revenue: 900, 800, 800, 700.\nWhat ranks does DENSE_RANK() OVER (ORDER BY revenue DESC) return vs RANK()?',
         options: [
@@ -129,6 +149,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'sql-3',
+        difficulty: 'Advanced',
         prompt:
           'You want EVERY customer row from customers (left) and only matching orders from orders (right), keeping customers with 0 orders. Which query works without accidentally turning the join into an INNER JOIN?',
         options: [
@@ -143,6 +164,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'sql-4',
+        difficulty: 'Advanced',
         prompt:
           'When analyzing slow SQL queries, how does a correlated subquery differ from a standard CTE/subquery?',
         options: [
@@ -157,6 +179,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'sql-5',
+        difficulty: 'Intermediate',
         prompt:
           'A dashboard pipeline starts failing after a table column is reordered and slow network I/O spikes. Why did SELECT * trigger both issues?',
         options: [
@@ -184,6 +207,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     questions: [
       {
         id: 'py-1',
+        difficulty: 'Beginner',
         prompt:
           'A sales dataset has a "revenue" column with the string "N/A" in 12 rows. Which expression converts the column to numeric and leaves the missing rows as NaN?',
         options: [
@@ -198,6 +222,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'py-2',
+        difficulty: 'Beginner',
         prompt:
           'You need revenue per region, but each order appears on its own row. Which approach produces the total per region correctly?',
         options: [
@@ -212,6 +237,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'py-3',
+        difficulty: 'Beginner',
         prompt:
           'The same customer appears three times because of a repeat import. What is the safest first step before analysing the data?',
         options: [
@@ -226,6 +252,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'py-4',
+        difficulty: 'Intermediate',
         prompt:
           'What does this code do?\n\nresult = df.merge(lookup, on="customer_id", how="left")',
         options: [
@@ -240,6 +267,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'py-5',
+        difficulty: 'Intermediate',
         prompt:
           'Which filter keeps only orders placed in 2024 AND worth more than 500, for either region?',
         options: [
@@ -269,6 +297,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     questions: [
       {
         id: 'xl-1',
+        difficulty: 'Intermediate',
         prompt:
           'You insert a new column inside a financial lookup table and your old =VLOOKUP(A2, $B$2:$E$50, 3, FALSE) suddenly returns the wrong field. Why does XLOOKUP prevent this bug?',
         options: [
@@ -283,6 +312,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'xl-2',
+        difficulty: 'Beginner',
         prompt:
           'A finance manager asks for monthly totals per governorate from 18,000 raw order rows in under two minutes without altering source formulas. Which tool is best?',
         options: [
@@ -297,6 +327,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'xl-3',
+        difficulty: 'Beginner',
         prompt:
           'Which formula accurately sums order totals in C2:C100 ONLY where column B equals "Cairo"?',
         options: [
@@ -310,6 +341,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'xl-4',
+        difficulty: 'Beginner',
         prompt:
           'You copy =B2*E1 down 50 rows to calculate VAT from a single tax rate stored in cell E1, and rows 2–50 calculate 0. How should the reference be written?',
         options: [
@@ -323,6 +355,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'xl-5',
+        difficulty: 'Beginner',
         prompt:
           'A SKU lookup returns #N/A for discontinued products, causing downstream KPI sums to fail. Which wrapper keeps the KPI report clean and transparent?',
         options: [
@@ -348,6 +381,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     questions: [
       {
         id: 'comm-1',
+        difficulty: 'Beginner',
         prompt: 'What does the STAR framework stand for in competency-based interviews?',
         options: [
           'Strategy, Tactics, Action, Revenue',
@@ -360,6 +394,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'comm-2',
+        difficulty: 'Beginner',
         prompt: 'In the STAR framework, which component should typically receive the MOST emphasis and detail?',
         options: [
           'Situation (background history)',
@@ -372,6 +407,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'comm-3',
+        difficulty: 'Intermediate',
         prompt: 'When presenting technical architecture to non-technical business stakeholders, what is the best strategy?',
         options: [
           'Use advanced technical jargon to demonstrate deep expertise.',
@@ -384,6 +420,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'comm-4',
+        difficulty: 'Intermediate',
         prompt: 'How should you approach answering a question about a past project failure?',
         options: [
           'Deny that any failure ever occurred.',
@@ -396,6 +433,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'comm-5',
+        difficulty: 'Beginner',
         prompt: 'What distinguishes an active listener in team collaborative environments?',
         options: [
           'Waiting silently for their turn to speak without processing.',
@@ -420,6 +458,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     questions: [
       {
         id: 'eng-1',
+        difficulty: 'Beginner',
         prompt: 'Which phrase is most appropriate for a polite, professional follow-up email to a hiring team?',
         options: [
           'Why haven\'t you replied to my application yet?',
@@ -432,6 +471,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'eng-2',
+        difficulty: 'Beginner',
         prompt: 'In technical writing, why is the active voice generally preferred over the passive voice?',
         options: [
           'It makes documents longer.',
@@ -444,6 +484,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'eng-3',
+        difficulty: 'Beginner',
         prompt: 'What does the idiom "on the same page" mean in a workplace setting?',
         options: [
           'Reading from the same physical sheet of paper.',
@@ -456,6 +497,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'eng-4',
+        difficulty: 'Intermediate',
         prompt: 'Which sentence demonstrates proper subject-verb agreement?',
         options: [
           'The team of data analysts are presenting their findings.',
@@ -468,6 +510,7 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
       },
       {
         id: 'eng-5',
+        difficulty: 'Beginner',
         prompt: 'What is the purpose of an Executive Summary at the start of a business or technical proposal?',
         options: [
           'To list the names of all employees in alphabetical order.',
@@ -491,9 +534,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     aliases: ['Power BI', 'Tableau', 'Power BI & Tableau'],
     visual: 'data-analysis',
     questions: [
-      { id: 'bi-1', prompt: 'A report total changes unexpectedly when a dimension is added. What should you inspect first?', options: ['The chart title', 'Relationship cardinality and filter direction in the data model', 'The page background', 'The browser zoom'], correctIndex: 1, explanation: 'Model relationships and filter propagation determine how measures aggregate when dimensions are introduced.' },
-      { id: 'bi-2', prompt: 'Which visual is usually best for showing a trend over monthly time periods?', options: ['Pie chart', 'Line chart', 'Gauge', 'Packed bubbles'], correctIndex: 1, explanation: 'A line chart makes ordered time trends and changes over time easy to compare.' },
-      { id: 'bi-3', prompt: 'What is the strongest first step when a dashboard is slow?', options: ['Add more visuals', 'Check model size, query performance and unnecessary high-cardinality fields', 'Use more colors', 'Increase the title font'], correctIndex: 1, explanation: 'Performance tuning starts with the data model and query workload, not decorative changes.' },
+      { id: 'bi-1', difficulty: 'Intermediate', prompt: 'A report total changes unexpectedly when a dimension is added. What should you inspect first?', options: ['The chart title', 'Relationship cardinality and filter direction in the data model', 'The page background', 'The browser zoom'], correctIndex: 1, explanation: 'Model relationships and filter propagation determine how measures aggregate when dimensions are introduced.' },
+      { id: 'bi-2', difficulty: 'Beginner', prompt: 'Which visual is usually best for showing a trend over monthly time periods?', options: ['Pie chart', 'Line chart', 'Gauge', 'Packed bubbles'], correctIndex: 1, explanation: 'A line chart makes ordered time trends and changes over time easy to compare.' },
+      { id: 'bi-3', difficulty: 'Intermediate', prompt: 'What is the strongest first step when a dashboard is slow?', options: ['Add more visuals', 'Check model size, query performance and unnecessary high-cardinality fields', 'Use more colors', 'Increase the title font'], correctIndex: 1, explanation: 'Performance tuning starts with the data model and query workload, not decorative changes.' },
     ],
   },
   {
@@ -506,9 +549,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'Statistics & A/B Testing',
     aliases: ['Statistics', 'Experimentation', 'A/B Testing', 'Hypothesis Testing'],
     questions: [
-      { id: 'stat-1', prompt: 'What is the main purpose of random assignment in an experiment?', options: ['Guarantee a positive result', 'Reduce systematic differences between treatment groups', 'Increase the sample mean', 'Remove the need for a control group'], correctIndex: 1, explanation: 'Random assignment helps balance confounders so outcome differences can be attributed more credibly to treatment.' },
-      { id: 'stat-2', prompt: 'A 95% confidence interval for a lift crosses zero. What is the safest conclusion?', options: ['The treatment definitely works', 'The data do not establish a non-zero effect at the corresponding two-sided 5% level', 'The control group is invalid', 'The effect is exactly zero'], correctIndex: 1, explanation: 'An interval crossing zero does not provide conventional evidence that the effect differs from zero; it does not prove no effect.' },
-      { id: 'stat-3', prompt: 'Why should an analyst define the primary metric before inspecting experiment results?', options: ['To prevent metric switching that inflates false-positive risk', 'To ensure every metric is significant', 'To avoid checking sample size', 'To make the treatment group larger'], correctIndex: 0, explanation: 'Pre-specifying a primary metric limits selective reporting and multiple-testing bias.' },
+      { id: 'stat-1', difficulty: 'Beginner', prompt: 'What is the main purpose of random assignment in an experiment?', options: ['Guarantee a positive result', 'Reduce systematic differences between treatment groups', 'Increase the sample mean', 'Remove the need for a control group'], correctIndex: 1, explanation: 'Random assignment helps balance confounders so outcome differences can be attributed more credibly to treatment.' },
+      { id: 'stat-2', difficulty: 'Intermediate', prompt: 'A 95% confidence interval for a lift crosses zero. What is the safest conclusion?', options: ['The treatment definitely works', 'The data do not establish a non-zero effect at the corresponding two-sided 5% level', 'The control group is invalid', 'The effect is exactly zero'], correctIndex: 1, explanation: 'An interval crossing zero does not provide conventional evidence that the effect differs from zero; it does not prove no effect.' },
+      { id: 'stat-3', difficulty: 'Advanced', prompt: 'Why should an analyst define the primary metric before inspecting experiment results?', options: ['To prevent metric switching that inflates false-positive risk', 'To ensure every metric is significant', 'To avoid checking sample size', 'To make the treatment group larger'], correctIndex: 0, explanation: 'Pre-specifying a primary metric limits selective reporting and multiple-testing bias.' },
     ],
   },
   {
@@ -521,9 +564,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'TypeScript',
     aliases: ['JavaScript', 'TypeScript Engineering'],
     questions: [
-      { id: 'ts-1', prompt: 'A value from JSON.parse is untrusted. What is the safest type before validation?', options: ['any', 'unknown', 'never', 'object'], correctIndex: 1, explanation: 'unknown requires validation or narrowing before use, unlike any which permits unsafe access.' },
-      { id: 'ts-2', prompt: 'How should code handle a discriminated union safely?', options: ['Cast every branch to any', 'Switch on the shared literal discriminator and handle each variant', 'Use non-null assertions everywhere', 'Disable strict mode'], correctIndex: 1, explanation: 'Checking a discriminator lets TypeScript narrow the union to the correct variant.' },
-      { id: 'ts-3', prompt: 'What does `strictNullChecks` help prevent?', options: ['Null or undefined values being used without checking', 'All runtime exceptions', 'Slow compilation', 'Duplicate imports'], correctIndex: 0, explanation: 'Strict null checks require code to account for null and undefined explicitly.' },
+      { id: 'ts-1', difficulty: 'Beginner', prompt: 'A value from JSON.parse is untrusted. What is the safest type before validation?', options: ['any', 'unknown', 'never', 'object'], correctIndex: 1, explanation: 'unknown requires validation or narrowing before use, unlike any which permits unsafe access.' },
+      { id: 'ts-2', difficulty: 'Intermediate', prompt: 'How should code handle a discriminated union safely?', options: ['Cast every branch to any', 'Switch on the shared literal discriminator and handle each variant', 'Use non-null assertions everywhere', 'Disable strict mode'], correctIndex: 1, explanation: 'Checking a discriminator lets TypeScript narrow the union to the correct variant.' },
+      { id: 'ts-3', difficulty: 'Beginner', prompt: 'What does `strictNullChecks` help prevent?', options: ['Null or undefined values being used without checking', 'All runtime exceptions', 'Slow compilation', 'Duplicate imports'], correctIndex: 0, explanation: 'Strict null checks require code to account for null and undefined explicitly.' },
     ],
   },
   {
@@ -536,9 +579,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'React',
     aliases: ['React.js', 'ReactJS', 'Frontend Engineering'],
     questions: [
-      { id: 'react-1', prompt: 'When should a value usually be derived during render instead of mirrored in state?', options: ['Whenever it can be calculated from current props or state', 'Only inside a timeout', 'Never', 'Only after a network request'], correctIndex: 0, explanation: 'Derived values avoid redundant state and synchronization bugs.' },
-      { id: 'react-2', prompt: 'What should an effect do when it subscribes to an external event source?', options: ['Leave the subscription active forever', 'Return a cleanup function that unsubscribes', 'Set state in a tight loop', 'Disable dependency checks'], correctIndex: 1, explanation: 'Cleanup prevents duplicate subscriptions and updates after a component is removed.' },
-      { id: 'react-3', prompt: 'What is a stable list key used for?', options: ['Styling the row', 'Helping React preserve item identity across list updates', 'Encrypting item data', 'Sorting the list automatically'], correctIndex: 1, explanation: 'Stable keys let React associate rendered elements with the same data items across changes.' },
+      { id: 'react-1', difficulty: 'Beginner', prompt: 'When should a value usually be derived during render instead of mirrored in state?', options: ['Whenever it can be calculated from current props or state', 'Only inside a timeout', 'Never', 'Only after a network request'], correctIndex: 0, explanation: 'Derived values avoid redundant state and synchronization bugs.' },
+      { id: 'react-2', difficulty: 'Intermediate', prompt: 'What should an effect do when it subscribes to an external event source?', options: ['Leave the subscription active forever', 'Return a cleanup function that unsubscribes', 'Set state in a tight loop', 'Disable dependency checks'], correctIndex: 1, explanation: 'Cleanup prevents duplicate subscriptions and updates after a component is removed.' },
+      { id: 'react-3', difficulty: 'Beginner', prompt: 'What is a stable list key used for?', options: ['Styling the row', 'Helping React preserve item identity across list updates', 'Encrypting item data', 'Sorting the list automatically'], correctIndex: 1, explanation: 'Stable keys let React associate rendered elements with the same data items across changes.' },
     ],
   },
   {
@@ -551,9 +594,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'CSS & Frontend Architecture',
     aliases: ['CSS', 'CSS Architecture', 'Frontend Architecture', 'Web Accessibility'],
     questions: [
-      { id: 'css-1', prompt: 'Which approach best supports a responsive two-column layout that collapses on narrow screens?', options: ['Fixed pixel widths only', 'CSS Grid or Flexbox with a breakpoint or intrinsic sizing', 'Absolute positioning for every item', 'A table layout'], correctIndex: 1, explanation: 'Grid and Flexbox support adaptive layouts without hard-coding a single viewport size.' },
-      { id: 'css-2', prompt: 'What is the preferred way to indicate an input error accessibly?', options: ['Change its color only', 'Associate visible error text and expose invalid state to assistive technology', 'Add a red shadow only', 'Use placeholder text as the error'], correctIndex: 1, explanation: 'Color alone is insufficient; semantic state and an associated message communicate the error clearly.' },
-      { id: 'css-3', prompt: 'Why limit unnecessary selector specificity?', options: ['It makes later overrides and component styles easier to reason about', 'It improves image resolution', 'It guarantees perfect contrast', 'It changes document semantics'], correctIndex: 0, explanation: 'Lower, predictable specificity reduces cascade conflicts and makes styling maintainable.' },
+      { id: 'css-1', difficulty: 'Intermediate', prompt: 'Which approach best supports a responsive two-column layout that collapses on narrow screens?', options: ['Fixed pixel widths only', 'CSS Grid or Flexbox with a breakpoint or intrinsic sizing', 'Absolute positioning for every item', 'A table layout'], correctIndex: 1, explanation: 'Grid and Flexbox support adaptive layouts without hard-coding a single viewport size.' },
+      { id: 'css-2', difficulty: 'Beginner', prompt: 'What is the preferred way to indicate an input error accessibly?', options: ['Change its color only', 'Associate visible error text and expose invalid state to assistive technology', 'Add a red shadow only', 'Use placeholder text as the error'], correctIndex: 1, explanation: 'Color alone is insufficient; semantic state and an associated message communicate the error clearly.' },
+      { id: 'css-3', difficulty: 'Intermediate', prompt: 'Why limit unnecessary selector specificity?', options: ['It makes later overrides and component styles easier to reason about', 'It improves image resolution', 'It guarantees perfect contrast', 'It changes document semantics'], correctIndex: 0, explanation: 'Lower, predictable specificity reduces cascade conflicts and makes styling maintainable.' },
     ],
   },
   {
@@ -566,9 +609,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'Backend API Design',
     aliases: ['API Design', 'Backend Engineering', 'REST APIs', 'Data Integrity'],
     questions: [
-      { id: 'api-1', prompt: 'Where should authorization for a user-owned record be enforced?', options: ['Only by hiding the UI button', 'On the server, checking ownership for every request', 'Only in client-side routing', 'In a CSS class'], correctIndex: 1, explanation: 'Clients are untrusted; the server must authorize every protected operation.' },
-      { id: 'api-2', prompt: 'What is a transaction useful for when creating a parent and several child rows?', options: ['Ensuring all related writes commit or roll back together', 'Making validation optional', 'Caching a browser page', 'Increasing JSON size'], correctIndex: 0, explanation: 'Transactions prevent partially written relational structures when one step fails.' },
-      { id: 'api-3', prompt: 'What should an API do with malformed input?', options: ['Persist it and fix it later', 'Validate at the boundary and return a clear client error', 'Trust the TypeScript type from the browser', 'Silently ignore all fields'], correctIndex: 1, explanation: 'Runtime validation protects the database because TypeScript types do not validate network payloads.' },
+      { id: 'api-1', difficulty: 'Beginner', prompt: 'Where should authorization for a user-owned record be enforced?', options: ['Only by hiding the UI button', 'On the server, checking ownership for every request', 'Only in client-side routing', 'In a CSS class'], correctIndex: 1, explanation: 'Clients are untrusted; the server must authorize every protected operation.' },
+      { id: 'api-2', difficulty: 'Intermediate', prompt: 'What is a transaction useful for when creating a parent and several child rows?', options: ['Ensuring all related writes commit or roll back together', 'Making validation optional', 'Caching a browser page', 'Increasing JSON size'], correctIndex: 0, explanation: 'Transactions prevent partially written relational structures when one step fails.' },
+      { id: 'api-3', difficulty: 'Beginner', prompt: 'What should an API do with malformed input?', options: ['Persist it and fix it later', 'Validate at the boundary and return a clear client error', 'Trust the TypeScript type from the browser', 'Silently ignore all fields'], correctIndex: 1, explanation: 'Runtime validation protects the database because TypeScript types do not validate network payloads.' },
     ],
   },
   {
@@ -581,9 +624,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'Machine Learning',
     aliases: ['AI/ML', 'AI/ML Engineer', 'Model Evaluation', 'Machine Learning Engineering'],
     questions: [
-      { id: 'ml-1', prompt: 'Why must preprocessing be fit only on the training split?', options: ['To prevent information leakage from validation or test data', 'To increase the number of labels', 'To guarantee accuracy of 100%', 'To eliminate feature engineering'], correctIndex: 0, explanation: 'Fitting transformations on held-out data leaks information and creates an overly optimistic evaluation.' },
-      { id: 'ml-2', prompt: 'For a rare positive class, why can accuracy be misleading?', options: ['A model can predict only the majority class and still score highly', 'Accuracy cannot be calculated', 'The dataset has too many columns', 'It always equals recall'], correctIndex: 0, explanation: 'Class imbalance can make a trivial majority-class predictor appear accurate while missing the target class.' },
-      { id: 'ml-3', prompt: 'What is a useful purpose of a separate test set?', options: ['Repeatedly tune every model parameter', 'Estimate final generalization after choices are made on training/validation data', 'Balance labels automatically', 'Replace data quality checks'], correctIndex: 1, explanation: 'A held-out test set provides a less biased final evaluation when it is not repeatedly used for tuning.' },
+      { id: 'ml-1', difficulty: 'Intermediate', prompt: 'Why must preprocessing be fit only on the training split?', options: ['To prevent information leakage from validation or test data', 'To increase the number of labels', 'To guarantee accuracy of 100%', 'To eliminate feature engineering'], correctIndex: 0, explanation: 'Fitting transformations on held-out data leaks information and creates an overly optimistic evaluation.' },
+      { id: 'ml-2', difficulty: 'Advanced', prompt: 'For a rare positive class, why can accuracy be misleading?', options: ['A model can predict only the majority class and still score highly', 'Accuracy cannot be calculated', 'The dataset has too many columns', 'It always equals recall'], correctIndex: 0, explanation: 'Class imbalance can make a trivial majority-class predictor appear accurate while missing the target class.' },
+      { id: 'ml-3', difficulty: 'Intermediate', prompt: 'What is a useful purpose of a separate test set?', options: ['Repeatedly tune every model parameter', 'Estimate final generalization after choices are made on training/validation data', 'Balance labels automatically', 'Replace data quality checks'], correctIndex: 1, explanation: 'A held-out test set provides a less biased final evaluation when it is not repeatedly used for tuning.' },
     ],
   },
   {
@@ -595,9 +638,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     timeMinutes: 6,
     skillName: 'Product Management',
     questions: [
-      { id: 'pm-1', prompt: 'What should a product team validate before committing to a large feature?', options: ['That the problem is meaningful to a defined user group', 'That the feature has the most settings', 'That a competitor has a longer roadmap', 'That engineering has spare capacity only'], correctIndex: 0, explanation: 'Strong product decisions start with evidence about user problems and desired outcomes.' },
-      { id: 'pm-2', prompt: 'Which is the strongest outcome metric for a new onboarding flow?', options: ['Number of buttons', 'Share of eligible users who successfully reach the activation event', 'Lines of code', 'Number of internal meetings'], correctIndex: 1, explanation: 'An outcome metric measures whether users achieve the intended value, rather than the amount of output.' },
-      { id: 'pm-3', prompt: 'When two requests compete for capacity, what is a sound prioritization step?', options: ['Compare user impact, confidence, effort and strategic fit', 'Choose the loudest requester automatically', 'Ship both without testing', 'Ignore dependencies'], correctIndex: 0, explanation: 'Transparent prioritization weighs impact and evidence against cost and dependencies.' },
+      { id: 'pm-1', difficulty: 'Beginner', prompt: 'What should a product team validate before committing to a large feature?', options: ['That the problem is meaningful to a defined user group', 'That the feature has the most settings', 'That a competitor has a longer roadmap', 'That engineering has spare capacity only'], correctIndex: 0, explanation: 'Strong product decisions start with evidence about user problems and desired outcomes.' },
+      { id: 'pm-2', difficulty: 'Intermediate', prompt: 'Which is the strongest outcome metric for a new onboarding flow?', options: ['Number of buttons', 'Share of eligible users who successfully reach the activation event', 'Lines of code', 'Number of internal meetings'], correctIndex: 1, explanation: 'An outcome metric measures whether users achieve the intended value, rather than the amount of output.' },
+      { id: 'pm-3', difficulty: 'Advanced', prompt: 'When two requests compete for capacity, what is a sound prioritization step?', options: ['Compare user impact, confidence, effort and strategic fit', 'Choose the loudest requester automatically', 'Ship both without testing', 'Ignore dependencies'], correctIndex: 0, explanation: 'Transparent prioritization weighs impact and evidence against cost and dependencies.' },
     ],
   },
   {
@@ -610,9 +653,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'Cybersecurity',
     aliases: ['Security', 'Cyber Security', 'Information Security'],
     questions: [
-      { id: 'sec-1', prompt: 'What does least privilege mean?', options: ['Give each identity only the permissions needed for its task', 'Share one admin account', 'Disable audit logs', 'Grant broad access to avoid support requests'], correctIndex: 0, explanation: 'Least privilege limits the damage from mistakes or compromised credentials.' },
-      { id: 'sec-2', prompt: 'How should an application handle user-supplied SQL values?', options: ['Concatenate them into SQL strings', 'Use parameterized queries and validate the input', 'Trust hidden form fields', 'Escape only spaces'], correctIndex: 1, explanation: 'Parameterized queries separate data from SQL syntax and prevent injection attacks.' },
-      { id: 'sec-3', prompt: 'What is a sensible first response to a confirmed credential leak?', options: ['Rotate/revoke the credential and investigate scope and access logs', 'Delete the alert', 'Post the secret in a ticket', 'Wait until the next release'], correctIndex: 0, explanation: 'Containment starts with revocation, followed by scoped investigation and remediation.' },
+      { id: 'sec-1', difficulty: 'Beginner', prompt: 'What does least privilege mean?', options: ['Give each identity only the permissions needed for its task', 'Share one admin account', 'Disable audit logs', 'Grant broad access to avoid support requests'], correctIndex: 0, explanation: 'Least privilege limits the damage from mistakes or compromised credentials.' },
+      { id: 'sec-2', difficulty: 'Beginner', prompt: 'How should an application handle user-supplied SQL values?', options: ['Concatenate them into SQL strings', 'Use parameterized queries and validate the input', 'Trust hidden form fields', 'Escape only spaces'], correctIndex: 1, explanation: 'Parameterized queries separate data from SQL syntax and prevent injection attacks.' },
+      { id: 'sec-3', difficulty: 'Intermediate', prompt: 'What is a sensible first response to a confirmed credential leak?', options: ['Rotate/revoke the credential and investigate scope and access logs', 'Delete the alert', 'Post the secret in a ticket', 'Wait until the next release'], correctIndex: 0, explanation: 'Containment starts with revocation, followed by scoped investigation and remediation.' },
     ],
   },
   {
@@ -625,9 +668,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'UX Research & Design',
     aliases: ['UI/UX Designer', 'UX Design', 'User Experience', 'UI Design'],
     questions: [
-      { id: 'ux-1', prompt: 'What is the main value of observing representative users complete a task?', options: ['It reveals friction in the real workflow', 'It proves every user behaves identically', 'It replaces accessibility testing', 'It guarantees a visual style'], correctIndex: 0, explanation: 'Usability observation surfaces where users hesitate, misunderstand or fail to complete a task.' },
-      { id: 'ux-2', prompt: 'Which is the best way to evaluate an accessibility concern?', options: ['Rely on color preference', 'Combine automated checks with keyboard and assistive-technology testing', 'Ask only the design team', 'Hide the control'], correctIndex: 1, explanation: 'Automated tests catch only some issues; manual interaction and assistive-technology checks are also needed.' },
-      { id: 'ux-3', prompt: 'What makes a research question less leading?', options: ['It suggests the preferred answer', 'It invites participants to describe their experience without implying a judgment', 'It asks for praise', 'It combines unrelated questions'], correctIndex: 1, explanation: 'Neutral questions reduce bias and help participants report their own behavior and reasoning.' },
+      { id: 'ux-1', difficulty: 'Intermediate', prompt: 'What is the main value of observing representative users complete a task?', options: ['It reveals friction in the real workflow', 'It proves every user behaves identically', 'It replaces accessibility testing', 'It guarantees a visual style'], correctIndex: 0, explanation: 'Usability observation surfaces where users hesitate, misunderstand or fail to complete a task.' },
+      { id: 'ux-2', difficulty: 'Intermediate', prompt: 'Which is the best way to evaluate an accessibility concern?', options: ['Rely on color preference', 'Combine automated checks with keyboard and assistive-technology testing', 'Ask only the design team', 'Hide the control'], correctIndex: 1, explanation: 'Automated tests catch only some issues; manual interaction and assistive-technology checks are also needed.' },
+      { id: 'ux-3', difficulty: 'Beginner', prompt: 'What makes a research question less leading?', options: ['It suggests the preferred answer', 'It invites participants to describe their experience without implying a judgment', 'It asks for praise', 'It combines unrelated questions'], correctIndex: 1, explanation: 'Neutral questions reduce bias and help participants report their own behavior and reasoning.' },
     ],
   },
   {
@@ -640,9 +683,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'Digital Marketing Analytics',
     aliases: ['Digital Marketing', 'Marketing Analytics', 'SEO', 'Campaign Analytics'],
     questions: [
-      { id: 'mkt-1', prompt: 'Why use consistent campaign UTM parameters?', options: ['To make campaign traffic identifiable in analytics', 'To increase organic rankings automatically', 'To bypass consent requirements', 'To guarantee a conversion'], correctIndex: 0, explanation: 'Consistent campaign parameters support reliable source and campaign reporting.' },
-      { id: 'mkt-2', prompt: 'What is a conversion rate?', options: ['Conversions divided by an explicitly defined eligible audience or visits', 'Total impressions multiplied by cost', 'The number of campaign names', 'Revenue minus all expenses'], correctIndex: 0, explanation: 'The denominator must be defined, since sessions, users and leads produce different rates.' },
-      { id: 'mkt-3', prompt: 'When comparing campaign performance, what should be checked before declaring a winner?', options: ['Comparable audience, attribution window, spend and statistical uncertainty', 'Only which one has more impressions', 'The ad color', 'Whether the campaign name is shorter'], correctIndex: 0, explanation: 'Fair comparisons require comparable measurement conditions and consideration of uncertainty.' },
+      { id: 'mkt-1', difficulty: 'Beginner', prompt: 'Why use consistent campaign UTM parameters?', options: ['To make campaign traffic identifiable in analytics', 'To increase organic rankings automatically', 'To bypass consent requirements', 'To guarantee a conversion'], correctIndex: 0, explanation: 'Consistent campaign parameters support reliable source and campaign reporting.' },
+      { id: 'mkt-2', difficulty: 'Intermediate', prompt: 'What is a conversion rate?', options: ['Conversions divided by an explicitly defined eligible audience or visits', 'Total impressions multiplied by cost', 'The number of campaign names', 'Revenue minus all expenses'], correctIndex: 0, explanation: 'The denominator must be defined, since sessions, users and leads produce different rates.' },
+      { id: 'mkt-3', difficulty: 'Advanced', prompt: 'When comparing campaign performance, what should be checked before declaring a winner?', options: ['Comparable audience, attribution window, spend and statistical uncertainty', 'Only which one has more impressions', 'The ad color', 'Whether the campaign name is shorter'], correctIndex: 0, explanation: 'Fair comparisons require comparable measurement conditions and consideration of uncertainty.' },
     ],
   },
   {
@@ -655,9 +698,9 @@ const ASSESSMENT_CATEGORIES: AssessmentCategory[] = [
     skillName: 'Business Analysis',
     aliases: ['Business Analyst', 'Requirements Analysis', 'Business Process Modeling'],
     questions: [
-      { id: 'ba-1', prompt: 'What makes an acceptance criterion useful?', options: ['It is observable and testable against the stated outcome', 'It describes a vague aspiration', 'It is hidden from stakeholders', 'It changes after every test'], correctIndex: 0, explanation: 'Testable criteria align delivery and validation around an observable result.' },
-      { id: 'ba-2', prompt: 'What should a process map help stakeholders identify?', options: ['Handoffs, decisions, delays and exception paths', 'Only the department names', 'The color palette', 'Individual performance rankings'], correctIndex: 0, explanation: 'Process maps expose how work flows and where bottlenecks or control gaps occur.' },
-      { id: 'ba-3', prompt: 'How should conflicting stakeholder requirements be handled?', options: ['Document the underlying needs, constraints and decision owner, then facilitate resolution', 'Implement both without clarification', 'Choose the newest email', 'Delete one requirement'], correctIndex: 0, explanation: 'Clarifying needs, constraints and decision rights supports an auditable resolution.' },
+      { id: 'ba-1', difficulty: 'Beginner', prompt: 'What makes an acceptance criterion useful?', options: ['It is observable and testable against the stated outcome', 'It describes a vague aspiration', 'It is hidden from stakeholders', 'It changes after every test'], correctIndex: 0, explanation: 'Testable criteria align delivery and validation around an observable result.' },
+      { id: 'ba-2', difficulty: 'Intermediate', prompt: 'What should a process map help stakeholders identify?', options: ['Handoffs, decisions, delays and exception paths', 'Only the department names', 'The color palette', 'Individual performance rankings'], correctIndex: 0, explanation: 'Process maps expose how work flows and where bottlenecks or control gaps occur.' },
+      { id: 'ba-3', difficulty: 'Advanced', prompt: 'How should conflicting stakeholder requirements be handled?', options: ['Document the underlying needs, constraints and decision owner, then facilitate resolution', 'Implement both without clarification', 'Choose the newest email', 'Delete one requirement'], correctIndex: 0, explanation: 'Clarifying needs, constraints and decision rights supports an auditable resolution.' },
     ],
   },
 ];
@@ -1088,8 +1131,26 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
           /* Question card */
           <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
-              <span>
-                {selectedCategory.title} · {selectedCategory.level}
+              <span className="flex flex-wrap items-center gap-2">
+                <span>
+                  {selectedCategory.title} · {selectedCategory.level}
+                </span>
+                {/* The difficulty of the question in front of the candidate.
+                    They are told what they are being asked before they
+                    answer, not after, and the word matches the band the
+                    result is later broken down by. */}
+                <span
+                  data-assessment-question-difficulty={currentQ.difficulty}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                    currentQ.difficulty === 'Advanced'
+                      ? 'border-[var(--color-warning-strong)]/40 bg-[var(--color-warning-surface)] text-[var(--color-warning-strong)]'
+                      : currentQ.difficulty === 'Intermediate'
+                        ? 'border-[var(--color-primary)]/40 bg-[var(--color-accent-surface)] text-[var(--color-primary-text)]'
+                        : 'border-[var(--color-border)] bg-[var(--color-surface-secondary)] text-[var(--text-secondary)]'
+                  }`}
+                >
+                  {t(QUESTION_DIFFICULTY_LABELS[currentQ.difficulty])}
+                </span>
               </span>
               {/* The progress of the check, drawn as shapes.
                   One node per question: a closed disc where the candidate has
@@ -1115,6 +1176,10 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
             <h3 className="mt-4 text-base font-bold text-[var(--text-primary)] sm:text-lg">
               {currentQ.prompt}
             </h3>
+
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-muted)]">
+              {t(QUESTION_DIFFICULTY_DESCRIPTIONS[currentQ.difficulty])}
+            </p>
 
             {/* Options */}
             <div className="mt-6 space-y-3">
@@ -1365,6 +1430,67 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
               </div>
             </StaggerItem>
 
+            {/* The score, broken down by difficulty.
+                The overall percentage is still the headline — but a candidate
+                who scored 80% overall and 40% on the advanced band is told
+                exactly that, instead of being congratulated for a number
+                that hid the weak part. */}
+            <StaggerItem
+              className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
+              data-assessment-difficulty-breakdown
+            >
+              <h4 className="text-sm font-bold text-[var(--text-primary)]">
+                {t('Score by difficulty')}
+              </h4>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                {t(ASSESSMENT_DIFFICULTY_RULE)}
+              </p>
+
+              {(() => {
+                const rows = difficultyBreakdown(selectedCategory.questions, selectedAnswers);
+                const weakest = weakestDifficulty(rows);
+                return (
+                  <div className="mt-4 space-y-3">
+                    {rows.map((row) => {
+                      const pct = difficultyPercentage(row);
+                      return (
+                        <div key={row.difficulty}>
+                          <div className="flex items-center justify-between gap-3 text-xs">
+                            <span className="font-semibold text-[var(--text-primary)]">
+                              {t(QUESTION_DIFFICULTY_LABELS[row.difficulty])}
+                            </span>
+                            <span className="font-mono text-[var(--text-secondary)]">
+                              {row.correct}/{row.total} · {pct}%
+                            </span>
+                          </div>
+                          <div
+                            className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-secondary)]"
+                            role="img"
+                            aria-label={`${t(QUESTION_DIFFICULTY_LABELS[row.difficulty])}: ${row.correct} of ${row.total} correct, ${pct}%`}
+                          >
+                            <div
+                              className="h-full rounded-full bg-[var(--color-primary)]"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {weakest && weakest.total > 0 && difficultyPercentage(weakest) < 60 && (
+                      <p className="rounded-lg bg-[var(--color-warning-surface)] p-2.5 text-[11px] leading-relaxed text-[var(--color-warning-strong)]">
+                        {t(
+                          'Your weakest band is {difficulty} ({percentage}%). It is the band to work on next.',
+                        )
+                          .replace('{difficulty}', t(QUESTION_DIFFICULTY_LABELS[weakest.difficulty]))
+                          .replace('{percentage}', String(difficultyPercentage(weakest)))}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            </StaggerItem>
+
             {/* Answer breakdown */}
             <StaggerItem className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
               <h4 className="text-sm font-bold text-[var(--text-primary)]">
@@ -1389,6 +1515,9 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({ onNavi
                           <p className="font-bold text-[var(--text-primary)]">
                             {idx + 1}. {q.prompt}
                           </p>
+                          <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                            {t(QUESTION_DIFFICULTY_LABELS[q.difficulty])}
+                          </span>
                           <p className="text-[var(--text-secondary)]">
                             <span className="font-semibold">{t('Your answer')}:</span>{' '}
                             {userAnswer !== undefined ? q.options[userAnswer] : t('Not answered')}

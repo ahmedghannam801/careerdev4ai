@@ -321,4 +321,22 @@ export const careerAr: Record<string, string> = {
   'matched': 'مطابقة',
   '1 · Career domain': '1 · المجال المهني',
   '2 · Specialisation in': '2 · التخصّص ضمن',
+
+  // The spiral career timeline
+  'Your career as a spiral: every verified record you own, from the earliest to the newest.':
+    'مسارك المهني في شكل حلزوني: كل سجل موثّق تملكه، من الأقدم إلى الأحدث.',
+  'Your career timeline starts here': 'خطّك الزمني للمهنة يبدأ من هنا',
+  'Add your education, experience, certifications and projects and they will appear on the spiral as your career grows.':
+    'أضف دراستك وخبرتك وشهاداتك ومشاريعك، وستظهر على الحلزون مع نموّ مسارك المهني.',
+  'Journey completed': 'نسبة المسار المُنجَز',
+  'Happening now': 'جارٍ الآن',
+  'Still to come': 'لم يحدث بعد',
+  'Qualification': 'المؤهّل العلمي',
+  'Started': 'البداية',
+  'Ended': 'النهاية',
+  'Grade': 'التقدير',
+  'Issued': 'تاريخ الإصدار',
+  'Credential': 'رقم الاعتماد',
+  'Milestone': 'محطة',
+  'Achieved': 'تاريخ الإنجاز',
 };

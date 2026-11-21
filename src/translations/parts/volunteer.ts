@@ -121,4 +121,13 @@ export const volunteerAr: Record<string, string> = {
   'Apply by': 'التقديم بحلول',
   'by the end of the month': 'بحلول نهاية الشهر',
   'Verified source': 'مصدر موثّق',
+
+  // The filter panel
+  'Filters': 'المرشّحات',
+  'Selected': 'المُختار',
+  'Remove this filter': 'أزل هذا المرشّح',
+  'Close the filters': 'أغلق المرشّحات',
+  'Opportunity status': 'حالة الفرصة',
+  'Showing the 24 most common. Use the search box for the rest.':
+    'يتم عرض الـ 24 الأكثر شيوعًا. استخدم خانة البحث للوصول إلى الباقي.',
 };

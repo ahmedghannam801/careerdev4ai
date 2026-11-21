@@ -13,7 +13,7 @@
  * removed because they can no longer be applied to.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowUpRight,
@@ -57,6 +57,16 @@ import {
   type OpportunityKind,
 } from '../../../shared/opportunities';
 import { trackEvent } from '../../lib/analytics';
+import {
+  EMPTY_ADVANCED_FILTERS,
+  activeFilterIndicators,
+  collectAdvancedFilterOptions,
+  countAdvancedFilters,
+  filterByAdvancedFilters,
+  matchesOpportunitySearch,
+  toggleInList,
+  type VolunteerAdvancedFilters,
+} from '../../lib/volunteerFilters';
 import {
   dedupeOpportunities,
   matchedGapSkills,
@@ -177,6 +187,13 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
   const [activeMode, setActiveMode] = useState<ModeFilter>('all');
   const [activeAudience, setActiveAudience] = useState<AudienceFilter>('all');
   const [activeFocus, setActiveFocus] = useState<string>('all');
+  // The filters that used to sit permanently above the results. They live in a
+  // panel now, and they are the ones the catalogue's own fields support: the
+  // category, the skill, the place and where the opportunity stands.
+  const [advancedFilters, setAdvancedFilters] = useState<VolunteerAdvancedFilters>(
+    EMPTY_ADVANCED_FILTERS
+  );
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -289,7 +306,10 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
 
   const visible = useMemo(() => {
     const term = normalize(search);
-    return relevantCatalogue
+    // The panel's own filters are applied first, so the counts shown next to
+    // each option are the counts within what is already narrowed down.
+    const narrowed = filterByAdvancedFilters(relevantCatalogue, advancedFilters);
+    return narrowed
       .filter((item) => {
         if (activeKind !== 'all' && item.kind !== activeKind) return false;
         if (activeMode === 'egypt' && item.country !== 'Egypt') return false;
@@ -297,22 +317,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
         if (activeMode === 'hybrid' && item.participationMode !== 'hybrid') return false;
         if (activeAudience !== 'all' && !item.audiences.includes(activeAudience)) return false;
         if (!matchesFocus(item, activeFocus)) return false;
-        if (term) {
-          const haystack = [
-            item.title,
-            item.organization,
-            item.description,
-            item.category,
-            item.location,
-            item.eligibility ?? '',
-            ...item.tags,
-            ...item.skillsGained,
-            ...item.requiredSkills,
-          ]
-            .join(' ')
-            .toLowerCase();
-          if (!haystack.includes(term)) return false;
-        }
+        if (term && !matchesOpportunitySearch(item, term)) return false;
         return true;
       })
       .sort((a, b) => {
@@ -340,7 +345,20 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
     activeMode,
     activeAudience,
     activeFocus,
+    advancedFilters,
   ]);
+
+  // The options the panel offers, taken from the catalogue itself. A filter
+  // that no record carries is not offered at all.
+  const advancedOptions = useMemo(
+    () => collectAdvancedFilterOptions(catalogue),
+    [catalogue]
+  );
+
+  const selectedIndicators = useMemo(
+    () => activeFilterIndicators(advancedFilters),
+    [advancedFilters]
+  );
 
   const activeFilterCount = [
     activeKind !== 'all',
@@ -348,6 +366,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
     activeAudience !== 'all',
     activeFocus !== 'all',
     search.trim().length > 0,
+    countAdvancedFilters(advancedFilters) > 0,
   ].filter(Boolean).length;
 
   const clearFilters = () => {
@@ -356,10 +375,30 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
     setActiveMode('all');
     setActiveAudience('all');
     setActiveFocus('all');
+    setAdvancedFilters(EMPTY_ADVANCED_FILTERS);
   };
 
   const matched = visible.filter((item) => item.relevance > 0).length;
   const egyptCount = catalogue.filter((item) => item.country === 'Egypt').length;
+
+  // The filter panel is a dialog: it takes the keyboard while it is open, the
+  // escape key closes it, and the focus goes back to the button that opened
+  // it so the candidate is never left wondering where they are.
+  const filtersButtonRef = useRef<HTMLButtonElement | null>(null);
+  const filtersPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setFiltersOpen(false);
+        filtersButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    filtersPanelRef.current?.focus();
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [filtersOpen]);
 
   const toggleSaved = async (opportunity: VolunteerOpportunity) => {
     // Optimistic: the list is a catalogue, not a queue, so the flip should
@@ -429,7 +468,7 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
         </div>
       </div>
 
-      {/* Search and the clear control. */}
+      {/* Search, the filters button, and the clear control. */}
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-0 flex-1">
@@ -441,115 +480,279 @@ export const VolunteerOpportunities: React.FC<VolunteerOpportunitiesProps> = ({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t('Search organisations, programmes, skills or cities')}
+              aria-label={t('Search organisations, programmes, skills or cities')}
               className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] py-2 ps-8 pe-3 text-sm text-[var(--text-primary)]"
             />
           </div>
+          <button
+            type="button"
+            ref={filtersButtonRef}
+            onClick={() => setFiltersOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={filtersOpen}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)]/40 hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
+          >
+            <Filter size={13} />
+            {t('Filters')}
+            {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </button>
           <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-            <Filter size={12} />
             {catalogue.length} {t('live opportunities')}
           </span>
           {activeFilterCount > 0 && (
             <button
               type="button"
               onClick={clearFilters}
-              className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
             >
               <X size={12} /> {t('Clear filters')} ({activeFilterCount})
             </button>
           )}
         </div>
 
-        <div className="mt-3 space-y-2.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="me-1 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-              {t('Type')}
+        {/* What is narrowing the list is always visible, so the candidate never
+            has to open the panel to find out why a result set is short. */}
+        {selectedIndicators.length > 0 && (
+          <div
+            data-volunteer-filter-indicators
+            className="mt-2.5 flex flex-wrap items-center gap-1.5"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              {t('Selected')}
             </span>
-            <button type="button" onClick={() => setActiveKind('all')} className={chip(activeKind === 'all')}>
-              {t('All')} ({catalogue.length})
-            </button>
-            {kindOptions.map(({ kind, count }) => (
+            {selectedIndicators.map((indicator) => (
               <button
-                key={kind}
+                key={`${indicator.group}-${indicator.value}`}
                 type="button"
-                onClick={() => setActiveKind(kind)}
-                className={chip(activeKind === kind)}
+                onClick={() =>
+                  setAdvancedFilters((previous) => ({
+                    ...previous,
+                    [indicator.group]: toggleInList(
+                      previous[indicator.group],
+                      indicator.value
+                    ),
+                  }))
+                }
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 px-2 py-0.5 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--accent-primary)]/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
               >
-                {t(OPPORTUNITY_LABELS[kind])} ({count})
+                {indicator.value}
+                <X size={11} aria-hidden="true" />
+                <span className="sr-only">{t('Remove this filter')}</span>
               </button>
             ))}
           </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="me-1 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-              {t('Where')}
-            </span>
-            {MODE_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setActiveMode(option.id)}
-                className={chip(activeMode === option.id)}
-              >
-                {option.id === 'all'
-                  ? `${t(option.label)} (${catalogue.length})`
-                  : option.id === 'egypt'
-                    ? `${t(option.label)} (${egyptCount})`
-                    : t(option.label)}
-              </button>
-            ))}
-          </div>
-
-          {audienceOptions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="me-1 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                {t('For')}
-              </span>
-              <button
-                type="button"
-                onClick={() => setActiveAudience('all')}
-                className={chip(activeAudience === 'all')}
-              >
-                {t('Everyone')}
-              </button>
-              {audienceOptions.map((audience) => (
-                <button
-                  key={audience}
-                  type="button"
-                  onClick={() => setActiveAudience(audience)}
-                  className={chip(activeAudience === audience)}
-                >
-                  {t(AUDIENCE_LABELS[audience])}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {focusOptions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="me-1 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                {t('Focus')}
-              </span>
-              <button
-                type="button"
-                onClick={() => setActiveFocus('all')}
-                className={chip(activeFocus === 'all')}
-              >
-                {t('Any focus')}
-              </button>
-              {focusOptions.map((focus) => (
-                <button
-                  key={focus}
-                  type="button"
-                  onClick={() => setActiveFocus(focus)}
-                  className={chip(activeFocus === focus)}
-                >
-                  {t(FOCUS_LABELS[focus] ?? focus)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </div>
+
+      {/* THE FILTER PANEL. The options are not all shown at once: they were,
+          and on a phone they took the whole screen before a single
+          opportunity had been seen. */}
+      {filtersOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex justify-end bg-black/45 backdrop-blur-xs"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setFiltersOpen(false);
+          }}
+        >
+          <div
+            ref={filtersPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('Filters')}
+            tabIndex={-1}
+            className="flex h-full w-full max-w-md flex-col overflow-y-auto border-s border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-xl"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-main)] px-4 py-3">
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                {t('Filters')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltersOpen(false);
+                  filtersButtonRef.current?.focus();
+                }}
+                aria-label={t('Close the filters')}
+                className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-5 px-4 py-4">
+              {/* Type */}
+              <fieldset>
+                <legend className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                  {t('Type')}
+                </legend>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setActiveKind('all')}
+                    className={chip(activeKind === 'all')}
+                  >
+                    {t('All')} ({catalogue.length})
+                  </button>
+                  {kindOptions.map(({ kind, count }) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => setActiveKind(kind)}
+                      className={chip(activeKind === kind)}
+                    >
+                      {t(OPPORTUNITY_LABELS[kind])} ({count})
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              {/* Where */}
+              <fieldset>
+                <legend className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                  {t('Where')}
+                </legend>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {MODE_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setActiveMode(option.id)}
+                      className={chip(activeMode === option.id)}
+                    >
+                      {option.id === 'all'
+                        ? `${t(option.label)} (${catalogue.length})`
+                        : option.id === 'egypt'
+                          ? `${t(option.label)} (${egyptCount})`
+                          : t(option.label)}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              {/* For */}
+              {audienceOptions.length > 0 && (
+                <fieldset>
+                  <legend className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                    {t('For')}
+                  </legend>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveAudience('all')}
+                      className={chip(activeAudience === 'all')}
+                    >
+                      {t('Everyone')}
+                    </button>
+                    {audienceOptions.map((audience) => (
+                      <button
+                        key={audience}
+                        type="button"
+                        onClick={() => setActiveAudience(audience)}
+                        className={chip(activeAudience === audience)}
+                      >
+                        {t(AUDIENCE_LABELS[audience])}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+
+              {/* Focus */}
+              {focusOptions.length > 0 && (
+                <fieldset>
+                  <legend className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                    {t('Focus')}
+                  </legend>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveFocus('all')}
+                      className={chip(activeFocus === 'all')}
+                    >
+                      {t('Any focus')}
+                    </button>
+                    {focusOptions.map((focus) => (
+                      <button
+                        key={focus}
+                        type="button"
+                        onClick={() => setActiveFocus(focus)}
+                        className={chip(activeFocus === focus)}
+                      >
+                        {t(FOCUS_LABELS[focus] ?? focus)}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+
+              {/* The multi-select filters, each one collapsible so the panel
+                  is never a wall of options. */}
+              {(
+                [
+                  ['categories', t('Category'), advancedOptions.categories],
+                  ['skills', t('Skills'), advancedOptions.skills],
+                  ['locations', t('Location'), advancedOptions.locations],
+                  ['statuses', t('Opportunity status'), advancedOptions.statuses],
+                ] as const
+              ).map(([group, label, options]) =>
+                options.length === 0 ? null : (
+                  <fieldset key={group}>
+                    <legend className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                      {label}
+                    </legend>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {options.slice(0, 24).map((option) => {
+                        const selected = advancedFilters[group].includes(option.value);
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            aria-pressed={selected}
+                            onClick={() =>
+                              setAdvancedFilters((previous) => ({
+                                ...previous,
+                                [group]: toggleInList(previous[group], option.value),
+                              }))
+                            }
+                            className={chip(selected)}
+                          >
+                            {option.value} ({option.count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {options.length > 24 ? (
+                      <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
+                        {t('Showing the 24 most common. Use the search box for the rest.')}
+                      </p>
+                    ) : null}
+                  </fieldset>
+                )
+              )}
+            </div>
+
+            <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] bg-[var(--surface-main)] px-4 py-3">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
+              >
+                {t('Clear filters')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltersOpen(false);
+                  filtersButtonRef.current?.focus();
+                }}
+                className="rounded-lg bg-[var(--accent-primary)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
+              >
+                {t('Show')} {visible.length}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <div className="p-10 rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 text-center">

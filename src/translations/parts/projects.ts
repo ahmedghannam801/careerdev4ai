@@ -182,4 +182,10 @@ export const projectsAr: Record<string, string> = {
   'Portfolio evidence recorded': 'تم توثيق دليل معرض الأعمال',
   '"{title}" was linked in Evidence & Portfolio to substantiate your skills.':
     'تم ربط "{title}" في الأدلة ومعرض الأعمال لتوثيق مهاراتك.',
+
+  // The project search, the difficulty filter and the order
+  'Search your projects by name, goal or skill': 'ابحث في مشاريعك بالاسم أو الهدف أو المهارة',
+  'All difficulties': 'كل المستويات',
+  'Most recent first': 'الأحدث أولًا',
+  'Name (A–Z)': 'الاسم (أ–ي)',
 };
