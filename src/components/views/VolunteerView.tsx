@@ -11,6 +11,7 @@ import {
   Trash2,
   Pencil,
   Check,
+  ChevronRight,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { VOLUNTEER_TABS } from '../../lib/routing';
@@ -86,8 +87,15 @@ const EMPTY_DRAFT: DraftState = {
 };
 
 export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
-  const { volunteerExperiences, projects, addVolunteerExperience, updateVolunteerExperience, deleteVolunteerExperience, t } =
-    useCareer();
+  const {
+    volunteerExperiences,
+    projects,
+    targetRole,
+    addVolunteerExperience,
+    updateVolunteerExperience,
+    deleteVolunteerExperience,
+    t,
+  } = useCareer();
 
   const [tab, setTab] = useRouteParam<'opportunities' | 'record'>('tab', VOLUNTEER_TABS, 'opportunities');
   const [draft, setDraft] = useState<DraftState | null>(null);
@@ -108,6 +116,27 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
     }
     return names.size;
   }, [volunteerExperiences]);
+
+  /**
+   * The target-role skills these records actually demonstrate.
+   *
+   * A volunteering record is not a second CV: its value is the evidence it
+   * adds to the role the candidate is aiming at. The comparison uses the
+   * names the candidate themselves recorded, so it credits only skills they
+   * have claimed and never assumes a skill because the cause sounds related.
+   */
+  const roleSkillsInVolunteering = useMemo(() => {
+    const recorded = new Set(
+      volunteerExperiences.flatMap((entry) => entry.skills.map((skill) => skill.trim().toLowerCase()))
+    );
+    const required = (targetRole?.requiredSkills ?? [])
+      .map((skill) => skill.name)
+      .filter(Boolean);
+    return {
+      covered: required.filter((skill) => recorded.has(skill.trim().toLowerCase())),
+      missing: required.filter((skill) => !recorded.has(skill.trim().toLowerCase())),
+    };
+  }, [volunteerExperiences, targetRole]);
 
   const openAdd = () => {
     setDraft({ ...EMPTY_DRAFT });
@@ -283,6 +312,77 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
           </div>
         ))}
       </div>
+
+      {/* What the record adds to the role the candidate is chasing. It is
+          computed from the skills they recorded, so it cannot flatter them
+          with a skill they never claimed. */}
+      {targetRole && volunteerExperiences.length > 0 && (
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                {t('What this adds to your target role')}
+              </div>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                {roleSkillsInVolunteering.covered.length > 0
+                  ? t('These target-role skills are named in your volunteering record.')
+                  : t('None of your target-role skills are named in these records yet. Add the skills each stint actually used.')}
+              </p>
+            </div>
+            {roleSkillsInVolunteering.covered.length > 0 && (
+              <span className="text-sm font-bold tabular-nums text-[var(--text-primary)]">
+                {roleSkillsInVolunteering.covered.length}
+                <span className="ms-1 text-[11px] font-medium text-[var(--text-muted)]">
+                  / {roleSkillsInVolunteering.covered.length + roleSkillsInVolunteering.missing.length}
+                </span>
+              </span>
+            )}
+          </div>
+
+          {roleSkillsInVolunteering.covered.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {roleSkillsInVolunteering.covered.map((skill) => (
+                <span
+                  key={skill}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--color-success-strong)]/25 bg-[var(--color-success-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-success-strong)]"
+                >
+                  <Check className="h-2.5 w-2.5" />
+                  {skill}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {roleSkillsInVolunteering.missing.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-3">
+              <span className="text-[11px] text-[var(--text-muted)]">
+                {t('Still to prove elsewhere:')}
+              </span>
+              {roleSkillsInVolunteering.missing.slice(0, 4).map((skill) => (
+                <span
+                  key={skill}
+                  className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]"
+                >
+                  {skill}
+                </span>
+              ))}
+              {roleSkillsInVolunteering.missing.length > 4 ? (
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  +{roleSkillsInVolunteering.missing.length - 4}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onNavigate?.('skills')}
+                className="ms-auto inline-flex min-h-[30px] items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-primary-text)] hover:border-[var(--accent-primary)]"
+              >
+                {t('Open Skills Center')}
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* List */}
       {volunteerExperiences.length === 0 ? (

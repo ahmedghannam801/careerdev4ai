@@ -1,6 +1,6 @@
 # Payment brand assets — sources and licences
 
-These are the marks of the payment rails Roadmapak accepts. They are used
+These are the marks of the payment rails Aionvia accepts. They are used
 to tell the customer which company will receive their money; nothing else.
 
 ## Vodafone Cash — `vodafone.svg`

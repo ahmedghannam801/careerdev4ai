@@ -62,8 +62,10 @@ export interface StripeConfigStatus {
   warnings: StripeConfigIssue[];
 }
 
-const DEFAULT_SITE_ORIGIN = 'https://roadmapak.pages.dev';
+const DEFAULT_SITE_ORIGIN = BRAND_ORIGIN;
 const DEFAULT_API_BASE = 'https://api.stripe.com';
+
+import { BRAND_ORIGIN } from '../../shared/brand';
 
 export class StripeConfigError extends Error {
   constructor(message: string) {

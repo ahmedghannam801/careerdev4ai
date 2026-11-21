@@ -2,7 +2,7 @@
  * Career domains — the top level of the career taxonomy.
  *
  * This module is the single source of truth for "what career domains does
- * Roadmapak support?". It is imported by BOTH the React frontend and the
+ * Aionvia support?". It is imported by BOTH the React frontend and the
  * Node/Cloudflare API, so it must stay free of any DOM or Node-only
  * dependency.
  *

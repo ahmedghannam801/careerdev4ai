@@ -14,8 +14,8 @@ export const profileAr: Record<string, string> = {
   "Expired": "منتهية",
   "Key Achievements": "الإنجازات الرئيسية",
   "Key Responsibilities": "المسؤوليات الرئيسية",
-  'Choose Roadmapak Avatar': 'اختر صورة Roadmapak',
-  'Choose Your Roadmapak Avatar': 'اختر صورة Roadmapak الخاصة بك',
+  'Choose Aionvia Avatar': 'اختر صورة Aionvia',
+  'Choose Your Aionvia Avatar': 'اختر صورة Aionvia الخاصة بك',
   'Select a curated illustrated avatar that represents your professional profile.':
     'اختر صورة منتقاة تمثّل ملفك المهني.',
   'Copy shareable link': 'انسخ رابط المشاركة',
@@ -149,7 +149,7 @@ export const profileAr: Record<string, string> = {
   'Skills (comma separated)': 'المهارات (مفصولة بفواصل)',
   'GitHub Repo URL': 'رابط مستودع غيت هَب',
   'Live Demo URL': 'رابط العرض الحي',
-  'Back to Roadmapak': 'العودة إلى Roadmapak',
+  'Back to Aionvia': 'العودة إلى Aionvia',
   'Loading public profile…': 'جارٍ تحميل الملف العام…',
   'Profile not available': 'الملف غير متاح',
   'This profile does not exist or its owner has not made it public.':
@@ -172,4 +172,9 @@ export const profileAr: Record<string, string> = {
   'Add Education': 'إضافة تعليم',
   'Graduation Date (or Expected)': 'تاريخ التخرج (أو المتوقع)',
   'I am currently studying here (not yet graduated)': 'ما زلت أدرس هنا حاليًا (لم أتخرج بعد)',
+
+  'Do this next': 'افعل هذا تالياً',
+  'The highest-value gap in your profile right now.': 'أعلى فجوة قيمة في ملفك الآن.',
+  'Fix this gap': 'أغلق هذه الفجوة',
+  'Other ways to improve:': 'طرق أخرى للتحسين:',
 };

@@ -135,7 +135,7 @@ export const GUIDES: GuideDefinition[] = [
         target: '[data-guide="cv-build"]',
         fallbacks: ['#main-content'],
         title: 'Your CV, built from your data',
-        body: 'Roadmapak assembles this from the experience, skills, projects, volunteering and courses you have entered. It never invents anything.',
+        body: 'Aionvia assembles this from the experience, skills, projects, volunteering and courses you have entered. It never invents anything.',
       },
     ],
   },

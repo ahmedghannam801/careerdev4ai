@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2).filter((value) => value !== '--check');
 const CHECK_ONLY = process.argv.includes('--check');
-const PROJECT = args[0] ?? 'roadmapak';
+const PROJECT = args[0] ?? 'aionvia';
 
 /** The secrets the worker needs at request time. */
 const SECRET_KEYS = [

@@ -288,8 +288,8 @@ describe('the sitemap', () => {
       { path: '/' },
       { path: '/about' },
     ]);
-    assert.match(xml, /<loc>https:\/\/roadmapak\.pages\.dev\/<\/loc>/);
-    assert.match(xml, /<loc>https:\/\/roadmapak\.pages\.dev\/about<\/loc>/);
+    assert.match(xml, /<loc>https:\/\/aionvia\.pages\.dev\/<\/loc>/);
+    assert.match(xml, /<loc>https:\/\/aionvia\.pages\.dev\/about<\/loc>/);
     // The sitemap must carry the current origin only: neither the predecessor
     // origin nor the older legacy origin may appear in it.
     assert.equal(xml.includes('careerdev4ai'), false);
@@ -342,7 +342,7 @@ describe('robots.txt', () => {
   });
 
   it('points at the sitemap', () => {
-    assert.match(buildRobotsTxt(), /^Sitemap: https:\/\/roadmapak\.pages\.dev\/sitemap\.xml$/m);
+    assert.match(buildRobotsTxt(), /^Sitemap: https:\/\/aionvia\.pages\.dev\/sitemap\.xml$/m);
   });
 
   it('matches the copy that is deployed as a static file', () => {
@@ -370,7 +370,7 @@ describe('the Search Console verification file', () => {
 });
 
 describe('the document metadata of the application', () => {
-  it('publishes the Roadmapak site name in static homepage structured data', () => {
+  it('publishes the Aionvia site name in static homepage structured data', () => {
     const html = readFileSync(join(REPO_ROOT, 'index.html'), 'utf-8');
     const blocks = [
       ...html.matchAll(
@@ -380,19 +380,19 @@ describe('the document metadata of the application', () => {
     const schemas = blocks.map((block) => JSON.parse(block[1]));
     const website = schemas.find((schema) => schema['@type'] === 'WebSite');
     assert.ok(website, 'the static homepage must contain WebSite structured data');
-    assert.equal(website.name, 'Roadmapak');
+    assert.equal(website.name, 'Aionvia');
     assert.deepEqual(website.alternateName, [
-      'Roadmapak',
-      'Roadmapak AI',
-      'Roadmapak Career Platform',
+      'Aionvia',
+      'Aionvia AI',
+      'Aionvia Career Platform',
     ]);
-    assert.equal(website.url, 'https://roadmapak.pages.dev/');
+    assert.equal(website.url, 'https://aionvia.pages.dev/');
     assert.equal(websiteSchema().name, website.name);
     assert.equal(websiteSchema().url, website.url);
     assert.equal((websiteSchema().alternateName as string[])[0], website.alternateName[0]);
-    assert.match(html, /<link rel="canonical" href="https:\/\/roadmapak\.pages\.dev\/"\s*\/>/);
-    assert.match(html, /<meta property="og:site_name" content="Roadmapak"\s*\/>/);
-    assert.match(html, /<title>Roadmapak — Turn Your Ambition Into a Career Plan<\/title>/);
+    assert.match(html, /<link rel="canonical" href="https:\/\/aionvia\.pages\.dev\/"\s*\/>/);
+    assert.match(html, /<meta property="og:site_name" content="Aionvia"\s*\/>/);
+    assert.match(html, /<title>Aionvia — Turn Your Ambition Into a Career Plan<\/title>/);
   });
 
   it('indexes the landing page and hides the signed-in views', () => {
@@ -450,7 +450,7 @@ describe('the document metadata of the application', () => {
     // The application is one document at one address; a hash is not part of
     // the address a crawler sees.
     for (const view of ['landing', 'dashboard', 'learning']) {
-      assert.equal(routeMetaFor(view).canonical, 'https://roadmapak.pages.dev/');
+      assert.equal(routeMetaFor(view).canonical, 'https://aionvia.pages.dev/');
     }
   });
 });

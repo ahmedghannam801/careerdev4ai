@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const BASE = (process.argv[2] ?? 'https://roadmapak.pages.dev').replace(/\/$/, '');
+const BASE = (process.argv[2] ?? 'https://aionvia.pages.dev').replace(/\/$/, '');
 const ROOT = process.cwd();
 
 function readEnv() {

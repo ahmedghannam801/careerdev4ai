@@ -188,4 +188,20 @@ export const projectsAr: Record<string, string> = {
   'All difficulties': 'كل المستويات',
   'Most recent first': 'الأحدث أولًا',
   'Name (A–Z)': 'الاسم (أ–ي)',
+
+  // Portfolio coverage
+  'Portfolio coverage': 'تغطية ملف الأعمال',
+  'How much of your target role you can already show, not just claim.': 'كم من متطلبات وظيفتك المستهدفة تستطيع أن تُظهرها فعلاً، لا أن تدّعيها فقط.',
+  'Completed work appears here as proof you can hand to an employer.': 'يظهر العمل المكتمل هنا كدليل يمكنك تقديمه لصاحب العمل.',
+  'covered': 'مغطاة',
+  'shipped': 'منجزة',
+  'shipped projects': 'مشاريع منجزة',
+  'openable links': 'روابط قابلة للفتح',
+  'skills evidenced': 'مهارات موثّقة',
+  'Where the proof is thin': 'حيث الدليل ضعيف',
+  'Proof looks complete': 'الدليل يبدو مكتملاً',
+  'These role skills have no finished project behind them yet:': 'هذه المهارات المطلوبة للوظيفة لا يقف خلفها مشروع منجز بعد:',
+  'Start a project for': 'ابدأ مشروعاً لـ',
+  'Every skill your target role asks for is demonstrated by finished work. Keep the links current and the write-ups short.': 'كل مهارة تطلبها وظيفتك المستهدفة موثّقة بعمل منجز. أبقِ الروابط محدّثة والكتابة مختصرة.',
+  'Finish one project to turn a plan into proof. A shipped, linked project is worth more than three unfinished ones.': 'أنجز مشروعاً واحداً لتحوّل الخطة إلى دليل. مشروع منجز ومرتبط برابط أقوى من ثلاثة مشاريع غير مكتملة.',
 };

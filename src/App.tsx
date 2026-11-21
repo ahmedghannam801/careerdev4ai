@@ -475,7 +475,7 @@ function AppRoutes() {
       {/* The first-use tour. It is mounted outside the shell so it can sit
           over the whole application, and it remembers that it has been
           seen on the server. */}
-      <GuidedTourHost currentView={currentView} />
+      <GuidedTourHost currentView={currentView} suppressed={tourOpen} />
       {/* The contextual feedback invitation. It decides for itself whether
           this view and this account are eligible, and it never opens over a
           dialog. */}
@@ -499,10 +499,31 @@ function AppRoutes() {
  * The dismissal is stored on the server, so a tour does not reappear on the
  * next device, and a tour that has already been seen is never shown again.
  */
-function GuidedTourHost({ currentView }: { currentView: string }) {
+function GuidedTourHost({
+  currentView,
+  suppressed = false,
+}: {
+  currentView: string;
+  /**
+   * True while another first-use tour is on screen.
+   *
+   * Two tours used to open on top of each other — the product tour and the
+   * per-screen guide — and the second one covered the first one's controls.
+   * The per-screen guide now waits: there is only ever one tour at a time.
+   */
+  suppressed?: boolean;
+}) {
   const { settings, t } = useCareer();
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [activeGuide, setActiveGuide] = useState<GuideDefinition | null>(null);
+  /**
+   * Whether the first-use product tour has been dealt with.
+   *
+   * Until it has been completed or skipped, the per-screen guides stay out of
+   * the way: the product tour already walks through the same screens, and two
+   * onboarding layers competing for the same click is not onboarding.
+   */
+  const [productTourSettled, setProductTourSettled] = useState(false);
 
   // Which screen each tour belongs to.
   const VIEW_TO_GUIDE: Record<string, GuideKey> = {
@@ -519,7 +540,17 @@ function GuidedTourHost({ currentView }: { currentView: string }) {
     let cancelled = false;
     fetchDismissedGuides()
       .then((keys) => {
-        if (!cancelled) setDismissed(keys);
+        if (!cancelled) {
+          setDismissed(keys);
+          let localDismissed = false;
+          try {
+            const raw = localStorage.getItem('careerdev4ai_product_tour_state');
+            localDismissed = Boolean(raw && JSON.parse(raw)?.tourDismissed);
+          } catch {
+            localDismissed = false;
+          }
+          setProductTourSettled(localDismissed || keys.includes('product_tour'));
+        }
       })
       .catch(() => {
         // A failure here only means the tour may be offered again.
@@ -531,7 +562,7 @@ function GuidedTourHost({ currentView }: { currentView: string }) {
 
   useEffect(() => {
     const guideKey = VIEW_TO_GUIDE[currentView];
-    if (!guideKey) {
+    if (!guideKey || suppressed || !productTourSettled) {
       setActiveGuide(null);
       return;
     }
@@ -541,7 +572,7 @@ function GuidedTourHost({ currentView }: { currentView: string }) {
     }
     const definition = GUIDES.find((guide) => guide.key === guideKey) ?? null;
     setActiveGuide(definition);
-  }, [currentView, dismissed]);
+  }, [currentView, dismissed, productTourSettled, suppressed]);
 
   const close = () => {
     setActiveGuide(null);

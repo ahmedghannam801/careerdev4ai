@@ -44,7 +44,7 @@ export function organizationSchema(): Record<string, unknown> {
     },
     image: ogImageUrl(),
     description:
-      'Roadmapak is an AI-powered career development platform for students and young professionals: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.',
+      'Aionvia is an AI-powered career development platform for students and young professionals: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.',
   };
 }
 

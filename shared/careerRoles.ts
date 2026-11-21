@@ -1,7 +1,7 @@
 /**
  * The career role catalogue.
  *
- * This is the single source of truth for the roles Roadmapak supports. It is
+ * This is the single source of truth for the roles Aionvia supports. It is
  * imported by the React frontend (`src/`) and by the API (`server/`, `app.ts`)
  * so that both sides resolve the same role, the same skills and the same
  * learning-resource mapping.

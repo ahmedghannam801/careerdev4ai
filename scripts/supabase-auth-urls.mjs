@@ -7,7 +7,7 @@
  *
  * Usage:
  *   node scripts/supabase-auth-urls.mjs            # show the current config
- *   node scripts/supabase-auth-urls.mjs --set      # apply the Roadmapak values
+ *   node scripts/supabase-auth-urls.mjs --set      # apply the Aionvia values
  */
 
 import 'dotenv/config';
@@ -15,20 +15,26 @@ import 'dotenv/config';
 const PROJECT_REF = 'ciihprsfdojzvjnqgbxl';
 const API = `https://api.supabase.com/v1/projects/${PROJECT_REF}/config/auth`;
 
-const NEW_SITE_URL = 'https://roadmapak.pages.dev';
+const NEW_SITE_URL = 'https://aionvia.pages.dev';
 
 /**
  * The redirect allowlist.
  *
- * The new origin is the canonical one. The two previous origins stay listed
- * for the length of the migration: password-recovery and email-confirmation
- * links that were already delivered to a user's inbox point at the old host,
- * and Supabase rejects a redirect whose target is not on this list.
+ * The new origin is the canonical one. The previous origins stay listed for
+ * the length of the migration: password-recovery and email-confirmation links
+ * that were already delivered to a user's inbox point at the old host, and
+ * Supabase rejects a redirect whose target is not on this list.
  *
  * `com.careerpilot.ai://auth/callback` is the native application deep link.
  * The scheme is bound to an installed application id and cannot be renamed.
  */
 const NEW_ALLOW_LIST = [
+  'https://aionvia.pages.dev',
+  'https://aionvia.pages.dev/',
+  'https://aionvia.pages.dev/**',
+  'https://*.aionvia.pages.dev/**',
+  // The origin the platform was served from before the rebrand. Kept only so
+  // links already delivered by email keep working while they age out.
   'https://roadmapak.pages.dev',
   'https://roadmapak.pages.dev/',
   'https://roadmapak.pages.dev/**',

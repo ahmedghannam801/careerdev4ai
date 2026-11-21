@@ -14,7 +14,6 @@ import {
   Flag,
   FolderGit2,
   GitBranch,
-  Info,
   PlayCircle,
   RefreshCw,
   Sparkles,
@@ -42,9 +41,9 @@ import { AnimatedProgress } from '../motion/AnimatedProgress';
 import { MorphingMilestone } from '../motion/Morph';
 import type { MilestoneMorphState } from '../motion/Morph';
 import { Stagger, StaggerItem } from '../motion/Motion';
-import { CareerImage } from '../ui/CareerImage';
 import { TimeBreakdown } from '../ui/TimeBreakdown';
 import { RoadmapTreeView } from '../roadmap/RoadmapTreeView';
+import { RoadmapCommandCenter } from '../roadmap/RoadmapCommandCenter';
 import { useToast } from '../toast/ToastProvider';
 
 interface RoadmapViewProps {
@@ -622,7 +621,7 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           <Flag className="mx-auto h-6 w-6 text-[var(--text-muted)]" />
           <p className="text-sm font-semibold text-[var(--text-primary)]">{t('No roadmap yet')}</p>
           <p className="text-xs text-[var(--text-secondary)] max-w-md mx-auto">
-            {t('Choose a target role and Roadmapak will build a staged plan from your real skill gaps.')}
+            {t('Choose a target role and Aionvia will build a staged plan from your real skill gaps.')}
           </p>
           {onNavigate && (
             <button
@@ -641,64 +640,78 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="space-y-7">
-      {/* Header: the target, the progress and the two plan controls. */}
-      <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="text-xs text-[var(--text-secondary)]">{t('YOUR PLAN, ONE STAGE AT A TIME')}</div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-            {t('Personal Career Roadmap')}
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">
-            {t('Where you are, what comes next, and why each step is here.')}
-          </p>
-        </div>
-
+    <div className="space-y-6">
+      {/* One toolbar for the two ways to read the plan, and the one control
+          that rebuilds it. The plan itself introduces itself in the panel
+          below, so this row carries no repeated progress figure. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="me-2 text-end">
-            <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              {t('Roadmap completion')}
-            </div>
-            <div className="font-mono text-base font-bold tabular-nums text-[var(--color-primary-text)]">
-              {completedTasks} / {totalTasks} ({progressPct}%)
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              setIsUpdating(true);
-              try {
-                await regeneratePersonalizedRoadmap();
-              } finally {
-                setIsUpdating(false);
-              }
-            }}
-            disabled={isUpdating}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)] disabled:opacity-50"
-            title={t('Recalculate priorities based on your latest skills, CV and experience')}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
-            <span>{isUpdating ? t('Updating…') : t('Sync With Profile')}</span>
-          </button>
-          {!isEnrolledInRoadmap && (
-            <button
-              type="button"
-              onClick={enrollInRoadmap}
-              className="rounded-lg bg-[var(--accent-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs hover:bg-[var(--accent-secondary)]"
-            >
-              {t('Enroll in Roadmap')}
-            </button>
-          )}
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            {t('View mode')}
+          </span>
+          <RoadmapViewSwitcher mode={viewMode} onChange={chooseViewMode} t={t} />
         </div>
+        <button
+          type="button"
+          onClick={async () => {
+            setIsUpdating(true);
+            try {
+              await regeneratePersonalizedRoadmap();
+            } finally {
+              setIsUpdating(false);
+            }
+          }}
+          disabled={isUpdating}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)] disabled:opacity-50"
+          title={t('Recalculate priorities based on your latest skills, CV and experience')}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
+          <span>{isUpdating ? t('Updating…') : t('Sync With Profile')}</span>
+        </button>
       </div>
 
-      {/* The two ways to read the same plan. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-          {t('View mode')}
-        </span>
-        <RoadmapViewSwitcher mode={viewMode} onChange={chooseViewMode} t={t} />
-      </div>
+      <RoadmapCommandCenter
+        roleTitle={
+          targetRole?.title ??
+          roadmapPhases[0]?.title?.replace(
+            / (Foundations|Core Delivery|Advanced Practice|Market Readiness)$/,
+            ''
+          ) ??
+          t('Career Roadmap')
+        }
+        roleDomain={targetRole?.category ?? null}
+        stageLabel={currentStage?.phase.title ?? null}
+        stageNumber={currentStageIndex >= 0 ? currentStageIndex + 1 : stages.length}
+        stageCount={stages.length}
+        completedTasks={completedTasks}
+        totalTasks={totalTasks}
+        progressPct={progressPct}
+        totalHours={totalHours}
+        gaps={roadmapMetrics.gaps.slice(0, 5)}
+        nextTaskTitle={(gapClosingTask ?? nextTask)?.title ?? null}
+        nextStageLabel={
+          (gapClosingTask ?? nextTask)
+            ? (stages.find((stage) =>
+                stage.tasks.some((task) => task.id === (gapClosingTask ?? nextTask)!.id)
+              )?.label ?? null)
+            : null
+        }
+        onOpenStage={
+          (gapClosingTask ?? nextTask)
+            ? () => {
+                const task = gapClosingTask ?? nextTask;
+                const stage = stages.find((entry) =>
+                  entry.tasks.some((candidate) => candidate.id === task!.id)
+                );
+                if (stage) scrollToStage(stage.id);
+              }
+            : undefined
+        }
+        onCloseGap={onNavigate ? () => onNavigate('skills') : undefined}
+        jobReady={jobReady}
+        isEnrolled={isEnrolledInRoadmap}
+        onEnroll={enrollInRoadmap}
+      />
 
       {viewMode === 'tree' ? (
         <RoadmapTreeView
@@ -708,77 +721,17 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
         />
       ) : (
       <>
-      {/* Visual Roadmap Banner */}
-      {(() => {
-        const targetRoleTitle =
-          roadmapPhases[0]?.title?.replace(
-            / (Foundations|Core Delivery|Advanced Practice|Market Readiness)$/,
-            ''
-          ) || t('Career Roadmap');
-        return (
-          <div className="relative overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">
-            <div className="relative h-32 w-full sm:h-40">
-              <CareerImage
-                category={targetRoleTitle}
-                size="md"
-                aspectRatio="21/9"
-                rounded="rounded-2xl"
-                className="h-full w-full object-cover brightness-[0.8] contrast-[1.05]"
-              >
-                <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface-main)] via-[var(--surface-main)]/40 to-transparent" />
-                <div className="absolute bottom-3 start-4 end-4 flex items-end justify-between">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
-                    <Target className="h-3.5 w-3.5 text-[var(--color-primary-text)]" />
-                    {targetRoleTitle}
-                  </span>
-                </div>
-              </CareerImage>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* The plan summary: three facts, not a wall of text. */}
-      <div data-guide="roadmap-summary" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            <Target className="h-3 w-3" />
-            {t('Target role')}
-          </div>
-          <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-            {roadmapPhases[0]?.title?.replace(
-              / (Foundations|Core Delivery|Advanced Practice|Market Readiness)$/,
-              ''
-            ) ?? t('Not available')}
-          </div>
-          <div className="text-[11px] text-[var(--text-muted)]">
-            {t('Every step below closes a skill gap for this role')}
-          </div>
-        </div>
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            <Clock className="h-3 w-3" />
-            {t('Estimated time')}
-          </div>
-          <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-            {totalHours} {t('hours')}
-          </div>
-          <div className="text-[11px] text-[var(--text-muted)]">
-            {t('Across')} {totalTasks} {t('steps')}
-          </div>
-          <TimeBreakdown breakdown={planTimeBreakdown} className="mt-2.5" />
-        </div>
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            <Info className="h-3 w-3" />
-            {t('How this plan was built')}
-          </div>
-          <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-            {t('From your skill ratings')}
-          </div>
-          <div className="text-[11px] text-[var(--text-muted)]">
-            {t('Steps you already meet are left out')}
-          </div>
+      {/* The plan's own time split, kept as one honest strip rather than a
+          third summary card in the heading. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] px-4 py-2.5">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+          {t('How this plan was built')} · {t('From your skill ratings')}
+        </span>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+          <TimeBreakdown breakdown={planTimeBreakdown} className="max-w-md" showLabels={false} />
+          <span className="hidden shrink-0 text-[10px] text-[var(--text-muted)] sm:inline">
+            {totalHours} {t('hours')} · {totalTasks} {t('steps')}
+          </span>
         </div>
       </div>
 
@@ -1116,6 +1069,22 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
           );
           const limited = showAll.includes(stage.id) ? visibleTasks : visibleTasks.slice(0, 5);
           const hasMore = visibleTasks.length > limited.length;
+          // The skills this stage actually builds, from its own actions. They
+          // are what connect the plan to the skills centre, the assessments
+          // and the projects, so they are named on the stage itself.
+          const stageSkills = [
+            ...new Set(
+              stage.tasks
+                .map((task) => task.skillName)
+                .filter((name): name is string => Boolean(name))
+            ),
+          ];
+          const pendingSkills = new Set(
+            stage.tasks
+              .filter((task) => task.status !== 'completed')
+              .map((task) => task.skillName)
+              .filter((name): name is string => Boolean(name))
+          );
 
           return (
             <StaggerItem key={stage.id} className="space-y-4">
@@ -1204,6 +1173,27 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
                       </span>
                       <span>{stage.pct}%</span>
                     </div>
+                    {stageSkills.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {stageSkills.slice(0, 4).map((skill) => (
+                          <span
+                            key={skill}
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                              pendingSkills.has(skill)
+                                ? 'border-[var(--color-primary)]/30 bg-[var(--color-primary-surface)] text-[var(--color-primary-text)]'
+                                : 'border-[var(--border-subtle)] bg-[var(--surface-secondary)]/60 text-[var(--text-muted)] line-through decoration-[var(--text-muted)]/40'
+                            }`}
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                        {stageSkills.length > 4 ? (
+                          <span className="text-[10px] text-[var(--text-muted)]">
+                            +{stageSkills.length - 4}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {/* Where this stage's hours go. The parts add up to the
                         stage total above, so the two can never disagree. */}
                     <TimeBreakdown
@@ -1230,6 +1220,54 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({ onNavigate }) => {
 
                 {isOpen && (
                   <div className="space-y-4 border-t border-[var(--border-subtle)] p-5">
+                    {/* The other surfaces this stage answers to. A step is not
+                        only reading: the same skill can be measured by an
+                        assessment, proved by a project and tracked in the
+                        skills centre. These are the real destinations for
+                        those links, not decorative buttons. */}
+                    {onNavigate ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="me-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                          {t('Work on this stage')}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onNavigate('assessment')}
+                          className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)]"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {t('Practise this skill')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onNavigate('projects')}
+                          className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)]"
+                        >
+                          <FolderGit2 className="h-3 w-3" />
+                          {t('Build proof')}
+                        </button>
+                        {stageSkills.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => onNavigate('skills')}
+                            className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)]"
+                          >
+                            <Compass className="h-3 w-3" />
+                            {t('Rate your skills')}
+                          </button>
+                        ) : null}
+                        {stage.resources.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => onNavigate('learning')}
+                            className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)]"
+                          >
+                            <BookOpen className="h-3 w-3" />
+                            {t('Open learning')}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {/* Where this stage's hours go. Every part is a real kind
                         of work, and they add up to the stage's own total. */}
                     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 p-3">

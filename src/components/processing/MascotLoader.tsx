@@ -6,7 +6,7 @@
  * same friendly face while the platform works.
  *
  * THE OFFICIAL MASCOT, AND ONLY THE OFFICIAL MASCOT
- * The artwork is the platform's own `roadmapak-ai-mascot.webp`. It is not
+ * The artwork is the platform's own `aionvia-ai-mascot.webp`. It is not
  * redrawn, not replaced by a generic robot and not substituted by another
  * illustration: the file is served from `/brand/`, the same place the AI
  * assistant's avatar is loaded from, so there is exactly one mascot in the
@@ -64,7 +64,7 @@ export const MascotLoader: React.FC<MascotLoaderProps> = ({
   size = 'md',
   message = MASCOT_LOADING_MESSAGE,
   className = '',
-  alt = 'Roadmapak assistant',
+  alt = 'Aionvia assistant',
   showMessage = true,
 }) => {
   const { t } = useCareer();
@@ -91,7 +91,7 @@ export const MascotLoader: React.FC<MascotLoaderProps> = ({
           transition={{ duration: 2.4, repeat: reduced ? 0 : Infinity, ease: 'easeInOut' }}
         />
         <motion.img
-          src="/brand/roadmapak-ai-mascot.webp"
+          src="/brand/aionvia-ai-mascot.webp"
           alt={alt}
           width={348}
           height={490}

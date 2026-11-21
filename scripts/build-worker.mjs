@@ -60,11 +60,11 @@ await build({
   // built-ins are resolvable this way, which is all these calls need.
   banner: {
     js: [
-      "import { createRequire as __roadmapakCreateRequire } from 'node:module';",
+      "import { createRequire as __aionviaCreateRequire } from 'node:module';",
       // `import.meta.url` is not populated for Pages' bundled `_worker.js`, so a
       // stable absolute path is used. Only built-in specifiers are resolved, and
       // those do not depend on the referrer path.
-      "const require = __roadmapakCreateRequire('/_worker.js');",
+      "const require = __aionviaCreateRequire('/_worker.js');",
     ].join('\n'),
   },
   logLevel: 'warning',

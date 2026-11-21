@@ -120,6 +120,8 @@ export function parseSubscriptionLookupKey(
   lookupKey: string | null | undefined
 ): { planCode: string; billingCycle: 'monthly' | 'annual' } | null {
   if (!lookupKey) return null;
+  // The prefix is a live Stripe lookup key, not a display string. It stays
+  // `roadmapak_` until the catalogue is migrated in Stripe itself.
   const match = /^roadmapak_(.+)_(monthly|annual)$/.exec(lookupKey);
   if (!match) return null;
   return {

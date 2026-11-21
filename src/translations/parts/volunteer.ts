@@ -130,4 +130,10 @@ export const volunteerAr: Record<string, string> = {
   'Opportunity status': 'حالة الفرصة',
   'Showing the 24 most common. Use the search box for the rest.':
     'يتم عرض الـ 24 الأكثر شيوعًا. استخدم خانة البحث للوصول إلى الباقي.',
+
+  'What this adds to your target role': 'ما يضيفه هذا لوظيفتك المستهدفة',
+  'These target-role skills are named in your volunteering record.': 'هذه المهارات المطلوبة لوظيفتك مذكورة في سجل تطوعك.',
+  'None of your target-role skills are named in these records yet. Add the skills each stint actually used.': 'لا توجد مهارات من وظيفتك المستهدفة مذكورة في هذه السجلات بعد. أضف المهارات التي استخدمتها فعلاً في كل تجربة.',
+  'Still to prove elsewhere:': 'ما زال بحاجة إلى إثبات في مكان آخر:',
+  'Open Skills Center': 'افتح مركز المهارات',
 };

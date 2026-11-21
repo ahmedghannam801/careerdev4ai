@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 
-const BASE = process.env.QA_URL ?? 'https://roadmapak.pages.dev/';
+const BASE = process.env.QA_URL ?? 'https://aionvia.pages.dev/';
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();

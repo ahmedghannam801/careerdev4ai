@@ -1,10 +1,12 @@
 // Canonical OpenRouter Configuration and Client Manager
-// Single source of truth for OpenRouter API configuration and calls across Roadmapak.
+// Single source of truth for OpenRouter API configuration and calls across Aionvia.
+
+import { BRAND_NAME, BRAND_ORIGIN } from '../../shared/brand';
 
 export const CANONICAL_OPENROUTER_MODEL = 'openrouter/free';
 export const OPENROUTER_API_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-export const APP_REFERER = 'https://roadmapak.pages.dev';
-export const APP_TITLE = 'Roadmapak';
+export const APP_REFERER = BRAND_ORIGIN;
+export const APP_TITLE = BRAND_NAME;
 
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';

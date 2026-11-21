@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const ORIGIN = 'https://roadmapak.pages.dev';
+const ORIGIN = 'https://aionvia.pages.dev';
 
 let failures = 0;
 function check(label, ok, detail = '') {
@@ -53,7 +53,7 @@ const bundle = [...chunks.values()].join('\n');
 console.log(`entry chunk: assets/${entry}`);
 console.log(`chunks fetched from the live origin: ${chunks.size}\n`);
 
-check('the bundle carries the new brand', bundle.includes('Roadmapak'));
+check('the bundle carries the new brand', bundle.includes('Aionvia'));
 // The previous brand names, assembled at run time: the check has to look for
 // them, but the literal must not sit in this file.
 const LEGACY_BRANDS = ['Career' + 'Ra', 'career' + 'ra', 'Career' + 'Dev4AI'];
@@ -91,7 +91,7 @@ for (const key of [
 }
 
 check('the bundle keeps the guided-tour event name', bundle.includes('careerdev4ai:open-tour'));
-check('the bundle carries the new origin', bundle.includes('https://roadmapak.pages.dev'));
+check('the bundle carries the new origin', bundle.includes('https://aionvia.pages.dev'));
 check('the bundle carries no legacy origin', !bundle.includes('careerdev4ai.pages.dev'));
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}\n`);

@@ -17,7 +17,7 @@
 import 'dotenv/config';
 import { createHmac } from 'node:crypto';
 
-const ORIGIN = process.argv[2] ?? 'https://roadmapak.pages.dev';
+const ORIGIN = process.argv[2] ?? 'https://aionvia.pages.dev';
 const URL = `${ORIGIN}/api/stripe/webhook`;
 const secret = process.env.STRIPE_WEBHOOK_SECRET;
 

@@ -46,8 +46,8 @@ await build({
   legalComments: 'none',
   banner: {
     js: [
-      "import { createRequire as __roadmapakCreateRequire } from 'node:module';",
-      "const require = __roadmapakCreateRequire('/worker.js');",
+      "import { createRequire as __aionviaCreateRequire } from 'node:module';",
+      "const require = __aionviaCreateRequire('/worker.js');",
     ].join('\n'),
   },
   logLevel: 'warning',

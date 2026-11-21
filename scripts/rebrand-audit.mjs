@@ -1,5 +1,5 @@
 /**
- * Roadmapak rebrand — final consistency audit.
+ * Aionvia rebrand — final consistency audit.
  * -----------------------------------------------------------------------------
  * Searches the whole repository for the previous brand names, the previous
  * production origin, the previous logo asset paths and the previous document
@@ -147,7 +147,7 @@ const EXCLUDED_FILES = new Set([
   // The migration report is the historical record of the rename. It has to
   // name the previous brand and the previous logo paths, because saying what
   // was renamed is the whole point of the document.
-  'ROADMAPAK_MIGRATION_REPORT.md',
+  'AIONVIA_MIGRATION_REPORT.md',
 ]);
 
 const EXTENSIONS = new Set([
@@ -229,7 +229,7 @@ for (const finding of findings) {
   byCategory.set(finding.category, list);
 }
 
-console.log('\n=== Roadmapak rebrand — final consistency audit ===\n');
+console.log('\n=== Aionvia rebrand — final consistency audit ===\n');
 
 for (const category of [...byCategory.keys()].sort()) {
   const list = byCategory.get(category);

@@ -96,7 +96,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Roadmapak Server running on port ${PORT}`);
+    console.log(`Aionvia Server running on port ${PORT}`);
   });
 }
 

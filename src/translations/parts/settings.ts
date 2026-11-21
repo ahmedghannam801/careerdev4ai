@@ -66,7 +66,7 @@ export const settingsAr: Record<string, string> = {
   'Display Theme': 'مظهر العرض',
   'Light': 'فاتح',
   'Dark': 'داكن',
-  'Software Engineer & Creator of Roadmapak': 'مهندس برمجيات ومؤسس Roadmapak',
+  'Software Engineer & Creator of Aionvia': 'مهندس برمجيات ومؤسس Aionvia',
   'Contact': 'تواصل',
   'Profiles': 'الملفات',
   'Current Password': 'كلمة المرور الحالية',

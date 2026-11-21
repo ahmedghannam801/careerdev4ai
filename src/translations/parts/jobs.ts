@@ -227,4 +227,9 @@ export const jobsAr: Record<string, string> = {
   'The openings that ask for the most you do not have':
     'الفرص التي تطلب أكثر ما لا تملكه',
   'skills': 'مهارة',
+
+  'Ready to apply': 'جاهز للتقديم',
+  'Only postings where every listed required skill is already in your profile': 'الوظائف التي تملك كل مهاراتها المطلوبة في ملفك فقط',
+  'No fully qualified openings in this search': 'لا توجد وظائف مؤهَّل لها بالكامل في هذا البحث',
+  'Every posting in this search still asks for a skill your profile does not show. Turn the filter off to see them with the gaps named, or close those gaps in your roadmap first.': 'كل وظيفة في هذا البحث ما زالت تطلب مهارة لا تظهر في ملفك. أطفئ الفلتر لعرضها مع تحديد الفجوات، أو أغلق هذه الفجوات في خارطة طريقك أولاً.',
 };

@@ -10,7 +10,7 @@
  *   node scripts/production/verify-migration.mjs
  */
 
-const NEW_ORIGIN = 'https://roadmapak.pages.dev';
+const NEW_ORIGIN = 'https://aionvia.pages.dev';
 const OLD_ORIGIN = 'https://careerdev4ai.pages.dev';
 
 /**
@@ -50,7 +50,7 @@ console.log(`\n=== ${NEW_ORIGIN} ===\n`);
       response.headers.get('cf-cache-status') !== null,
     `server ${response.headers.get('server') ?? 'n/a'}, protocol ${response.url.startsWith('https') ? 'https' : 'other'}`,
   );
-  check('brand name is Roadmapak', body.includes('Roadmapak'));
+  check('brand name is Aionvia', body.includes('Aionvia'));
   check('no legacy brand name in the document', !hasLegacyBrand(body));
 }
 
@@ -78,13 +78,13 @@ console.log(`\n=== ${NEW_ORIGIN} ===\n`);
 
   const favicon = await head(`${NEW_ORIGIN}/favicon.svg`, { text: true });
   check('favicon.svg is served', favicon.response.status === 200, `status ${favicon.response.status}`);
-  check('favicon.svg is labelled Roadmapak', favicon.body.includes('Roadmapak'));
+  check('favicon.svg is labelled Aionvia', favicon.body.includes('Aionvia'));
   check('favicon.svg is not an old asset', !hasLegacyBrand(favicon.body));
 
   const manifest = await head(`${NEW_ORIGIN}/site.webmanifest`, { text: true });
   check('manifest is served', manifest.response.status === 200, `status ${manifest.response.status}`);
-  check('manifest name is Roadmapak', manifest.body.includes('"name": "Roadmapak"'));
-  check('manifest short_name is Roadmapak', manifest.body.includes('"short_name": "Roadmapak"'));
+  check('manifest name is Aionvia', manifest.body.includes('"name": "Aionvia"'));
+  check('manifest short_name is Aionvia', manifest.body.includes('"short_name": "Aionvia"'));
 
   const og = await head(`${NEW_ORIGIN}/brand/og-image-1200x630.png`);
   check('og-image is served', og.response.status === 200, `status ${og.response.status}`);
@@ -121,7 +121,7 @@ console.log(`\n=== ${NEW_ORIGIN} ===\n`);
 
   const terms = await head(`${NEW_ORIGIN}/terms`, { text: true });
   check('the /terms page renders', terms.response.status === 200, `status ${terms.response.status}`);
-  check('the /terms page carries the new brand', terms.body.includes('Roadmapak'));
+  check('the /terms page carries the new brand', terms.body.includes('Aionvia'));
 }
 
 /* -------------------------------------------------------------------------- */

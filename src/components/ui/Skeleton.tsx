@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Roadmapak AI — skeleton placeholder.
+ * Aionvia AI — skeleton placeholder.
  *
  * Shown while a panel's content is still arriving. A skeleton keeps the
  * layout stable, so nothing jumps when the real content replaces it, and it

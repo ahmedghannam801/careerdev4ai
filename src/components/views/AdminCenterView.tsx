@@ -7,7 +7,7 @@
  * verified caller's permission. The tabs below are therefore a convenience,
  * not the security boundary.
  *
- * The visual language stays inside the existing Roadmapak shell: the same
+ * The visual language stays inside the existing Aionvia shell: the same
  * cards, borders, radii and typography as the rest of the product.
  */
 

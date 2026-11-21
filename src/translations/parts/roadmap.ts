@@ -93,8 +93,8 @@ export const roadmapAr: Record<string, string> = {
   'Job Preparation': 'التحضير للعمل',
   'YOUR PLAN, ONE STAGE AT A TIME': 'خطتك، مرحلة واحدة في كل مرة',
   'No roadmap yet': 'لا توجد خارطة طريق بعد',
-  'Choose a target role and Roadmapak will build a staged plan from your real skill gaps.':
-    'اختر دورًا مستهدفًا وسيبني Roadmapak خطة مرحلية من فجوات مهاراتك الفعلية.',
+  'Choose a target role and Aionvia will build a staged plan from your real skill gaps.':
+    'اختر دورًا مستهدفًا وسيبني Aionvia خطة مرحلية من فجوات مهاراتك الفعلية.',
   'Choose a target role': 'اختر دورًا مستهدفًا',
   'Where you are, what comes next, and why each step is here.':
     'أين أنت، وما التالي، ولماذا كل خطوة هنا.',
@@ -356,4 +356,25 @@ export const roadmapAr: Record<string, string> = {
     "المحللون الذين يشرحون عملهم علناً يحصلون على فرص أكثر ممن يبقيه خاصاً، وإرشاد مبتدئ هو أسرع طريقة لمعرفة ما تفهمه فعلاً.",
   "Publish one write-up of an analysis and answer one question somebody else asked.":
     "انشر كتابة واحدة عن تحليل وأجب عن سؤال طرحه شخص آخر.",
+
+  // Roadmap command centre
+  'Stage': 'المرحلة',
+  'Actions': 'الإجراءات',
+  'Estimated effort': 'الجهد المقدَّر',
+  'Open gaps': 'الفجوات المفتوحة',
+  'Your next step': 'خطوتك التالية',
+  'Open this stage': 'افتح هذه المرحلة',
+  'Close gaps': 'أغلق الفجوات',
+  'Job ready': 'جاهز للوظيفة',
+  'Enroll in this plan': 'سجّل في هذه الخطة',
+  'Work on this stage': 'اعمل على هذه المرحلة',
+  'Practise this skill': 'تدرّب على هذه المهارة',
+  'Build proof': 'ابنِ دليلاً',
+  'Rate your skills': 'قيّم مهاراتك',
+  'Open learning': 'افتح التعلّم',
+  'None — targets met': 'لا شيء — الأهداف محققة',
+  'Across the whole plan': 'عبر الخطة كاملة',
+  'remaining': 'متبقية',
+  'All stages': 'كل المراحل',
+  'complete': 'مكتمل',
 };

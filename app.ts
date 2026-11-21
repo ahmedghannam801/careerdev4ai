@@ -1,5 +1,5 @@
 /**
- * The Roadmapak API, as a framework-level Express application.
+ * The Aionvia API, as a framework-level Express application.
  *
  * The module builds the app and registers every route; it deliberately does
  * NOT open a port, load `.env`, or serve static assets. Those are entry-point
@@ -2158,8 +2158,8 @@ app.post('/api/copilot', requireAuth, (req: Request, res: Response, next) => {
       return modelUnavailable(res);
     }
 
-    const systemInstruction = `You are Roadmapak Copilot, an AI career advisor that works across every career domain — technology, engineering, data, design, product, business, operations, finance, marketing, sales, people and HR, healthcare, education, and legal.
-You are given the user's real career state below, read from their Roadmapak account.
+    const systemInstruction = `You are Aionvia Copilot, an AI career advisor that works across every career domain — technology, engineering, data, design, product, business, operations, finance, marketing, sales, people and HR, healthcare, education, and legal.
+You are given the user's real career state below, read from their Aionvia account.
 The user is currently looking at the "${activeView}" screen of the app.
 
 ${contextBlock}
@@ -7454,7 +7454,7 @@ app.post(
     if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 320) {
       return res.status(503).json({ error: 'Email test recipient is not configured.' });
     }
-    const idempotencyKey = `roadmapak-test/${req.authUser!.id}/${Math.floor(Date.now() / 300_000)}`;
+    const idempotencyKey = `aionvia-test/${req.authUser!.id}/${Math.floor(Date.now() / 300_000)}`;
     const result = await sendTestEmail(recipient, idempotencyKey);
     if (result.ok) return res.status(200).json({ success: true, messageId: result.id });
     if (result.status === null) {

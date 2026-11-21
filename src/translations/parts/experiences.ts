@@ -79,8 +79,8 @@ export const experiencesAr: Record<string, string> = {
   'Any duration': 'أي مدة',
 
   // Footer
-  'Simulations are published by Forage and open on the official provider site. Roadmapak curates the catalogue and records your own progress; it does not verify completion or certificates.':
-    'تنشر Forage المحاكاات وتفتح على موقع المزود الرسمي. ينسّق Roadmapak الدليل ويسجل تقدمك أنت؛ وهو لا يتحقق من الإكمال أو الشهادات.',
+  'Simulations are published by Forage and open on the official provider site. Aionvia curates the catalogue and records your own progress; it does not verify completion or certificates.':
+    'تنشر Forage المحاكاات وتفتح على موقع المزود الرسمي. ينسّق Aionvia الدليل ويسجل تقدمك أنت؛ وهو لا يتحقق من الإكمال أو الشهادات.',
   'Simulation titles and descriptions are shown as the provider publishes them.':
     'تُعرض عناوين المحاكاات وأوصافها كما ينشرها المزود.',
 
@@ -91,8 +91,8 @@ export const experiencesAr: Record<string, string> = {
   'Why this is recommended': 'سبب الترشيح',
   'Certificate link': 'رابط الشهادة',
   'View certificate': 'عرض الشهادة',
-  'This link is stored as self-reported. Forage and Roadmapak have not verified it.':
-    'هذا الرابط محفوظ كإبلاغ ذاتي. لم تتحقق Forage ولا Roadmapak منه.',
+  'This link is stored as self-reported. Forage and Aionvia have not verified it.':
+    'هذا الرابط محفوظ كإبلاغ ذاتي. لم تتحقق Forage ولا Aionvia منه.',
   'Edit link': 'تعديل الرابط',
   'Add certificate link': 'إضافة رابط الشهادة',
   'Certificate link (HTTPS)': 'رابط الشهادة (HTTPS)',

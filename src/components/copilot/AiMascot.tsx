@@ -7,7 +7,7 @@ interface AiMascotProps {
   alt?: string;
 }
 
-export const AiMascot: React.FC<AiMascotProps> = ({ className, state = 'still', alt = 'Roadmapak AI assistant' }) => {
+export const AiMascot: React.FC<AiMascotProps> = ({ className, state = 'still', alt = 'Aionvia AI assistant' }) => {
   const reduced = useReducedMotion() ?? false;
   const animate = reduced || state === 'still'
     ? { y: 0, rotate: 0, scale: 1 }
@@ -17,7 +17,7 @@ export const AiMascot: React.FC<AiMascotProps> = ({ className, state = 'still', 
 
   return (
     <motion.img
-      src="/brand/roadmapak-ai-mascot.webp"
+      src="/brand/aionvia-ai-mascot.webp"
       alt={alt}
       aria-hidden={alt === '' ? true : undefined}
       className={className}

@@ -11,7 +11,7 @@
 
 import 'dotenv/config';
 
-const ORIGIN = process.argv[2] ?? 'https://roadmapak.pages.dev';
+const ORIGIN = process.argv[2] ?? 'https://aionvia.pages.dev';
 const key = (process.env.INDEXNOW_KEY ?? '').trim();
 
 if (!key) {

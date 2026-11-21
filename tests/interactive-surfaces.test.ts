@@ -217,7 +217,7 @@ describe('the duplicate projects', () => {
 describe('the loading surface', () => {
   it('uses the official mascot', () => {
     const loader = read('src/components/processing/MascotLoader.tsx');
-    assert.match(loader, /\/brand\/roadmapak-ai-mascot\.webp/);
+    assert.match(loader, /\/brand\/aionvia-ai-mascot\.webp/);
   });
 
   it('says the waiting line in the interface\'s language', () => {

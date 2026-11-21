@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '../brand/Logo';
 import { SkeletonCard } from '../ui/Skeleton';
-import { RoadmapakAvatar } from '../ui/RoadmapakAvatars';
+import { AionviaAvatar } from '../ui/AionviaAvatars';
 import { apiUrl } from '../../lib/native';
 import { useCareer } from '../../context/CareerContext';
 
@@ -135,7 +135,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
             className="text-xs font-semibold text-[var(--color-primary-text)] hover:underline flex items-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5 rtl:rotate-180" />
-            <span>{t('Back to Roadmapak')}</span>
+            <span>{t('Back to Aionvia')}</span>
           </button>
         </div>
       </header>
@@ -181,7 +181,7 @@ export const PublicProfileView: React.FC<{ username: string; onBack: () => void 
           <>
             <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-6 sm:p-8 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <RoadmapakAvatar
+                <AionviaAvatar
                   avatarId={profile.avatarUrl}
                   className="w-16 h-16 rounded-2xl border border-[var(--border-subtle)]"
                 />

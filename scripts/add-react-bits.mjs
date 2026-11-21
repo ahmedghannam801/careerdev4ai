@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Roadmapak AI — React Bits installer
+ * Aionvia AI — React Bits installer
  * ---------------------------------------------------------------------------
  * React Bits (reactbits.dev) is not an npm package: every component is source
  * code you own. Its documentation ships a `shadcn` CLI shortcut, but that CLI

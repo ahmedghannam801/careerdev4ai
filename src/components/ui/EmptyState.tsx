@@ -2,7 +2,7 @@ import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 /**
- * Roadmapak AI — shared empty state.
+ * Aionvia AI — shared empty state.
  *
  * An empty state should read as an intentional part of the product rather
  * than a failure to load data. Every empty state names what is missing and

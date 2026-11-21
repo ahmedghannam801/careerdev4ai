@@ -1,7 +1,7 @@
 /**
  * Builds the redirect-only deployment for the predecessor origin.
  *
- * The platform moved from `careerdev4ai.pages.dev` to `roadmapak.pages.dev`.
+ * The platform moved from `careerdev4ai.pages.dev` to `aionvia.pages.dev`.
  * Once the new origin is verified in production, the old one becomes a
  * permanent pointer to it: every request is answered with a 301 to the
  * equivalent path on the new origin.
@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET = path.resolve(ROOT, process.argv[2] ?? 'dist-legacy-redirect');
-const NEW_ORIGIN = 'https://roadmapak.pages.dev';
+const NEW_ORIGIN = 'https://aionvia.pages.dev';
 
 const REDIRECTS = `# The predecessor origin.
 #
@@ -41,7 +41,7 @@ const INDEX = `<!doctype html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Roadmapak</title>
+    <title>Aionvia</title>
     <meta http-equiv="refresh" content="0; url=${NEW_ORIGIN}/" />
     <meta name="robots" content="noindex, nofollow" />
     <link rel="canonical" href="${NEW_ORIGIN}/" />

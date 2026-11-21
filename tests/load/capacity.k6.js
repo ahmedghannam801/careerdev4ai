@@ -41,7 +41,7 @@ function validateTarget() {
   // Both production origins are refused: the current one and the predecessor
   // that is still serving during the domain migration.
   if (
-    host === 'roadmapak.pages.dev' ||
+    host === 'aionvia.pages.dev' ||
     host === 'careerdev4ai.pages.dev' ||
     host.endsWith('.supabase.co')
   ) {
@@ -70,7 +70,7 @@ export const options = {
     authenticated_api_latency: ['p(95)<1000'],
     api_429_count: ['count<100'],
   },
-  userAgent: 'Roadmapak-staging-capacity-test/k6',
+  userAgent: 'Aionvia-staging-capacity-test/k6',
 };
 
 const endpoints = [

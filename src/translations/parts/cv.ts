@@ -12,8 +12,8 @@ export const cvAr: Record<string, string> = {
   'Your CV could not be assembled right now': 'تعذّر تجهيز سيرتك الذاتية الآن',
   'What this CV is built from': 'ما بُنيت منه هذه السيرة',
   'Still needed to complete this CV': 'ما زال ناقصًا لإكمال هذه السيرة',
-  'Nothing here is filled in for you. Roadmapak will not invent a job, a date, a metric or a certificate you do not have.':
-    'لا يُملأ أي شيء نيابةً عنك. لن يختلق Roadmapak وظيفة أو تاريخًا أو رقمًا أو شهادة لا تملكها.',
+  'Nothing here is filled in for you. Aionvia will not invent a job, a date, a metric or a certificate you do not have.':
+    'لا يُملأ أي شيء نيابةً عنك. لن يختلق Aionvia وظيفة أو تاريخًا أو رقمًا أو شهادة لا تملكها.',
   'Summary': 'الملخّص',
   'Experience': 'الخبرة',
   'Education': 'التعليم',
@@ -487,4 +487,25 @@ export const cvAr: Record<string, string> = {
   'Upgrade to Pro for Unlimited Edits': 'اشترك في Pro للحصول على تعديلات غير محدودة',
   'Your AI edits for today are used up. The timer in the studio header shows when they come back.':
     'استنفدت تعديلات الذكاء الاصطناعي اليوم. المؤقت في أعلى الاستوديو يوضّح متى تعود.',
+
+  'An employer can reach you': 'صاحب العمل يستطيع الوصول إليك',
+  'Email and a phone number or location are on the document.': 'البريد الإلكتروني ورقم الهاتف أو الموقع موجودان في المستند.',
+  'Add an email and either a phone number or a location.': 'أضف بريداً إلكترونياً ورقم هاتف أو موقعاً.',
+  'The top of the page says who you are': 'أعلى الصفحة يقول من أنت',
+  'A summary of at least a sentence is present.': 'يوجد ملخص من جملة واحدة على الأقل.',
+  'Write two lines naming the role you want and the value you bring.': 'اكتب سطرين يذكران الوظيفة التي تريدها والقيمة التي تقدمها.',
+  'At least one bullet shows a result': 'نقطة واحدة على الأقل تُظهر نتيجة',
+  'A bullet carries a number, which is what makes impact credible.': 'إحدى النقاط تحمل رقماً، وهذا ما يجعل الأثر مقنعاً.',
+  'Add a number to one bullet: volume, percentage, time saved or people served.': 'أضف رقماً إلى إحدى النقاط: حجم أو نسبة أو وقت موفَّر أو عدد المستفيدين.',
+  'The skills section is usable': 'قسم المهارات قابل للاستخدام',
+  'Five or more skills are listed.': 'خمس مهارات أو أكثر مذكورة.',
+  'List at least five skills, strongest first.': 'اذكر خمس مهارات على الأقل، الأقوى أولاً.',
+  'There is a way to see your work': 'توجد طريقة لرؤية عملك',
+  'A professional link is on the document.': 'يوجد رابط مهني في المستند.',
+  'Add a LinkedIn, GitHub or portfolio link.': 'أضف رابط LinkedIn أو GitHub أو ملف أعمال.',
+  'Send-ready: contact details, summary, evidence and skills are all present.': 'جاهز للإرسال: بيانات التواصل والملخص والدليل والمهارات كلها موجودة.',
+  'One thing to fix before you send this': 'شيء واحد لإصلاحه قبل إرسال هذا',
+  '{count} things to fix before you send this': '{count} أشياء لإصلاحها قبل إرسال هذا',
+  'You can still export. These are what a recruiter or an ATS is most likely to mark down.': 'يمكنك التصدير رغم ذلك. هذه أكثر ما قد يأخذه عليك مسؤول التوظيف أو نظام التتبع.',
+  'Fix': 'أصلح',
 };

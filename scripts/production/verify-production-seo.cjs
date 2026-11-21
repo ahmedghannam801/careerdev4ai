@@ -28,7 +28,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
-const BASE = (process.argv[2] || 'https://roadmapak.pages.dev').replace(/\/+$/, '');
+const BASE = (process.argv[2] || 'https://aionvia.pages.dev').replace(/\/+$/, '');
 const VERIFICATION_FILE = 'googleecc4c0f834a5c71c.html';
 const VERIFICATION_TOKEN = 'google-site-verification: googleecc4c0f834a5c71c.html';
 

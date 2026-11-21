@@ -40,7 +40,7 @@ export const DashboardFeedbackCard: React.FC = () => {
             id="dashboard-feedback-title"
             className="text-sm font-semibold text-[var(--text-primary)]"
           >
-            {t('Help shape Roadmapak')}
+            {t('Help shape Aionvia')}
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
             {t('Tell us what works and what gets in your way. It takes about three minutes.')}

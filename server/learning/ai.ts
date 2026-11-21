@@ -188,7 +188,7 @@ function buildPrompt(
     gapMap.set(skill.name, { current: skill.currentLevel, target: skill.targetLevel, gap: skill.gap });
   }
 
-  return `You are the explanation layer of Roadmapak's Learning Hub.
+  return `You are the explanation layer of Aionvia's Learning Hub.
 A deterministic engine has ALREADY selected and scored the courses below.
 
 Your job is only to explain, for each selected course:

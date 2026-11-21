@@ -134,7 +134,7 @@ const BOARD_CONCURRENCY = 4;
  * between a well-behaved reader and an anonymous one.
  */
 const USER_AGENT =
-  'Mozilla/5.0 (compatible; Roadmapak/1.0; +https://roadmapak.pages.dev; job-board-aggregator)';
+  'Mozilla/5.0 (compatible; Aionvia/1.0; +https://aionvia.pages.dev; job-board-aggregator)';
 
 /**
  * Reads one board's JSON.

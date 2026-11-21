@@ -19,7 +19,7 @@
 import 'dotenv/config';
 
 const OLD_ORIGIN = 'https://careerdev4ai.pages.dev';
-const NEW_ORIGIN = 'https://roadmapak.pages.dev';
+const NEW_ORIGIN = 'https://aionvia.pages.dev';
 const key = process.env.STRIPE_SECRET_KEY;
 
 if (!key) {

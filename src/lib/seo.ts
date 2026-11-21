@@ -23,7 +23,17 @@
  * link and a bookmark are all distinguishable.
  */
 
-const SITE_ORIGIN = 'https://roadmapak.pages.dev';
+import {
+  BRAND_ALTERNATE_NAMES,
+  BRAND_NAME,
+  BRAND_ORIGIN,
+  BRAND_URL,
+  BRAND_LEGACY_ORIGINS,
+} from '../../shared/brand';
+
+/** The canonical origin. It is overridable for a preview deployment. */
+const SITE_ORIGIN =
+  (import.meta.env?.VITE_SITE_ORIGIN as string | undefined)?.trim() || BRAND_ORIGIN;
 
 /**
  * The canonical address of the home page.
@@ -32,10 +42,10 @@ const SITE_ORIGIN = 'https://roadmapak.pages.dev';
  * `WebSite` schema all carry, so the site is never described under two
  * different addresses.
  */
-const SITE_URL = `${SITE_ORIGIN}/`;
+const SITE_URL = SITE_ORIGIN === BRAND_ORIGIN ? BRAND_URL : `${SITE_ORIGIN.replace(/\/+$/, '')}/`;
 
 /** The name of the product, used in the document metadata. */
-const SITE_NAME = 'Roadmapak';
+const SITE_NAME = BRAND_NAME;
 
 /**
  * The other written forms of the same name.
@@ -44,11 +54,10 @@ const SITE_NAME = 'Roadmapak';
  * ones a search engine needs in order to show the site under the name a
  * person actually typed.
  */
-const SITE_ALTERNATE_NAMES = [
-  'Roadmapak',
-  'Roadmapak AI',
-  'Roadmapak Career Platform',
-];
+const SITE_ALTERNATE_NAMES = [...BRAND_ALTERNATE_NAMES];
+
+/** The origin the platform used to live at, kept for redirects only. */
+export const LEGACY_SITE_ORIGINS = BRAND_LEGACY_ORIGINS;
 
 /** The image used for link previews. */
 const OG_IMAGE = `${SITE_ORIGIN}/brand/og-image-1200x630.png`;
@@ -75,19 +84,19 @@ export interface RouteMeta {
  */
 const VIEW_META: Record<string, { title: string; description: string }> = {
   landing: {
-    title: `Roadmapak — Turn Your Ambition Into a Career Plan`,
+    title: `Aionvia — Turn Your Ambition Into a Career Plan`,
     description:
-      'Roadmapak is an AI-powered career operating system for students and young professionals: goals, skills, roadmaps, CVs, job applications, interview practice and volunteering opportunities in one bilingual workspace.',
+      'Aionvia is an AI-powered career operating system for students and young professionals: goals, skills, roadmaps, CVs, job applications, interview practice and volunteering opportunities in one bilingual workspace.',
   },
   onboarding: {
     title: `Set up your career plan | ${SITE_NAME}`,
     description:
-      'Tell Roadmapak the role you are aiming at, the experience you have and the time you have, and build a career plan around it.',
+      'Tell Aionvia the role you are aiming at, the experience you have and the time you have, and build a career plan around it.',
   },
   dashboard: {
     title: `Dashboard | ${SITE_NAME}`,
     description:
-      'Your Roadmapak dashboard: where your plan stands, what is next, and how your skills, roadmap and applications are progressing.',
+      'Your Aionvia dashboard: where your plan stands, what is next, and how your skills, roadmap and applications are progressing.',
   },
   'my-career': {
     title: `My career | ${SITE_NAME}`,
@@ -97,7 +106,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   roles: {
     title: `Choose your career | ${SITE_NAME}`,
     description:
-      'Pick the career role you are aiming at from the Roadmapak catalogue, and make every later step answer to it.',
+      'Pick the career role you are aiming at from the Aionvia catalogue, and make every later step answer to it.',
   },
   analysis: {
     title: `Career analysis | ${SITE_NAME}`,
@@ -167,7 +176,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   profile: {
     title: `Profile | ${SITE_NAME}`,
     description:
-      'Your Roadmapak profile: your experience, your education, your skills and the work you have done.',
+      'Your Aionvia profile: your experience, your education, your skills and the work you have done.',
   },
   activity: {
     title: `Activity | ${SITE_NAME}`,
@@ -187,7 +196,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
   admin: {
     title: `Administration | ${SITE_NAME}`,
     description:
-      'The Roadmapak administration centre: users, catalogue, communications and analytics.',
+      'The Aionvia administration centre: users, catalogue, communications and analytics.',
   },
   referrals: {
     title: `Referrals | ${SITE_NAME}`,
@@ -200,7 +209,7 @@ const VIEW_META: Record<string, { title: string; description: string }> = {
 const PUBLIC_PROFILE_META = {
   title: `Career profile | ${SITE_NAME}`,
   description:
-    'A public Roadmapak profile: the experience, education, skills and projects behind the career.',
+    'A public Aionvia profile: the experience, education, skills and projects behind the career.',
 };
 
 /**
@@ -219,7 +228,7 @@ export function routeMetaFor(
   const title = entry?.title ?? `${SITE_NAME}`;
   const description =
     entry?.description ??
-    'Roadmapak is an AI-powered career operating system: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.';
+    'Aionvia is an AI-powered career operating system: goals, skills, roadmaps, CVs, job applications and interview practice in one workspace.';
 
   // The public landing page and a public profile may be indexed. Everything
   // else is behind authentication.

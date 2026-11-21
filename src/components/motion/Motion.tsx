@@ -10,7 +10,7 @@ import {
 } from '../../lib/motion';
 
 /**
- * Roadmapak AI — reusable motion wrappers.
+ * Aionvia AI — reusable motion wrappers.
  *
  * Views use these instead of hand-rolling variants, so every panel in the
  * product enters the same way and every one of them honours the visitor's

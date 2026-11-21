@@ -1,10 +1,10 @@
 /**
- * Roadmapak AI — Android launcher icon and launch screen.
+ * Aionvia AI — Android launcher icon and launch screen.
  * ---------------------------------------------------------------------------
  * Produces the native image assets of the Android application from the brand
  * artwork the web application already uses.
  *
- * The source is `src/assets/brand/roadmapak-icon.png` — the very same
+ * The source is `src/assets/brand/aionvia-icon.png` — the very same
  * prepared mark the React <Logo> component renders and the favicon set is
  * derived from. Nothing is redrawn, recoloured or re-lettered: the mark is
  * only resized and composited onto a tile, exactly like the brand pipeline in
@@ -26,7 +26,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RES = path.join(ROOT, 'android', 'app', 'src', 'main', 'res');
 
 /** The mark the platform already ships, used as the single source. */
-const ICON = path.join(ROOT, 'src', 'assets', 'brand', 'roadmapak-icon.png');
+const ICON = path.join(ROOT, 'src', 'assets', 'brand', 'aionvia-icon.png');
 
 /**
  * The tile behind the mark.

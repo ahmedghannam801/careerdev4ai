@@ -1,10 +1,10 @@
 /**
- * Roadmapak — official brand asset pipeline.
+ * Aionvia — official brand asset pipeline.
  * -----------------------------------------------------------------------------
  * Turns the approved brand artwork in `src/assets/brand/official/` into every
  * derivative the platform ships:
  *
- *   official/roadmapak-logo.png  ->  app / favicon / PWA icon set, the larger
+ *   official/aionvia-logo.png  ->  app / favicon / PWA icon set, the larger
  *                                    UI presentation and the social card
  *
  * The official file is NEVER redrawn, recoloured, restretched or re-lettered.
@@ -22,9 +22,10 @@
  */
 
 import sharp from 'sharp';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensurePlaceholderLogo } from './generate-brand-placeholder.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OFFICIAL_DIR = path.join(ROOT, 'src', 'assets', 'brand', 'official');
@@ -32,7 +33,7 @@ const BUNDLED_DIR = path.join(ROOT, 'src', 'assets', 'brand');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const PUBLIC_BRAND_DIR = path.join(PUBLIC_DIR, 'brand');
 
-const OFFICIAL_LOGO = path.join(OFFICIAL_DIR, 'roadmapak-logo.png');
+const OFFICIAL_LOGO = path.join(OFFICIAL_DIR, 'aionvia-logo.png');
 
 /** Brand tokens mirrored from `src/index.css`. */
 const BRAND = {
@@ -195,6 +196,15 @@ const PNG_OUTPUT = { palette: true, quality: 92, effort: 10, compressionLevel: 9
 async function build() {
   await mkdir(PUBLIC_BRAND_DIR, { recursive: true });
 
+  // The supplied artwork is the source of truth. Until it is in place, a plain
+  // typographic placeholder is used so no build can ship the previous mark.
+  try {
+    await access(OFFICIAL_LOGO);
+  } catch {
+    console.warn('! official logo not found — writing the interim Aionvia mark');
+    await ensurePlaceholderLogo();
+  }
+
   /* ------------------------------------------------------------------ */
   /* 1. Icon: prepare the art, trim, centre on a square canvas.           */
   /* ------------------------------------------------------------------ */
@@ -203,7 +213,7 @@ async function build() {
   const iconSquare = await squareCanvas(iconRaw, 0.94, 512);
 
   // Bundled copy — imported by the React <Logo> component.
-  await writeFile(path.join(BUNDLED_DIR, 'roadmapak-icon.png'), iconSquare);
+  await writeFile(path.join(BUNDLED_DIR, 'aionvia-icon.png'), iconSquare);
 
   // Favicon / PWA set — served statically from /brand/.
   for (const size of [16, 32, 192, 512]) {
@@ -269,7 +279,7 @@ async function build() {
     .png(PNG_OUTPUT)
     .toBuffer();
 
-  await writeFile(path.join(BUNDLED_DIR, 'roadmapak-logo.png'), lockup);
+  await writeFile(path.join(BUNDLED_DIR, 'aionvia-logo.png'), lockup);
 
   /* ------------------------------------------------------------------ */
   /* 3. favicon.svg — the official raster, embedded (never redrawn).    */
@@ -279,7 +289,7 @@ async function build() {
     .resize(512, 512, { kernel: 'lanczos3' })
     .png(PNG_OUTPUT)
     .toBuffer();
-  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Roadmapak">
+  const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Aionvia">
   <image href="data:image/png;base64,${icon512.toString('base64')}" width="512" height="512"/>
 </svg>
 `;
@@ -290,8 +300,8 @@ async function build() {
   /* ------------------------------------------------------------------ */
   console.log('→ web manifest');
   const manifest = {
-    name: 'Roadmapak',
-    short_name: 'Roadmapak',
+    name: 'Aionvia',
+    short_name: 'Aionvia',
     description: 'Your personal career operating system.',
     start_url: '/',
     display: 'standalone',
@@ -328,11 +338,11 @@ async function build() {
   /* ------------------------------------------------------------------ */
   /* Report                                                              */
   /* ------------------------------------------------------------------ */
-  const bundledIcon = await sharp(path.join(BUNDLED_DIR, 'roadmapak-icon.png')).metadata();
-  const bundledLogo = await sharp(path.join(BUNDLED_DIR, 'roadmapak-logo.png')).metadata();
+  const bundledIcon = await sharp(path.join(BUNDLED_DIR, 'aionvia-icon.png')).metadata();
+  const bundledLogo = await sharp(path.join(BUNDLED_DIR, 'aionvia-logo.png')).metadata();
   console.log('');
-  console.log('  src/assets/brand/roadmapak-icon.png ', `${bundledIcon.width}x${bundledIcon.height}`);
-  console.log('  src/assets/brand/roadmapak-logo.png ', `${bundledLogo.width}x${bundledLogo.height}`);
+  console.log('  src/assets/brand/aionvia-icon.png ', `${bundledIcon.width}x${bundledIcon.height}`);
+  console.log('  src/assets/brand/aionvia-logo.png ', `${bundledLogo.width}x${bundledLogo.height}`);
   console.log('  public/brand/*.png, public/favicon.svg, public/site.webmanifest');
   console.log('');
   console.log('done');

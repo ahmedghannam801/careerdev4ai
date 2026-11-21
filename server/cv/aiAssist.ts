@@ -281,7 +281,7 @@ export function buildCvAssistPrompt(input: {
   }
 
   parts.push('');
-  parts.push("The candidate's own record, read from their Roadmapak account:");
+  parts.push("The candidate's own record, read from their Aionvia account:");
   parts.push(input.careerContextBlock);
 
   if (input.sourceBlock) {
@@ -559,7 +559,7 @@ export function buildCvHeadlineSuggestionsPrompt(input: {
     parts.push(`The CV is aimed at the role: ${input.targetRoleTitle}.`);
   }
   parts.push('');
-  parts.push("The candidate's own record, read from their Roadmapak account:");
+  parts.push("The candidate's own record, read from their Aionvia account:");
   parts.push(input.careerContextBlock);
   parts.push('');
   parts.push('Requirements:');

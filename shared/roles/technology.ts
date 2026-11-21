@@ -3,7 +3,7 @@ import type { RoleDefinition } from '../careerTypes.ts';
 /**
  * Technology and data roles.
  *
- * The five technology roles that shipped with Roadmapak originally are
+ * The five technology roles that shipped with Aionvia originally are
  * preserved here with their full detail; the rest are new so that the
  * catalogue is not IT-only.
  */

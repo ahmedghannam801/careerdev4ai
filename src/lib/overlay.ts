@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 /**
- * Roadmapak AI — overlay behaviour helpers.
+ * Aionvia AI — overlay behaviour helpers.
  *
  * Shared by every modal and drawer so they all dismiss the same way and none
  * of them leaves the page scrollable behind itself.

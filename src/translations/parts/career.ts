@@ -104,7 +104,7 @@ export const careerAr: Record<string, string> = {
   'The problem': 'المشكلة',
   'Career decisions are fragmented.': 'قرارات المسار المهني مُشتّتة.',
   'How it works': 'كيف يعمل',
-  'Roadmapak brings the journey together.': 'يجمع Roadmapak الرحلة في مكان واحد.',
+  'Aionvia brings the journey together.': 'يجمع Aionvia الرحلة في مكان واحد.',
   'One connected path instead of eight disconnected tools.':
     'مسار واحد متصل بدلًا من ثماني أدوات منفصلة.',
   'AI intelligence': 'ذكاء اصطناعي',
@@ -120,7 +120,7 @@ export const careerAr: Record<string, string> = {
   'Privacy': 'الخصوصية',
   'Terms': 'الشروط',
   'English / العربية': 'English / العربية',
-  'Roadmapak is analyzing your graph': 'يحلّل Roadmapak رسمك البياني',
+  'Aionvia is analyzing your graph': 'يحلّل Aionvia رسمك البياني',
   'Sending…': 'جارٍ الإرسال…',
   'Sent': 'تم الإرسال',
   "Today's Next Step": 'خطوتك التالية اليوم',
@@ -158,7 +158,7 @@ export const careerAr: Record<string, string> = {
   'Projects & volunteering': 'المشاريع والتطوع',
   'Your CV': 'سيرتك الذاتية',
   'Your Career Journey': 'مسارك المهني',
-  'The Roadmapak journey': 'رحلة Roadmapak',
+  'The Aionvia journey': 'رحلة Aionvia',
   'You are here': 'أنت هنا',
 
   // Target roles & path explorer

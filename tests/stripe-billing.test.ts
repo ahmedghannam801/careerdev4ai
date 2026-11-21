@@ -100,6 +100,8 @@ describe('Stripe catalogue', () => {
 
 describe('Subscription lookup keys', () => {
   test('round-trips every plan, including one with an underscore', () => {
+    // The lookup-key prefix is a Stripe-side identifier, not the product
+    // name. It stays `roadmapak_` until the live catalogue is migrated.
     for (const plan of ['student', 'pro', 'career_plus']) {
       for (const cycle of ['monthly', 'annual'] as const) {
         const parsed = parseSubscriptionLookupKey(`roadmapak_${plan}_${cycle}`);

@@ -8,6 +8,8 @@
  * published legal documents can point at it.
  */
 
+import { BRAND_NAME } from './brand';
+
 /** The support and feedback address. */
 export const SUPPORT_EMAIL = 'ahmedghannam801@gmail.com';
 
@@ -103,7 +105,7 @@ export interface BusinessContactDetails {
  * structured data all read from this one object.
  */
 export const BUSINESS_CONTACT: BusinessContactDetails = {
-  businessName: 'Roadmapak',
+  businessName: BRAND_NAME,
   address: {
     street: null,
     locality: null,

@@ -32,7 +32,7 @@ const HOST_DELAY_MS = 1_200;
  * to an unexpected crawler, so this is not hidden behind a generic string.
  */
 export const USER_AGENT =
-  'Roadmapak-OpportunitySync/1.0 (+https://roadmapak.pages.dev; public training opportunity index)';
+  'Aionvia-OpportunitySync/1.0 (+https://aionvia.pages.dev; public training opportunity index)';
 
 /** Why a fetch did not produce a page. */
 export type FetchErrorCode =

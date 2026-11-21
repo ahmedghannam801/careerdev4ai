@@ -20,6 +20,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   Briefcase,
+  CheckCircle2,
   ExternalLink,
   Filter,
   MapPin,
@@ -173,6 +174,16 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const [compareIds, setCompareIds] = useState<string[]>([]);
   /** The comparison itself, once the server has made it. */
   const [comparison, setComparison] = useState<JobComparison | null>(null);
+  /**
+   * Show only the vacancies the candidate fully qualifies for.
+   *
+   * A list sorted by fit still mixes "apply now" with "apply after two more
+   * skills". This narrows the same list to the postings where no required
+   * skill is missing, which is the shortlist a candidate can act on today.
+   * A posting that lists no required skills is not counted as ready: there is
+   * nothing to compare, and an unknown is never treated as a match.
+   */
+  const [readyOnly, setReadyOnly] = useState(false);
 
   /** The first search runs once, after the profile has loaded. */
   const startedRef = useRef(false);
@@ -375,6 +386,19 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   }, [results, sort, scores, includeSenior, candidateBand]);
 
   const expiredCount = useMemo(() => ordered.filter((entry) => entry.job.expired).length, [ordered]);
+
+  const readyJobs = useMemo(
+    () =>
+      ordered.filter((entry) => {
+        const required = entry.match.requiredSkills;
+        return required.missing.length === 0 && required.matched.length + required.missing.length > 0;
+      }),
+    [ordered]
+  );
+
+  // What the list actually renders. The ready filter never changes the search
+  // that was made, only which of its results are shown.
+  const visibleJobs = readyOnly ? readyJobs : ordered;
 
   const linkedInSearchUrl = useMemo(() => {
     // The search is seeded from the candidate's own target role. With no role
@@ -745,6 +769,22 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               {ordered.length} {t('openings')}
             </span>
           )}
+          {!loading && !error && ordered.length > 0 && (
+            <button
+              type="button"
+              aria-pressed={readyOnly}
+              onClick={() => setReadyOnly((value) => !value)}
+              className={`inline-flex min-h-[28px] items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${
+                readyOnly
+                  ? 'border-[var(--accent-primary)] bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
+                  : 'border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+              title={t('Only postings where every listed required skill is already in your profile')}
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              {t('Ready to apply')} ({readyJobs.length})
+            </button>
+          )}
           {!loading && !error && lastCheckedAt && (
             <span>
               {t('Last checked: {time}').replace(
@@ -865,13 +905,23 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       )}
 
       {/* Empty */}
-      {!loading && !error && ordered.length === 0 && (
+      {!loading && !error && visibleJobs.length === 0 && (
         <EmptyState
           icon={Briefcase}
-          title={t('No openings matched this search')}
-          description={t(
-            'Try a broader title, a nearby city, a longer date range, or another country. The provider only returns openings it can currently find.'
-          )}
+          title={
+            ordered.length > 0 && readyOnly
+              ? t('No fully qualified openings in this search')
+              : t('No openings matched this search')
+          }
+          description={
+            ordered.length > 0 && readyOnly
+              ? t(
+                  'Every posting in this search still asks for a skill your profile does not show. Turn the filter off to see them with the gaps named, or close those gaps in your roadmap first.'
+                )
+              : t(
+                  'Try a broader title, a nearby city, a longer date range, or another country. The provider only returns openings it can currently find.'
+                )
+          }
           actionLabel={t('Clear filters')}
           onAction={() => {
             const next: JobSearchFilters = {
@@ -915,45 +965,23 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       {comparison && <JobComparisonPanel comparison={comparison} t={t} />}
 
       {/* Results */}
-      {!loading && !error && ordered.length > 0 && (
+      {!loading && !error && visibleJobs.length > 0 && (
         <AnimatedList className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {ordered.map((item) => {
-            const match = scores.get(item.job.id);
-            return (
-              <div key={item.job.id} className="space-y-3">
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4">
-                  <p className="text-lg font-bold text-[var(--color-primary-text)]">{t('Fit Score')}: {match?.score ?? 0}%</p>
-                  <p className="mt-2 text-[11px] font-semibold">{t('Required skills')}: {match?.requiredSkills.matched.join(', ') || t('None')} · {t('Still needed')}: {match?.requiredSkills.missing.join(', ') || t('None')}</p>
-                  <p className="text-[11px] font-semibold">{t('Preferred skills')}: {match?.preferredSkills.matched.join(', ') || t('None')} · {t('Still needed')}: {match?.preferredSkills.missing.join(', ') || t('None')}</p>
-                  <details className="mt-3 text-[11px]">
-                    <summary className="cursor-pointer font-semibold">{t('Why this Match Score?')}</summary>
-                    {match?.factors.map((factor) => (
-                      <p key={factor.factor} className="mt-2 text-[var(--text-secondary)]">
-                        {t(factor.factor === 'requiredSkills' ? 'Required skills' : factor.factor === 'preferredSkills' ? 'Preferred skills' : factor.factor === 'experience' ? 'Experience / seniority' : factor.factor === 'education' ? 'Education' : 'Location / work type')}: {factor.score}% · {factor.weight}% · +{factor.contribution.toFixed(1)} — {factor.reason}
-                      </p>
-                    ))}
-                    {match?.semantic && (
-                      <p className="mt-2 text-[var(--text-secondary)]">
-                        {t('Semantic match')}: {match.semantic.score}% · {match.semantic.weight}% · +{match.semantic.contribution.toFixed(1)} — {match.semantic.reason}
-                      </p>
-                    )}
-                  </details>
-                </div>
-                <LiveJobCard
-                  item={item}
-                  bookmarked={bookmarkedJobIds.includes(item.job.id)}
-                  onToggleBookmark={toggleBookmarkJob}
-                  onTrackApplication={(entry) => void handleTrackApplication(entry)}
-                  onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
-                  onCompare={(entry) => void toggleCompare(entry.job.id)}
-                  comparing={compareIds.includes(item.job.id)}
-                  tracking={trackingId === item.job.id}
-                  tailoring={tailoringId === item.job.id}
-                  t={t}
-                />
-              </div>
-            );
-          })}
+          {visibleJobs.map((item) => (
+            <LiveJobCard
+              key={item.job.id}
+              item={item}
+              bookmarked={bookmarkedJobIds.includes(item.job.id)}
+              onToggleBookmark={toggleBookmarkJob}
+              onTrackApplication={(entry) => void handleTrackApplication(entry)}
+              onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
+              onCompare={(entry) => void toggleCompare(entry.job.id)}
+              comparing={compareIds.includes(item.job.id)}
+              tracking={trackingId === item.job.id}
+              tailoring={tailoringId === item.job.id}
+              t={t}
+            />
+          ))}
         </AnimatedList>
       )}
 

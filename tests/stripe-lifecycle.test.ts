@@ -552,7 +552,7 @@ describe('Stripe configuration validation', () => {
     const status = describeStripeConfig({
       STRIPE_SECRET_KEY: 'sk_test_example',
       STRIPE_WEBHOOK_SECRET: 'whsec_example',
-      SITE_ORIGIN: 'https://roadmapak.pages.dev',
+      SITE_ORIGIN: 'https://aionvia.pages.dev',
     } as NodeJS.ProcessEnv);
     assert.equal(status.mode, 'test');
     assert.equal(status.checkoutReady, true);

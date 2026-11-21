@@ -39,6 +39,7 @@ import { CvSectionOrderControl } from '../cv/studio/CvSectionOrderControl';
 import { ResumeLanguagePicker } from '../cv/studio/ResumeLanguagePicker';
 import { CvSaveStatusIndicator } from '../cv/studio/CvSaveStatusIndicator';
 import { CvDraftRecovery } from '../cv/studio/CvDraftRecovery';
+import { CvSendChecklist } from '../cv/CvSendChecklist';
 import { CareerImage } from '../ui/CareerImage';
 import {
   authorizeCvTemplateExport,
@@ -517,6 +518,17 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           server, so a CV that finished while the tab was closed is still
           here when the studio is opened again. */}
       <BackgroundJobsPanel />
+
+      {/* What a recruiter would mark down, named before the file is sent.
+          It appears on the document tab because that is where the export
+          buttons are, and it reads the same document they export. */}
+      {activeTab === 'editor' && (
+        <CvSendChecklist
+          cv={activeCV}
+          onOpenTab={(tab) => setActiveTab(tab)}
+          t={t}
+        />
+      )}
 
       {exportError && (
         <div

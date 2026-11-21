@@ -157,6 +157,58 @@ export const ProjectsView: React.FC = () => {
     return map;
   }, [volunteerExperiences]);
 
+  /**
+   * What the portfolio actually proves, measured against the role the
+   * candidate is aiming at.
+   *
+   * A list of projects is not a portfolio. What matters is whether the skills
+   * the target role asks for are demonstrated by something that shipped, and
+   * whether that work can be opened by a stranger. This is computed from the
+   * candidate's own records, so the number moves as they finish real work.
+   */
+  const portfolio = useMemo(() => {
+    const shipped = projects.filter(
+      (project) => project.status === 'completed' || project.status === 'published'
+    );
+    const provenSkills = new Set<string>();
+    shipped.forEach((project) => {
+      (project.skills ?? []).forEach((skill) => provenSkills.add(skill.trim().toLowerCase()));
+    });
+    const targetSkills = (targetRole?.requiredSkills ?? [])
+      .map((skill) => skill.name)
+      .filter(Boolean);
+    const covered = targetSkills.filter((skill) => provenSkills.has(skill.trim().toLowerCase()));
+    const uncovered = targetSkills.filter((skill) => !provenSkills.has(skill.trim().toLowerCase()));
+    const linkable = shipped.filter((project) => project.repositoryUrl || project.demoUrl);
+    return {
+      shippedCount: shipped.length,
+      liveCount: linkable.length,
+      provenCount: provenSkills.size,
+      targetSkills,
+      covered,
+      uncovered,
+      coverage:
+        targetSkills.length > 0 ? Math.round((covered.length / targetSkills.length) * 100) : 0,
+    };
+  }, [projects, targetRole]);
+
+  /**
+   * Opens the project form already aimed at a skill the portfolio cannot yet
+   * prove. The wording is a starting point the candidate edits, not content
+   * that gets saved behind their back.
+   */
+  const startProjectForSkill = (skill: string) => {
+    resetForm();
+    setTitle(`${skill}: proof-of-skill project`);
+    setGoal(
+      `Prove ${skill} with one small, documented piece of work: the question you answered, the approach you took, the result you got and what you would change next time.`
+    );
+    setSkillsStr(skill);
+    setDifficulty('Intermediate');
+    setStatus('planned');
+    setShowAddModal(true);
+  };
+
   const resetForm = () => {
     setTitle('');
     setGoal('');
@@ -393,6 +445,123 @@ export const ProjectsView: React.FC = () => {
 
       {/* The AI advisor */}
       <ProjectAiPanel />
+
+      {/* Portfolio coverage. The list below is the evidence; this is what the
+          evidence adds up to against the role the candidate is chasing. */}
+      <div className="grid gap-4 lg:grid-cols-[1.15fr,1fr]">
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                {t('Portfolio coverage')}
+              </div>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                {portfolio.targetSkills.length > 0
+                  ? t('How much of your target role you can already show, not just claim.')
+                  : t('Completed work appears here as proof you can hand to an employer.')}
+              </p>
+            </div>
+            <span className="text-2xl font-bold tabular-nums text-[var(--text-primary)]">
+              {portfolio.targetSkills.length > 0 ? `${portfolio.coverage}%` : portfolio.shippedCount}
+              <span className="ms-1 text-[11px] font-medium text-[var(--text-muted)]">
+                {portfolio.targetSkills.length > 0 ? t('covered') : t('shipped')}
+              </span>
+            </span>
+          </div>
+
+          <div
+            className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-secondary)]"
+            role="progressbar"
+            aria-valuenow={portfolio.coverage}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={t('Portfolio coverage')}
+          >
+            <div
+              className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-500"
+              style={{ width: `${portfolio.targetSkills.length > 0 ? portfolio.coverage : 0}%` }}
+            />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
+            <span>
+              <strong className="text-[var(--text-primary)]">{portfolio.shippedCount}</strong>{' '}
+              {t('shipped projects')}
+            </span>
+            <span>
+              <strong className="text-[var(--text-primary)]">{portfolio.liveCount}</strong>{' '}
+              {t('openable links')}
+            </span>
+            <span>
+              <strong className="text-[var(--text-primary)]">{portfolio.provenCount}</strong>{' '}
+              {t('skills evidenced')}
+            </span>
+          </div>
+
+          {portfolio.targetSkills.length > 0 && portfolio.covered.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-[var(--border-subtle)] pt-3">
+              {portfolio.covered.slice(0, 6).map((skill) => (
+                <span
+                  key={skill}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--color-success)]/25 bg-[var(--color-success-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-success-strong)]"
+                >
+                  <span aria-hidden>✓</span>
+                  {skill}
+                </span>
+              ))}
+              {portfolio.covered.length > 6 ? (
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  +{portfolio.covered.length - 6}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-5 shadow-xs">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            {portfolio.uncovered.length > 0
+              ? t('Where the proof is thin')
+              : t('Proof looks complete')}
+          </div>
+          {portfolio.uncovered.length > 0 ? (
+            <>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                {t('These role skills have no finished project behind them yet:')}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {portfolio.uncovered.slice(0, 3).map((skill) => (
+                  <span
+                    key={skill}
+                    className="rounded-full border border-[var(--accent-primary)]/30 bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]"
+                  >
+                    {skill}
+                  </span>
+                ))}
+                {portfolio.uncovered.length > 3 ? (
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    +{portfolio.uncovered.length - 3}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => startProjectForSkill(portfolio.uncovered[0])}
+                className="mt-3 inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-on-primary)] hover:bg-[var(--accent-secondary)]"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t('Start a project for')} {portfolio.uncovered[0]}
+              </button>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {portfolio.shippedCount > 0
+                ? t('Every skill your target role asks for is demonstrated by finished work. Keep the links current and the write-ups short.')
+                : t('Finish one project to turn a plan into proof. A shipped, linked project is worth more than three unfinished ones.')}
+            </p>
+          )}
+        </div>
+      </div>
 
       {/* Filter Tabs: Status & Category */}
       <div className="space-y-3 pb-1">

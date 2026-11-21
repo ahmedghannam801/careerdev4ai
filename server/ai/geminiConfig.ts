@@ -1,5 +1,5 @@
 // Canonical Gemini Configuration and Client Manager
-// Single source of truth for Google Gemini configuration across Roadmapak AI.
+// Single source of truth for Google Gemini configuration across Aionvia AI.
 
 import { GoogleGenAI } from '@google/genai/web';
 

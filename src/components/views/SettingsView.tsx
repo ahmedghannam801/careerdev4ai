@@ -886,7 +886,7 @@ export const SettingsView: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  {t('Roadmapak')}
+                  {t('Aionvia')}
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   Your Personal Career Operating System: goals, skills, roadmaps, learning, projects, evidence, CVs, job applications, and interview practice in one unified workspace.
@@ -908,7 +908,7 @@ export const SettingsView: React.FC = () => {
                 {t('Ahmed Ebrahim')}
               </h3>
               <p className="text-xs text-[var(--text-secondary)] mt-1">
-                {t('Software Engineer & Creator of Roadmapak')}
+                {t('Software Engineer & Creator of Aionvia')}
               </p>
             </div>
 

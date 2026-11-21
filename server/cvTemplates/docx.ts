@@ -1331,7 +1331,7 @@ export async function buildCvDocx(input: CvDocxInput): Promise<Buffer> {
   }
 
   const doc = new Document({
-    creator: 'Roadmapak',
+    creator: 'Aionvia',
     title: document.fullName ? `${document.fullName} — CV` : 'CV',
     description: `CV exported with the ${input.template.name} template.`,
     styles: {

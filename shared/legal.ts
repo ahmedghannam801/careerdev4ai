@@ -37,23 +37,23 @@ export const TERMS_DOCUMENT: {
   approved: true,
   sections: [
     {
-      heading: 'Roadmapak — Terms of Service',
+      heading: 'Aionvia — Terms of Service',
       body: `Last Updated: November 4, 2026
 Effective Date: November 4, 2026`,
     },
     {
       heading: '1. Acceptance of Terms',
-      body: `Welcome to Roadmapak.
+      body: `Welcome to Aionvia.
 
-These Terms of Service govern your access to and use of the Roadmapak platform, website, applications, and related services.
+These Terms of Service govern your access to and use of the Aionvia platform, website, applications, and related services.
 
 By creating an account, accessing the platform, or using its services, you acknowledge that you have read and understood these Terms.
 
 If you do not agree with these Terms, you must discontinue using the platform.`,
     },
     {
-      heading: '2. About Roadmapak',
-      body: `Roadmapak is an AI-powered career development platform designed to help users improve their professional profiles, prepare for employment opportunities, and develop career-related skills.
+      heading: '2. About Aionvia',
+      body: `Aionvia is an AI-powered career development platform designed to help users improve their professional profiles, prepare for employment opportunities, and develop career-related skills.
 
 Our services may include:
 
@@ -86,7 +86,7 @@ We reserve the right to restrict or suspend accounts involved in abuse, fraud, s
     },
     {
       heading: '4. Acceptable Use',
-      body: `You agree to use Roadmapak only for lawful and legitimate purposes.
+      body: `You agree to use Aionvia only for lawful and legitimate purposes.
 
 You must not:
 
@@ -103,7 +103,7 @@ We may investigate violations and take appropriate action.`,
     },
     {
       heading: '5. AI-Generated Content and Limitations',
-      body: `Roadmapak uses artificial intelligence to generate analyses, recommendations, documents, and other career-related outputs.
+      body: `Aionvia uses artificial intelligence to generate analyses, recommendations, documents, and other career-related outputs.
 
 You acknowledge that:
 
@@ -118,9 +118,9 @@ You must not rely on AI-generated content as the sole basis for important employ
     },
     {
       heading: '6. User Content and Uploaded Documents',
-      body: `You retain ownership of the documents and information you upload to Roadmapak, subject to any third-party rights.
+      body: `You retain ownership of the documents and information you upload to Aionvia, subject to any third-party rights.
 
-By uploading content, you grant Roadmapak the limited permission necessary to:
+By uploading content, you grant Aionvia the limited permission necessary to:
 
 • Store and process your submitted information.
 • Analyze your CV and job descriptions.
@@ -136,7 +136,7 @@ You are responsible for maintaining copies of important documents.`,
     },
     {
       heading: '7. Intellectual Property',
-      body: `The Roadmapak platform, including its branding, logos, design, software, interface, and original platform materials, is protected by applicable intellectual property laws.
+      body: `The Aionvia platform, including its branding, logos, design, software, interface, and original platform materials, is protected by applicable intellectual property laws.
 
 You may not copy, reproduce, distribute, or commercially exploit protected platform materials without prior authorization.
 
@@ -146,7 +146,7 @@ Ownership and permitted use of AI-generated outputs are subject to applicable la
     },
     {
       heading: '8. Third-Party Services',
-      body: `Roadmapak may rely on third-party services and providers to operate certain features.
+      body: `Aionvia may rely on third-party services and providers to operate certain features.
 
 These may include:
 
@@ -162,7 +162,7 @@ We are not responsible for independent third-party services beyond our control.`
     },
     {
       heading: '9. Service Availability',
-      body: `We aim to provide reliable and secure access to Roadmapak.
+      body: `We aim to provide reliable and secure access to Aionvia.
 
 However, we do not guarantee uninterrupted or error-free availability.
 
@@ -196,7 +196,7 @@ Please review our Privacy Policy for further details about data collection, proc
     },
     {
       heading: '11. Account Suspension and Termination',
-      body: `You may stop using Roadmapak at any time.
+      body: `You may stop using Aionvia at any time.
 
 We may suspend or restrict access when reasonably necessary to:
 
@@ -211,7 +211,7 @@ Account deletion and associated data handling are governed by our Privacy Policy
     },
     {
       heading: '12. Limitation of Liability',
-      body: `To the maximum extent permitted by applicable law, Roadmapak shall not be liable for indirect, incidental, special, or consequential damages arising from your use of the platform.
+      body: `To the maximum extent permitted by applicable law, Aionvia shall not be liable for indirect, incidental, special, or consequential damages arising from your use of the platform.
 
 We do not guarantee:
 
@@ -241,9 +241,9 @@ The applicable governing law and dispute resolution arrangements must be specifi
     },
     {
       heading: '15. Contact Information',
-      body: `For questions, complaints, or requests concerning these Terms, please contact the Roadmapak platform administration through the official contact channels published on our website.
+      body: `For questions, complaints, or requests concerning these Terms, please contact the Aionvia platform administration through the official contact channels published on our website.
 
-By using Roadmapak, you acknowledge that you have read and understood these Terms of Service.`,
+By using Aionvia, you acknowledge that you have read and understood these Terms of Service.`,
     },
   ],
 };

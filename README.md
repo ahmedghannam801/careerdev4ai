@@ -1,6 +1,6 @@
-# Roadmapak
+# Aionvia
 
-Roadmapak is a personal career operating system: goals, skills, roadmap,
+Aionvia is a personal career operating system: goals, skills, roadmap,
 learning, projects, evidence, CVs, job applications, and interview practice in
 one workspace. State is stored in PostgreSQL (Supabase) and scoped to the
 signed-in Supabase Auth user.
@@ -110,14 +110,14 @@ so the API and the browser app share one origin.
 
 ## Deploy to Cloudflare Pages
 
-The production target is Cloudflare Pages, project `roadmapak`:
+The production target is Cloudflare Pages, project `aionvia`:
 
-<https://roadmapak.pages.dev>
+<https://aionvia.pages.dev>
 
 The predecessor project, `careerdev4ai` (<https://careerdev4ai.pages.dev>), and the
 older legacy project, `careerpilot4ai` (<https://careerpilot4ai.pages.dev>), are
 kept as separate deployments. Neither is referenced by `wrangler.jsonc` or the
-npm scripts, so deploying `roadmapak` cannot modify either of them. The
+npm scripts, so deploying `aionvia` cannot modify either of them. The
 predecessor is kept serving during the migration so that in-flight password
 recovery and email confirmation links keep working; it is retired only after
 the new origin has been verified in production.
@@ -139,22 +139,22 @@ implementation.
 ```bash
 npm ci
 npm run build
-npx wrangler pages deploy dist --project-name roadmapak --branch main
+npx wrangler pages deploy dist --project-name aionvia --branch main
 ```
 
 `--branch main` is what targets the **Production** environment
-(`roadmapak.pages.dev`). Pages maps the production branch to Production and
+(`aionvia.pages.dev`). Pages maps the production branch to Production and
 every other branch to a Preview environment, and Wrangler derives the branch from
 the current Git branch when `--branch` is omitted. Without the explicit flag, a
 deploy from any other branch silently publishes a preview URL and leaves
-`roadmapak.pages.dev` on the old build.
+`aionvia.pages.dev` on the old build.
 
 Use the npm scripts, which encode the same targets:
 
 | Script | Target |
 | --- | --- |
-| `npm run cf:deploy` | Production (`--branch main`) — updates `roadmapak.pages.dev` |
-| `npm run cf:preview` | Preview (`--branch preview`) — alias `preview.roadmapak.pages.dev` |
+| `npm run cf:deploy` | Production (`--branch main`) — updates `aionvia.pages.dev` |
+| `npm run cf:preview` | Preview (`--branch preview`) — alias `preview.aionvia.pages.dev` |
 | `npm run cf:dev` | Local Pages runtime on `http://localhost:8788` |
 | `npm run cf:deployments` | List deployments for the project |
 | `npm run cf:env` | Apply the environment variables below to Pages, from `.env` |
@@ -243,9 +243,9 @@ The job feed adds one more server variable, `JSEARCH_RAPIDAPI_KEY`. See
 
 Supabase Auth must also be configured (Authentication → URL Configuration):
 
-- **Site URL**: `https://roadmapak.pages.dev`
-- **Redirect URLs**: `https://roadmapak.pages.dev/**`,
-  `https://*.roadmapak.pages.dev/**` for previews, and
+- **Site URL**: `https://aionvia.pages.dev`
+- **Redirect URLs**: `https://aionvia.pages.dev/**`,
+  `https://*.aionvia.pages.dev/**` for previews, and
   `http://localhost:3000/**` for local development. The two previous origins
   (`https://careerdev4ai.pages.dev/**` and
   `https://careerpilot4ai.pages.dev/**`) stay listed while those deployments
@@ -273,7 +273,7 @@ client secret or GitHub credential belongs in this repository or in any
    Supabase dashboard only.
 3. Add the production callback to Supabase → Authentication → URL
    Configuration → Redirect URLs:
-   `https://roadmapak.pages.dev/auth/callback`. Add
+   `https://aionvia.pages.dev/auth/callback`. Add
    `http://localhost:3000/auth/callback` for local development. An existing
    `<origin>/**` entry already covers the path.
 4. After the first GitHub sign-in, the existing `careerpilot_handle_new_user`
@@ -281,7 +281,7 @@ client secret or GitHub credential belongs in this repository or in any
    runs exactly as it does for email/password and the other providers.
 
 > `wrangler.jsonc` and the deployment commands above use the Pages project name
-> `roadmapak`. Keep the Supabase Site URL and Redirect URLs aligned with the
+> `aionvia`. Keep the Supabase Site URL and Redirect URLs aligned with the
 > origin actually deployed. The previous origins stay listed only while those
 > deployments are still serving.
 

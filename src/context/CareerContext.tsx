@@ -6630,7 +6630,7 @@ Skills: ${activeCV.skillsList.join(', ')}
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullGraph, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `roadmapak_data_${profile.name.toLowerCase().replace(/\s+/g, '_')}.json`);
+    downloadAnchor.setAttribute("download", `aionvia_data_${profile.name.toLowerCase().replace(/\s+/g, '_')}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -6639,7 +6639,7 @@ Skills: ${activeCV.skillsList.join(', ')}
   const resetAllData = () => {
     // B.4 finding L-1: `localStorage.clear()` also wiped the Supabase auth
     // session, so "reset my data" silently signed the user out. Only the
-    // Roadmapak cache keys are removed; the auth session is left alone.
+    // Aionvia cache keys are removed; the auth session is left alone.
     for (const key of [
       'careerpilot_profile',
       'careerpilot_target_role',

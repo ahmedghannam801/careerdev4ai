@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const PROJECT = 'roadmapak';
+const PROJECT = 'aionvia';
 const ACCOUNT =
   process.env.CLOUDFLARE_ACCOUNT_ID ?? '2609c1a7921f6c50f1edd82e93bff1a8';
 

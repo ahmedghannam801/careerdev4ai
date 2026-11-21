@@ -2,7 +2,7 @@
  * Centralized Payment Account Configuration
  * ------------------------------------------------------------------
  * SINGLE SOURCE OF TRUTH for every offline (manual) payment identifier
- * used by Roadmapak — Vodafone Cash and InstaPay.
+ * used by Aionvia — Vodafone Cash and InstaPay.
  *
  * Rules enforced by this module:
  *  - No component may hardcode a wallet number, an IPA handle, or an
@@ -24,12 +24,14 @@ export const VODAFONE_CASH_WALLET = '01027053876';
 export const VODAFONE_CASH_WALLET_INTERNATIONAL = '+201027053876';
 
 /** Registered account holder shown on the Vodafone Cash transfer. */
+// Registered account holder — must match the wallet registration.
 export const VODAFONE_CASH_ACCOUNT_HOLDER = 'Roadmapak Operations';
 
 /** InstaPay Instant Payment Address (IPA). */
 export const INSTAPAY_HANDLE = 'ahmed1192005@instapay';
 
 /** Registered account holder shown on the InstaPay transfer. */
+// Registered account holder — must match the InstaPay registration.
 export const INSTAPAY_ACCOUNT_HOLDER = 'Roadmapak Commercial';
 
 export type PaymentBrand = 'vodafone_cash' | 'instapay';

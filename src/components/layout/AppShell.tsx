@@ -40,7 +40,7 @@ import { Logo } from '../brand/Logo';
 import { AiMascot } from '../copilot/AiMascot';
 import { backdropVariants, drawerLeftVariants, drawerVariants } from '../../lib/motion';
 import { useRouteParam } from '../../lib/useRouteParams';
-import { RoadmapakAvatar } from '../ui/RoadmapakAvatars';
+import { AionviaAvatar } from '../ui/AionviaAvatars';
 import { useAdminAccess } from '../../lib/useAdminAccess';
 import { CreditBalanceBadge } from '../subscription/CreditBalanceBadge';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
@@ -282,7 +282,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <Logo variant="icon" className="h-8 w-8" alt="" />
             <div>
               <div className="font-bold text-sm tracking-tight text-[var(--text-primary)]">
-                {t('Roadmapak')}
+                {t('Aionvia')}
               </div>
               <div className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[140px]">
                 {targetRole?.title ?? ''}
@@ -341,7 +341,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             className="w-full p-2 rounded-xl hover:bg-[var(--surface-secondary)] flex items-center justify-between text-start transition-colors group"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <RoadmapakAvatar
+              <AionviaAvatar
                 avatarId={avatarId}
                 className="w-7 h-7 rounded-lg border border-[var(--border-subtle)]"
               />
@@ -394,7 +394,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 onClick={() => onNavigate('dashboard')} 
                 className="hidden shrink-0 font-medium hover:text-[var(--text-primary)] sm:inline"
               >
-                {t('Roadmapak')}
+                {t('Aionvia')}
               </button>
               <span className="hidden shrink-0 text-[var(--text-muted)] sm:inline">/</span>
               <span className="truncate font-semibold text-[var(--text-primary)]">
@@ -471,7 +471,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                 className="hidden sm:flex items-center gap-2 ps-2 border-s border-[var(--border-subtle)] group"
                 title={t('View My Profile')}
               >
-                <RoadmapakAvatar
+                <AionviaAvatar
                   avatarId={avatarId}
                   className="w-7 h-7 rounded-full border border-[var(--border-subtle)] group-hover:border-[var(--accent-primary)] transition-colors"
                 />
@@ -591,7 +591,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         {/* Global Authenticated Shell Footer */}
         <footer className="mt-auto border-t border-[var(--border-subtle)] px-4 sm:px-8 py-3 text-xs text-[var(--text-muted)]">
           <div className="flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-2">
-            <span>© 2026 Roadmapak</span>
+            <span>© 2026 Aionvia</span>
             <span>
               {t('Developed by')}{' '}
               <a
@@ -633,7 +633,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2">
                 <Logo variant="icon" className="h-7 w-7" alt="" />
-                <span className="font-bold text-sm text-[var(--text-primary)]">{t('Roadmapak')}</span>
+                <span className="font-bold text-sm text-[var(--text-primary)]">{t('Aionvia')}</span>
               </div>
               <button 
                 onClick={() => setMobileMenuOpen(false)}
