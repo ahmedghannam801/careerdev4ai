@@ -26,7 +26,7 @@ import { useCareer } from '../../context/CareerContext';
 import {
   nextTier,
   planIdentityForTier,
-  resolvePlanIdentityTier,
+  planPresentationFor,
   type PlanIdentity,
 } from '../../../shared/planIdentity';
 import {
@@ -135,9 +135,18 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
   const { subscription, creditBalance, settings, t } = useCareer();
   const arabic = settings.language === 'ar';
 
-  const tier = resolvePlanIdentityTier(subscription?.planCode);
+  // The tier and the subscription state are resolved together: a plan whose
+  // period has ended is shown as ended, not as the paid plan it used to be.
+  const display = planPresentationFor({
+    planCode: subscription?.planCode,
+    status: subscription?.status,
+    expiresAt: subscription?.expiresAt,
+  });
+  const tier = display.tier;
   const identity = planIdentityForTier(tier);
-  const isFree = identity.isFree;
+  const isExpired = display.isExpired;
+  const isInactive = display.isInactive;
+  const isFree = tier === 'free' && !isExpired && !isInactive;
   const upgradeTo = isFree ? nextTier(tier) : null;
   const upgradeIdentity = upgradeTo ? planIdentityForTier(upgradeTo) : null;
 
@@ -149,15 +158,18 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
   const renewed = formatDate(subscription?.expiresAt, arabic);
   const temporary = subscription?.status === 'temporary_access';
 
-  const accent = `var(${identity.accentVar})`;
-  const surface = `var(${identity.surfaceVar})`;
+  const accent = `var(${display.accentVar})`;
+  const surface = `var(${display.surfaceVar})`;
   const highlights = planHighlights(subscription?.planCode ?? 'free');
+  const currentLabel = arabic ? display.labelAr : display.label;
 
   const manageLabel = isFree
     ? upgradeIdentity
       ? t('Upgrade to {tier}').replace('{tier}', tierName(upgradeIdentity, arabic))
       : t('Upgrade')
-    : t('Manage plan');
+    : isExpired || isInactive
+      ? t('Renew plan')
+      : t('Manage plan');
 
   if (variant === 'row') {
     return (
@@ -165,19 +177,26 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
         type="button"
         onClick={onManagePlan}
         className={`w-full px-4 py-3 text-start hover:bg-[var(--surface-secondary)] transition-colors ${className}`.trim()}
-        data-plan-tier={identity.tier}
+        data-plan-tier={display.tier}
+        data-plan-state={display.state}
       >
         <div className="flex items-center justify-between gap-2">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-            style={{ color: accent, backgroundColor: surface, borderColor: accent }}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+              arabic ? '' : 'uppercase tracking-wide'
+            }`}
+            style={{
+              color: accent,
+              backgroundColor: surface,
+              borderColor: `color-mix(in srgb, ${accent} 38%, transparent)`,
+            }}
           >
             <span
-              className="h-1.5 w-1.5 rounded-full motion-safe:animate-pulse"
+              className="h-1.5 w-1.5 rounded-full"
               style={{ backgroundColor: accent }}
               aria-hidden="true"
             />
-            {tierName(identity, arabic)}
+            {currentLabel}
           </span>
           <ArrowUpRight className="w-3.5 h-3.5 text-[var(--text-muted)]" aria-hidden="true" />
         </div>
@@ -195,7 +214,8 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
         borderColor: `color-mix(in srgb, ${accent} 35%, transparent)`,
         backgroundColor: `color-mix(in srgb, ${surface} 70%, transparent)`,
       }}
-      data-plan-tier={identity.tier}
+      data-plan-tier={display.tier}
+      data-plan-state={display.state}
       aria-label={t('Membership')}
     >
       {/* The plan's own colour as a hairline across the top: a quiet
@@ -211,15 +231,21 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
               <Crown className="w-4 h-4 shrink-0" style={{ color: accent }} aria-hidden="true" />
             )}
             <span
-              className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-              style={{ color: accent, backgroundColor: surface, borderColor: accent }}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
+                arabic ? '' : 'uppercase tracking-wide'
+              }`}
+              style={{
+                color: accent,
+                backgroundColor: surface,
+                borderColor: `color-mix(in srgb, ${accent} 38%, transparent)`,
+              }}
             >
               <span
-                className="h-1.5 w-1.5 rounded-full motion-safe:animate-pulse"
+                className="h-1.5 w-1.5 rounded-full"
                 style={{ backgroundColor: accent }}
                 aria-hidden="true"
               />
-              {tierName(identity, arabic)}
+              {currentLabel}
             </span>
           </div>
 
@@ -284,6 +310,8 @@ export const MembershipPanel: React.FC<MembershipPanelProps> = ({
         <div className="bg-[var(--surface-main)] p-4">
           <PlanIdentityFrame
             planCode={subscription?.planCode ?? 'free'}
+            status={subscription?.status}
+            expiresAt={subscription?.expiresAt}
             variant="always"
             shape="pill"
             className="w-full"

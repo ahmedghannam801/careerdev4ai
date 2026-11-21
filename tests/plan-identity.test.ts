@@ -27,6 +27,8 @@ import {
   nextTier,
   planIdentityFor,
   planIdentityForTier,
+  planPresentationFor,
+  resolvePlanIdentityState,
   resolvePlanIdentityTier,
 } from '../shared/planIdentity.ts';
 
@@ -47,6 +49,7 @@ describe('the subscription tier identities', () => {
   it('also understands the tier names themselves', () => {
     // The catalogue may be renamed to these; the identity must not have to
     // change when it is.
+    assert.equal(resolvePlanIdentityTier('basic'), 'plus');
     assert.equal(resolvePlanIdentityTier('plus'), 'plus');
     assert.equal(resolvePlanIdentityTier('ultra'), 'ultra');
   });
@@ -72,7 +75,7 @@ describe('the subscription tier identities', () => {
 
   it('names the tiers rather than the codes', () => {
     assert.equal(planIdentityFor('career_plus').label, 'Ultra');
-    assert.equal(planIdentityFor('student').label, 'Plus');
+    assert.equal(planIdentityFor('student').label, 'Basic');
     assert.equal(planIdentityFor('pro').label, 'Pro');
     assert.equal(planIdentityFor('free').label, 'Free');
   });
@@ -112,6 +115,74 @@ describe('the subscription tier identities', () => {
         `the stylesheet must define ${identity.surfaceVar}`,
       );
     }
+    assert.ok(stylesheet.includes('--plan-inactive-accent:'));
+    assert.ok(stylesheet.includes('--plan-inactive-surface:'));
+  });
+
+  it('keeps a paid identity while the subscription is active', () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const presentation = planPresentationFor({
+      planCode: 'pro',
+      status: 'active',
+      expiresAt: future,
+    });
+
+    assert.equal(presentation.tier, 'pro');
+    assert.equal(presentation.state, 'active');
+    assert.equal(presentation.label, 'Pro');
+    assert.equal(presentation.isExpired, false);
+  });
+
+  it('shows an expired subscription as expired, not as its paid tier', () => {
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+    const presentation = planPresentationFor({
+      planCode: 'career_plus',
+      status: 'active',
+      expiresAt: past,
+    });
+
+    assert.equal(presentation.tier, 'ultra');
+    assert.equal(presentation.state, 'expired');
+    assert.equal(presentation.label, 'Expired');
+    assert.equal(presentation.isExpired, true);
+    assert.equal(presentation.accentVar, '--plan-inactive-accent');
+  });
+
+  it('shows a suspended subscription as inactive', () => {
+    const presentation = planPresentationFor({
+      planCode: 'pro',
+      status: 'suspended',
+      expiresAt: null,
+    });
+
+    assert.equal(presentation.state, 'inactive');
+    assert.equal(presentation.label, 'Inactive');
+    assert.equal(presentation.isInactive, true);
+  });
+
+  it('keeps a cancelled plan until the period it paid for ends', () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    assert.equal(
+      resolvePlanIdentityState({ planCode: 'pro', status: 'cancelled', expiresAt: future }),
+      'active',
+    );
+    assert.equal(
+      resolvePlanIdentityState({ planCode: 'pro', status: 'cancelled', expiresAt: null }),
+      'expired',
+    );
+  });
+
+  it('marks provisional access as temporary without hiding the plan', () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const presentation = planPresentationFor({
+      planCode: 'student',
+      status: 'temporary_access',
+      expiresAt: future,
+    });
+
+    assert.equal(presentation.state, 'temporary');
+    assert.equal(presentation.label, 'Basic');
+    assert.equal(presentation.isTemporary, true);
   });
 
   it('does not hard-code a colour in the identity module', () => {

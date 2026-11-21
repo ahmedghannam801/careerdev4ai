@@ -135,23 +135,30 @@
      * deliberately apart from the brand primary: the terracotta belongs to
      * the platform, and these belong to the plans.
      *
-     *   Free   neutral silver — the free experience is not a lesser version
+     *   Free   neutral gray — the free experience is not a lesser version
      *          of a paid one, it is a plain one.
-     *   Plus   orange — the first paid step.
-     *   Pro    royal blue — the working tier.
-     *   Ultra  black with gold — the top of the ladder.
+     *   Basic  soft blue — the first paid step.
+     *   Pro    gold — the working tier.
+     *   Ultra  purple — the top of the ladder.
      *
      * The code never names a colour. `shared/planIdentity.ts` knows the tier
      * and the name of the property; the palette is here.
+     *
+     * Each accent is dark enough to read as text on its own surface, and each
+     * surface is light enough to keep the badge compact without a second
+     * foreground colour. The border is derived from the accent in the badge,
+     * so the palette stays to these two values per tier.
      */
-    --plan-free-accent: #8A93A0;
-    --plan-free-surface: #EEF0F3;
-    --plan-plus-accent: #D2691E;
-    --plan-plus-surface: #FBEDE1;
-    --plan-pro-accent: #2F55D4;
-    --plan-pro-surface: #E7ECFB;
-    --plan-ultra-accent: #C9A227;
-    --plan-ultra-surface: #1A1C21;
+    --plan-free-accent: #4B5563;
+    --plan-free-surface: #F1F2F4;
+    --plan-plus-accent: #1D4ED8;
+    --plan-plus-surface: #E8F0FE;
+    --plan-pro-accent: #6B4F00;
+    --plan-pro-surface: #F7E8B8;
+    --plan-ultra-accent: #5B21B6;
+    --plan-ultra-surface: #F3E8FF;
+    --plan-inactive-accent: #5A616D;
+    --plan-inactive-surface: #F3F4F6;
 
     /* ------------------------------------------------------------------
      * Elevation
@@ -241,17 +248,18 @@
     /* The tier identities, seen on a dark surface.
      *
      * The accents are lightened so they keep their contrast against the dark
-     * panels, and Ultra stays black with gold: on a dark interface its own
-     * surface is the darker one, which is what makes it read as the top of
-     * the ladder rather than another coloured badge. */
-    --plan-free-accent: #A8B0BB;
-    --plan-free-surface: #33373C;
-    --plan-plus-accent: #F09A56;
-    --plan-plus-surface: #3B2A1C;
-    --plan-pro-accent: #7D9BFF;
-    --plan-pro-surface: #20263A;
-    --plan-ultra-accent: #E0BC4A;
-    --plan-ultra-surface: #14161A;
+     * panels, and the surfaces deepen rather than invert: Ultra is a deep
+     * purple with a lilac accent, Pro a dark gold with a warm gold accent. */
+    --plan-free-accent: #B7BDC7;
+    --plan-free-surface: #31353A;
+    --plan-plus-accent: #8FB4FF;
+    --plan-plus-surface: #14243F;
+    --plan-pro-accent: #E8C766;
+    --plan-pro-surface: #3A2E10;
+    --plan-ultra-accent: #C9A7FF;
+    --plan-ultra-surface: #2B1B45;
+    --plan-inactive-accent: #9CA3AF;
+    --plan-inactive-surface: #2C3034;
 
     --color-warning: #F0B872;
     --color-danger: #F08C82;

@@ -3,11 +3,11 @@
  *
  * Four tiers, four identities:
  *
- *   Free   a neutral silver, so the free experience looks like the free
+ *   Free   neutral gray, so the free experience looks like the free
  *          experience and not like a lesser version of a paid one;
- *   Plus   orange, the first paid step;
- *   Pro    royal blue, the working tier;
- *   Ultra  black with gold, the top of the ladder.
+ *   Basic  soft blue, the first paid step;
+ *   Pro    gold, the working tier;
+ *   Ultra  purple, the top of the ladder.
  *
  * Two rules shape this module.
  *
@@ -27,6 +27,20 @@ import type { SubscriptionPlanCode } from './subscriptions.ts';
 
 /** The four tiers the platform recognises. */
 export type PlanIdentityTier = 'free' | 'plus' | 'pro' | 'ultra';
+
+/**
+ * The state of the subscription behind the identity.
+ *
+ * The tier says which plan was bought; the state says whether it still
+ * applies. A subscription that has expired is not the plan it used to be, so
+ * the badge must not keep wearing the paid colour after access has ended.
+ */
+export type PlanIdentityState =
+  | 'free'
+  | 'active'
+  | 'temporary'
+  | 'expired'
+  | 'inactive';
 
 /** How one tier looks and what it is called. */
 export interface PlanIdentity {
@@ -57,8 +71,8 @@ const IDENTITIES: Record<PlanIdentityTier, PlanIdentity> = {
   },
   plus: {
     tier: 'plus',
-    label: 'Plus',
-    labelAr: 'بلس',
+    label: 'Basic',
+    labelAr: 'أساسي',
     order: 1,
     isFree: false,
     accentVar: '--plan-plus-accent',
@@ -76,7 +90,7 @@ const IDENTITIES: Record<PlanIdentityTier, PlanIdentity> = {
   ultra: {
     tier: 'ultra',
     label: 'Ultra',
-    labelAr: 'ألتترا',
+    labelAr: 'ألترا',
     order: 3,
     isFree: false,
     accentVar: '--plan-ultra-accent',
@@ -96,6 +110,7 @@ const IDENTITIES: Record<PlanIdentityTier, PlanIdentity> = {
 const TIER_BY_PLAN_CODE: Record<string, PlanIdentityTier> = {
   free: 'free',
   student: 'plus',
+  basic: 'plus',
   plus: 'plus',
   pro: 'pro',
   career_plus: 'ultra',
@@ -130,6 +145,121 @@ export function planIdentityFor(
 /** The identity of a tier. */
 export function planIdentityForTier(tier: PlanIdentityTier): PlanIdentity {
   return IDENTITIES[tier];
+}
+
+/**
+ * The neutral identity a subscription wears when it no longer grants access.
+ *
+ * Expired and suspended subscriptions keep their tier for the data attribute
+ * — a caller may still want to know which plan ended — but they must not keep
+ * the paid colour, or the interface would say the candidate still has it.
+ */
+const INACTIVE_ACCENT_VAR = '--plan-inactive-accent';
+const INACTIVE_SURFACE_VAR = '--plan-inactive-surface';
+
+/** The subscription fields the presentation reads. */
+export interface PlanIdentitySubject {
+  planCode?: string | null;
+  /** The status the subscription service reported. */
+  status?: string | null;
+  /** The end of the current period, when the service reported one. */
+  expiresAt?: string | null;
+}
+
+/** Everything the badge needs to draw one subscription. */
+export interface PlanIdentityPresentation {
+  tier: PlanIdentityTier;
+  state: PlanIdentityState;
+  label: string;
+  labelAr: string;
+  accentVar: string;
+  surfaceVar: string;
+  isExpired: boolean;
+  isInactive: boolean;
+  isTemporary: boolean;
+}
+
+const INACTIVE_STATUSES = new Set(['suspended', 'inactive', 'paused']);
+
+/**
+ * The state of the subscription, from the fields the server sent.
+ *
+ * The plan code alone is not enough. A row can still say `career_plus` while
+ * its period has ended, and an administrator can suspend a plan without
+ * changing its code. The status and the period end are therefore read
+ * together, and the safe answer is the one that grants nothing.
+ */
+export function resolvePlanIdentityState(
+  subject: PlanIdentitySubject,
+  now: Date = new Date(),
+): PlanIdentityState {
+  const code = subject.planCode?.trim().toLowerCase();
+  const status = subject.status?.trim().toLowerCase();
+
+  if (!code || code === 'free' || status === 'free') return 'free';
+  if (status === 'expired') return 'expired';
+
+  let hasValidEnd = false;
+  let ended = false;
+  if (subject.expiresAt) {
+    const endsAt = new Date(subject.expiresAt);
+    hasValidEnd = !Number.isNaN(endsAt.getTime());
+    ended = hasValidEnd && endsAt.getTime() <= now.getTime();
+  }
+
+  if (ended) return 'expired';
+
+  // A cancelled subscription remains paid until the period it paid for ends.
+  // When no usable period end was sent, there is nothing left to grant.
+  if (status === 'cancelled' || status === 'canceled') {
+    return hasValidEnd ? 'active' : 'expired';
+  }
+
+  if (status && INACTIVE_STATUSES.has(status)) return 'inactive';
+  if (status === 'temporary_access') return 'temporary';
+  return 'active';
+}
+
+/**
+ * The identity a badge should draw for one subscription.
+ *
+ * This is the single resolution both badge locations use, so the header and
+ * the profile cannot disagree about a plan, and an expired plan cannot keep
+ * a paid colour in one place while the other has already let it go.
+ */
+export function planPresentationFor(
+  subject: PlanIdentitySubject,
+  now: Date = new Date(),
+): PlanIdentityPresentation {
+  const tier = resolvePlanIdentityTier(subject.planCode);
+  const state = resolvePlanIdentityState(subject, now);
+
+  if (state === 'expired' || state === 'inactive') {
+    return {
+      tier,
+      state,
+      label: state === 'expired' ? 'Expired' : 'Inactive',
+      labelAr: state === 'expired' ? 'منتهي' : 'غير مفعّل',
+      accentVar: INACTIVE_ACCENT_VAR,
+      surfaceVar: INACTIVE_SURFACE_VAR,
+      isExpired: state === 'expired',
+      isInactive: state === 'inactive',
+      isTemporary: false,
+    };
+  }
+
+  const identity = IDENTITIES[tier];
+  return {
+    tier,
+    state,
+    label: identity.label,
+    labelAr: identity.labelAr,
+    accentVar: identity.accentVar,
+    surfaceVar: identity.surfaceVar,
+    isExpired: false,
+    isInactive: false,
+    isTemporary: state === 'temporary',
+  };
 }
 
 /**

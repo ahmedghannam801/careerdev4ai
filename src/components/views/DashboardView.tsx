@@ -30,7 +30,6 @@ import { MetricCard } from '../career/MetricCard';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
-import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 import { AnimatedList } from '../react-bits/AnimatedList';
 import { Stagger, StaggerItem } from '../motion/Motion';
@@ -100,7 +99,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     markNotificationRead,
     recordNotificationClick,
     identity,
-    subscription,
     t,
   } = useCareer();
 
@@ -416,10 +414,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {/* The tier's identity, so a candidate can see which plan they are
-              on without going to the pricing page. It is drawn from the plan
-              the server resolved. */}
-          <PlanIdentityBadge planCode={subscription?.planCode ?? 'free'} size="md" />
           {/* The daily reward sits beside the balance the topbar shows. It is
               the same widget as the one inside that badge, so the platform
               never states two different opinions about today's tokens. */}

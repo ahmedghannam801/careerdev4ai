@@ -180,6 +180,8 @@ export const subscriptionsAr: Record<string, string> = {
   // ---- The membership, shown beside the profile ----------------------------
   'Membership': 'العضوية',
   'Manage plan': 'إدارة الباقة',
+  'Renew plan': 'تجديد الباقة',
+  'Inactive': 'غير مفعّل',
   'Upgrade': 'ترقية',
   'Upgrade to {tier}': 'ترقية إلى {tier}',
   'AI credits left': 'الرصيد الذكي المتبقي',

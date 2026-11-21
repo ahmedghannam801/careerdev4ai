@@ -25,8 +25,7 @@
 import React from 'react';
 
 import {
-  planIdentityForTier,
-  resolvePlanIdentityTier,
+  planPresentationFor,
   type PlanIdentityTier,
 } from '../../../shared/planIdentity';
 
@@ -36,6 +35,10 @@ export interface PlanIdentityFrameProps {
    * this is the only source of the tier.
    */
   planCode: string | null | undefined;
+  /** The subscription status, so an ended plan loses its premium frame. */
+  status?: string | null;
+  /** The end of the current period, when the service reported one. */
+  expiresAt?: string | null;
   /** What the frame is drawn around. */
   children: React.ReactNode;
   /**
@@ -56,26 +59,37 @@ const TOP_TIER: PlanIdentityTier = 'ultra';
 
 export const PlanIdentityFrame: React.FC<PlanIdentityFrameProps> = ({
   planCode,
+  status,
+  expiresAt,
   children,
   variant = 'premium',
   className = '',
   shape = 'square',
   label,
 }) => {
-  const tier = resolvePlanIdentityTier(planCode);
-  const identity = planIdentityForTier(tier);
+  const display = planPresentationFor({ planCode, status, expiresAt });
 
-  // The premium frame belongs to the top tier alone.
-  if (variant === 'premium' && tier !== TOP_TIER) {
+  // The premium frame belongs to the top tier alone, and only while that
+  // subscription still grants access. An expired Ultra plan does not get to
+  // keep the frame that says it is the top of the ladder.
+  if (
+    variant === 'premium' &&
+    (display.tier !== TOP_TIER || display.isExpired || display.isInactive)
+  ) {
     return <>{children}</>;
   }
 
-  const accent = `var(${identity.accentVar})`;
+  const accent = `var(${display.accentVar})`;
   const radius = shape === 'pill' ? '9999px' : '1.25rem';
   const innerRadius = shape === 'pill' ? '9999px' : '1.05rem';
 
   return (
-    <div className={`relative inline-block ${className}`.trim()} title={label}>
+    <div
+      className={`relative inline-block ${className}`.trim()}
+      title={label}
+      data-plan-tier={display.tier}
+      data-plan-state={display.state}
+    >
       {/*
         The frame is a gradient border, drawn with a padding and an opaque
         inner surface. It costs one paint and no filter, so it stays crisp on

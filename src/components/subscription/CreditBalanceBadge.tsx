@@ -37,7 +37,7 @@ interface CreditBalanceBadgeProps {
 }
 
 export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPricing }) => {
-  const { creditBalance, subscription, t } = useCareer();
+  const { creditBalance, subscription, settings, t } = useCareer();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   // The badge is the surface a candidate looks at right after spending, so it
   // says when the authoritative number is being read again. It never shows a
@@ -68,6 +68,20 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
         aria-expanded={dropdownOpen}
         aria-busy={refreshing}
       >
+        {/* The subscription identity belongs to the tokens, so it lives in
+            the tokens chip rather than beside the language selector. The
+            plan is read from the same subscription the rest of the shell
+            reads, and a status that has ended is shown as ended. */}
+        <PlanIdentityBadge
+          planCode={subscription?.planCode ?? 'free'}
+          status={subscription?.status}
+          expiresAt={subscription?.expiresAt}
+          variant="solid"
+          size="xs"
+          language={settings.language}
+          className="shrink-0"
+        />
+        <span className="h-3 w-px shrink-0 bg-[var(--border-subtle)]" aria-hidden="true" />
         <span className="relative">
           <Sparkles className="w-3.5 h-3.5 shrink-0" />
           {dailyAvailable ? (
@@ -123,7 +137,13 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
                 {/* The tier's own identity, drawn from the plan the server
                     resolved. The plan code itself stays out of the way: a
                     candidate reads "Ultra", not "career_plus". */}
-                <PlanIdentityBadge planCode={subscription?.planCode ?? 'free'} />
+                <PlanIdentityBadge
+                  planCode={subscription?.planCode ?? 'free'}
+                  status={subscription?.status}
+                  expiresAt={subscription?.expiresAt}
+                  size="xs"
+                  language={settings.language}
+                />
               </div>
             </div>
 

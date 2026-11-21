@@ -63,7 +63,7 @@ describe('the membership beside the profile', () => {
     withPlan('free');
     render(<MembershipPanel onManagePlan={() => {}} />);
 
-    expect(screen.getByRole('button', { name: 'Upgrade to Plus' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upgrade to Basic' })).toBeInTheDocument();
     expect(screen.getByText('Unlock tailored CVs, detailed ATS analysis and interview practice.')).toBeInTheDocument();
   });
 
@@ -79,6 +79,20 @@ describe('the membership beside the profile', () => {
     render(<MembershipPanel />);
 
     expect(screen.getByText('برو')).toBeInTheDocument();
+  });
+
+  it('shows an ended plan as expired in the plan\'s neutral colour', () => {
+    withPlan('career_plus');
+    (mocks.career.subscription as { status: string; expiresAt: string | null }).status = 'active';
+    (mocks.career.subscription as { status: string; expiresAt: string | null }).expiresAt =
+      new Date(Date.now() - 86_400_000).toISOString();
+
+    const { container } = render(<MembershipPanel onManagePlan={() => {}} />);
+
+    const badge = container.querySelector('[data-plan-state="expired"]');
+    expect(badge).not.toBeNull();
+    expect(screen.getByText('Expired')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Renew plan' })).toBeInTheDocument();
   });
 });
 

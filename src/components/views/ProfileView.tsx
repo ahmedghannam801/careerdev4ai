@@ -742,6 +742,8 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               */}
               <PlanIdentityFrame
                 planCode={subscription?.planCode ?? 'free'}
+                status={subscription?.status}
+                expiresAt={subscription?.expiresAt}
                 variant="premium"
                 label={t('Your membership frames your profile photo')}
               >

@@ -45,7 +45,6 @@ import { useAdminAccess } from '../../lib/useAdminAccess';
 import { CreditBalanceBadge } from '../subscription/CreditBalanceBadge';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 import { MembershipPanel } from '../subscription/MembershipPanel';
-import { resolvePlanIdentityTier } from '../../../shared/planIdentity';
 
 const GlobalSearchModal = lazy(() =>
   import('./GlobalSearchModal').then((module) => ({ default: module.GlobalSearchModal }))
@@ -122,16 +121,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
    * reloaded. The identity is now resolved once, in the context.
    */
   const displayName = identity.displayName || t('Signed in');
-
-  /**
-   * Whether the candidate is on the free plan.
-   *
-   * The tier is read from the plan code the server sent, never chosen here.
-   * A free candidate is not nagged in the header: they get the quiet mark and
-   * a clear upgrade path where it belongs, in the profile and the account
-   * menu.
-   */
-  const isFreePlan = resolvePlanIdentityTier(subscription?.planCode) === 'free';
 
   // Global Ctrl/Cmd + K keyboard shortcut
   useEffect(() => {
@@ -351,14 +340,16 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                     {identity.displayName}
                   </span>
                   {/* The tier, beside the name it belongs to. It is drawn from
-                      the plan the server resolved, so it cannot say a plan the
-                      candidate does not hold. */}
+                      the plan the server resolved, and it reads the
+                      subscription status too, so an ended plan cannot keep a
+                      paid colour in the sidebar. */}
                   <PlanIdentityBadge
                     planCode={subscription?.planCode ?? 'free'}
+                    status={subscription?.status}
+                    expiresAt={subscription?.expiresAt}
                     variant="solid"
                     size="sm"
                     language={settings.language}
-                    markOnly={isFreePlan}
                     className="shrink-0"
                   />
                 </div>
@@ -437,19 +428,11 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
             {/* Notifications & Account Controls */}
             <div data-tour="notifications-account" className="flex items-center gap-1.5 sm:gap-2">
-              {/* The tier's identity, always visible in the header.
-                  It is drawn from the plan the server resolved, so it cannot
-                  say a plan the candidate does not hold. A paid plan carries
-                  its name — the candidate paid for it and should see it; the
-                  free plan stays a quiet mark, because "Free" on every screen
-                  is noise rather than information. */}
-              <PlanIdentityBadge
-                planCode={subscription?.planCode ?? 'free'}
-                variant="outline"
-                markOnly={isFreePlan}
-                language={settings.language}
-                className={isFreePlan ? 'h-7 w-7 justify-center' : ''}
-              />
+              {/* The subscription identity lives inside the tokens chip,
+                  beside the balance it belongs to. There is no standalone
+                  plan label in the header any more: the plan and the tokens
+                  are one control, and the sidebar repeats the same identity
+                  beside the candidate's name. */}
               <CreditBalanceBadge onOpenPricing={() => onNavigate('pricing')} />
 
               {/* Notifications */}

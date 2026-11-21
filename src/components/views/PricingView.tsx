@@ -425,6 +425,10 @@ export const PricingView: React.FC = () => {
                   {t('Plan')}:{' '}
                   <PlanIdentityBadge
                     planCode={subscription?.planCode ?? 'free'}
+                    status={subscription?.status}
+                    expiresAt={subscription?.expiresAt}
+                    size="xs"
+                    language={settings.language}
                     className="align-middle"
                   />
                 </span>
