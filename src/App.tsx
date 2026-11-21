@@ -264,6 +264,10 @@ function AppRoutes() {
   useEffect(() => {
     let cancelled = false;
     const checkTourState = async () => {
+      // The guide state belongs to a signed-in candidate, and the tour is only
+      // ever offered to one on the dashboard. Asking for it as a visitor only
+      // earns a 401 and a red line in the console on the public landing page.
+      if (!currentUser) return;
       try {
         const dismissed = await fetchDismissedGuides();
         if (cancelled) return;
