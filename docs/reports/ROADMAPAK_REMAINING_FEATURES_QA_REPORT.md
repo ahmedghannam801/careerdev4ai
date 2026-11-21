@@ -171,6 +171,14 @@ What was exercised as a function, not just looked at:
 phone Arabic), plus **7/7 targeted interaction checks** on top of it. The run before the fixes in §10
 reported failures; every one of them is either fixed or explained below.
 
+**The deployed site was checked too, not only the local one.** After the deployment, a smoke test ran
+against https://roadmapak.pages.dev/: the page loads, the title and the direction are right, the
+application mounts and the landing page renders. One request fails — `401 /api/guides` — because the
+landing page asks for the dismissed-tour list while nobody is signed in. **This is pre-existing**: the
+same 401 appears on the previous deployment, and no part of this work touches the guides route. It is
+recorded here rather than fixed, because the fix belongs to the landing page's own data flow and is
+outside the A–J scope.
+
 ---
 
 ## 9. Screenshots
@@ -213,6 +221,7 @@ stays exactly as it was written. In English the same 18 markers read "Education:
 | **The application takes ~5–6 seconds to hydrate** | Every domain is fetched in parallel before the shell is populated. | **Measured locally.** Not changed. |
 | **The database-backed suite cannot run** | The disposable Supabase project in `.env.test` does not resolve. | **Pre-existing.** |
 | **The local job feeds need a key** | `/api/jobs/search` and `/api/jobs/recommend` answer `503 not_configured` without `JSEARCH_RAPIDAPI_KEY`. | **Local configuration only.** The key is present in production. |
+| **The signed-out landing page asks for the tour list** | `/api/guides` answers `401` for a visitor who is not signed in, and the request shows up in the browser console. | **Pre-existing**, confirmed on the previous deployment. Not changed — outside the A–J scope. |
 
 **Defects found by the browser run and fixed in this task**
 
@@ -288,9 +297,9 @@ broken feature.
 |---|---|
 | Branch | `main` |
 | Base commit | `9598a22` (`docs: record the release state and the Live credential blocker`) |
-| New commit | one commit carrying the A–J implementation and the QA fixes (see the delivery message for its hash) |
-| Pushed to | `origin/main` |
-| Deployment | Cloudflare Pages project `roadmapak` — see the delivery message for the deployment id and URL |
+| New commit | `c68e6e4` (`feat(roadmapak): the remaining features, verified in the browser`) — the implementation, the QA fixes and this report |
+| Pushed to | `origin/main` (`9598a22..c68e6e4`) |
+| Deployment | Cloudflare Pages project `roadmapak`, deployment `1f7ccc24-d4b1-4f46-a695-34e1f2517f93`, source `c68e6e4` → https://1f7ccc24.roadmapak.pages.dev (the canonical https://roadmapak.pages.dev/ serves the same build) |
 
 **Working tree before the commit**
 
