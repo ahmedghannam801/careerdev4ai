@@ -189,6 +189,16 @@ describe('the spiral timeline', () => {
     assert.equal(formatMilestoneDate('not a date'), '');
   });
 
+  it('writes the month in the reader\'s own language', () => {
+    // The date is a word, not a number: an Arabic page must not print "OCT 2025".
+    const arabic = formatMilestoneDate('2025-10-02', 'ar');
+    assert.ok(arabic.length > 0);
+    assert.ok(!/oct/i.test(arabic), `expected an Arabic month, received ${arabic}`);
+    assert.ok(/٢٠٢٥|2025/.test(arabic), `expected the year 2025, received ${arabic}`);
+    // The default stays the stable English form the rest of the UI relies on.
+    assert.equal(formatMilestoneDate('2025-10-02'), 'Oct 2025');
+  });
+
   it('turns further as there are more milestones, so the drawing stays readable', () => {
     assert.ok(spiralSweep(4) < spiralSweep(12));
     assert.ok(spiralSweep(12) < spiralSweep(24));

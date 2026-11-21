@@ -51,6 +51,11 @@ export interface SpiralTimelineProps {
   milestones: SpiralMilestone[];
   /** The translation helper. */
   t: (key: string) => string;
+  /**
+   * The language the dates are written in. A month is a word, not a number:
+   * an Arabic reader should see the month in Arabic, not `JUN 2025`.
+   */
+  locale?: string;
 }
 
 /** The colours of each state. The word that names it is in the library. */
@@ -76,7 +81,7 @@ const STATE_STYLE: Record<
   },
 };
 
-export const SpiralTimeline: React.FC<SpiralTimelineProps> = ({ milestones, t }) => {
+export const SpiralTimeline: React.FC<SpiralTimelineProps> = ({ milestones, t, locale = 'en-GB' }) => {
   const reduced = useReducedMotion() ?? false;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const drawingRef = useRef<HTMLDivElement | null>(null);
@@ -290,7 +295,7 @@ export const SpiralTimeline: React.FC<SpiralTimelineProps> = ({ milestones, t })
                     <span className="min-w-0 flex-1">
                       <span className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                         {t(entry.label)}
-                        {entry.date ? ` · ${formatMilestoneDate(entry.date)}` : ''}
+                        {entry.date ? ` · ${formatMilestoneDate(entry.date, locale)}` : ''}
                       </span>
                       <span className="block truncate text-xs font-semibold text-[var(--text-primary)]">
                         {entry.title || t('Untitled')}

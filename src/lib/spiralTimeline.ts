@@ -425,12 +425,21 @@ function formatDate(value: string | null | undefined): string {
  * "2026-07-07T20:35:22.107092+00:00" is "Jul 2026" to the person who owns
  * it.
  */
-export function formatMilestoneDate(value: string | null | undefined): string {
+/**
+ * The month a record belongs to, in the reader's own language.
+ *
+ * A record dated at an instant (a project's creation timestamp) is shown as a
+ * month and a year, never as the raw string it was stored as.
+ */
+export function formatMilestoneDate(
+  value: string | null | undefined,
+  locale: string = 'en-GB'
+): string {
   if (!value) return '';
   const day = value.slice(0, 10);
   const parsed = new Date(day);
   if (Number.isNaN(parsed.getTime())) return '';
-  return parsed.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  return parsed.toLocaleDateString(locale, { month: 'short', year: 'numeric' });
 }
 
 /**

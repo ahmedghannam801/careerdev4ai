@@ -13,6 +13,7 @@ import {
   Star
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
+import { formatMilestoneDate } from '../../lib/spiralTimeline';
 import { ScoreInfoTooltip } from '../ui/ScoreInfoTooltip';
 import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { isSkillMastered } from '../../../shared/careerMetrics';
@@ -78,7 +79,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
     milestones,
     addMilestone,
     careerBlockers,
-    learningItems, careerIdentity, t,} = useCareer();
+    learningItems, careerIdentity, settings, t,} = useCareer();
 
   const [addGoalModalOpen, setAddGoalModalOpen] = useState(false);
   const [goalForm, setGoalForm] = useState({
@@ -613,7 +614,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
                   <span>{m.category.toUpperCase()}</span>
-                  <span>{m.dateAchieved}</span>
+                  <span>{formatMilestoneDate(m.dateAchieved, settings.language === 'ar' ? 'ar' : 'en-GB')}</span>
                 </div>
                 {m.notes && (
                   <p className="text-[11px] text-[var(--text-secondary)]">{m.notes}</p>
@@ -639,7 +640,11 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             </div>
           </div>
 
-          <SpiralTimeline milestones={spiralMilestones} t={t} />
+          <SpiralTimeline
+            milestones={spiralMilestones}
+            t={t}
+            locale={settings.language === 'ar' ? 'ar' : 'en-GB'}
+          />
         </div>
       </div>
 
