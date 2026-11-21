@@ -248,10 +248,12 @@ export const RoadmapCommandCenter: React.FC<RoadmapCommandCenterProps> = ({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-row items-center gap-5 lg:flex-col lg:items-end">
-          <ProgressRing value={progressPct} />
+        <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center lg:flex-col lg:items-end">
+          <div className="self-center sm:self-auto lg:self-end">
+            <ProgressRing value={progressPct} />
+          </div>
 
-          <div className="min-w-0 flex-1 rounded-2xl border border-[var(--accent-primary)]/35 bg-[var(--color-primary-surface)]/70 p-3.5 lg:w-[17rem] lg:flex-none">
+          <div className="w-full min-w-0 rounded-2xl border border-[var(--accent-primary)]/35 bg-[var(--color-primary-surface)]/70 p-3.5 sm:flex-1 lg:w-[17rem] lg:flex-none">
             <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-primary-text)]">
               {t('Your next step')}
             </div>

@@ -892,8 +892,11 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
             </div>
             <span className="text-xs text-[var(--text-secondary)]">
               {profileCompleteness.overallPercent === 100 
-                ? 'Your career identity is fully calibrated and verified!' 
-                : `${profileCompleteness.missingItems.length} recommendations to reach 100%`}
+                ? t('Your career identity is fully calibrated and verified!')
+                : t('{count} recommendations to reach 100%').replace(
+                    '{count}',
+                    String(profileCompleteness.missingItems.length)
+                  )}
             </span>
           </div>
 
