@@ -369,6 +369,7 @@ export class LiveInterviewClient {
           onopen: () => {
             this.active = true;
             this.callbacks.onState('listening');
+            this.beginInterview();
           },
           onmessage: (message) => {
             this.handleMessage(message);
@@ -593,6 +594,35 @@ export class LiveInterviewClient {
         this.pushTurn(turn);
       }
       this.callbacks.onState('listening');
+    }
+  }
+
+  /**
+   * Starts the conversation.
+   *
+   * A Live session waits for the candidate to speak first. A real interview
+   * does not: the interviewer greets them and asks the first question. The
+   * control turn is text sent through the session, not a fake microphone
+   * recording, and it is not part of the stored transcript.
+   */
+  private beginInterview(): void {
+    try {
+      this.session?.sendClientContent({
+        turns: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: '[Interview control] The candidate has joined the call. Greet them briefly and ask your first interview question now.',
+              },
+            ],
+          },
+        ],
+        turnComplete: true,
+      });
+    } catch {
+      // If the session cannot take the opening turn, the candidate can still
+      // speak first; the microphone path is unaffected.
     }
   }
 
