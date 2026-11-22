@@ -245,6 +245,7 @@ export class LiveInterviewClient {
   private active = false;
   private disconnectHandled = false;
   private prepared = false;
+  private openingSent = false;
 
   constructor(callbacks: LiveInterviewClientCallbacks) {
     this.callbacks = callbacks;
@@ -297,6 +298,7 @@ export class LiveInterviewClient {
 
     this.stopped = false;
     this.disconnectHandled = false;
+    this.openingSent = false;
     this.callbacks.onState('connecting');
 
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -383,6 +385,12 @@ export class LiveInterviewClient {
           },
         },
       });
+
+      // `onopen` can fire before `connect()` resolves, while `this.session`
+      // is still null. The opening turn is attempted again here; the
+      // `openingSent` guard means it is only sent once.
+      this.active = true;
+      this.beginInterview();
     } catch (error) {
       await this.releaseMedia();
       throw error instanceof Error ? error : new Error('The live interview could not be started.');
@@ -606,8 +614,10 @@ export class LiveInterviewClient {
    * recording, and it is not part of the stored transcript.
    */
   private beginInterview(): void {
+    if (!this.session || this.openingSent) return;
+    this.openingSent = true;
     try {
-      this.session?.sendClientContent({
+      this.session.sendClientContent({
         turns: [
           {
             role: 'user',
