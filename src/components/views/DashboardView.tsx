@@ -27,6 +27,13 @@ import { computeCareerMetrics, cvReadinessFromVersions, toMetricSkills, type Car
 import { EmptyState } from '../ui/EmptyState';
 import { CareerJourneyStepper } from '../career/CareerJourneyStepper';
 import { MetricCard } from '../career/MetricCard';
+import { BarChart, ChartCard, DonutChart, formatCount } from '../charts';
+import {
+  skillChartCenter,
+  skillChartSeries,
+  stageChartHasData,
+  stageChartSeries,
+} from '../../lib/dashboardCharts';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
@@ -223,6 +230,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
    * candidate is actually short of and what the recommendation is for.
    */
   const priorityGap = metrics.gaps[0] ?? null;
+
+  /* --------------------------------------------------------------------
+   * THE TWO CHARTS IN THE OVERVIEW
+   *
+   * They draw the numbers the cards above already state, from the same engine,
+   * so they cannot disagree with them. The derivation lives in
+   * `lib/dashboardCharts.ts`, where it can be checked without the app.
+   * -------------------------------------------------------------------- */
+  const stageSeries = useMemo(() => stageChartSeries(metrics, t), [metrics, t]);
+  const skillSeries = useMemo(() => skillChartSeries(metrics, t), [metrics, t]);
 
   const gapLearning = useMemo(() => {
     if (!priorityGap) return null;
@@ -518,6 +535,56 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             navigateLabel="Open your roadmap"
           />
         </AnimatedList>
+
+        {/* The same three figures, drawn. The bars are the five journey
+            stages the cards above are built from; the donut splits the
+            target role's skills into what is proven, what is only claimed and
+            what has not been started. Both read `metrics`, so a change in the
+            engine moves the cards and the charts together. */}
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <ChartCard
+            title={t('Journey progress by stage')}
+            description={t('How much of each of the five stages is done, from your own records.')}
+            badge={`${Math.round(metrics.journeyProgressPct)}%`}
+            empty={!stageChartHasData(stageSeries)}
+            emptyMessage={t(
+              'No stage has progress yet. Fill in your profile and the first bar appears here.'
+            )}
+            footnote={t('Each bar is one stage of the career journey, out of 100%.')}
+            testId="dashboard-stages-chart"
+          >
+            <BarChart
+              data={stageSeries}
+              orientation="vertical"
+              height={150}
+              max={100}
+              formatValue={(value) => `${Math.round(value)}%`}
+              locale={undefined}
+              ariaLabel={t('Journey progress by stage')}
+              testId="dashboard-stages-bars"
+            />
+          </ChartCard>
+
+          <ChartCard
+            title={t('Your skills at a glance')}
+            description={t('Where the target role\u2019s skills actually stand.')}
+            badge={formatCount(metrics.skillsTotal)}
+            empty={metrics.skillsTotal === 0 || skillSeries.length === 0}
+            emptyMessage={t(
+              'Choose a target role and the skills it needs appear here, split by how well each one is proven.'
+            )}
+            footnote={t('A skill you claim is not counted as mastered until something confirms it.')}
+            testId="dashboard-skills-chart"
+          >
+            <DonutChart
+              data={skillSeries}
+              centerValue={skillChartCenter(metrics)}
+              centerLabel={t('mastered')}
+              ariaLabel={t('Your skills at a glance')}
+              testId="dashboard-skills-donut"
+            />
+          </ChartCard>
+        </div>
 
         {/* The gaps, with the classification explained. Every badge says why
             it is critical or blocking. */}

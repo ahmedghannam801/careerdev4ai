@@ -20,8 +20,15 @@
  * marker. That is the difference between a reward the candidate has to find
  * and a reward the platform points at.
  *
- * Every colour is a theme variable, so the badge reads the same in the light
- * and in the dark theme.
+ * THE CHIP WEARS THE PLAN'S COLOUR
+ * The tokens belong to a subscription, so the whole chip is painted with that
+ * subscription's palette: the plan's surface behind it, the plan's accent for
+ * the border, the number and the icon. A free account reads as the free
+ * palette, Pro as Pro's, and an ended period as the inactive palette the plan
+ * badge already uses — the chip and the tier inside it can no longer be two
+ * different colours. The palette itself is not in this file: the custom
+ * property names come from `planPresentationFor`, so the dark theme and the
+ * high-contrast theme are handled where the colours are defined.
  */
 
 import React, { useState, useSyncExternalStore } from 'react';
@@ -31,6 +38,7 @@ import { DailyTokenClaim } from './DailyTokenClaim';
 import { PlanIdentityBadge } from './PlanIdentityBadge';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 import { getCreditsSnapshot, subscribeCredits } from '../../lib/creditsStore';
+import { planPresentationFor } from '../../../shared/planIdentity';
 
 interface CreditBalanceBadgeProps {
   onOpenPricing?: () => void;
@@ -55,15 +63,27 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
   // The daily reward is worth pointing at while it is still available.
   const dailyAvailable = daily !== null && daily.allowance > 0 && !daily.claimedToday;
 
+  // The same resolution the tier badge uses, so the chip is painted from the
+  // plan the server sent — including the inactive palette once a period ends.
+  const plan = planPresentationFor({
+    planCode: subscription?.planCode ?? 'free',
+    status: subscription?.status,
+    expiresAt: subscription?.expiresAt,
+  });
+
   return (
     <div className="relative inline-block text-start">
       <button
         type="button"
         onClick={() => setDropdownOpen((prev) => !prev)}
-        className={`flex min-h-10 items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border transition-all sm:px-3 ${refreshing ? 'opacity-80' : ''} ${isLow
-            ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20'
-            : 'bg-[var(--accent-surface)] border-[var(--accent-primary)]/25 text-[var(--color-primary-text)] hover:bg-[var(--accent-primary)]/10'
-          }`}
+        className={`flex min-h-10 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-bold transition-colors sm:px-3 ${
+          refreshing ? 'opacity-80' : ''
+        }`}
+        style={{
+          color: `var(${plan.accentVar})`,
+          backgroundColor: `var(${plan.surfaceVar})`,
+          borderColor: `color-mix(in srgb, var(${plan.accentVar}) 38%, transparent)`,
+        }}
         title={t('Tokens')}
         aria-expanded={dropdownOpen}
         aria-busy={refreshing}
@@ -76,14 +96,26 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
           planCode={subscription?.planCode ?? 'free'}
           status={subscription?.status}
           expiresAt={subscription?.expiresAt}
-          variant="solid"
+          variant="outline"
           size="xs"
           language={settings.language}
           className="shrink-0"
         />
-        <span className="h-3 w-px shrink-0 bg-[var(--border-subtle)]" aria-hidden="true" />
+        {/* The divider is the plan's own accent, at the same weight as the
+            ring, so it disappears into the chip rather than cutting it. */}
+        <span
+          className="h-3 w-px shrink-0"
+          style={{ backgroundColor: `color-mix(in srgb, var(${plan.accentVar}) 32%, transparent)` }}
+          aria-hidden="true"
+        />
         <span className="relative">
-          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+          {/* A low balance keeps one quiet cue: the icon turns amber. The chip
+              itself stays in the plan's colour, because the plan is what the
+              chip is about. */}
+          <Sparkles
+            className={`w-3.5 h-3.5 shrink-0 ${isLow ? 'text-amber-500' : ''}`}
+            aria-label={isLow ? t('Low token balance') : undefined}
+          />
           {dailyAvailable ? (
             <span
               className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-[var(--color-success-strong)] ring-2 ring-[var(--surface-main)]"
@@ -92,8 +124,8 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
           ) : null}
         </span>
         <AnimatedCounter value={balance} duration={0.35} />
-        <span className="hidden sm:inline font-normal text-[var(--text-muted)]">{t('Tokens')}</span>
-        <ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />
+        <span className="hidden font-normal opacity-70 sm:inline">{t('Tokens')}</span>
+        <ChevronDown className="w-3 h-3 opacity-60" />
       </button>
 
       {dropdownOpen && (
