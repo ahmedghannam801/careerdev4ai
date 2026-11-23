@@ -6,7 +6,7 @@
  * (the manual wallets and the previous card provider). History is kept and
  * counted; no new payment can be made through those rails, and the labels in
  * the per-method breakdown name the method a past payment actually used.
- * payments via Stripe. Card figures are read from the webhook-written mirror;
+ * payments, and the card figures are read from the webhook-written mirror;
  * test-mode invoices are listed and labelled but are never added to revenue.
  * Refunds are subtracted once and shown separately, and offline transactions
  * keep the reference an admin needs to reconcile the wallet.
@@ -138,7 +138,7 @@ export const AdminRevenuePanel: React.FC = () => {
             <span>{t('Revenue & Finance')}</span>
           </h2>
           <p className="text-xs text-[var(--text-muted)] mt-1">
-            إحصائيات الإيرادات المحصلة بالجنيه المصري (فودافون كاش، إنستاباي، والبطاقات عبر Stripe)، مع استبعاد وضع الاختبار من الإيرادات الفعلية.
+            إحصائيات الإيرادات المحصلة بالجنيه المصري (تحويلات المحافظ اليدوية السابقة، والبطاقات)، مع استبعاد وضع الاختبار من الإيرادات الفعلية.
           </p>
         </div>
 
@@ -290,7 +290,9 @@ export const AdminRevenuePanel: React.FC = () => {
             <div className="p-3 rounded-xl bg-[var(--surface-raised)] border border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-bold text-[var(--text-primary)]">Card (Stripe)</span>
+                <span className="text-xs font-bold text-[var(--text-primary)]">
+                  {t('Card (previous gateway)')}
+                </span>
                 {stripeRevenue?.testMode && (
                   <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 text-[9px] font-extrabold uppercase">
                     {t('Test')}
@@ -390,12 +392,12 @@ export const AdminRevenuePanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Stripe card invoices and refunds */}
+      {/* Card invoices and refunds, kept as history */}
       <div className={`${CARD} p-5 space-y-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-blue-600" />
-            <span>{t('Card invoices (Stripe)')}</span>
+            <span>{t('Card invoices (previous gateway)')}</span>
             {stripeRevenue?.testMode && (
               <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] font-extrabold uppercase tracking-wider">
                 {t('Test mode')}
@@ -449,7 +451,7 @@ export const AdminRevenuePanel: React.FC = () => {
 
         {stripeRevenue && !stripeRevenue.available ? (
           <p className="text-xs text-amber-600">
-            {t('Stripe invoice history is not available on this deployment.')}
+            {t('No card invoice history is available on this deployment.')}
           </p>
         ) : stripeInvoices.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)]">
@@ -537,7 +539,7 @@ export const AdminRevenuePanel: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
             <ReceiptText className="w-4 h-4 text-emerald-600" />
-            <span>{t('Wallet transactions (Vodafone Cash / InstaPay)')}</span>
+            <span>{t('Manual wallet transfers (historical)')}</span>
           </h3>
           <div className="text-[11px] text-[var(--text-muted)] font-semibold">
             {offline

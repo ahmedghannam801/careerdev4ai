@@ -104,8 +104,6 @@ export const subscriptionsAr: Record<string, string> = {
     'هل الميزات الأساسية للمنصة مجانية بالفعل؟',
   'Yes — the core platform is completely free: job discovery, goal tracking and the basic learning maps. Paid plans exist to cover the running cost of the advanced AI models (Gemini), document processing and interview simulation.':
     'نعم — المنصة الأساسية مجانية بالكامل: استكشاف الوظائف وتتبع الأهداف وخرائط التعلم الأساسية. باقات الاشتراك مخصصة لتغطية تكاليف نماذج الذكاء الاصطناعي المتقدمة (Gemini) ومعالجة الوثائق ومحاكاة المقابلات.',
-  'How is my account activated after I pay with Vodafone Cash or InstaPay?':
-    'كيف يتم تفعيل الحساب بعد التحويل عبر فودافون كاش أو إنستاباي؟',
   'As soon as you enter the transfer reference and upload a screenshot of the receipt, the system gives you temporary access for 24 hours so you can carry on straight away, while an administrator makes the final confirmation during working hours.':
     'بمجرد إدخال الرقم المرجعي للتحويل ورفع لقطة الشاشة للإيصال، يمنحك النظام وصولاً مؤقتاً لمدة ٢٤ ساعة لمتابعة مهامك على الفور، بينما يقوم المشرف بالتأكيد النهائي خلال ساعات العمل.',
   'What happens if the AI call fails? Do I lose my tokens?':
@@ -113,8 +111,6 @@ export const subscriptionsAr: Record<string, string> = {
   'Never. The platform runs a secure double-entry ledger. If there is any network interruption or a model error, the tokens that were held are automatically refunded to your account straight away.':
     'مستحيل. المنصة تطبّق نظام دفتر الأستاذ المزدوج الآمن. إذا حدث أي انقطاع للشبكة أو خطأ في النموذج، تُسترد التوكنات المخصومة تلقائياً إلى حسابك فوراً.',
   'Can I pay by bank card?': 'هل يمكنني الدفع بالبطاقة البنكية؟',
-  'Yes. Choose “Bank card” when you subscribe and you will be taken to Stripe’s secure page to enter your card details. The platform never sees or stores your card number, the subscription activates as soon as Stripe confirms the payment, and you can manage the card or cancel the renewal from “Manage invoices” on this page.':
-    'نعم. اختر «بطاقة بنكية» عند الاشتراك لتنتقل إلى صفحة Stripe الآمنة لإدخال بيانات البطاقة. المنصة لا ترى رقم بطاقتك ولا تخزنه، ويتفعل الاشتراك تلقائياً بعد تأكيد الدفع، ويمكنك إدارة البطاقة أو إلغاء التجديد من زر «إدارة الفواتير» في هذه الصفحة.',
 
   // The daily claim.
   //
@@ -160,19 +156,9 @@ export const subscriptionsAr: Record<string, string> = {
   // Card payments (Stripe)
   'Card': 'بطاقة بنكية',
   'Continue to secure card payment': 'المتابعة إلى الدفع الآمن بالبطاقة',
-  'Card payments are not available right now. Please choose Vodafone Cash or InstaPay.':
-    'الدفع بالبطاقة غير متاح حالياً. يرجى اختيار فودافون كاش أو إنستاباي.',
   'Failed to start card checkout': 'تعذر بدء الدفع بالبطاقة',
-  'You will enter your card details and any promotion code on Stripe’s secure page. We never see or store your card number.':
-    'ستُدخل بيانات بطاقتك وأي كود خصم في صفحة Stripe الآمنة. نحن لا نرى رقم بطاقتك ولا نخزنه.',
-  'Charged in Egyptian pounds on Stripe. Your bank may add a cross-border or currency-conversion fee.':
-    'يُحصَّل المبلغ بالجنيه المصري عبر Stripe. قد يضيف بنكك رسوم تحويل دولي أو فرق عملة.',
   'Payment received': 'تم استلام الدفع',
   'Card checkout cancelled': 'تم إلغاء الدفع بالبطاقة',
-  'Your plan and credits activate as soon as Stripe confirms the payment — usually within a few seconds.':
-    'يتم تفعيل خطتك ورصيدك بمجرد تأكيد Stripe للدفع — عادةً خلال ثوانٍ.',
-  'Nothing was charged. You can try again, or pay with Vodafone Cash or InstaPay.':
-    'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى، أو الدفع عبر فودافون كاش أو إنستاباي.',
   'Card subscription': 'اشتراك البطاقة',
   'Cancels on': 'يُلغى في',
   'Renews on': 'يتجدد في',
@@ -211,11 +197,11 @@ export const subscriptionsAr: Record<string, string> = {
   'Test mode': 'وضع الاختبار',
   'Manage billing': 'إدارة الفواتير',
   'Failed to open the billing portal': 'تعذر فتح بوابة إدارة الفواتير',
-  'Card invoices (Stripe)': 'فواتير البطاقات (Stripe)',
+  'Card invoices (previous gateway)': 'فواتير البطاقات (المزوّد السابق)',
   'paid invoices': 'فواتير مدفوعة',
   'test-mode invoices are excluded from revenue': 'فاتورة اختبار مستبعدة من الإيرادات',
-  'Stripe invoice history is not available on this deployment.':
-    'سجل فواتير Stripe غير متاح على هذا الإصدار.',
+  'No card invoice history is available on this deployment.':
+    'لا يوجد سجل فواتير بطاقات متاح على هذا الإصدار.',
   'No card invoices yet. Test-mode invoices are listed here but excluded from revenue.':
     'لا توجد فواتير بطاقات بعد. تُعرض فواتير وضع الاختبار هنا لكنها مستبعدة من الإيرادات.',
   'Test': 'اختبار',
@@ -234,18 +220,8 @@ export const subscriptionsAr: Record<string, string> = {
   'Your saved card can be reused for future purchases.':
     'يمكن إعادة استخدام بطاقتك المحفوظة للمشتريات القادمة.',
   'Billing updated': 'تم تحديث الفواتير',
-  'Your subscription and payment method changes have been refreshed from Stripe.':
-    'تم تحديث حالة اشتراكك وطريقة الدفع من Stripe.',
-  'Stripe could not collect the latest payment. Update your card to restore access.':
-    'تعذر على Stripe تحصيل الدفعة الأخيرة. حدّث بطاقتك لاستعادة الوصول.',
   'Update payment method': 'تحديث طريقة الدفع',
-  'Secure local payment methods — and card payment via Stripe':
-    'طرق دفع محلية آمنة — ودفع بالبطاقة عبر Stripe',
   'Secure local payment methods': 'طرق دفع محلية آمنة',
-  'Pay directly with Vodafone Cash or InstaPay, or by card on Stripe’s secure page. Wallet access is activated after the receipt is reviewed; a card subscription activates as soon as Stripe confirms the payment.':
-    'ادفع مباشرة عبر فودافون كاش أو إنستاباي، أو بالبطاقة على صفحة Stripe الآمنة. يتم تفعيل الوصول بعد مراجعة الإيصال، ويتفعل اشتراك البطاقة بمجرد تأكيد Stripe للدفع.',
-  'Pay directly with Vodafone Cash or InstaPay. Access is activated after the receipt is reviewed.':
-    'ادفع مباشرة عبر فودافون كاش أو إنستاباي. يتم تفعيل الوصول بعد مراجعة الإيصال.',
 
   // Admin revenue additions
   'Refresh': 'تحديث',
@@ -271,7 +247,7 @@ export const subscriptionsAr: Record<string, string> = {
   'Failed': 'فاشلة',
   'Disputes': 'النزاعات',
   'Recent card refunds': 'أحدث عمليات استرداد البطاقات',
-  'Wallet transactions (Vodafone Cash / InstaPay)':
+  'Manual wallet transfers (historical)':
     'معاملات المحافظ (فودافون كاش / إنستاباي)',
   'No wallet transactions in this period.': 'لا توجد معاملات محافظ في هذه الفترة.',
   'No reference': 'بدون رقم مرجعي',
@@ -290,7 +266,6 @@ export const subscriptionsAr: Record<string, string> = {
   'Failed to initialize payment': 'تعذر بدء عملية الدفع',
   'Failed to submit payment evidence': 'تعذر إرسال إثبات الدفع',
   'Wallet number': 'رقم المحفظة',
-  'InstaPay address': 'عنوان إنستاباي',
   'Account holder': 'اسم المستلم',
   'Copy the account details and complete the transfer from your banking app.':
     'انسخ بيانات الحساب وأكمل التحويل من تطبيق البنك.',
@@ -356,4 +331,5 @@ export const subscriptionsAr: Record<string, string> = {
   'Nothing was charged. You can try again whenever you are ready.': 'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى وقتما تشاء.',
   'Your plan and credits activate as soon as the payment is confirmed — usually within a few seconds.':
     'يُفعّل اشتراكك ونقاطك بمجرد تأكيد الدفع — عادةً في خلال ثوانٍ.',
+  'Card (previous gateway)': 'البطاقات (المزوّد السابق)',
 };
