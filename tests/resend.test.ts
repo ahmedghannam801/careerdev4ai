@@ -85,6 +85,19 @@ test('a verified sending address replaces the shared test sender, and a broken o
 });
 
 test('the delivery status says what is missing rather than waiting for a failed send', () => {
+  // The process environment is the fallback when no request-scoped value is
+  // set, so another test file that sets RESEND_FROM would otherwise decide the
+  // answer here. The variables are cleared for the duration of this test.
+  const saved = {
+    RESEND_FROM: process.env.RESEND_FROM,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_TEST_RECIPIENT: process.env.RESEND_TEST_RECIPIENT,
+  };
+  delete process.env.RESEND_FROM;
+  delete process.env.RESEND_API_KEY;
+  delete process.env.RESEND_TEST_RECIPIENT;
+
+  try {
   const unconfigured = withRuntimeEnv({}, emailDeliveryStatus);
   assert.equal(unconfigured.apiKeyConfigured, false);
   assert.equal(unconfigured.recipientConfigured, false);
@@ -119,6 +132,12 @@ test('the delivery status says what is missing rather than waiting for a failed 
   assert.equal(badRecipient.recipientConfigured, false);
   assert.equal(normalizeRecipient('  owner@example.com  '), 'owner@example.com');
   assert.equal(normalizeRecipient(''), undefined);
+  } finally {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
 });
 
 test('a send uses the deployment sender and carries no provider body back', async () => {
