@@ -172,6 +172,7 @@ ul.clean li:last-child { border-bottom: 0; }
 [dir="rtl"] .notice { border-left: 1px solid var(--border); border-right: 3px solid var(--primary); }
 [dir="rtl"] .contact-label,
 [dir="rtl"] .chip-pending { letter-spacing: 0; }
+[dir="rtl"] .contact-value[dir="ltr"] { text-align: right; }
 [dir="rtl"] .breadcrumb span[aria-hidden="true"] { display: inline-block; }
 @media (max-width: 640px) {
   .site-nav { gap: 14px; font-size: 0.85rem; }
@@ -250,6 +251,7 @@ const FOOTER_LINKS: PublicLink[] = [
   { href: '/learning', label: 'Learning' },
   { href: '/opportunities', label: 'Opportunities' },
   { href: '/business-information', label: 'Business Information' },
+  { href: '/refund-policy', label: 'Refund Policy' },
   { href: '/contact', label: 'Contact Us' },
 ];
 
