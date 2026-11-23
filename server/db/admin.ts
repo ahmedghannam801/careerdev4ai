@@ -316,6 +316,9 @@ export interface AnnouncementDTO {
   publishedAt: string | null;
   archivedAt: string | null;
   recipientCount: number;
+  /** True when this announcement is also an email campaign. */
+  emailEnabled: boolean;
+  emailSentAt: string | null;
   stats: AnnouncementStats;
   createdAt: string;
   updatedAt: string;
@@ -344,6 +347,8 @@ interface AnnouncementRow {
   published_at: string | null;
   archived_at: string | null;
   recipient_count: number | null;
+  email_enabled: boolean | null;
+  email_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -378,6 +383,8 @@ const ANNOUNCEMENT_COLUMNS = [
   'published_at',
   'archived_at',
   'recipient_count',
+  'email_enabled',
+  'email_sent_at',
   'created_at',
   'updated_at',
 ].join(', ');
@@ -453,6 +460,8 @@ function toAnnouncement(
     publishedAt: row.published_at,
     archivedAt: row.archived_at,
     recipientCount: row.recipient_count ?? 0,
+    emailEnabled: row.email_enabled === true,
+    emailSentAt: row.email_sent_at,
     stats,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -900,6 +909,8 @@ export interface AnnouncementInput {
   audienceType?: AnnouncementAudience;
   audienceValues?: string[];
   audienceRules?: AudienceRuleGroup[];
+  /** Also deliver this announcement by email, using the same audience. */
+  emailEnabled?: boolean;
 }
 
 function parsedDate(value: string | null | undefined, field: string): string | null {
@@ -952,6 +963,7 @@ export async function createAnnouncement(
       audience_summary: auditSummary(rules, audienceType, audienceValues),
       created_by: admin.profileId,
       created_by_name: admin.fullName ?? admin.email,
+      email_enabled: input.emailEnabled ?? false,
     })
     .select(ANNOUNCEMENT_COLUMNS)
     .single();
@@ -982,6 +994,7 @@ export async function updateAnnouncement(
     update.expires_at = parsedDate(patch.expiresAt, 'Expiration date');
   }
   if (patch.audienceType !== undefined) update.audience_type = patch.audienceType;
+  if (patch.emailEnabled !== undefined) update.email_enabled = patch.emailEnabled;
   if (patch.audienceValues !== undefined) update.audience_values = patch.audienceValues;
   if (patch.audienceRules !== undefined) {
     let rules: AudienceRuleGroup[];
@@ -1172,7 +1185,24 @@ export async function publishAnnouncement(id: string): Promise<AnnouncementDTO> 
     .single();
   if (error) throw error;
 
-  return toAnnouncement(data as unknown as AnnouncementRow, (await loadAnnouncementStats([id])).get(id));
+  // The email half of a campaign is queued after the inbox delivery is
+  // committed. A failure to queue must never reverse a publication that
+  // already reached the ledger; it is visible in the admin screen and can be
+  // sent again, idempotently.
+  const publishedRow = data as unknown as AnnouncementRow;
+  if (publishedRow.email_enabled === true && !publishedRow.email_sent_at) {
+    try {
+      const { enqueueAnnouncementEmails } = await import('../email/queue.ts');
+      await enqueueAnnouncementEmails(id);
+    } catch (emailError) {
+      console.error(
+        `Announcement ${id} was published but its email could not be queued:`,
+        emailError,
+      );
+    }
+  }
+
+  return toAnnouncement(publishedRow, (await loadAnnouncementStats([id])).get(id));
 }
 
 /** Schedules an announcement for a future server-side publish. */

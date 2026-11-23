@@ -207,17 +207,17 @@ describe('a payment cannot be taken twice', () => {
 
 describe('the card rail appears only when it can take a payment', () => {
   test('it is decided by the server status', () => {
-    assert.match(modal, /fetchStripeBillingStatus/);
+    assert.match(modal, /fetchCardBillingStatus/);
     assert.match(modal, /status\.configured && status\.checkoutReady/);
   });
 
-  test('a deployment without Stripe keeps the wallet rails', () => {
+  test('a deployment without a card provider keeps the wallet rails', () => {
     assert.match(modal, /setCardAvailable\(false\)/);
     assert.match(modal, /cardAvailable/);
   });
 
   test('the card leaves for Stripe\'s hosted page', () => {
-    assert.match(modal, /beginCardCheckout/);
+    assert.match(modal, /beginCardPayment/);
   });
 });
 

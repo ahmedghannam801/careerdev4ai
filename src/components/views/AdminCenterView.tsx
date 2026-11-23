@@ -55,7 +55,7 @@ import { AdminRevenuePanel } from '../admin/AdminRevenuePanel';
 import { CvTemplatesPanel } from '../admin/CvTemplatesPanel';
 import { CreditMonitorPanel } from '../admin/CreditMonitorPanel';
 import { EvidenceReviewPanel } from '../admin/EvidenceReviewPanel';
-import { EmailDeliveryPanel } from '../admin/EmailDeliveryPanel';
+import { EmailManagementPanel } from '../admin/EmailManagementPanel';
 import {
   createAdmin,
   deleteAdmin,
@@ -1486,7 +1486,7 @@ export const AdminCenterView: React.FC = () => {
         <ExperiencesPanel canWrite={permissions.has('learning.write')} />
       )}
       {tab === 'evidence' && <EvidenceReviewPanel />}
-      {tab === 'email' && <EmailDeliveryPanel />}
+      {tab === 'email' && <EmailManagementPanel />}
       {tab === 'audit' && <AuditPanel />}
       {tab === 'subscriptions' && <AdminSubscriptionsPanel />}
       {tab === 'payments' && <AdminPaymentsPanel />}

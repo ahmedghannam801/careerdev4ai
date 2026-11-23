@@ -77,7 +77,7 @@ export const EvidenceView: React.FC = () => {
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
         <button
           onClick={() => setSelectedType('all')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+          className={`inline-flex min-h-9 items-center px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
             selectedType === 'all'
               ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
               : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -89,7 +89,7 @@ export const EvidenceView: React.FC = () => {
           <button
             key={evidenceType}
             onClick={() => setSelectedType(evidenceType)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
+            className={`inline-flex min-h-9 items-center px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap capitalize transition-colors ${
               selectedType === evidenceType
                 ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)] shadow-xs'
                 : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

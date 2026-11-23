@@ -72,7 +72,7 @@ export const ActivityView: React.FC<{ onNavigate: (view: string) => void }> = ({
             <button
               key={tab.id}
               onClick={() => setFilterType(tab.id)}
-              className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+              className={`inline-flex min-h-9 items-center px-2.5 py-1 rounded-md font-medium transition-colors ${
                 filterType === tab.id
                   ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
                   : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

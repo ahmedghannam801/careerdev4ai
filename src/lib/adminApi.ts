@@ -58,6 +58,8 @@ export interface AdminAnnouncement {
   publishedAt: string | null;
   archivedAt: string | null;
   recipientCount: number;
+  emailEnabled: boolean;
+  emailSentAt: string | null;
   stats: {
     deliveredCount: number;
     readCount: number;
@@ -248,6 +250,8 @@ export interface AnnouncementInput {
   ctaUrl?: string | null;
   publishAt?: string | null;
   expiresAt?: string | null;
+  /** Also deliver this announcement by email, using the same audience. */
+  emailEnabled?: boolean;
 }
 
 export async function createAnnouncement(
@@ -697,6 +701,7 @@ export interface AdminEmailStatus {
   recipientConfigured: boolean;
   sender: string;
   senderIsSharedTestAddress: boolean;
+  domain?: AdminEmailConfig | null;
 }
 
 /**
@@ -725,3 +730,214 @@ export async function sendAdminEmailTest(): Promise<{ success: boolean; messageI
     body: JSON.stringify({}),
   });
 }
+
+export interface AdminEmailDomainRecord {
+  record: string;
+  name: string;
+  type: string;
+  status: string;
+  value: string;
+  ttl?: string | number;
+  priority?: number;
+}
+
+export interface AdminEmailDomain {
+  id: string;
+  name: string;
+  status: string;
+  region?: string;
+  createdAt?: string;
+  records: AdminEmailDomainRecord[];
+}
+
+export interface AdminEmailConfig {
+  apiKeyConfigured: boolean;
+  sender: string;
+  senderAddress: string | null;
+  senderDomain: string | null;
+  senderIsSharedTestAddress: boolean;
+  ownerRecipient: string | null;
+  domains: AdminEmailDomain[];
+  verifiedDomains: string[];
+  domainVerified: boolean;
+  productionReady: boolean;
+  reason: string | null;
+  checkedAt: string;
+}
+
+export type AdminEmailStatusName =
+  | 'pending'
+  | 'processing'
+  | 'sent'
+  | 'delivered'
+  | 'failed'
+  | 'dead_letter'
+  | 'suppressed'
+  | 'blocked'
+  | 'bounced'
+  | 'complained';
+
+export interface AdminEmailLog {
+  id: string;
+  recipient: string;
+  template: string;
+  category: string;
+  status: AdminEmailStatusName;
+  attempt: number;
+  max_attempts: number;
+  provider_message_id: string | null;
+  last_error: string | null;
+  announcement_id: string | null;
+  scheduled_for: string;
+  next_attempt_at: string;
+  sent_at: string | null;
+  delivered_at: string | null;
+  opened_at: string | null;
+  clicked_at: string | null;
+  bounced_at: string | null;
+  created_at: string;
+}
+
+export interface AdminEmailCampaign {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  audienceSummary: string | null;
+  recipientCount: number;
+  publishedAt: string | null;
+  emailSentAt: string | null;
+  queued: number;
+  sent: number;
+  delivered: number;
+  failed: number;
+  blocked: number;
+  bounced: number;
+}
+
+export interface AdminEmailOverview {
+  config: AdminEmailConfig;
+  counts: {
+    total: number;
+    pending: number;
+    processing: number;
+    sent: number;
+    delivered: number;
+    failed: number;
+    deadLetter: number;
+    suppressed: number;
+    blocked: number;
+    bounced: number;
+    complained: number;
+  };
+  events: { delivered: number; bounced: number; complained: number; opened: number; clicked: number };
+  last30Days: { delivered: number; bounced: number; complained: number; opened: number; clicked: number };
+  campaigns: AdminEmailCampaign[];
+  recent: AdminEmailLog[];
+  recentEvents: Array<{
+    id: string;
+    eventType: string;
+    recipient: string | null;
+    providerMessageId: string | null;
+    occurredAt: string;
+  }>;
+}
+
+export async function fetchAdminEmailOverview(): Promise<AdminEmailOverview> {
+  const response = await request<{ overview: AdminEmailOverview }>('/api/admin/email/overview');
+  return response.overview;
+}
+
+export async function fetchAdminEmailLogs(filter?: {
+  status?: AdminEmailStatusName;
+  category?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<AdminEmailLog[]> {
+  const params = new URLSearchParams();
+  if (filter?.status) params.set('status', filter.status);
+  if (filter?.category) params.set('category', filter.category);
+  if (filter?.search) params.set('search', filter.search);
+  params.set('limit', String(filter?.limit ?? 50));
+  params.set('offset', String(filter?.offset ?? 0));
+  const response = await request<{ logs: AdminEmailLog[] }>(
+    `/api/admin/email/logs?${params.toString()}`,
+  );
+  return response.logs ?? [];
+}
+
+export async function retryAdminEmail(id: string): Promise<AdminEmailLog> {
+  const response = await request<{ email: AdminEmailLog }>(
+    `/api/admin/email/${encodeURIComponent(id)}/retry`,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+  return response.email;
+}
+
+export async function processAdminEmailQueue(input?: {
+  limit?: number;
+  digests?: boolean;
+}): Promise<{ summary: Record<string, unknown>; digests: Record<string, unknown> | null }> {
+  return request('/api/admin/email/process', {
+    method: 'POST',
+    body: JSON.stringify(input ?? {}),
+  });
+}
+
+export async function queueAdminDigests(force = false): Promise<Record<string, unknown>> {
+  return request('/api/admin/email/digests', {
+    method: 'POST',
+    body: JSON.stringify({ force }),
+  });
+}
+
+export async function releaseBlockedAdminEmails(): Promise<number> {
+  const response = await request<{ released: number }>('/api/admin/email/release-blocked', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  return response.released;
+}
+
+export async function previewAdminEmail(input: {
+  template: string;
+  locale?: 'en' | 'ar';
+  payload?: Record<string, unknown>;
+}): Promise<{ subject: string; html: string; text: string }> {
+  const response = await request<{ preview: { subject: string; html: string; text: string } }>(
+    '/api/admin/email/preview',
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  return response.preview;
+}
+
+export async function createAdminEmailDomain(name: string): Promise<{
+  domain: AdminEmailDomain;
+  config: AdminEmailConfig;
+}> {
+  return request('/api/admin/email/domain', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function verifyAdminEmailDomain(id: string): Promise<{
+  domain: AdminEmailDomain;
+  config: AdminEmailConfig;
+}> {
+  return request(`/api/admin/email/domain/${encodeURIComponent(id)}/verify`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function sendAdminEmailCampaign(id: string): Promise<number> {
+  const response = await request<{ queued: number }>(
+    `/api/admin/email/campaigns/${encodeURIComponent(id)}/send`,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+  return response.queued;
+}
+
+

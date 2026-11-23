@@ -60,7 +60,7 @@ export const CreditBalanceBadge: React.FC<CreditBalanceBadgeProps> = ({ onOpenPr
       <button
         type="button"
         onClick={() => setDropdownOpen((prev) => !prev)}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border transition-all sm:px-3 ${refreshing ? 'opacity-80' : ''} ${isLow
+        className={`flex min-h-10 items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border transition-all sm:px-3 ${refreshing ? 'opacity-80' : ''} ${isLow
             ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20'
             : 'bg-[var(--accent-surface)] border-[var(--accent-primary)]/25 text-[var(--color-primary-text)] hover:bg-[var(--accent-primary)]/10'
           }`}
