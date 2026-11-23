@@ -1,7 +1,10 @@
 /**
- * Comprehensive Test Suite for SaaS Subscription & Payment System.
+ * The subscription system.
+ *
  * Verifies plan definitions, pricing in piasters, feature entitlements,
- * double-entry credit weights, Egyptian payment instructions, and Law 151 compliance.
+ * credit weights and the booster packs. The payment instructions these tests
+ * used to check belong to the rails that no longer exist; the entitlement and
+ * pricing rules they sat beside are what still matters.
  */
 
 import assert from 'node:assert/strict';
@@ -17,11 +20,6 @@ import {
   AI_CREDIT_ACTIONS,
   CREDIT_PACKS,
 } from '../shared/credits.ts';
-import {
-  PAYMENT_METHODS,
-  PAYMENT_STATUSES,
-} from '../shared/payments.ts';
-import { getPaymentInstructions } from '../server/db/payments.ts';
 
 describe('SaaS Subscription Architecture & Domain Tests', () => {
   it('defines the 4 official subscription plans', () => {
@@ -109,25 +107,5 @@ describe('SaaS Subscription Architecture & Domain Tests', () => {
     assert.equal(p100.pricePiasters, 19900); // 199 EGP
   });
 
-  it('validates supported Egyptian payment methods', () => {
-    assert.deepEqual(Array.from(PAYMENT_METHODS), ['vodafone_cash', 'instapay']);
-    assert.ok(PAYMENT_STATUSES.includes('temporary_access'));
-    assert.ok(PAYMENT_STATUSES.includes('paid'));
-    assert.ok(PAYMENT_STATUSES.includes('under_review'));
-  });
-
-  it('generates accurate localized payment instructions for Vodafone Cash and InstaPay', () => {
-    const vfInstructions = getPaymentInstructions('vodafone_cash', 9900);
-    assert.equal(vfInstructions.method, 'vodafone_cash');
-    assert.equal(vfInstructions.amountFormatted, '99 EGP');
-    assert.ok(vfInstructions.recipientAccount.length > 0);
-    assert.ok(vfInstructions.instructionsEn.length >= 3);
-    assert.ok(vfInstructions.instructionsAr.length >= 3);
-
-    const ipInstructions = getPaymentInstructions('instapay', 17900);
-    assert.equal(ipInstructions.method, 'instapay');
-    assert.equal(ipInstructions.amountFormatted, '179 EGP');
-    assert.ok(ipInstructions.recipientAccount.includes('@'));
-  });
 });
 

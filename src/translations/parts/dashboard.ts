@@ -30,7 +30,7 @@ export const dashboardAr: Record<string, string> = {
   'Save Notes & Reminder': 'حفظ الملاحظات والتذكير',
   'Track New Application': 'تتبّع طلب جديد',
   'Company Name': 'اسم الشركة',
-  'e.g. Stripe, Linear, Vercel': 'مثال: Stripe أو Linear أو Vercel',
+  'e.g. Google, Linear, Vercel': 'مثال: Google أو Linear أو Vercel',
   'Target Role Title': 'المسمى الوظيفي المستهدف',
   'e.g. Frontend Engineer': 'مثال: مهندس واجهات أمامية',
   'Work Mode': 'نمط العمل',

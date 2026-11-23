@@ -92,6 +92,8 @@ export async function startXPayCheckout(params: {
   packId?: string;
   billingCycle?: 'monthly' | 'annual';
   couponCode?: string;
+  /** Ask for the birthday discount; the server decides whether it applies. */
+  applyBirthdayReward?: boolean;
   locale?: 'ar' | 'en';
   idempotencyKey?: string;
 }): Promise<XPayCheckoutResponse> {
@@ -142,6 +144,11 @@ export async function goToHostedPage(url: string): Promise<void> {
     // Not running under Capacitor; fall through to a normal navigation.
   }
   window.location.assign(url);
+}
+
+/** True when a hosted session id belongs to XPay, from its prefix. */
+export function isXPaySessionId(sessionId: string | null | undefined): sessionId is string {
+  return typeof sessionId === 'string' && /^cs_(test|live)_[A-Za-z0-9]+$/.test(sessionId);
 }
 
 /** Starts the checkout and leaves for it. */

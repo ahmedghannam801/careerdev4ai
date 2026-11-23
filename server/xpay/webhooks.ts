@@ -13,8 +13,9 @@
  */
 
 import type { BillingCycle } from '../../shared/subscriptions.ts';
-import { grantAiCredits } from '../stripe/store.ts';
+import { grantAiCredits } from '../credits/grant.ts';
 import { getPlanByCode } from '../db/subscriptions.ts';
+import { redeemBirthdayReward } from '../birthday/service.ts';
 import type { XPaySessionResponse } from './checkout.ts';
 import {
   getXPayPurchaseBySession,
@@ -254,6 +255,12 @@ export async function fulfillPaidSession(
       description: `Credit pack ${stored.pack_id ?? ''} (${stored.credits} credits) bought through XPay`.trim(),
       metadata: { pack_id: stored.pack_id, xpay_session: session.id },
     });
+  }
+
+  // The birthday reward is spent only once the money is in. A candidate who
+  // abandons the checkout keeps it.
+  if (metadata.birthday_reward === 'applied') {
+    await redeemBirthdayReward(stored.profile_id, null);
   }
 
   if (stored.purchase_kind === 'subscription' && stored.plan_code) {

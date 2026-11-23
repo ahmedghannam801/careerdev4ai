@@ -7,8 +7,6 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthedRequest } from '../auth/require-auth.ts';
 import { getActiveSubscription } from '../db/subscriptions.ts';
-import { getActiveTemporaryAccessPayment } from '../db/payments.ts';
-import { getActiveStripeSubscription } from '../stripe/store.ts';
 import { getActiveXPayAccess } from '../xpay/store.ts';
 import {
   type EntitlementFeature,
@@ -46,23 +44,10 @@ const HIGH_RISK_TEMPORARY_RESTRICTIONS = new Set<EntitlementFeature>([
  */
 export async function getUserEffectivePlan(profileId: string): Promise<EffectivePlanState> {
   try {
-    // A card subscription bought through Stripe is the strongest signal: Stripe
-    // has already collected the money and manages the renewal. It is checked
-    // before the manual rails so a candidate who pays by card unlocks the plan
-    // the moment the webhook lands.
-    const stripeSub = await getActiveStripeSubscription(profileId);
-    if (stripeSub) {
-      return {
-        planCode: stripeSub.plan_code as SubscriptionPlanCode,
-        isTemporary: false,
-        expiresAt: stripeSub.current_period_end,
-      };
-    }
-
-    // A plan period bought through XPay. It is a one-time payment with a fixed
-    // end date — there is no mandate on file — so the period end is the whole
-    // entitlement, and it sits alongside the Stripe check rather than replacing
-    // it: a candidate keeps whatever either rail granted.
+    // A plan period bought through XPay is the strongest signal: the money has
+    // arrived and the period end is the whole entitlement. It is checked first
+    // so a candidate who pays by card unlocks the plan the moment the verified
+    // webhook lands.
     const xpayPurchase = await getActiveXPayAccess(profileId);
     if (xpayPurchase?.plan_code && xpayPurchase.access_ends_at) {
       return {
@@ -78,15 +63,6 @@ export async function getUserEffectivePlan(profileId: string): Promise<Effective
         planCode: activeSub.planCode,
         isTemporary: false,
         expiresAt: activeSub.currentPeriodEndsAt,
-      };
-    }
-
-    const tempPayment = await getActiveTemporaryAccessPayment(profileId);
-    if (tempPayment && tempPayment.temporaryAccessExpiresAt) {
-      return {
-        planCode: (tempPayment.planCode as SubscriptionPlanCode) || 'student',
-        isTemporary: true,
-        expiresAt: tempPayment.temporaryAccessExpiresAt,
       };
     }
 

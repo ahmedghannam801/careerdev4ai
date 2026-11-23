@@ -10,8 +10,6 @@ import {
   listSubscriptionsForUser,
   cancelSubscription,
 } from '../db/subscriptions.ts';
-import { getActiveTemporaryAccessPayment } from '../db/payments.ts';
-import { getActiveStripeSubscription } from '../stripe/store.ts';
 import { getActiveXPayAccess } from '../xpay/store.ts';
 import type {
   SubscriptionDTO,
@@ -37,33 +35,13 @@ export interface UserSubscriptionSummary {
 export async function getUserSubscriptionSummary(
   profileId: string
 ): Promise<UserSubscriptionSummary> {
-  const [activeSub, tempPayment, history, stripeSub, xpayPurchase] = await Promise.all([
+  const [activeSub, history, xpayPurchase] = await Promise.all([
     getActiveSubscription(profileId),
-    getActiveTemporaryAccessPayment(profileId),
     listSubscriptionsForUser(profileId),
-    getActiveStripeSubscription(profileId),
     // A period bought through XPay behaves the same way from the candidate's
     // side: it is active until a date, and it is renewed by hand.
     getActiveXPayAccess(profileId).catch(() => null),
   ]);
-
-  // Card subscriptions live in their own mirror because Stripe, not an
-  // administrator, owns their lifecycle. Reporting them here keeps the pricing
-  // page and the settings page correct without a second API call.
-  if (stripeSub) {
-    const plan = await getPlanByCode(stripeSub.plan_code);
-    return {
-      planCode: stripeSub.plan_code as SubscriptionPlanCode,
-      planNameEn: plan?.nameEn ?? stripeSub.plan_code,
-      planNameAr: plan?.nameAr ?? stripeSub.plan_code,
-      status: 'active',
-      activeSubscription: null,
-      temporaryPaymentId: null,
-      expiresAt: stripeSub.current_period_end,
-      autoRenew: !stripeSub.cancel_at_period_end,
-      history,
-    };
-  }
 
   if (xpayPurchase?.plan_code) {
     const plan = await getPlanByCode(xpayPurchase.plan_code);
@@ -90,20 +68,6 @@ export async function getUserSubscriptionSummary(
       temporaryPaymentId: null,
       expiresAt: activeSub.currentPeriodEndsAt,
       autoRenew: activeSub.autoRenew,
-      history,
-    };
-  }
-
-  if (tempPayment && tempPayment.temporaryAccessExpiresAt) {
-    return {
-      planCode: (tempPayment.planCode as SubscriptionPlanCode) || 'student',
-      planNameEn: tempPayment.planNameEn,
-      planNameAr: tempPayment.planNameAr,
-      status: 'temporary_access',
-      activeSubscription: null,
-      temporaryPaymentId: tempPayment.id,
-      expiresAt: tempPayment.temporaryAccessExpiresAt,
-      autoRenew: false,
       history,
     };
   }

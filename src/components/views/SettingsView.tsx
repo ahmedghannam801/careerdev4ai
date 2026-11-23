@@ -33,8 +33,7 @@ import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
 import { TabButtons } from '../ui/TabButtons';
 import { MembershipPanel } from '../subscription/MembershipPanel';
-import { SUPPORT_EMAIL } from '../../../shared/contact.ts';
-import { CONTACT_PHONE } from '../../../shared/paymentAccounts.ts';
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from '../../../shared/contact.ts';
 
 /**
  * A short, honest description of the browser this session is running in.
@@ -889,7 +888,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
                 </a>
 
                 <a
-                  href={`tel:${CONTACT_PHONE}`}
+                  href={`tel:${SUPPORT_PHONE}`}
                   className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-secondary)] hover:border-[var(--color-primary-text)]/30 transition-all flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -899,7 +898,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
                     <div className="min-w-0">
                       <div className="font-semibold text-[var(--text-primary)]">{t('Phone')}</div>
                       <div className="text-[11px] text-[var(--text-secondary)] truncate font-mono">
-                        {CONTACT_PHONE}
+                        {SUPPORT_PHONE}
                       </div>
                     </div>
                   </div>

@@ -1,7 +1,11 @@
 /**
  * AdminRevenuePanel — Financial Metrics & Manual Credit Grants.
  *
- * Aggregates verified Egyptian revenue from Vodafone Cash, InstaPay and card
+ * Aggregates the revenue this platform has collected: the card payments made
+ * through XPay, plus the historical rows written by rails that no longer exist
+ * (the manual wallets and the previous card provider). History is kept and
+ * counted; no new payment can be made through those rails, and the labels in
+ * the per-method breakdown name the method a past payment actually used.
  * payments via Stripe. Card figures are read from the webhook-written mirror;
  * test-mode invoices are listed and labelled but are never added to revenue.
  * Refunds are subtracted once and shown separately, and offline transactions

@@ -51,8 +51,6 @@ const SECRET_KEYS = [
  * feature is not configured.
  */
 const OPTIONAL_SECRET_KEYS = [
-  'STRIPE_SECRET_KEY',
-  'STRIPE_WEBHOOK_SECRET',
   'XPAY_SECRET_KEY',
   'XPAY_WEBHOOK_SECRET',
   'XPAY_ALLOW_LIVE',

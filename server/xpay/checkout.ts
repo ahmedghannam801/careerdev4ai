@@ -105,6 +105,8 @@ export interface BuildCheckoutInput {
   origin: string;
   locale: 'ar' | 'en';
   couponCode?: string | null;
+  /** Extra metadata a caller needs to carry onto the session. */
+  extraMetadata?: Record<string, string>;
   paymentMethodConfigurationId?: string | null;
   expiresAfterMinutes?: number;
 }
@@ -138,6 +140,7 @@ export function buildCheckoutBody(input: BuildCheckoutInput): XPayCheckoutBody {
   if (entitlement.credits) metadata.credits = String(entitlement.credits);
   if (input.couponCode) metadata.coupon_code = input.couponCode;
   if (amount.discountAmount > 0) metadata.discount_amount = String(amount.discountAmount);
+  if (input.extraMetadata) Object.assign(metadata, input.extraMetadata);
 
   const body: XPayCheckoutBody = {
     mode: 'payment',

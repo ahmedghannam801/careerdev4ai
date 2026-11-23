@@ -16,6 +16,7 @@
 
 import { getPlanByCode } from '../db/subscriptions.ts';
 import { validateCoupon } from '../coupons/service.ts';
+import { getActiveBirthdayReward } from '../birthday/service.ts';
 import type { BillingCycle, SubscriptionPlanCode } from '../../shared/subscriptions.ts';
 import { CREDIT_PACKS } from '../../shared/credits.ts';
 import { describeXPayConfig, getXPayConfig, isXPayConfigured, type XPayConfigStatus } from './config.ts';
@@ -62,6 +63,12 @@ export interface CreateCheckoutInput {
   billingCycle?: BillingCycle;
   packId?: string;
   couponCode?: string | null;
+  /**
+   * The candidate may ask for their birthday discount; the server decides
+   * whether it applies and what it is worth. The request never carries an
+   * amount.
+   */
+  applyBirthdayReward?: boolean;
   /** Reused when the browser retries the same click. */
   idempotencyKey?: string;
 }
@@ -164,7 +171,28 @@ export async function createXPayCheckoutForProfile(
     couponCode = input.couponCode.trim().toUpperCase();
   }
 
-  const amount = purchaseAmount(purchase, discountAmount);
+  /**
+   * The birthday discount.
+   *
+   * It is worked out here, from the catalogue price, and only when the server
+   * has confirmed that today really is the candidate's birthday. It is applied
+   * instead of a coupon rather than on top of one: two discounts on one
+   * checkout would be a price nobody agreed to.
+   */
+  let birthdayDiscountAmount = 0;
+  if (input.applyBirthdayReward && !couponCode && purchase.kind === 'subscription') {
+    const reward = await getActiveBirthdayReward(input.profileId);
+    if (reward) {
+      const gross = purchaseAmount(purchase).listAmount;
+      birthdayDiscountAmount = Math.min(
+        Math.floor((gross * reward.discountPercentage) / 100),
+        reward.maxDiscountPiasters
+      );
+    }
+  }
+
+  const couponDiscount = discountAmount + birthdayDiscountAmount;
+  const amount = purchaseAmount(purchase, couponDiscount);
   const entitlement = purchaseEntitlement(purchase);
   const config = getXPayConfig();
   const body = buildCheckoutBody({
@@ -175,6 +203,11 @@ export async function createXPayCheckoutForProfile(
     origin: input.origin,
     locale: input.locale,
     couponCode,
+    // The discount is carried in metadata so fulfilment can record that the
+    // birthday reward was used, and so the amount can be audited later.
+    extraMetadata: birthdayDiscountAmount > 0
+      ? { birthday_discount: String(birthdayDiscountAmount), birthday_reward: 'applied' }
+      : undefined,
     paymentMethodConfigurationId: config.paymentMethodConfigurationId,
     // A candidate paying by Fawry needs time to take the reference to an
     // outlet, so the window is shorter than XPay's 24-hour default but not so

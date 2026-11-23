@@ -496,43 +496,6 @@ export interface AdminSubscriptionRow {
   };
 }
 
-export interface AdminPaymentRow {
-  id: string;
-  profile_id: string;
-  plan_id: string;
-  billing_cycle: string;
-  original_amount_piasters: number;
-  discount_amount_piasters: number;
-  amount_piasters: number;
-  currency: string;
-  payment_method: string;
-  status: string;
-  transaction_reference: string | null;
-  sender_phone_or_handle: string | null;
-  receipt_storage_path: string | null;
-  receipt_filename: string | null;
-  risk_score: number;
-  risk_flags: string[];
-  temporary_access_granted_at: string | null;
-  temporary_access_expires_at: string | null;
-  review_notes: string | null;
-  rejection_reason: string | null;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
-  paid_at: string | null;
-  expires_at: string;
-  created_at: string;
-  subscription_plans?: {
-    code: string;
-    name_en: string;
-    name_ar: string;
-  };
-  profiles?: {
-    full_name: string | null;
-    username: string | null;
-  };
-}
-
 export interface AdminStripeInvoiceRow {
   id: string;
   number: string | null;
@@ -617,51 +580,6 @@ export async function fetchAdminSubscriptions(): Promise<AdminSubscriptionRow[]>
   return data.subscriptions ?? [];
 }
 
-export async function fetchAdminPayments(status?: string): Promise<AdminPaymentRow[]> {
-  const query = status ? `?status=${encodeURIComponent(status)}` : '';
-  const data = await request<{ payments: AdminPaymentRow[] }>(`/api/admin/payments${query}`);
-  return data.payments ?? [];
-}
-
-export async function confirmAdminPayment(
-  paymentId: string,
-  notes?: string
-): Promise<{ success: boolean; subscriptionId?: string }> {
-  return request<{ success: boolean; subscriptionId?: string }>(
-    `/api/admin/payments/${encodeURIComponent(paymentId)}/confirm`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ notes }),
-    }
-  );
-}
-
-export async function rejectAdminPayment(
-  paymentId: string,
-  reason: string,
-  notes?: string
-): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>(
-    `/api/admin/payments/${encodeURIComponent(paymentId)}/reject`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ reason, notes }),
-    }
-  );
-}
-
-export async function restoreAdminPayment(
-  paymentId: string,
-  notes?: string
-): Promise<{ success: boolean; subscriptionId?: string }> {
-  return request<{ success: boolean; subscriptionId?: string }>(
-    `/api/admin/payments/${encodeURIComponent(paymentId)}/restore`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ notes }),
-    }
-  );
-}
 
 export async function fetchAdminRevenue(filter?: {
   from?: string;

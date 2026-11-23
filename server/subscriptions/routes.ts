@@ -1,33 +1,23 @@
 /**
- * Subscription, Payments, Credits, and Revenue API Routes.
+ * Subscription, Credits, and Revenue API Routes.
+ *
+ * Card payment lives in `server/xpay/routes.ts`: this file owns the plans, the
+ * candidate's entitlement, credits, coupons, birthdays, and the administrator's
+ * view of subscriptions and revenue.
  * All candidate endpoints require verified session authentication.
  * All administration endpoints require verified administrator status and RBAC permission checks.
  */
 
 import type { Express, Request, Response } from 'express';
-import multer from 'multer';
 import { requireAuth, type AuthedRequest } from '../auth/require-auth.ts';
 import { resolvePlanIdentityTier } from '../../shared/planIdentity.ts';
 import { requireAdmin, requirePermission, type AdminRequest } from '../admin/permissions.ts';
-import { logAdminAction } from '../db/admin.ts';
 import { getSupabaseServer } from '../db/supabase.ts';
 import {
   getUserSubscriptionSummary,
   getPublicPlans,
   cancelActiveSubscription,
 } from './service.ts';
-import {
-  createCheckout,
-  submitEvidence,
-  confirmPaymentByAdmin,
-  rejectPaymentByAdmin,
-  restorePaymentByAdmin,
-} from '../payments/service.ts';
-import {
-  listPaymentRequestsForUser,
-  getPaymentRequestById,
-  listVerifications,
-} from '../db/payments.ts';
 import {
   getUserCreditsWithTrial,
   getCreditLedgerHistory,
@@ -39,8 +29,6 @@ import {
   revokeBirthdayConsent,
   getActiveBirthdayReward,
 } from '../birthday/service.ts';
-import type { PaymentMethod } from '../../shared/payments.ts';
-import { isTestMode } from '../stripe/config.ts';
 import {
   computeAdminRevenue,
   parseRevenueDateRange,
@@ -48,12 +36,7 @@ import {
   type StripeDisputeRevenueRow,
   type StripeInvoiceRevenueRow,
   type StripeRefundRevenueRow,
-} from '../stripe/revenue.ts';
-
-const receiptUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
-});
+} from '../revenue/service.ts';
 
 export function registerSubscriptionRoutes(app: Express): void {
   /* -------------------------------------------------------------------------- */
@@ -116,121 +99,6 @@ export function registerSubscriptionRoutes(app: Express): void {
   /* -------------------------------------------------------------------------- */
 
   // Candidate: Create payment checkout intent
-  app.post('/api/payments/checkout', requireAuth, async (req: AuthedRequest, res: Response) => {
-    try {
-      const planCode = String(req.body?.planCode ?? '').trim();
-      const billingCycle = req.body?.billingCycle === 'annual' ? 'annual' : 'monthly';
-      const paymentMethod = req.body?.paymentMethod as PaymentMethod;
-      const couponCode = req.body?.couponCode ? String(req.body.couponCode).trim() : undefined;
-      const applyBirthdayReward = Boolean(req.body?.applyBirthdayReward);
-
-      if (!planCode) {
-        return res.status(400).json({ error: 'planCode is required' });
-      }
-      if (paymentMethod !== 'vodafone_cash' && paymentMethod !== 'instapay') {
-        return res.status(400).json({ error: 'Valid paymentMethod (vodafone_cash | instapay) is required' });
-      }
-
-      const result = await createCheckout({
-        profileId: req.authUser!.id,
-        planCode,
-        billingCycle,
-        paymentMethod,
-        couponCode,
-        applyBirthdayReward,
-      });
-
-      return res.json({
-        success: true,
-        paymentRequest: result.paymentRequest,
-        instructions: result.instructions,
-      });
-    } catch (error: any) {
-      console.error('Checkout creation error:', error);
-      return res.status(400).json({ error: error.message || 'Failed to create checkout' });
-    }
-  });
-
-  // Candidate: Submit payment proof (reference, sender handle, receipt image)
-  app.post(
-    '/api/payments/evidence',
-    requireAuth,
-    receiptUpload.single('receipt'),
-    async (req: AuthedRequest, res: Response) => {
-      try {
-        const paymentRequestId = String(req.body?.paymentRequestId ?? '').trim();
-        const transactionReference = String(req.body?.transactionReference ?? '').trim();
-        const senderPhoneOrHandle = String(req.body?.senderPhoneOrHandle ?? '').trim();
-
-        if (!paymentRequestId) {
-          return res.status(400).json({ error: 'paymentRequestId is required' });
-        }
-        if (!transactionReference || transactionReference.length < 4) {
-          return res.status(400).json({ error: 'Valid transaction reference is required' });
-        }
-        if (!senderPhoneOrHandle) {
-          return res.status(400).json({ error: 'Sender phone or handle is required' });
-        }
-        if (!req.file || !req.file.buffer) {
-          return res.status(400).json({ error: 'Payment receipt image file is required' });
-        }
-
-        const updated = await submitEvidence({
-          profileId: req.authUser!.id,
-          paymentRequestId,
-          transactionReference,
-          senderPhoneOrHandle,
-          receiptBuffer: req.file.buffer,
-          filename: req.file.originalname || 'receipt.png',
-          contentType: req.file.mimetype || 'image/png',
-          sizeBytes: req.file.size,
-        });
-
-        return res.json({
-          success: true,
-          paymentRequest: updated,
-          provisionalAccessGranted: updated.status === 'temporary_access',
-        });
-      } catch (error: any) {
-        console.error('Evidence submission error:', error);
-        return res.status(400).json({ error: error.message || 'Failed to submit payment evidence' });
-      }
-    }
-  );
-
-  // Candidate: View own payment requests
-  app.get('/api/payments/my-requests', requireAuth, async (req: AuthedRequest, res: Response) => {
-    try {
-      const requests = await listPaymentRequestsForUser(req.authUser!.id);
-      return res.json({ success: true, requests });
-    } catch (error) {
-      console.error('Failed to list user payment requests:', error);
-      return res.status(500).json({ error: 'Failed to retrieve payment history' });
-    }
-  });
-
-  // Candidate: Get details and verifications of a specific payment request
-  app.get('/api/payments/requests/:id', requireAuth, async (req: AuthedRequest, res: Response) => {
-    try {
-      const requestId = req.params.id;
-      const request = await getPaymentRequestById(requestId, req.authUser!.id);
-      if (!request) {
-        return res.status(404).json({ error: 'Payment request not found' });
-      }
-
-      const verifications = await listVerifications(requestId);
-      return res.json({ success: true, request, verifications });
-    } catch (error) {
-      console.error('Failed to get payment request:', error);
-      return res.status(500).json({ error: 'Failed to retrieve payment details' });
-    }
-  });
-
-  /* -------------------------------------------------------------------------- */
-  /* AI Credits & Ledger Routes                                                 */
-  /* -------------------------------------------------------------------------- */
-
-  // Candidate: Get current credit balance and monthly allocation
   app.get('/api/credits/balance', requireAuth, async (req: AuthedRequest, res: Response) => {
     try {
       const balance = await getUserCreditsWithTrial(req.authUser!.id);
@@ -398,147 +266,6 @@ export function registerSubscriptionRoutes(app: Express): void {
 
   // Admin: View payment requests awaiting review or history
   app.get(
-    '/api/admin/payments',
-    requireAuth,
-    requireAdmin,
-    requirePermission('payments.read'),
-    async (req: AdminRequest, res: Response) => {
-      try {
-        const statusFilter = req.query.status ? String(req.query.status) : undefined;
-        let query = getSupabaseServer()
-          .from('payment_requests')
-          .select(`
-            id, profile_id, plan_id, billing_cycle,
-            original_amount_piasters, discount_amount_piasters, amount_piasters,
-            currency, payment_method, status, transaction_reference,
-            sender_phone_or_handle, receipt_storage_path, receipt_filename,
-            risk_score, risk_flags, temporary_access_granted_at,
-            temporary_access_expires_at, review_notes, rejection_reason,
-            reviewed_by, reviewed_at, paid_at, expires_at, created_at,
-            subscription_plans(code, name_en, name_ar),
-            profiles:profile_id(full_name, username)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(100);
-
-        if (statusFilter) {
-          query = query.eq('status', statusFilter);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        return res.json({ success: true, payments: data ?? [] });
-      } catch (error) {
-        console.error('Admin payments query failed:', error);
-        return res.status(500).json({ error: 'Failed to load payments' });
-      }
-    }
-  );
-
-  // Admin: Confirm payment and activate candidate subscription
-  app.post(
-    '/api/admin/payments/:id/confirm',
-    requireAuth,
-    requireAdmin,
-    requirePermission('payments.confirm'),
-    async (req: AdminRequest, res: Response) => {
-      try {
-        const paymentId = req.params.id;
-        const notes = req.body?.notes ? String(req.body.notes).slice(0, 500) : undefined;
-
-        const outcome = await confirmPaymentByAdmin(req.admin!.id, paymentId, notes);
-        if (!outcome.success) {
-          return res.status(400).json({ error: outcome.error || 'Failed to confirm payment' });
-        }
-
-        await logAdminAction(req.admin!, {
-          action: 'payments.confirmed',
-          entityType: 'payment_request',
-          entityId: paymentId,
-          metadata: {
-            subscriptionId: outcome.subscriptionId,
-            creditsGranted: outcome.creditsGranted,
-            notes,
-          },
-        });
-
-        return res.json({
-          success: true,
-          subscriptionId: outcome.subscriptionId,
-          creditsGranted: outcome.creditsGranted,
-        });
-      } catch (error) {
-        console.error('Admin confirm payment error:', error);
-        return res.status(500).json({ error: 'Failed to confirm payment' });
-      }
-    }
-  );
-
-  // Admin: Reject payment request with reason
-  app.post(
-    '/api/admin/payments/:id/reject',
-    requireAuth,
-    requireAdmin,
-    requirePermission('payments.confirm'),
-    async (req: AdminRequest, res: Response) => {
-      try {
-        const paymentId = req.params.id;
-        const reason = String(req.body?.reason ?? 'Payment verification failed').slice(0, 500);
-        const notes = req.body?.notes ? String(req.body.notes).slice(0, 500) : undefined;
-
-        const outcome = await rejectPaymentByAdmin(req.admin!.id, paymentId, reason, notes);
-        if (!outcome.success) {
-          return res.status(400).json({ error: outcome.error || 'Failed to reject payment' });
-        }
-
-        await logAdminAction(req.admin!, {
-          action: 'payments.rejected',
-          entityType: 'payment_request',
-          entityId: paymentId,
-          metadata: { reason, notes },
-        });
-
-        return res.json({ success: true });
-      } catch (error) {
-        console.error('Admin reject payment error:', error);
-        return res.status(500).json({ error: 'Failed to reject payment' });
-      }
-    }
-  );
-
-  // Admin: Restore late payment
-  app.post(
-    '/api/admin/payments/:id/restore',
-    requireAuth,
-    requireAdmin,
-    requirePermission('payments.confirm'),
-    async (req: AdminRequest, res: Response) => {
-      try {
-        const paymentId = req.params.id;
-        const notes = req.body?.notes ? String(req.body.notes).slice(0, 500) : undefined;
-
-        const outcome = await restorePaymentByAdmin(req.admin!.id, paymentId, notes);
-        if (!outcome.success) {
-          return res.status(400).json({ error: outcome.error || 'Failed to restore payment' });
-        }
-
-        await logAdminAction(req.admin!, {
-          action: 'payments.restored',
-          entityType: 'payment_request',
-          entityId: paymentId,
-          metadata: { subscriptionId: outcome.subscriptionId, notes },
-        });
-
-        return res.json({ success: true, subscriptionId: outcome.subscriptionId });
-      } catch (error) {
-        console.error('Admin restore payment error:', error);
-        return res.status(500).json({ error: 'Failed to restore payment' });
-      }
-    }
-  );
-
-  // Admin: Financial & Revenue Metrics
-  app.get(
     '/api/admin/revenue',
     requireAuth,
     requireAdmin,
@@ -555,7 +282,7 @@ export function registerSubscriptionRoutes(app: Express): void {
         // and Supabase has no aggregate helper without an RPC. At real volume
         // this becomes a `sum(...)` RPC plus a limited list query; capping the
         // rows here would silently understate revenue. The arithmetic lives in
-        // `server/stripe/revenue.ts` so the refund and double-counting rules
+        // `server/revenue/service.ts` so the refund and double-counting rules
         // are testable.
         const { data: paymentRows, error: paymentError } = await getSupabaseServer()
           .from('payment_requests')
@@ -668,7 +395,10 @@ export function registerSubscriptionRoutes(app: Express): void {
         const metrics = computeAdminRevenue(
           { payments, invoices, refunds, disputes },
           {
-            testMode: isTestMode(),
+            // The card rail that wrote these invoice rows is gone; the rows are
+            // history and stay countable. There is no live mode to compare them
+            // against, so nothing is excluded here.
+            testMode: false,
             range: parsedRange.range,
             stripeAvailable: !stripeInvoiceError,
           }

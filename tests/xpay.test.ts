@@ -364,6 +364,44 @@ test('an async payment that fails leaves the session unpaid and grants nothing',
   assert.equal(purchases.length, 0);
 });
 
+test('an expired session is recorded and grants nothing', async () => {
+  const { deps, purchases, granted } = harness();
+
+  // The candidate opened the checkout and never paid; XPay closes it after the
+  // window. Nothing was bought, so nothing is granted and nothing is refunded.
+  const result = await processXPayEvent(
+    event(
+      'checkout.session.expired',
+      session({ status: 'expired', paymentStatus: 'unpaid', paymentIntentId: null })
+    ),
+    deps
+  );
+
+  assert.deepEqual(result.handled, ['checkout.session.expired']);
+  assert.equal(purchases.length, 0);
+  assert.equal(granted.length, 0);
+});
+
+test('the plan opens on the money, not on the candidate returning to the page', async () => {
+  const { deps, purchases } = harness();
+
+  // This is the whole reason fulfilment reads `paymentStatus` and never
+  // `status`: a session can be `complete` while the money has not arrived.
+  await processXPayEvent(
+    event('checkout.session.completed', session({ status: 'complete', paymentStatus: 'unpaid' })),
+    deps
+  );
+  assert.equal(purchases.length, 0);
+
+  // The browser returning with `?xpay=success` changes nothing either: the
+  // only path that grants is a verified event that says the money is in.
+  await processXPayEvent(
+    event('checkout.session.async_payment_succeeded', session({ paymentStatus: 'paid' }), 'evt_money'),
+    deps
+  );
+  assert.deepEqual(purchases, [{ sessionId: 'cs_test_abc123', planCode: 'career_plus' }]);
+});
+
 test('a credit pack is granted with the session id as its idempotency key', async () => {
   const { deps, granted, purchases } = harness();
   const packSession = session({

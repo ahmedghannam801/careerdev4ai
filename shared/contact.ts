@@ -13,6 +13,19 @@ import { BRAND_NAME } from './brand';
 /** The support and feedback address. */
 export const SUPPORT_EMAIL = 'ahmedghannam801@gmail.com';
 
+/**
+ * The support phone number, in international format.
+ *
+ * It is the number the operator answers on. It used to be read from the manual
+ * payment configuration, where it doubled as a wallet number; the wallet rails
+ * are gone, and a phone number that a candidate can call is contact
+ * information, not a payment destination.
+ */
+export const SUPPORT_PHONE = '+201027053876';
+
+/** The support phone in the local format people dial domestically. */
+export const SUPPORT_PHONE_LOCAL = '01027053876';
+
 /** The operator's public professional profile. */
 export const OPERATOR_LINKEDIN_URL = 'https://www.linkedin.com/in/ahmed-ebrahim2';
 

@@ -34,7 +34,6 @@ import {
   TrendingUp,
   Users,
   CreditCard,
-  Smartphone,
   DollarSign,
   LayoutTemplate,
   Coins,
@@ -50,7 +49,6 @@ import { ChartCard, DonutChart, ProgressMeter, formatCount } from '../charts';
 import { AnnouncementsPanel } from '../admin/AnnouncementsPanel';
 import { TrafficAnalyticsPanel } from '../admin/TrafficAnalyticsPanel';
 import { AdminSubscriptionsPanel } from '../admin/AdminSubscriptionsPanel';
-import { AdminPaymentsPanel } from '../admin/AdminPaymentsPanel';
 import { AdminRevenuePanel } from '../admin/AdminRevenuePanel';
 import { CvTemplatesPanel } from '../admin/CvTemplatesPanel';
 import { CreditMonitorPanel } from '../admin/CreditMonitorPanel';
@@ -97,7 +95,6 @@ type AdminTab =
   | 'email'
   | 'audit'
   | 'subscriptions'
-  | 'payments'
   | 'revenue'
   | 'cv-templates'
   | 'credits';
@@ -1276,9 +1273,6 @@ export const AdminCenterView: React.FC = () => {
     if (permissions.has('subscriptions.read')) {
       entries.push({ id: 'subscriptions', label: t('Subscriptions'), icon: CreditCard });
     }
-    if (permissions.has('payments.read')) {
-      entries.push({ id: 'payments', label: t('Payments'), icon: Smartphone });
-    }
     if (permissions.has('revenue.read')) {
       entries.push({ id: 'revenue', label: t('Revenue & Finance'), icon: DollarSign });
     }
@@ -1489,7 +1483,6 @@ export const AdminCenterView: React.FC = () => {
       {tab === 'email' && <EmailDeliveryPanel />}
       {tab === 'audit' && <AuditPanel />}
       {tab === 'subscriptions' && <AdminSubscriptionsPanel />}
-      {tab === 'payments' && <AdminPaymentsPanel />}
       {tab === 'revenue' && <AdminRevenuePanel />}
       {tab === 'cv-templates' && (
         <CvTemplatesPanel canWrite={permissions.has('plans.manage')} />

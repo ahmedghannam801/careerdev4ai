@@ -1194,7 +1194,7 @@ export const ApplicationsView: React.FC = () => {
                   required
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
-                  placeholder={t('e.g. Stripe, Linear, Vercel')}
+                  placeholder={t('e.g. Google, Linear, Vercel')}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
                 />
               </div>

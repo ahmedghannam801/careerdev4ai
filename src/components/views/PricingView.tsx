@@ -1,7 +1,9 @@
 /**
  * PricingView — Production SaaS Pricing & Subscription Center.
  * Comprehensive Egyptian-pound tier catalog (Student, Pro, Career Plus), credit packs,
- * billing cycle toggles, and checkout over Vodafone Cash / InstaPay or a Stripe-hosted card page.
+ * billing cycle toggles, and checkout over XPay's hosted page — cards, Apple Pay,
+ * Fawry and ValU — where every method shown is one the merchant account has
+ * enabled.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -20,23 +22,11 @@ import { useCareer } from '../../context/CareerContext';
 import { CheckoutModal } from '../subscription/CheckoutModal';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
-import {
-  CardNetworkMarks,
-  InstaPayMark,
-  StripeMark,
-  VodafoneCashMark,
-} from '../payment/PaymentBrandMarks';
 import { formatEgpPrice } from '../../../shared/subscriptions';
 import { CREDIT_PACKS } from '../../../shared/credits';
 import { CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS } from '../../../shared/cvTemplates';
-import {
-  fetchStripeBillingStatus,
-  openStripePortal,
-  goToStripe,
-  type StripeBillingStatus,
-} from '../../lib/stripeApi';
-import { isXPaySessionId } from '../../lib/cardBilling';
-import { syncXPaySession } from '../../lib/xpayApi';
+import { fetchXPayStatus, type XPayStatus } from '../../lib/xpayApi';
+import { isXPaySessionId, syncXPaySession } from '../../lib/xpayApi';
 import { useRoute } from '../../lib/useRouteParams';
 import { buildRouteHash } from '../../lib/routing';
 
@@ -184,9 +174,9 @@ const FAQ_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
       'Yes — the core platform is completely free: job discovery, goal tracking and the basic learning maps. Paid plans exist to cover the running cost of the advanced AI models (Gemini), document processing and interview simulation.',
   },
   {
-    question: 'How is my account activated after I pay with Vodafone Cash or InstaPay?',
+    question: 'Which payment methods can I use?',
     answer:
-      'As soon as you enter the transfer reference and upload a screenshot of the receipt, the system gives you temporary access for 24 hours so you can carry on straight away, while an administrator makes the final confirmation during working hours.',
+      'Payment goes through XPay, Egypt’s payment provider. The methods offered are the ones enabled on our merchant account — cards, Apple Pay, Fawry and ValU — and the checkout shows exactly what is available when you pay. Your plan activates the moment the payment is confirmed, and a Fawry reference activates it the moment the money arrives.',
   },
   {
     question: 'What happens if the AI call fails? Do I lose my tokens?',
@@ -194,6 +184,22 @@ const FAQ_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
       'Never. The platform runs a secure double-entry ledger. If there is any network interruption or a model error, the tokens that were held are automatically refunded to your account straight away.',
   },
 ];
+
+/** The label for a payment method XPay reports. */
+const paymentMethodLabel = (method: string): string => {
+  switch (method) {
+    case 'card':
+      return 'Visa / Mastercard';
+    case 'apple_pay':
+      return 'Apple Pay';
+    case 'fawry':
+      return 'Fawry';
+    case 'valu':
+      return 'ValU';
+    default:
+      return method;
+  }
+};
 
 export const PricingView: React.FC = () => {
   const { t, settings, subscription, creditBalance, refreshSubscription, refreshCredits } =
@@ -205,7 +211,7 @@ export const PricingView: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState<PlanDefinition | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  // A hosted-checkout redirect lands on `#/pricing?stripe=success` or
+  // The hosted-checkout redirect lands on
   // `#/pricing?xpay=success&session_id=cs_test_...`. The result is copied into
   // local state and stripped from the URL so a refresh does not replay the
   // banner.
@@ -213,24 +219,24 @@ export const PricingView: React.FC = () => {
   // A Fawry payment is complete before it is paid. Until XPay says `paid`, the
   // page says so instead of claiming the plan is active.
   const [pendingReference, setPendingReference] = useState<string | null>(null);
-  const [stripeStatus, setStripeStatus] = useState<StripeBillingStatus | null>(null);
-  const [billingBusy, setBillingBusy] = useState(false);
-  const [billingError, setBillingError] = useState<string | null>(null);
-  const [portalNotice, setPortalNotice] = useState(false);
+  // What this merchant account can actually charge. Read from the server,
+  // which reads it from XPay: a method the account was not provisioned for is
+  // never advertised here.
+  const [xpayStatus, setXpayStatus] = useState<XPayStatus | null>(null);
 
   const currentPlanCode = subscription?.planCode ?? 'free';
 
-  const loadStripeStatus = useCallback(async () => {
+  const loadXPayStatus = useCallback(async () => {
     try {
-      setStripeStatus(await fetchStripeBillingStatus());
+      setXpayStatus(await fetchXPayStatus());
     } catch {
-      // Card billing is optional. A failure here must not break the page.
+      // Payments being unavailable must not break the pricing page.
     }
   }, []);
 
   useEffect(() => {
-    void loadStripeStatus();
-  }, [loadStripeStatus]);
+    void loadXPayStatus();
+  }, [loadXPayStatus]);
 
   /**
    * The XPay return.
@@ -281,112 +287,16 @@ export const PricingView: React.FC = () => {
     };
   }, [params.xpay, params.session_id, refreshSubscription, refreshCredits]);
 
-  useEffect(() => {
-    const result = params.stripe;
-    if (result !== 'success' && result !== 'cancelled') return;
-
-    setCheckoutNotice(result);
-    window.history.replaceState(null, '', buildRouteHash('pricing'));
-
-    if (result !== 'success') return;
-
-    // The webhook and the browser redirect race each other: refresh now, then
-    // once more when the event has almost certainly been processed.
-    void refreshSubscription();
-    void refreshCredits();
-    void loadStripeStatus();
-    const timer = window.setTimeout(() => {
-      void refreshSubscription();
-      void refreshCredits();
-      void loadStripeStatus();
-    }, 3000);
-    return () => window.clearTimeout(timer);
-  }, [params.stripe, refreshSubscription, refreshCredits, loadStripeStatus]);
-
-  // The Customer Portal returns to this page after a cancellation or a card
-  // change. Refresh both the entitlement and the billing mirror, otherwise the
-  // page would keep showing the state from before the candidate left.
-  useEffect(() => {
-    if (params.billing !== 'portal') return;
-    setPortalNotice(true);
-    window.history.replaceState(null, '', buildRouteHash('pricing'));
-    void refreshSubscription();
-    void refreshCredits();
-    void loadStripeStatus();
-  }, [params.billing, refreshSubscription, refreshCredits, loadStripeStatus]);
-
-  const handleManageBilling = async () => {
-    setBillingBusy(true);
-    setBillingError(null);
-    try {
-      const portal = await openStripePortal();
-      await goToStripe(portal.url);
-    } catch (err: any) {
-      setBillingError(err?.message || t('Failed to open the billing portal'));
-    } finally {
-      setBillingBusy(false);
-    }
-  };
-
   const handleSelectPlan = (plan: PlanDefinition) => {
     if (plan.code === 'free') return;
     setSelectedPlan(plan);
     setCheckoutOpen(true);
   };
 
-  // `subscription` is the entitlement (active/trialing/past_due). The latest
-  // row also covers `unpaid`, `incomplete` and `canceled`, so the page can
-  // explain why access stopped instead of simply hiding the card section.
-  const activeCardSubscription = stripeStatus?.latestSubscription ?? stripeStatus?.subscription ?? null;
-  const activeCardPlan = PLANS.find((plan) => plan.code === activeCardSubscription?.plan_code);
-  const cardPlanLabel = activeCardPlan
-    ? isAr
-      ? activeCardPlan.nameAr
-      : activeCardPlan.nameEn
-    : activeCardSubscription?.plan_code ?? '';
-  const cardRenewalLabel = activeCardSubscription
-    ? new Date(activeCardSubscription.current_period_end).toLocaleDateString(
-        isAr ? 'ar-EG' : 'en-GB',
-        { year: 'numeric', month: 'long', day: 'numeric' }
-      )
-    : '';
-
-  const cardStatus = activeCardSubscription?.status ?? null;
-  const cardStatusLabel =
-    cardStatus === 'active' || cardStatus === 'trialing'
-      ? t('Active')
-      : cardStatus === 'past_due'
-        ? t('Payment failed')
-        : cardStatus === 'unpaid'
-          ? t('Unpaid')
-          : cardStatus === 'incomplete'
-            ? t('Payment incomplete')
-            : cardStatus === 'incomplete_expired'
-              ? t('Expired')
-              : cardStatus === 'canceled'
-                ? t('Cancelled')
-                : cardStatus === 'paused'
-                  ? t('Paused')
-                  : null;
-  const cardStatusTone =
-    cardStatus === 'active' || cardStatus === 'trialing'
-      ? 'bg-emerald-500/15 text-emerald-600'
-      : cardStatus === 'past_due' || cardStatus === 'unpaid' || cardStatus === 'incomplete'
-        ? 'bg-amber-500/15 text-amber-600'
-        : 'bg-surface-raised text-muted';
-  const cardNeedsPaymentMethod =
-    cardStatus === 'past_due' || cardStatus === 'unpaid' || cardStatus === 'incomplete';
-  const cardPeriodLabel = activeCardSubscription
-    ? activeCardSubscription.cancel_at_period_end
-      ? `${t('Cancels on')} ${cardRenewalLabel}`
-      : cardStatus === 'active' || cardStatus === 'trialing'
-        ? `${t('Renews on')} ${cardRenewalLabel}`
-        : cardStatus === 'canceled' || cardStatus === 'incomplete_expired'
-          ? `${t('Ended on')} ${cardRenewalLabel}`
-          : `${t('Current period ends')} ${cardRenewalLabel}`
-    : t('Your saved card can be reused for future purchases.');
-
-  const stripeReady = Boolean(stripeStatus?.checkoutReady);
+  // Payments are offered only when the server says the merchant account can
+  // take them: a key, a webhook secret, and EGP provisioned.
+  const xpayReady = Boolean(xpayStatus?.checkoutReady);
+  const paymentMethods = xpayStatus?.paymentMethods?.methodsForEgp ?? [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
@@ -400,13 +310,9 @@ export const PricingView: React.FC = () => {
           {t('Choose the plan that fits your career ambitions')}
         </h1>
         <p className="text-base sm:text-lg text-muted leading-relaxed">
-          {stripeReady
-            ? isAr
-              ? 'خطط عادلة وبسيطة بالجنيه المصري: تحويل فوري عبر فودافون كاش وإنستاباي، أو دفع آمن بالبطاقة البنكية عبر Stripe.'
-              : 'Fair, simple plans in Egyptian pounds: instant Vodafone Cash or InstaPay transfer, or secure card payment via Stripe.'
-            : isAr
-              ? 'خطط عادلة وبسيطة بالجنيه المصري مع تحويل فوري عبر فودافون كاش أو إنستاباي.'
-              : 'Fair, simple plans in Egyptian pounds with instant Vodafone Cash or InstaPay transfer.'}
+          {isAr
+            ? 'خطط عادلة وبسيطة بالجنيه المصري، بدفع آمن عبر XPay: البطاقات وآبل باي وفوري وفاليو.'
+            : 'Fair, simple plans in Egyptian pounds, paid securely through XPay: cards, Apple Pay, Fawry and ValU.'}
         </p>
 
         {/* Billing Cycle Switcher */}
@@ -555,7 +461,7 @@ export const PricingView: React.FC = () => {
                     : t(
                         'This payment is not confirmed yet. If you were charged, the plan unlocks as soon as the provider confirms it — refresh this page in a moment.'
                       )
-                  : t('Nothing was charged. You can try again, or pay with Vodafone Cash or InstaPay.')}
+                  : t('Nothing was charged. You can try again whenever you are ready.')}
             </p>
             {pendingReference && checkoutNotice === 'pending' && (
               <p className="mt-1 font-mono text-xs font-semibold text-foreground" dir="ltr">
@@ -571,87 +477,6 @@ export const PricingView: React.FC = () => {
           >
             <X className="w-4 h-4" />
           </button>
-        </div>
-      )}
-
-      {/* Return from the Customer Portal: state has been refreshed above. */}
-      {portalNotice && (
-        <div
-          className="max-w-3xl mx-auto w-full rounded-2xl border border-blue-500/25 bg-blue-500/10 p-4 flex items-start gap-3"
-          role="status"
-        >
-          <div className="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-600 flex items-center justify-center shrink-0">
-            <Check className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0 text-sm leading-relaxed">
-            <div className="font-bold text-foreground">{t('Billing updated')}</div>
-            <p className="text-xs text-muted mt-0.5">
-              {t('Your subscription and payment method changes have been refreshed from Stripe.')}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setPortalNotice(false)}
-            className="p-1 rounded-lg text-muted hover:text-foreground transition-colors"
-            aria-label="Dismiss"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Card subscription & billing portal */}
-      {(activeCardSubscription || stripeStatus?.customerId) && (
-        <div
-          className={`max-w-3xl mx-auto w-full rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${
-            cardNeedsPaymentMethod
-              ? 'border-amber-500/30 bg-amber-500/10'
-              : 'border-border bg-surface-raised'
-          }`}
-        >
-          <div className="w-9 h-9 rounded-xl bg-surface border border-border flex items-center justify-center shrink-0">
-            <StripeMark className="h-5 w-5" />
-          </div>
-          <div className="flex-1 min-w-0 text-sm">
-            <div className="font-bold text-foreground flex flex-wrap items-center gap-2">
-              <span>
-                {activeCardSubscription ? `${t('Card subscription')} · ${cardPlanLabel}` : t('Card billing')}
-              </span>
-              {cardStatusLabel && (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${cardStatusTone}`}>
-                  {cardStatusLabel}
-                </span>
-              )}
-              {stripeStatus?.testMode && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] font-extrabold uppercase tracking-wider">
-                  {t('Test mode')}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted mt-0.5">{cardPeriodLabel}</p>
-            {cardNeedsPaymentMethod && (
-              <p className="text-xs text-amber-700 mt-1">
-                {t('Stripe could not collect the latest payment. Update your card to restore access.')}
-              </p>
-            )}
-            {billingError && (
-              <p className="text-xs text-red-500 mt-1">{billingError}</p>
-            )}
-          </div>
-          {stripeStatus?.customerId && (
-            <button
-              type="button"
-              onClick={handleManageBilling}
-              disabled={billingBusy}
-              className="px-4 py-2 rounded-xl border border-border bg-surface text-xs font-bold text-foreground hover:bg-border/60 disabled:opacity-50 transition-colors shrink-0"
-            >
-              {billingBusy
-                ? '...'
-                : cardNeedsPaymentMethod
-                  ? t('Update payment method')
-                  : t('Manage billing')}
-            </button>
-          )}
         </div>
       )}
 
@@ -823,42 +648,44 @@ export const PricingView: React.FC = () => {
         </div>
       </div>
 
-      {/* Payment Methods Banner */}
+      {/* Payment methods, as this merchant account actually enables them. */}
       <div className="p-8 rounded-3xl bg-gradient-to-r from-primary/5 via-surface to-primary/5 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-2 text-start">
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary shrink-0" />
             <h3 className="text-base font-bold text-[var(--text-primary)]">
-              {stripeReady
-                ? t('Secure local payment methods — and card payment via Stripe')
-                : t('Secure local payment methods')}
+              {t('Secure payments through XPay')}
             </h3>
           </div>
           <p className="text-xs text-muted max-w-xl leading-relaxed">
-            {stripeReady
+            {xpayStatus?.paymentMethods?.egpSupported === false
               ? t(
-                  'Pay directly with Vodafone Cash or InstaPay, or by card on Stripe’s secure page. Wallet access is activated after the receipt is reviewed; a card subscription activates as soon as Stripe confirms the payment.'
+                  'Card payment is not enabled for this account yet, so checkout is unavailable. Nothing is charged and no plan changes.'
                 )
               : t(
-                  'Pay directly with Vodafone Cash or InstaPay. Access is activated after the receipt is reviewed.'
+                  'You pay on XPay’s secure page; Aionvia never sees or stores your card number. Your plan activates as soon as the payment is confirmed, and a Fawry reference activates it when the money arrives.'
                 )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
-            <VodafoneCashMark className="h-5 w-5" />
-            <span className="text-xs font-bold text-foreground">Vodafone Cash</span>
-          </div>
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
-            <InstaPayMark className="h-4 w-auto shrink-0" />
-            <span className="text-xs font-bold text-foreground">InstaPay</span>
-          </div>
-          {stripeReady && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm">
-              <StripeMark className="h-5 w-5" />
-              <span className="text-xs font-bold text-foreground">Visa / Mastercard</span>
-              <CardNetworkMarks className="h-3.5 w-auto" />
-            </div>
+          {paymentMethods.length === 0 ? (
+            <span className="text-[11px] text-muted">
+              {xpayStatus ? t('No payment method is enabled yet.') : t('Checking available payment methods…')}
+            </span>
+          ) : (
+            paymentMethods.map((method) => (
+              <div
+                key={method}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border shadow-sm"
+              >
+                <span className="text-xs font-bold text-foreground">{paymentMethodLabel(method)}</span>
+              </div>
+            ))
+          )}
+          {xpayStatus?.testMode && (
+            <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 text-[10px] font-extrabold uppercase tracking-wider">
+              {t('Test mode')}
+            </span>
           )}
         </div>
       </div>
@@ -888,14 +715,14 @@ export const PricingView: React.FC = () => {
             </div>
           ))}
 
-          {stripeReady && (
+          {xpayReady && (
             <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
               <h4 className="font-bold text-sm text-foreground">
                 {t('Can I pay by bank card?')}
               </h4>
               <p className="text-xs text-muted leading-relaxed">
                 {t(
-                  'Yes. Choose “Bank card” when you subscribe and you will be taken to Stripe’s secure page to enter your card details. The platform never sees or stores your card number, the subscription activates as soon as Stripe confirms the payment, and you can manage the card or cancel the renewal from “Manage invoices” on this page.'
+                  'Yes. Choose a plan and you are taken to XPay’s secure page to pay by card, Apple Pay, Fawry or ValU. Aionvia never sees or stores your card number, and the plan activates as soon as the payment is confirmed.'
                 )}
               </p>
             </div>

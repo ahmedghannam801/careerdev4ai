@@ -66,8 +66,6 @@ const SECRET_KEYS = [
  * interface hides the rail. The Egyptian wallet rails are unaffected.
  */
 const OPTIONAL_SECRET_KEYS = [
-  'STRIPE_SECRET_KEY',
-  'STRIPE_WEBHOOK_SECRET',
 ];
 
 /**

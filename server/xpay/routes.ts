@@ -157,6 +157,7 @@ export function registerXPayRoutes(app: Express): void {
           packId,
           billingCycle: rawCycle as BillingCycle,
           couponCode,
+          applyBirthdayReward: body.applyBirthdayReward === true,
           idempotencyKey,
         });
 
