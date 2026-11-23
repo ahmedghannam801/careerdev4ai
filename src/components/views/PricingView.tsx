@@ -649,7 +649,7 @@ export const PricingView: React.FC = () => {
       </div>
 
       {/* Payment methods, as this merchant account actually enables them. */}
-      <div className="p-8 rounded-3xl bg-gradient-to-r from-primary/5 via-surface to-primary/5 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="p-8 rounded-3xl bg-gradient-to-r from-primary/5 via-surface to-primary/5 border border-primary/20 flex flex-col flex-wrap md:flex-row items-center justify-between gap-6">
         <div className="space-y-2 text-start">
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary shrink-0" />
@@ -667,7 +667,7 @@ export const PricingView: React.FC = () => {
                 )}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="flex min-w-0 flex-wrap items-center justify-center gap-3">
           {paymentMethods.length === 0 ? (
             <span className="text-[11px] text-muted">
               {xpayStatus ? t('No payment method is enabled yet.') : t('Checking available payment methods…')}
