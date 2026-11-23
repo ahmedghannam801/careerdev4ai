@@ -290,6 +290,18 @@ export async function semanticFactorFor(
  * exact factors still carry the whole score, so a candidate sees a complete
  * explanation either way.
  */
+/**
+ * How many postings one search may embed and compare.
+ *
+ * A search can now return postings from several boards at once, and embedding
+ * every one of them on the first search would make that search wait for a
+ * model call per batch of text. The cap keeps the semantic factor on the
+ * postings a candidate is most likely to read, and every posting beyond it
+ * keeps the exact factors, which is the same answer the product gave before
+ * the factor existed. Vectors are stored, so a posting pays this once.
+ */
+const MAX_SEMANTIC_JOBS = 40;
+
 export async function semanticFactorsFor(
   jobs: readonly LiveJob[],
   profileId: string,
@@ -306,22 +318,24 @@ export async function semanticFactorsFor(
   const factors = new Map<string, SemanticMatchFactor>();
   if (!jobs.length || !isEmbeddingConfigured()) return factors;
 
+  const considered = jobs.slice(0, MAX_SEMANTIC_JOBS);
+
   try {
     // Embed the postings that do not have a vector yet. A failure here is not
     // fatal: the postings that already have one can still be compared.
-    await embedAndStoreJobs(jobs);
+    await embedAndStoreJobs(considered);
 
     const candidateVector =
       (await storedProfileVector(profileId)) ?? (await embedAndStoreProfile(profileId, profile));
     if (!candidateVector) return factors;
 
-    const jobKeys = jobs.map(jobKeyFor);
+    const jobKeys = considered.map(jobKeyFor);
     const similarities = await semanticSimilarities(candidateVector, jobKeys);
     if (!similarities.size) return factors;
 
     const candidateText = profileEmbeddingText(profile);
 
-    for (const job of jobs) {
+    for (const job of considered) {
       const similarity = similarities.get(jobKeyFor(job));
       if (typeof similarity !== 'number' || !Number.isFinite(similarity)) continue;
 

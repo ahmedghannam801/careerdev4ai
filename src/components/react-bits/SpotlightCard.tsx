@@ -1,13 +1,32 @@
 import {
+  useEffect,
   useRef,
   type ComponentPropsWithoutRef,
+  type ElementType,
   type PointerEvent,
   type ReactNode,
   type Ref,
 } from 'react';
-import { gsap } from 'gsap';
-import { useGSAP } from '@gsap/react';
 
+/**
+ * A card whose background is lit from the pointer.
+ *
+ * WHY IT NO LONGER USES GSAP
+ * --------------------------
+ * Every pointer move used to start a GSAP tween on two custom properties. A
+ * grid of twelve cards meant twelve tweens being created and destroyed while
+ * the pointer moved across them, which is a lot of work for a glow — and it
+ * was measurable while scrolling, because a tween left running keeps the
+ * ticker busy.
+ *
+ * The same effect is now a pair of custom properties written directly to the
+ * element, coalesced into one frame with `requestAnimationFrame`. No tween is
+ * created, nothing keeps running after the pointer stops, and the browser
+ * paints the gradient it was already painting.
+ *
+ * Cards that do not want the effect at all simply do not use this component:
+ * the Skills list, for instance, is a plain list of rows.
+ */
 type SpotlightCardProps = {
   children: ReactNode;
   className?: string;
@@ -40,8 +59,17 @@ export function SpotlightCard({
   ref: forwardedRef,
   ...rest
 }: SpotlightCardProps) {
-  const card = useRef<HTMLElement>(null);
-  const { contextSafe } = useGSAP({ scope: card });
+  const card = useRef<HTMLElement | null>(null);
+  const frame = useRef<number | null>(null);
+
+  // A frame scheduled as the pointer left is cancelled with the card, so
+  // nothing writes to a node that is no longer on the page.
+  useEffect(
+    () => () => {
+      if (frame.current !== null) window.cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
 
   const assignRef = (element: HTMLElement | null) => {
     card.current = element;
@@ -52,30 +80,23 @@ export function SpotlightCard({
     }
   };
 
-  const moveSpotlight = contextSafe((event: PointerEvent<HTMLElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = `${event.clientX - rect.left}px`;
-    const y = `${event.clientY - rect.top}px`;
-    const reducedMotion =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reducedMotion) {
-      event.currentTarget.style.setProperty('--spotlight-x', x);
-      event.currentTarget.style.setProperty('--spotlight-y', y);
-      return;
-    }
-    gsap.to(event.currentTarget, {
-      '--spotlight-x': x,
-      '--spotlight-y': y,
-      duration: 0.25,
-      ease: 'power2.out',
+  const moveSpotlight = (event: PointerEvent<HTMLElement>) => {
+    const node = event.currentTarget;
+    const x = event.clientX - node.getBoundingClientRect().left;
+    const y = event.clientY - node.getBoundingClientRect().top;
+
+    // One write per frame, however many pointer events arrive.
+    if (frame.current !== null) return;
+    frame.current = window.requestAnimationFrame(() => {
+      frame.current = null;
+      node.style.setProperty('--spotlight-x', `${x}px`);
+      node.style.setProperty('--spotlight-y', `${y}px`);
     });
-  });
+  };
 
   // The element is chosen at runtime, so it is rendered through a tag that
   // carries the union's shared props rather than through any one of them.
-  const Tag = Element as React.ElementType;
+  const Tag = Element as ElementType;
 
   return (
     <Tag

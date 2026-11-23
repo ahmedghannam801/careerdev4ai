@@ -38,6 +38,9 @@ export const jobsAr: Record<string, string> = {
   'live vacancies': 'وظيفة مباشرة',
   '({count} expired)': '({count} منتهية)',
   'Provider quota left: {count}': 'الحصة المتبقية من المزوّد: {count}',
+  'Some job boards could not be read': 'تعذّرت قراءة بعض لوحات الوظائف',
+  '{board} could not be read, so its postings are missing from this list.':
+    'تعذّرت قراءة {board}، لذلك إعلاناتها غير موجودة في هذه القائمة.',
   'Sort by': 'ترتيب حسب',
   'Best fit first': 'الأعلى ملاءمة أولًا',
   'Newest first': 'الأحدث أولًا',
@@ -61,8 +64,8 @@ export const jobsAr: Record<string, string> = {
   // Empty
   'No openings matched this search':
     'لا توجد فرص مطابقة لهذا البحث',
-  'Try a broader title, a nearby city, a longer date range, or another country. The provider only returns openings it can currently find.':
-    'جرّب مسمىً أعمّ أو مدينة قريبة أو نطاقًا زمنيًا أطول أو بلدًا آخر. لا يُرجع المزوّد إلا الوظائف التي يستطيع العثور عليها حاليًا.',
+  'Try a broader title, a nearby city, a longer date range, or another country. The boards only return openings they can currently find.':
+    'جرّب مسمىً أعمّ أو مدينة قريبة أو نطاقًا زمنيًا أطول أو بلدًا آخر. لا تُرجع اللوحات إلا الوظائف التي تستطيع العثور عليها حاليًا.',
 
   // Card
   'Apply on {publisher}': 'قدّم على {publisher}',

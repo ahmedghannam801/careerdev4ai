@@ -46,6 +46,7 @@ import { useCareer } from '../../context/CareerContext';
 import { useAdminAccess } from '../../lib/useAdminAccess';
 import { AdminAccessDenied } from '../admin/AdminRouteGuard';
 import { TabButtons } from '../ui/TabButtons';
+import { ChartCard, DonutChart, ProgressMeter, formatCount } from '../charts';
 import { AnnouncementsPanel } from '../admin/AnnouncementsPanel';
 import { TrafficAnalyticsPanel } from '../admin/TrafficAnalyticsPanel';
 import { AdminSubscriptionsPanel } from '../admin/AdminSubscriptionsPanel';
@@ -1370,6 +1371,70 @@ export const AdminCenterView: React.FC = () => {
                 <StatCard label={t('Live opportunities')} value={analytics.activeOpportunities} icon={GraduationCap} />
                 <StatCard label={t('Draft & archived announcements')} value={analytics.announcements - analytics.publishedAnnouncements} icon={Archive} />
               </div>
+              {/* The platform's own ratios. The cards above are the totals;
+                  these are the proportions a total cannot show — how much of
+                  the learning that was started is finished, and how much of
+                  the announcement list is actually published. */}
+              <div className="grid gap-3 lg:grid-cols-2">
+                <ChartCard
+                  title={t('Learning completion on the platform')}
+                  description={t(
+                    'The share of started learning that reached completion. It is counted from the platform’s own learning records.'
+                  )}
+                  badge={formatCount(analytics.learningItems)}
+                  empty={analytics.learningItems === 0}
+                  emptyMessage={t('No learning has been started on the platform yet.')}
+                  testId="admin-learning-chart"
+                >
+                  <DonutChart
+                    data={[
+                      {
+                        key: 'completed',
+                        label: t('Completed'),
+                        value: analytics.completedLearning,
+                        color: 'var(--color-success-strong)',
+                      },
+                      {
+                        key: 'open',
+                        label: t('Not completed'),
+                        value: Math.max(0, analytics.learningItems - analytics.completedLearning),
+                        color: 'var(--color-info)',
+                      },
+                    ].filter((entry) => entry.value > 0)}
+                    centerValue={`${Math.round(
+                      (analytics.completedLearning / Math.max(1, analytics.learningItems)) * 100
+                    )}%`}
+                    centerLabel={t('completed')}
+                    ariaLabel={t('Learning completion on the platform')}
+                  />
+                </ChartCard>
+
+                <ChartCard
+                  title={t('Announcement coverage')}
+                  description={t(
+                    'How much of the announcement list is published rather than waiting as a draft.'
+                  )}
+                  empty={analytics.announcements === 0}
+                  emptyMessage={t('No announcements have been written yet.')}
+                  testId="admin-announcements-chart"
+                >
+                  <div className="space-y-3">
+                    <ProgressMeter
+                      label={t('Published')}
+                      value={analytics.announcements === 0 ? 0 : (analytics.publishedAnnouncements / analytics.announcements) * 100}
+                      detail={`${formatCount(analytics.publishedAnnouncements)} / ${formatCount(analytics.announcements)}`}
+                      tone="var(--color-success-strong)"
+                    />
+                    <ProgressMeter
+                      label={t('Live opportunities')}
+                      value={analytics.opportunities === 0 ? 0 : (analytics.activeOpportunities / analytics.opportunities) * 100}
+                      detail={`${formatCount(analytics.activeOpportunities)} / ${formatCount(analytics.opportunities)}`}
+                      tone="var(--accent-primary)"
+                    />
+                  </div>
+                </ChartCard>
+              </div>
+
               <div className={`${CARD} p-4`}>
                 <h2 className="text-sm font-bold text-[var(--text-primary)]">{t('Role map')}</h2>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">

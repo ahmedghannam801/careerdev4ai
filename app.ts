@@ -495,7 +495,6 @@ import {
   JobSearchError,
 } from './server/jsearch/client.ts';
 import { searchAllJobs } from './server/jobs/feed.ts';
-import { hasConfiguredAtsBoards } from './server/jobs/ats.ts';
 import { semanticFactorsFor } from './server/jobs/semantic.ts';
 import { loadMatchCandidate } from './server/jobs/candidate.ts';
 import { explainJobs } from './server/jobs/match.ts';
@@ -6611,14 +6610,6 @@ function sendJobSearchError(res: Response, error: JobSearchError): void {  if (e
 
 app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
   try {
-    if (!isJobSearchConfigured() && !hasConfiguredAtsBoards()) {
-      return res.status(503).json({
-        success: false,
-        error: 'Live job search is not configured on this server.',
-        code: 'not_configured',
-      });
-    }
-
     // One search across every board the platform reads: the aggregated
     // provider feed and the company careers boards this deployment
     // configures. The candidate sees one list; the provenance of each posting
@@ -6669,6 +6660,9 @@ app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request
       // knows the list is smaller than it could have been.
       boardsRead: result.boardsRead,
       boardsFailed: result.boardsFailed,
+      // Why a board could not be read, in the interface's own words. A
+      // shorter list is never presented as a complete one.
+      boardErrors: result.boardErrors,
     });
   } catch (error) {
     if (error instanceof JobSearchError) {
@@ -6690,14 +6684,6 @@ app.get('/api/jobs/search', requireAuth, jobSearchRateLimit, async (req: Request
 // read is a ranking they cannot act on.
 app.get('/api/jobs/recommend', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
   try {
-    if (!isJobSearchConfigured() && !hasConfiguredAtsBoards()) {
-      return res.status(503).json({
-        success: false,
-        error: 'Live job search is not configured on this server.',
-        code: 'not_configured',
-      });
-    }
-
     const candidate = await loadMatchCandidate(req.authUser!.id);
 
     // The search is built from the candidate's own record, so a candidate who
@@ -6744,6 +6730,7 @@ app.get('/api/jobs/recommend', requireAuth, jobSearchRateLimit, async (req: Requ
       checkedAt: result.fetchedAt,
       boardsRead: result.boardsRead,
       boardsFailed: result.boardsFailed,
+      boardErrors: result.boardErrors,
       // What the ranking was based on, so the candidate can see why it is the
       // ranking it is. Nothing here is inferred: it is what the record says.
       candidate: {
@@ -6779,14 +6766,6 @@ app.post('/api/jobs/compare', requireAuth, jobSearchRateLimit, async (req: Reque
       return res.status(400).json({
         success: false,
         error: `Pick at least two postings to compare, and no more than ${MAX_COMPARED_JOBS}.`,
-      });
-    }
-
-    if (!isJobSearchConfigured() && !hasConfiguredAtsBoards()) {
-      return res.status(503).json({
-        success: false,
-        error: 'Live job search is not configured on this server.',
-        code: 'not_configured',
       });
     }
 
@@ -6836,6 +6815,9 @@ app.post('/api/jobs/compare', requireAuth, jobSearchRateLimit, async (req: Reque
       checkedAt: result.fetchedAt,
       boardsRead: result.boardsRead,
       boardsFailed: result.boardsFailed,
+      // Why a board could not be read, in the interface's own words. A
+      // shorter list is never presented as a complete one.
+      boardErrors: result.boardErrors,
     });
   } catch (error) {
     if (error instanceof JobSearchError) {
@@ -6853,14 +6835,6 @@ app.post('/api/jobs/compare', requireAuth, jobSearchRateLimit, async (req: Reque
 // left out rather than shown as zero.
 app.get('/api/jobs/insights', requireAuth, jobSearchRateLimit, async (req: Request, res: Response) => {
   try {
-    if (!isJobSearchConfigured() && !hasConfiguredAtsBoards()) {
-      return res.status(503).json({
-        success: false,
-        error: 'Live job search is not configured on this server.',
-        code: 'not_configured',
-      });
-    }
-
     const candidate = await loadMatchCandidate(req.authUser!.id);
 
     const requested = req.query as Record<string, unknown>;
@@ -6894,6 +6868,7 @@ app.get('/api/jobs/insights', requireAuth, jobSearchRateLimit, async (req: Reque
       checkedAt: result.fetchedAt,
       boardsRead: result.boardsRead,
       boardsFailed: result.boardsFailed,
+      boardErrors: result.boardErrors,
       candidate: {
         skillCount: candidate.skillNames.length,
         experienceLevel: candidate.experienceLevel,

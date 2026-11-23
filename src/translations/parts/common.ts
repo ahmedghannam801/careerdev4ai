@@ -12,8 +12,8 @@ export const commonAr: Record<string, string> = {
   'Document workspace sections': 'أقسام مساحة المستندات',
   'Filter by type': 'التصفية حسب النوع',
   'Career Experience Hub sections': 'أقسام مركز الخبرة المهنية',
-  'Every posting above was fetched from these boards by the job provider, and each card names the board it came from.':
-    'كل إعلان أعلاه تم جلبه من هذه اللوحات بواسطة مزوّد الوظائف، وكل بطاقة تذكر اللوحة التي جاء منها.',
+  'Every posting above was read from one of these boards — by the aggregated provider or directly from the board’s own feed — and each card names the board it came from.':
+    'كل إعلان أعلاه قُرئ من إحدى هذه اللوحات — عبر المزوّد المجمِّع أو مباشرةً من تغذية اللوحة نفسها — وكل بطاقة تذكر اللوحة التي جاء منها.',
   'Learning Hub sections': 'أقسام مركز التعلّم',
   'Filter roadmap actions': 'تصفية إجراءات خارطة الطريق',
   'Settings sections': 'أقسام الإعدادات',

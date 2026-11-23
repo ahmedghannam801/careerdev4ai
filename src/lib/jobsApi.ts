@@ -34,6 +34,12 @@ export interface JobQuota {
   remaining: number | null;
 }
 
+/** One board that could not be read, and why. */
+export interface JobBoardError {
+  board: string;
+  message: string;
+}
+
 /** One search, as the server answered it. */
 export interface JobSearchResponse {
   jobs: MatchedJob[];
@@ -45,6 +51,13 @@ export interface JobSearchResponse {
   /** Which boards were read, and which could not be. */
   boardsRead?: string[];
   boardsFailed?: string[];
+  /**
+   * Why each board that failed did so.
+   *
+   * A board that could not be read is never dropped silently: the screen says
+   * so, because a shorter list must not be presented as a complete one.
+   */
+  boardErrors?: JobBoardError[];
 }
 
 /** One recommended vacancy, and why it was recommended. */
@@ -76,6 +89,7 @@ export interface JobRecommendationResponse {
   checkedAt: string;
   boardsRead?: string[];
   boardsFailed?: string[];
+  boardErrors?: JobBoardError[];
   candidate: RecommendationBasis;
 }
 

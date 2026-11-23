@@ -21,10 +21,9 @@ import type { RoadmapNodeState, RoadmapTreeNode, RoadmapTreeStage } from '../../
  * level and a done mark.
  *
  * It is a modal dialog on purpose: it covers the tree, the escape key closes
- * it, and the focus moves into it and comes back out again. The panel carries
- * `data-lenis-prevent` so the smooth scroller does not swallow the scroll of
- * a long topic, and `role="dialog"` so the smooth scroll provider stops the
- * page behind it while it is open.
+ * it, and the focus moves into it and comes back out again. `role="dialog"`
+ * and `aria-modal` tell a reader the page behind it is not the subject any
+ * more; the panel scrolls with the browser's own scrolling.
  */
 
 /** What the drawer is showing. */
@@ -163,7 +162,6 @@ export const RoadmapNodeDrawer: React.FC<RoadmapNodeDrawerProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="roadmap-drawer-title"
-        data-lenis-prevent
         className="rdm-drawer"
       >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-5">

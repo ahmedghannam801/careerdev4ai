@@ -19,8 +19,8 @@ import { isAtsAnalysisForRole } from '../../../shared/atsAnalysis';
 import { isSkillMastered } from '../../../shared/careerMetrics';
 import { MilestoneCategory, CareerGoal } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
-import { SpiralTimeline } from '../career/SpiralTimeline';
 import { buildSpiralMilestones } from '../../lib/spiralTimeline';
+import { CareerTimelineDashboard } from '../career/CareerTimelineDashboard';
 
 /**
  * Plain-language rendering of the career goals the user can pick. Used so the
@@ -624,7 +624,7 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
           </div>
         </div>
 
-        {/* The Spiral Career Timeline */}
+        {/* The Career Timeline dashboard. */}
         <div className="lg:col-span-2 p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
@@ -634,13 +634,13 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
                   {t('Career Timeline')}
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {t('Your career as a spiral: every verified record you own, from the earliest to the newest.')}
+                  {t('Every record you own, charted: how much is finished, what it is, and when it happened.')}
                 </p>
               </div>
             </div>
           </div>
 
-          <SpiralTimeline
+          <CareerTimelineDashboard
             milestones={spiralMilestones}
             t={t}
             locale={settings.language === 'ar' ? 'ar' : 'en-GB'}

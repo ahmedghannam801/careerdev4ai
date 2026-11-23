@@ -1,78 +1,57 @@
 import { useEffect, type ReactNode } from 'react';
-import Lenis from 'lenis';
-import 'lenis/dist/lenis.css';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { SplitText as GSAPSplitText } from 'gsap/SplitText';
 import { useGSAP } from '@gsap/react';
 
-gsap.registerPlugin(useGSAP, ScrollTrigger, GSAPSplitText);
+/**
+ * The animation runtime.
+ *
+ * WHAT THIS USED TO DO, AND WHY IT NO LONGER DOES
+ * ------------------------------------------------
+ * This provider installed Lenis, a smooth-scroll library, on the whole
+ * application. Lenis intercepts the wheel and animates the page towards where
+ * the pointer said to go, with a 0.1 lerp — which is exactly what "the page
+ * scrolls slower than my wheel" feels like. On a long dashboard the page was
+ * always a little behind the input, and every scroll frame also ran
+ * `ScrollTrigger.update` and a GSAP ticker with lag smoothing switched off.
+ *
+ * The platform does not need it. The scroll it wants is the browser's own
+ * scroll: instant, on the compositor, with the same physics as every other
+ * page the candidate uses, and with `scroll-margin`/`prefers-reduced-motion`
+ * respected for free. So the library is gone, and this provider now does the
+ * one thing that is still required: it registers the GSAP plugins the motion
+ * components use, once, before anything animates.
+ *
+ * The name is kept so the entry point does not change shape, and so the
+ * remaining `SmoothScrollProvider` import in `main.tsx` keeps meaning "the
+ * thing that sets motion up".
+ */
+
+/** Registers the GSAP plugins once, on the client. */
+function registerPlugins(): void {
+  gsap.registerPlugin(useGSAP, ScrollTrigger, GSAPSplitText);
+}
+
+if (typeof window !== 'undefined') {
+  registerPlugins();
+}
 
 export function SmoothScrollProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-
-    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let lenis: Lenis | null = null;
-    let ticker: ((time: number) => void) | null = null;
-    let scrollListener: (() => void) | null = null;
-    let observer: MutationObserver | null = null;
-
-    const syncModalState = () => {
-      if (document.querySelector('[role="dialog"]')) lenis?.stop();
-      else lenis?.start();
-    };
-
-    const initialize = () => {
-      if (lenis) {
-        if (scrollListener) lenis.off('scroll', scrollListener);
-        lenis.destroy();
-      }
-      if (ticker) gsap.ticker.remove(ticker);
-      observer?.disconnect();
-
-      lenis = new Lenis({
-        autoRaf: false,
-        smoothWheel: !motionPreference.matches,
-        syncTouch: !motionPreference.matches,
-        lerp: motionPreference.matches ? 1 : 0.1,
-        prevent: (node) =>
-          node.hasAttribute('data-lenis-prevent') ||
-          node.closest(
-            '[role="dialog"], [data-radix-scroll-area-viewport], .overflow-y-auto, .overflow-auto'
-          ) !== null,
-      });
-
-      scrollListener = () => ScrollTrigger.update();
-      lenis.on('scroll', scrollListener);
-      ticker = (time) => lenis?.raf(time * 1000);
-      gsap.ticker.add(ticker);
-      gsap.ticker.lagSmoothing(0);
-
-      observer = new MutationObserver(syncModalState);
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['role', 'data-state'],
-      });
-      syncModalState();
-    };
-
-    initialize();
-    motionPreference.addEventListener('change', initialize);
-
-    return () => {
-      motionPreference.removeEventListener('change', initialize);
-      observer?.disconnect();
-      if (ticker) gsap.ticker.remove(ticker);
-      if (lenis) {
-        if (scrollListener) lenis.off('scroll', scrollListener);
-        lenis.destroy();
-      }
-      gsap.ticker.lagSmoothing(500, 33);
-    };
+    // A component that mounts after a hot reload may be the first thing to
+    // animate; registering again is idempotent and costs nothing.
+    registerPlugins();
+    // ScrollTrigger measures against the real viewport, and the mobile
+    // browsers change it when the address bar collapses. Telling it to
+    // refresh on that event keeps the reveal animations aligned without any
+    // scroll listener of our own.
+    const onResize = () => ScrollTrigger.refresh();
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   return children;
 }
+
+export default SmoothScrollProvider;

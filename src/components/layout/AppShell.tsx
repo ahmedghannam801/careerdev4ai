@@ -366,7 +366,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       {/* Main Content Area & Top Bar */}
       <div className="flex-1 flex flex-col min-w-0 pb-[calc(4.75rem+env(safe-area-inset-bottom))] md:pb-0">
         {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 bg-[var(--surface-main)]/90 backdrop-blur-md border-b border-[var(--border-subtle)] px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
+        <header className="sticky top-0 z-30 bg-[var(--surface-main)] border-b border-[var(--border-subtle)] px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -714,7 +714,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       {/* Mobile Bottom Navigation Bar */}
       <nav
         aria-label={t('Primary')}
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--surface-main)]/95 backdrop-blur-md border-t border-[var(--border-subtle)] px-1 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] flex items-stretch justify-around text-[10px]"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--surface-main)] border-t border-[var(--border-subtle)] px-1 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] flex items-stretch justify-around text-[10px]"
       >
         {[
           { id: 'dashboard', label: t('Home'), icon: Home },

@@ -39,6 +39,13 @@ describe('Jobs & Internships source and filter contract', () => {
       'handshake',
       'wonderin',
       'company_careers',
+      // The boards the platform reads for itself, from their own public
+      // feeds, when the paid provider cannot answer.
+      'remotive',
+      'arbeitnow',
+      'jobicy',
+      'himalayas',
+      'remoteok',
     ]);
     assert.deepEqual(Object.values(JOB_SOURCE_LABELS), [
       'Google Jobs',
@@ -47,6 +54,11 @@ describe('Jobs & Internships source and filter contract', () => {
       'Handshake',
       'Wonderin.ai',
       'Company careers pages',
+      'Remotive',
+      'Arbeitnow',
+      'Jobicy',
+      'Himalayas',
+      'Remote OK',
     ]);
     // Wonderin still publishes no feed, so the interface must still say so
     // rather than claim postings it has not fetched.
@@ -56,6 +68,14 @@ describe('Jobs & Internships source and filter contract', () => {
 
   it('names the company careers pages board in the interface', () => {
     assert.match(jobsView, /company_careers/);
+  });
+
+  it('names the key-free boards in the interface', () => {
+    // A posting read from Remotive says Remotive, so the footer that names the
+    // boards has to name it too.
+    for (const board of ['remotive', 'arbeitnow', 'jobicy', 'himalayas', 'remoteok']) {
+      assert.match(jobsView, new RegExp(`'${board}'`));
+    }
   });
 
   it('classifies the four aggregated feeds and the direct-search source by attribution', () => {

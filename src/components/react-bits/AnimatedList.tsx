@@ -11,11 +11,16 @@ export function AnimatedList({ children, className = '' }: { children: ReactNode
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const items = list.current?.children;
     if (!items?.length) return;
+    // The whole reveal is bounded to about half a second. A fixed 50ms step
+    // is right for eight cards and turns into a four-second crawl for the
+    // eighty a live job search can return, which reads as a slow page rather
+    // than as a reveal.
+    const stagger = Math.min(0.05, 0.5 / Math.max(1, items.length));
     gsap.fromTo(items, { autoAlpha: 0, y: 12 }, {
       autoAlpha: 1,
       y: 0,
       duration: 0.35,
-      stagger: 0.05,
+      stagger,
       ease: 'power2.out',
     });
   }, { scope: list, dependencies: [childCount], revertOnUpdate: true });

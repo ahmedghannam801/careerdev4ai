@@ -6596,14 +6596,24 @@ Skills: ${activeCV.skillsList.join(', ')}
    * Anything that has no Arabic entry falls back to the English source, so a
    * missing translation degrades to English rather than to a broken label.
    */
-  const t = (key: string): string => {
-    const lang = settings.language;
-    const legacy = (translations[lang] as Record<string, string> | undefined)?.[key];
-    if (legacy) return legacy;
-    const english = (translations.en as Record<string, string>)[key];
-    if (english) return english;
-    return translate(key, lang);
-  };
+  //
+  // The function is stable for as long as the language is. It used to be
+  // rebuilt on every provider render, which meant every `useCallback` /
+  // `useMemo` in every consumer that listed `t` as a dependency produced a new
+  // value on every render and re-rendered its children for nothing. One
+  // callback per language is the difference between a screen that settles and
+  // a screen that re-renders while the pointer moves.
+  const language = settings.language;
+  const t = useCallback(
+    (key: string): string => {
+      const legacy = (translations[language] as Record<string, string> | undefined)?.[key];
+      if (legacy) return legacy;
+      const english = (translations.en as Record<string, string>)[key];
+      if (english) return english;
+      return translate(key, language);
+    },
+    [language]
+  );
 
   const exportDataJson = () => {
     const fullGraph = {

@@ -30,6 +30,7 @@ import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
 import { TabButtons } from '../ui/TabButtons';
 import { CourseCard } from '../learning/CourseCard';
+import { BarChart, ChartCard, formatCount, type ChartDatum } from '../charts';
 import { LEARNING_TABS } from '../../lib/routing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { useRouteParam } from '../../lib/useRouteParams';
@@ -526,6 +527,33 @@ export const LearningCenterView: React.FC = () => {
     onProgressDraft: handleProgressDraft,
   });
 
+  /**
+   * How far the candidate is through each course they started.
+   *
+   * A course card shows its own progress when you find it. This puts the
+   * courses side by side, which is the only view that answers "which of these
+   * is nearly finished, and which have I stalled on?" — and it is read from
+   * the progress each saved row really stores.
+   */
+  const startedCourseProgress: ChartDatum[] = useMemo(
+    () =>
+      learningItems
+        .filter((item) => item.status === 'in_progress')
+        .map((item) => {
+          const course = courseById.get(item.courseId);
+          const value = Math.max(0, Math.min(100, Number(item.progressPercent) || 0));
+          return {
+            key: item.courseId,
+            label: course?.title ?? item.courseId,
+            value,
+            hint: `${course?.title ?? item.courseId}: ${value}%`,
+          };
+        })
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8),
+    [learningItems, courseById]
+  );
+
   const tabs: { id: HubTab; label: string; count: number }[] = [
     { id: 'recommended', label: 'Recommended', count: learningRecommendations.length },
     { id: 'saved', label: 'Saved', count: savedItems.length },
@@ -618,6 +646,27 @@ export const LearningCenterView: React.FC = () => {
           </span>
         )}
       </div>
+
+      {/* The courses the candidate has started, side by side. It sits above the
+          tabs because it is about the courses already in hand, not about the
+          catalogue. */}
+      {startedCourseProgress.length > 0 && (
+        <ChartCard
+          title={t('How far through each course you are')}
+          description={t(
+            'The courses you have started, with the progress each one records.'
+          )}
+          badge={formatCount(startedCourseProgress.length)}
+          testId="learning-progress-chart"
+        >
+          <BarChart
+            data={startedCourseProgress}
+            formatValue={(value) => `${value}%`}
+            max={100}
+            ariaLabel={t('How far through each course you are')}
+          />
+        </ChartCard>
+      )}
 
       <TabButtons
         ariaLabel={t('Learning Hub sections')}

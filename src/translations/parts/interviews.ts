@@ -88,4 +88,15 @@ export const interviewsAr: Record<string, string> = {
   'No report': 'لا يوجد تقرير',
   'Transcript': 'النص الكامل',
   'interviews completed': 'مقابلة مكتملة',
+
+  // Interview score charts
+  'Where your interview scores stand': 'أين تقف درجات مقابلاتك',
+  'The average of each report dimension across every scored interview.':
+    'متوسط كل بُعد من أبعاد التقرير عبر جميع المقابلات التي حصلت على درجة.',
+  'Complete a scored interview and its five dimensions appear here, averaged with every other scored interview.':
+    'أكمل مقابلة مُقيَّمة لتظهر أبعادها الخمسة هنا، بمتوسط مع كل مقابلة مُقيَّمة أخرى.',
+  'Each dimension is scored out of ten by the interviewer.': 'كل بُعد يُقيَّم من عشرة من قِبل المُحاوِر.',
+  'average of': 'متوسط',
+  'interviews': 'مقابلات',
+  'Mock interview': 'مقابلة تجريبية',
 };

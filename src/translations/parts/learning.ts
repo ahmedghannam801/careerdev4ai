@@ -220,4 +220,9 @@ export const learningAr: Record<string, string> = {
     'لا توجد توصيات مخصّصة تطابق هذه المرشّحات.',
   'Full catalog': 'الكتالوج الكامل',
   'match these filters': 'تطابق هذه المرشّحات',
+
+  // Learning progress chart
+  'How far through each course you are': 'إلى أي مدى وصلت في كل دورة',
+  'The courses you have started, with the progress each one records.':
+    'الدورات التي بدأتها، مع نسبة التقدّم التي يسجّلها كل منها.',
 };

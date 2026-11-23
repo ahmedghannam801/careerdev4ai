@@ -204,4 +204,18 @@ export const projectsAr: Record<string, string> = {
   'Start a project for': 'ابدأ مشروعاً لـ',
   'Every skill your target role asks for is demonstrated by finished work. Keep the links current and the write-ups short.': 'كل مهارة تطلبها وظيفتك المستهدفة موثّقة بعمل منجز. أبقِ الروابط محدّثة والكتابة مختصرة.',
   'Finish one project to turn a plan into proof. A shipped, linked project is worth more than three unfinished ones.': 'أنجز مشروعاً واحداً لتحوّل الخطة إلى دليل. مشروع منجز ومرتبط برابط أقوى من ثلاثة مشاريع غير مكتملة.',
+
+  // Project charts
+  'Where your projects stand': 'أين تقف مشاريعك',
+  'Every project you have recorded, at the stage it is really at.':
+    'كل مشروع سجّلته، في المرحلة التي هو فيها فعلًا.',
+  'Record your first project and this chart will show the stage it reaches.':
+    'سجّل أول مشروع لك لتُظهر هذه اللوحة المرحلة التي يصل إليها.',
+  'projects': 'مشاريع',
+  'How much proof each skill has': 'مقدار الدليل وراء كل مهارة',
+  'The finished projects behind the skills your target role asks for.':
+    'المشاريع المنتهية التي تسند المهارات التي يطلبها دورك المستهدف.',
+  'Choose a target role and add the skills you want to prove; this chart will count the finished work behind each one.':
+    'اختر دورًا مستهدفًا وأضف المهارات التي تريد إثباتها؛ وستعدّ هذه اللوحة العمل المنتهي وراء كل مهارة.',
+  'Only finished and published projects count as proof.': 'لا يُحتسب كدليل إلا المشروع المنتهي أو المنشور.',
 };

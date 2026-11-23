@@ -21,6 +21,15 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { AnimatedProgress } from '../motion/AnimatedProgress';
+import {
+  BarChart,
+  ChartCard,
+  DonutChart,
+  LineChart,
+  chartColor,
+  formatCount,
+  type ChartDatum,
+} from '../charts';
 import { buildRouteHash } from '../../lib/routing';
 import {
   computeActivityStreak,
@@ -37,6 +46,7 @@ import {
   roleReadinessFromSkills,
 } from '../../../shared/careerMetrics';
 import { computeProgressSnapshot, isProgressSkillMastered } from '../../../shared/progressMetrics';
+import type { ApplicationStage } from '../../types/career';
 
 /**
  * The Progress Dashboard.
@@ -338,6 +348,72 @@ export const ProgressView: React.FC = () => {
   );
 
   const milestoneTotal = timeline.reduce((sum, group) => sum + group.milestones.length, 0);
+
+  /**
+   * The pipeline, split by the stage each application is really at.
+   *
+   * It is not the same information as the counters above: those count the
+   * total, the interviews and the offers. This shows where the whole pipeline
+   * sits, including the applications that were rejected or withdrawn — which
+   * is the part a candidate cannot see anywhere else on this page.
+   */
+  const applicationStages = useMemo(() => {
+    const stages: Array<{ key: ApplicationStage; label: string }> = [
+      { key: 'saved', label: 'Saved' },
+      { key: 'applied', label: 'Applied' },
+      { key: 'screening', label: 'Screening' },
+      { key: 'interview', label: 'Interview' },
+      { key: 'technical', label: 'Technical' },
+      { key: 'final', label: 'Final' },
+      { key: 'offer', label: 'Offer' },
+      { key: 'rejected', label: 'Rejected' },
+      { key: 'withdrawn', label: 'Withdrawn' },
+    ];
+    return stages
+      .map((stage) => ({
+        key: stage.key,
+        label: t(stage.label),
+        value: safeApplications.filter((application) => application?.stage === stage.key).length,
+      }))
+      .filter((entry) => entry.value > 0);
+  }, [safeApplications, t]);
+
+  /**
+   * The score of each scored mock interview, oldest first.
+   *
+   * Only sessions the model actually scored are on this line: a session with
+   * no score is not a zero, it is a session that was not measured, and drawing
+   * it as zero would invent a dip that did not happen.
+   */
+  const interviewTrend = useMemo(
+    () =>
+      [...safeInterviewSessions]
+        .filter((session) => typeof session?.aiFeedback?.score === 'number' && session.createdAt)
+        .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+        .map((session) => {
+          const parsed = new Date(session.createdAt);
+          const label = Number.isNaN(parsed.getTime())
+            ? session.createdAt.slice(0, 10)
+            : parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+          return {
+            label,
+            value: session.aiFeedback?.score ?? 0,
+            hint: `${label} · ${session.roleTitle || t('Mock interview')}: ${session.aiFeedback?.score ?? 0} / 10`,
+          };
+        }),
+    [safeInterviewSessions, t]
+  );
+
+  const weeklyActivity: ChartDatum[] = activityWeeks.map((week) => {
+    const label = formatWeekLabel(week.start);
+    return {
+      key: week.start,
+      label: week.isCurrent ? t('this week') : label,
+      value: week.count,
+      hint: `${t('Week of')} ${label}: ${week.count} ${week.count === 1 ? t('action') : t('actions')}`,
+      color: week.isCurrent ? 'var(--color-primary)' : 'var(--accent-primary)',
+    };
+  });
 
   return (
     <Reveal className="space-y-8">
@@ -683,39 +759,16 @@ export const ProgressView: React.FC = () => {
             {t('Nothing recorded yet. Your activity appears here as soon as you act.')}
           </p>
         ) : (
-          <div className="mt-4 flex h-40 items-end gap-1.5" data-progress-activity-chart>
-            {activityWeeks.map((week) => {
-              const height = week.count === 0 ? 2 : Math.max(6, Math.round((week.count / activityPeak) * 100));
-              const label = formatWeekLabel(week.start);
-              return (
-                <div key={week.start} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
-                  <span className="font-mono text-[10px] tabular-nums text-[var(--text-muted)]">
-                    {week.count > 0 ? week.count : ''}
-                  </span>
-                  <div
-                    role="img"
-                    aria-label={`${t('Week of')} ${label}: ${week.count} ${week.count === 1 ? t('action') : t('actions')}`}
-                    className={`w-full rounded-t-md transition-colors duration-200 motion-reduce:transition-none ${
-                      week.count === 0
-                        ? 'bg-[var(--border-subtle)]'
-                        : week.isCurrent
-                          ? 'bg-[var(--color-primary)]'
-                          : 'bg-[var(--accent-primary)]/55'
-                    }`}
-                    style={{ height: `${height}%` }}
-                  />
-                  <span
-                    className={`w-full truncate text-center text-[9px] ${
-                      week.isCurrent
-                        ? 'font-semibold text-[var(--color-primary-text)]'
-                        : 'text-[var(--text-muted)]'
-                    }`}
-                  >
-                    {week.isCurrent ? t('this week') : label}
-                  </span>
-                </div>
-              );
-            })}
+          <div className="mt-4" data-progress-activity-chart>
+            <BarChart
+              data={weeklyActivity}
+              orientation="vertical"
+              height={150}
+              max={Math.max(1, activityPeak)}
+              ariaLabel={t('Recorded actions per week, last 8 weeks.')}
+              locale={undefined}
+              testId="progress-activity"
+            />
           </div>
         )}
       </section>
@@ -775,6 +828,55 @@ export const ProgressView: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* THE PIPELINE AND THE INTERVIEW RECORD: the two parts of the
+          candidate's own history that were counted on other pages and never
+          drawn here. Both are read from their own records. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ChartCard
+          title={t('Where your applications stand')}
+          description={t(
+            'Every application you have tracked, at the stage it is really at.'
+          )}
+          badge={formatCount(safeApplications.length)}
+          empty={applicationStages.length === 0}
+          emptyMessage={t(
+            'Track your first application and this chart will show the stage each one reaches.'
+          )}
+          testId="progress-applications-chart"
+        >
+          <DonutChart
+            data={applicationStages.map((entry, index) => ({
+              ...entry,
+              color: chartColor(index),
+            }))}
+            centerValue={formatCount(safeApplications.length)}
+            centerLabel={t('applications')}
+            ariaLabel={t('Where your applications stand')}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title={t('Your interview scores over time')}
+          description={t(
+            'The score of each mock interview that was scored, oldest first.'
+          )}
+          empty={interviewTrend.length < 2}
+          emptyMessage={t(
+            'Two scored mock interviews are needed before a trend can be drawn. A session that was not scored is not a zero, so it is not on this line.'
+          )}
+          footnote={t('Each point is one mock interview, scored out of ten.')}
+          testId="progress-interview-chart"
+        >
+          <LineChart
+            points={interviewTrend}
+            ariaLabel={t('Your interview scores over time')}
+            formatValue={(value) => `${value} / 10`}
+            height={180}
+            color="var(--color-ai)"
+          />
+        </ChartCard>
+      </div>
 
       {/* Progress Breakdown Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

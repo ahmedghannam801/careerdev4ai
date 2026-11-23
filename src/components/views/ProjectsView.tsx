@@ -17,6 +17,11 @@ import { useCareer } from '../../context/CareerContext';
 import { PROJECT_STATUS_FILTERS } from '../../lib/routing';
 import { useRouteParam } from '../../lib/useRouteParams';
 import { CareerProject, ProjectCategory, ProjectStatus } from '../../types/career';
+import {
+  PROJECT_LIFECYCLE_STATUSES,
+  PROJECT_STATUS_LABELS,
+} from '../../../shared/projectLifecycle';
+import { BarChart, ChartCard, DonutChart, chartColor, formatCount, type ChartDatum } from '../charts';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { EmptyState } from '../ui/EmptyState';
 import { useToast } from '../toast/ToastProvider';
@@ -191,6 +196,49 @@ export const ProjectsView: React.FC = () => {
         targetSkills.length > 0 ? Math.round((covered.length / targetSkills.length) * 100) : 0,
     };
   }, [projects, targetRole]);
+
+  /**
+   * The portfolio, split by the stage each project is really at.
+   *
+   * The status filter above says which projects match a stage; this says how
+   * the whole portfolio is distributed across the stages, which is the part a
+   * candidate cannot see by looking at one card at a time.
+   */
+  const statusDistribution = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const project of projects) {
+      const status = project.status ?? 'planned';
+      counts.set(status, (counts.get(status) ?? 0) + 1);
+    }
+    return PROJECT_LIFECYCLE_STATUSES.map((status) => ({
+      key: status,
+      label: t(PROJECT_STATUS_LABELS[status]),
+      value: counts.get(status) ?? 0,
+    })).filter((entry) => entry.value > 0);
+  }, [projects, t]);
+
+  /**
+   * How many finished projects stand behind each skill the role asks for.
+   *
+   * A skill with one project is proof; a skill with three is a pattern. This
+   * counts the shipped work behind each of the first eight target skills, so
+   * the candidate can see where the portfolio is deep and where it is thin.
+   */
+  const proofBySkill: ChartDatum[] = useMemo(() => {
+    const shipped = projects.filter(
+      (project) => project.status === 'completed' || project.status === 'published'
+    );
+    return portfolio.targetSkills
+      .slice(0, 8)
+      .map((skill) => {
+        const lowered = skill.trim().toLowerCase();
+        const value = shipped.filter((project) =>
+          (project.skills ?? []).some((entry) => entry.trim().toLowerCase() === lowered)
+        ).length;
+        return { key: skill, label: skill, value };
+      })
+      .sort((a, b) => b.value - a.value);
+  }, [projects, portfolio.targetSkills]);
 
   /**
    * Opens the project form already aimed at a skill the portfolio cannot yet
@@ -561,6 +609,47 @@ export const ProjectsView: React.FC = () => {
             </p>
           )}
         </div>
+      </div>
+
+      {/* The portfolio, measured. Both charts read the records above them. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          title={t('Where your projects stand')}
+          description={t('Every project you have recorded, at the stage it is really at.')}
+          badge={formatCount(projects.length)}
+          empty={statusDistribution.length === 0}
+          emptyMessage={t('Record your first project and this chart will show the stage it reaches.')}
+          testId="projects-status-chart"
+        >
+          <DonutChart
+            data={statusDistribution.map((entry, index) => ({
+              ...entry,
+              color: chartColor(index),
+            }))}
+            centerValue={formatCount(projects.length)}
+            centerLabel={t('projects')}
+            ariaLabel={t('Where your projects stand')}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title={t('How much proof each skill has')}
+          description={t(
+            'The finished projects behind the skills your target role asks for.'
+          )}
+          empty={proofBySkill.length === 0}
+          emptyMessage={t(
+            'Choose a target role and add the skills you want to prove; this chart will count the finished work behind each one.'
+          )}
+          footnote={t('Only finished and published projects count as proof.')}
+          testId="projects-proof-chart"
+        >
+          <BarChart
+            data={proofBySkill}
+            ariaLabel={t('How much proof each skill has')}
+            max={Math.max(1, ...proofBySkill.map((entry) => entry.value))}
+          />
+        </ChartCard>
       </div>
 
       {/* Filter Tabs: Status & Category */}

@@ -85,6 +85,15 @@ export default defineConfig(() => {
               if (id.includes('@google/genai')) {
                 return 'vendor-genai';
               }
+              // The PDF writer and the font tools are only needed when a
+              // candidate downloads a CV. They are reached through a dynamic
+              // `import()`, and without a chunk of their own they would fall
+              // into `vendor-other`, which the entry point imports statically
+              // — so every visitor would download a PDF engine to read the
+              // landing page. One chunk keeps the download lazy.
+              if (id.includes('fontkit') || id.includes('fflate')) {
+                return 'vendor-pdf';
+              }
               return 'vendor-other';
             }
           },

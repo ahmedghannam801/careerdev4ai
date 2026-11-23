@@ -65,6 +65,11 @@ export const JOB_SOURCE_IDS = [
   'handshake',
   'wonderin',
   'company_careers',
+  'remotive',
+  'arbeitnow',
+  'jobicy',
+  'himalayas',
+  'remoteok',
 ] as const;
 export type JobSourceId = (typeof JOB_SOURCE_IDS)[number];
 
@@ -76,7 +81,27 @@ export const JOB_SOURCE_LABELS: Record<JobSourceId, string> = {
   handshake: 'Handshake',
   wonderin: 'Wonderin.ai',
   company_careers: 'Company careers pages',
+  remotive: 'Remotive',
+  arbeitnow: 'Arbeitnow',
+  jobicy: 'Jobicy',
+  himalayas: 'Himalayas',
+  remoteok: 'Remote OK',
 };
+
+/**
+ * The boards the platform fetches itself, without a paid provider.
+ *
+ * These publish a documented, public, key-free JSON feed. They are read on
+ * the server and merged with the aggregated provider's answer, so a candidate
+ * still sees real vacancies when the provider's monthly quota is spent.
+ */
+export const KEY_FREE_JOB_SOURCE_IDS = [
+  'remotive',
+  'arbeitnow',
+  'jobicy',
+  'himalayas',
+  'remoteok',
+] as const satisfies readonly JobSourceId[];
 
 /**
  * How a board name the provider writes is matched to a board the platform
@@ -90,6 +115,11 @@ const PUBLISHER_SOURCE_MATCHERS: ReadonlyArray<readonly [RegExp, JobSourceId]> =
   [/\bindeed\b/i, 'indeed'],
   [/\bhandshake\b/i, 'handshake'],
   [/\bwonderin\b/i, 'wonderin'],
+  [/\bremotive\b/i, 'remotive'],
+  [/\barbeitnow\b/i, 'arbeitnow'],
+  [/\bjobicy\b/i, 'jobicy'],
+  [/\bhimalayas\b/i, 'himalayas'],
+  [/\bremote\s?ok\b/i, 'remoteok'],
 ];
 
 /**

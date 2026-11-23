@@ -21,7 +21,8 @@ describe('premium motion integration', () => {
     assert.match(dashboard, /<AnimatedList className="mt-4 grid gap-3 sm:grid-cols-3">/);
     assert.match(jobs, /<AnimatedList className="grid grid-cols-1 gap-4 lg:grid-cols-2">/);
     assert.match(roadmap, /<AnimatedList className="rdm-tree__side">/);
-    assert.match(animatedList, /stagger:\s*0\.05/);
+    assert.match(animatedList, /stagger,/);
+    assert.match(animatedList, /Math\.min\(0\.05, 0\.5 \//);
   });
 
   it('respects reduced motion and guards browser-only matchMedia access', () => {
@@ -31,11 +32,15 @@ describe('premium motion integration', () => {
     assert.match(magnet, /prefers-reduced-motion:\s*reduce/);
   });
 
-  it('keeps Lenis synchronized to GSAP and excludes dialogs and inner scrollers', () => {
-    assert.match(smoothScroll, /gsap\.ticker\.add\(ticker\)/);
-    assert.match(smoothScroll, /data-lenis-prevent/);
-    assert.match(smoothScroll, /\[role="dialog"\]/);
-    assert.match(smoothScroll, /\.overflow-y-auto/);
+  it('leaves scrolling to the browser and only registers the animation plugins', () => {
+    // The page used to run a smooth-scroll library that intercepted the wheel
+    // and animated the page towards it. That is what made scrolling feel
+    // slower than the input, so it is gone: the browser's own scroll is used
+    // and the provider registers the GSAP plugins the motion components need.
+    assert.doesNotMatch(smoothScroll, /new Lenis/);
+    assert.doesNotMatch(smoothScroll, /smoothWheel/);
+    assert.match(smoothScroll, /gsap\.registerPlugin\(useGSAP, ScrollTrigger, GSAPSplitText\)/);
+    assert.match(smoothScroll, /ScrollTrigger\.refresh\(\)/);
   });
 
   it('animates dashboard metrics, token balances, and optimistic skill levels', () => {

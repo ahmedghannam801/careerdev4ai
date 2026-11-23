@@ -157,6 +157,13 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const [error, setError] = useState<{ code: string | null } | null>(null);
   /** When the vacancies were last read from the provider, in epoch millis. */
   const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null);
+  /**
+   * The boards that could not be read on this search.
+   *
+   * The server names them and says why; the screen says so too, because a
+   * shorter list must never be presented as a complete one.
+   */
+  const [boardWarnings, setBoardWarnings] = useState<string[]>([]);
   const [sort, setSort] = useState<SortOrder>('match');
   const [showSeniorRoles, setShowSeniorRoles] = useState<boolean | null>(null);
   const [trackingId, setTrackingId] = useState<string | null>(null);
@@ -193,65 +200,90 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   /** The pending trip to the studio, so it can be called off. */
   const tailorTimerRef = useRef<number | null>(null);
 
-  const runSearch = useCallback(async (next: JobSearchFilters) => {
-    const requestId = ++searchRequestIdRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetchLiveJobs(next);
-      if (requestId !== searchRequestIdRef.current) return;
-      setResults(response.jobs);
-      setQuota(response.quota);
-      setSource(response.source);
-      // When the vacancies were actually read. The candidate is told how old
-      // the list is, because a job board that was checked an hour ago is not
-      // the same thing as one that was checked a minute ago. The timestamp is
-      // the provider's own, so a cached answer is not passed off as a fresh
-      // one.
-      const checkedAt = Date.parse(response.checkedAt);
-      setLastCheckedAt(Number.isNaN(checkedAt) ? Date.now() : checkedAt);
-    } catch (caught) {
-      if (requestId !== searchRequestIdRef.current) return;
-      // The failure code is kept; the server's English sentence is not shown
-      // to the user, because the interface has its own sentence per code.
-      const code = caught instanceof ApiRequestError ? caught.code : null;
-      setResults([]);
-      setError({ code });
-    } finally {
-      if (requestId === searchRequestIdRef.current) setLoading(false);
-    }
-  }, []);
-
   /**
    * Asks the server what this candidate should look at.
    *
    * The server builds the search from the candidate's own record, so this is
    * a request without a query in it. A failure here never touches the search
    * below: the list the candidate asked for is still worth showing.
+   *
+   * The filters are passed in rather than read from state, and the call is
+   * made from the one place a search is made. Reading them from state meant a
+   * request for every keystroke in the filter bar, which is a duplicate call
+   * for a list that had not been searched for yet.
    */
-  const loadRecommendations = useCallback(async () => {
-    setRecommendationsLoading(true);
-    setRecommendationsError(null);
-    try {
-      const response = await fetchRecommendedJobs({
-        location: filters.location,
-        country: filters.country,
-        datePosted: filters.datePosted,
-        remoteOnly: filters.remoteOnly,
-        kind: filters.kind,
-        sources: filters.sources,
-        employmentTypes: filters.employmentTypes,
-      });
-      setRecommendations(response.recommendations);
-      setRecommendationBasis(response.candidate);
-    } catch (caught) {
-      setRecommendations([]);
-      const code = caught instanceof ApiRequestError ? caught.code : null;
-      setRecommendationsError(providerFailureMessage(code, t));
-    } finally {
-      setRecommendationsLoading(false);
-    }
-  }, [filters.location, filters.country, filters.datePosted, filters.remoteOnly, filters.kind, filters.sources, filters.employmentTypes, t]);
+  const loadRecommendations = useCallback(
+    async (next: JobSearchFilters) => {
+      setRecommendationsLoading(true);
+      setRecommendationsError(null);
+      try {
+        const response = await fetchRecommendedJobs({
+          location: next.location,
+          country: next.country,
+          datePosted: next.datePosted,
+          remoteOnly: next.remoteOnly,
+          kind: next.kind,
+          sources: next.sources,
+          employmentTypes: next.employmentTypes,
+        });
+        setRecommendations(response.recommendations);
+        setRecommendationBasis(response.candidate);
+      } catch (caught) {
+        setRecommendations([]);
+        const code = caught instanceof ApiRequestError ? caught.code : null;
+        setRecommendationsError(providerFailureMessage(code, t));
+      } finally {
+        setRecommendationsLoading(false);
+      }
+    },
+    [t]
+  );
+
+  const runSearch = useCallback(
+    async (next: JobSearchFilters) => {
+      const requestId = ++searchRequestIdRef.current;
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetchLiveJobs(next);
+        if (requestId !== searchRequestIdRef.current) return;
+        setResults(response.jobs);
+        setQuota(response.quota);
+        setSource(response.source);
+        // Which boards could not be read. Named, so a shorter list is never
+        // presented as a complete one.
+        setBoardWarnings(
+          (response.boardErrors ?? []).map((entry) =>
+            t('{board} could not be read, so its postings are missing from this list.').replace(
+              '{board}',
+              entry.board,
+            ),
+          ),
+        );
+        // When the vacancies were actually read. The candidate is told how old
+        // the list is, because a job board that was checked an hour ago is not
+        // the same thing as one that was checked a minute ago. The timestamp is
+        // the provider's own, so a cached answer is not passed off as a fresh
+        // one.
+        const checkedAt = Date.parse(response.checkedAt);
+        setLastCheckedAt(Number.isNaN(checkedAt) ? Date.now() : checkedAt);
+      } catch (caught) {
+        if (requestId !== searchRequestIdRef.current) return;
+        // The failure code is kept; the server's English sentence is not shown
+        // to the user, because the interface has its own sentence per code.
+        const code = caught instanceof ApiRequestError ? caught.code : null;
+        setResults([]);
+        setBoardWarnings([]);
+        setError({ code });
+      } finally {
+        if (requestId === searchRequestIdRef.current) setLoading(false);
+      }
+      // The recommendations are asked for in parallel with the search itself,
+      // so the screen is not waiting for one list before asking for the other.
+      void loadRecommendations(next);
+    },
+    [loadRecommendations, t]
+  );
 
   /**
    * Adds a posting to the comparison, or takes it out again.
@@ -297,18 +329,6 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
     void runSearch(next);
   }, [isHydrated, targetRole?.title ?? '', filters, runSearch]);
 
-  // The recommendations follow the same filters as the search, so what the
-  // platform suggests is never wider than what the candidate asked to see.
-  const recommendationsStartedRef = useRef(false);
-  useEffect(() => {
-    if (!isHydrated) return;
-    if (!recommendationsStartedRef.current) {
-      recommendationsStartedRef.current = true;
-      void loadRecommendations();
-      return;
-    }
-    void loadRecommendations();
-  }, [isHydrated, loadRecommendations]);
 
   const update = (patch: Partial<JobSearchFilters>) => {
     setFilters((previous) => ({ ...previous, ...patch }));
@@ -712,6 +732,28 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
         <span>{t('Based on your profile: {level}').replace('{level}', candidateBand ?? t('Not set'))}</span>
       </label>
 
+      {/* The boards that could not be read on this search. It is stated
+          plainly rather than left to look like a complete list: the same
+          search may return more once the board answers again. */}
+      {!loading && !error && boardWarnings.length > 0 && (
+        <div
+          role="status"
+          className="flex items-start gap-2.5 rounded-2xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 px-4 py-3 text-[11px] leading-relaxed text-[var(--text-secondary)]"
+        >
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-warning)]" />
+          <div className="space-y-1">
+            <p className="font-semibold text-[var(--text-primary)]">
+              {t('Some job boards could not be read')}
+            </p>
+            <ul className="list-disc space-y-0.5 ps-4">
+              {boardWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* Result count and ordering */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
@@ -882,7 +924,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
                   'Every posting in this search still asks for a skill your profile does not show. Turn the filter off to see them with the gaps named, or close those gaps in your roadmap first.'
                 )
               : t(
-                  'Try a broader title, a nearby city, a longer date range, or another country. The provider only returns openings it can currently find.'
+                  'Try a broader title, a nearby city, a longer date range, or another country. The boards only return openings they can currently find.'
                 )
           }
           actionLabel={t('Clear filters')}
@@ -1004,12 +1046,23 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           </h2>
           <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">
             {t(
-              'Every posting above was fetched from these boards by the job provider, and each card names the board it came from.'
+              'Every posting above was read from one of these boards — by the aggregated provider or directly from the board’s own feed — and each card names the board it came from.'
             )}
           </p>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {(
-              ['google_jobs', 'indeed', 'ziprecruiter', 'handshake', 'company_careers'] as const
+              [
+                'google_jobs',
+                'indeed',
+                'ziprecruiter',
+                'handshake',
+                'company_careers',
+                'remotive',
+                'arbeitnow',
+                'jobicy',
+                'himalayas',
+                'remoteok',
+              ] as const
             ).map((board) => (
               <span
                 key={board}

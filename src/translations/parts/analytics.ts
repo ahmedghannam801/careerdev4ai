@@ -51,4 +51,15 @@ export const analyticsAr: Record<string, string> = {
     'القياس يعمل من جانب المتصفح، لكن الخاصية غير قابلة للقراءة من الخادم بعد.',
   'The authorisation must include the analytics read-only scope, and the account that granted it needs "Read & analyze" access to the property in Google Analytics. The credentials stay on the server and are never sent to the browser.':
     'يجب أن يتضمن التفويض نطاق القراءة فقط للتحليلات، وأن يملك الحساب الذي منحه صلاحية «القراءة والتحليل» على الخاصية في جرائدل أناليتيكس. تبقى بيانات الاعتماد على الخادم ولا تُرسل إلى المتصفح أبدًا.',
+
+  // Admin overview charts
+  'Learning completion on the platform': 'نسبة إكمال التعلّم على المنصة',
+  'The share of started learning that reached completion. It is counted from the platform’s own learning records.':
+    'نسبة التعلّم المبدوء الذي وصل إلى الإكمال، محسوبة من سجلات التعلّم في المنصة.',
+  'No learning has been started on the platform yet.': 'لم يبدأ أحد التعلّم على المنصة بعد.',
+  'Not completed': 'غير مكتمل',
+  'Announcement coverage': 'تغطية الإعلانات',
+  'How much of the announcement list is published rather than waiting as a draft.':
+    'كم من قائمة الإعلانات منشور فعليًا بدل أن يبقى مسودة.',
+  'No announcements have been written yet.': 'لم تُكتب أي إعلانات بعد.',
 };

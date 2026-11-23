@@ -6,7 +6,6 @@ import { useRouteParam } from '../../lib/useRouteParams';
 import { SkillCategory, SkillSource, SkillEvidenceSource, UserSkill } from '../../types/career';
 import { Reveal } from '../motion/Motion';
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
-import { SpotlightCard } from '../react-bits/SpotlightCard';
 import { SkillLevelBar } from '../skills/SkillLevelBar';
 import {
   computeSkillGaps,
@@ -275,10 +274,10 @@ export const SkillsCenterView: React.FC = () => {
             const evidenceRec = skillEvidence[skill.name.toLowerCase()];
 
             return (
-              <SpotlightCard
+              <div
                 key={skill.id}
-                className={`p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ease-out ${
-                  pulsedSkillId === skill.id ? 'scale-[1.01] ring-2 ring-[var(--color-success-strong)]/30 shadow-lg' : ''
+                className={`p-4 rounded-xl bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-[border-color,box-shadow] duration-300 ease-out ${
+                  pulsedSkillId === skill.id ? 'ring-2 ring-[var(--color-success-strong)]/30 shadow-lg' : ''
                 }`}
               >
                 {/* Skill Name & Metadata (Clean unboxed separators) */}
@@ -388,7 +387,7 @@ export const SkillsCenterView: React.FC = () => {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-              </SpotlightCard>
+              </div>
             );
           })}
         </div>

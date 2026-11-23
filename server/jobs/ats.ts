@@ -207,7 +207,7 @@ export function descriptionText(record: Record<string, unknown>): string | null 
  * and what the interface renders as React text. It is never handed to
  * `dangerouslySetInnerHTML`.
  */
-function toPlainText(value: string): string {
+export function toPlainText(value: string): string {
   // Decoded once, at the start, and never again. Decoding again after the
   // markup has been stripped would turn any surviving `&lt;` back into a `<`
   // and put the shape of a tag back into the text.

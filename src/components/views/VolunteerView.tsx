@@ -20,6 +20,7 @@ import { VolunteerExperience } from '../../types/career';
 import { Reveal, Stagger, StaggerItem } from '../motion/Motion';
 import { VolunteerOpportunities } from '../volunteer/VolunteerOpportunities';
 import { TabButtons } from '../ui/TabButtons';
+import { BarChart, ChartCard, type ChartDatum } from '../charts';
 
 /**
  * The Volunteer page.
@@ -116,6 +117,53 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
       for (const skill of entry.skills) names.add(skill);
     }
     return names.size;
+  }, [volunteerExperiences]);
+
+  /**
+   * The stints, counted by the year they began.
+   *
+   * It is the only view that answers "how long have I been doing this, and
+   * when did I stop?" — read from the start date each record states. A stint
+   * with no start date is not placed on the axis, because there is no year to
+   * place it in.
+   */
+  const stintsByYear: ChartDatum[] = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of volunteerExperiences) {
+      const year = /^(\d{4})/.exec(entry.startDate ?? '')?.[1];
+      if (!year) continue;
+      counts.set(year, (counts.get(year) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([year, value]) => ({
+        key: year,
+        label: year,
+        value,
+        hint: `${year}: ${value} ${value === 1 ? t('stint started') : t('stints started')}`,
+      }));
+  }, [volunteerExperiences, t]);
+
+  /**
+   * Which skills the volunteering record repeats.
+   *
+   * A skill named by three stints is a pattern; a skill named once is a
+   * mention. The counts come from the skills the candidate recorded on each
+   * stint, and nothing is credited that they did not write.
+   */
+  const skillsAcrossStints: ChartDatum[] = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of volunteerExperiences) {
+      for (const skill of entry.skills ?? []) {
+        const name = skill.trim();
+        if (!name) continue;
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([name, value]) => ({ key: name, label: name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
   }, [volunteerExperiences]);
 
   /**
@@ -304,6 +352,45 @@ export const VolunteerView: React.FC<VolunteerViewProps> = ({ onNavigate }) => {
           </div>
         ))}
       </div>
+
+      {/* The volunteering record, measured. */}
+      {volunteerExperiences.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ChartCard
+            title={t('When you volunteered')}
+            description={t('The stints you recorded, by the year they began.')}
+            empty={stintsByYear.length === 0}
+            emptyMessage={t(
+              'Add a start date to your volunteering records and they appear here by year.'
+            )}
+            testId="volunteer-years-chart"
+          >
+            <BarChart
+              data={stintsByYear}
+              orientation="vertical"
+              height={140}
+              ariaLabel={t('When you volunteered')}
+              max={Math.max(1, ...stintsByYear.map((entry) => entry.value))}
+            />
+          </ChartCard>
+
+          <ChartCard
+            title={t('The skills your volunteering repeats')}
+            description={t(
+              'The skills named most often across your stints — the ones your record actually repeats.'
+            )}
+            empty={skillsAcrossStints.length === 0}
+            emptyMessage={t('No skills are recorded on your volunteering stints yet.')}
+            testId="volunteer-skills-chart"
+          >
+            <BarChart
+              data={skillsAcrossStints}
+              ariaLabel={t('The skills your volunteering repeats')}
+              max={Math.max(1, ...skillsAcrossStints.map((entry) => entry.value))}
+            />
+          </ChartCard>
+        </div>
+      )}
 
       {/* What the record adds to the role the candidate is chasing. It is
           computed from the skills they recorded, so it cannot flatter them

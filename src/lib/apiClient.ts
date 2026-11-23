@@ -53,13 +53,46 @@ export function isConsentRequiredError(error: unknown): boolean {
 }
 
 /**
+ * The reads that are in flight right now, by path.
+ *
+ * Two components that mount together often ask for the same thing — the
+ * Dashboard and the Progress screen both read the interview history, the
+ * sidebar and the profile both read the credits balance. Each of those used to
+ * be a separate request for the same bytes.
+ *
+ * Sharing the promise of a read that has not finished yet answers both callers
+ * with one request. It is deliberately limited to GET: a POST or a PATCH
+ * changes something, and two of those must reach the server twice.
+ *
+ * The entry is removed when the request settles, so a later mount reads fresh
+ * data rather than a cached answer, and a failure is not propagated to a
+ * request made after it.
+ */
+const inFlightReads = new Map<string, Promise<unknown>>();
+
+/**
  * Sends one authenticated request to the application's API and returns the
  * parsed JSON body.
  *
  * A non-2xx answer throws an ApiRequestError carrying the status and the
  * message the server sent.
  */
-export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  if (method !== 'GET') return sendRequest<T>(path, init);
+
+  const inFlight = inFlightReads.get(path);
+  if (inFlight) return inFlight as Promise<T>;
+
+  const request = sendRequest<T>(path, init).finally(() => {
+    inFlightReads.delete(path);
+  });
+  inFlightReads.set(path, request);
+  return request;
+}
+
+/** Sends the request itself. `apiRequest` is the only caller. */
+async function sendRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await getAccessToken();
   const isFormDataBody = typeof FormData !== 'undefined' && init?.body instanceof FormData;
   const headers: Record<string, string> = {

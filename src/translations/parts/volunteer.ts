@@ -136,4 +136,16 @@ export const volunteerAr: Record<string, string> = {
   'None of your target-role skills are named in these records yet. Add the skills each stint actually used.': 'لا توجد مهارات من وظيفتك المستهدفة مذكورة في هذه السجلات بعد. أضف المهارات التي استخدمتها فعلاً في كل تجربة.',
   'Still to prove elsewhere:': 'ما زال بحاجة إلى إثبات في مكان آخر:',
   'Open Skills Center': 'افتح مركز المهارات',
+
+  // Volunteering charts
+  'stint started': 'فترة بدأت',
+  'stints started': 'فترات بدأت',
+  'When you volunteered': 'متى تطوّعت',
+  'The stints you recorded, by the year they began.': 'فترات التطوّع التي سجّلتها، حسب سنة بدايتها.',
+  'Add a start date to your volunteering records and they appear here by year.':
+    'أضف تاريخ بداية إلى سجلات تطوّعك لتظهر هنا حسب السنة.',
+  'The skills your volunteering repeats': 'المهارات التي تتكرّر في تطوّعك',
+  'The skills named most often across your stints — the ones your record actually repeats.':
+    'المهارات الأكثر ذكرًا في فترات تطوّعك — أي التي يتكرّر ذكرها في سجلك فعلًا.',
+  'No skills are recorded on your volunteering stints yet.': 'لم تُسجَّل مهارات على فترات تطوّعك بعد.',
 };

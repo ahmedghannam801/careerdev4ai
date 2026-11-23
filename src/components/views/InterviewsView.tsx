@@ -25,6 +25,7 @@ import { Reveal } from '../motion/Motion';
 import { CareerImage } from '../ui/CareerImage';
 import { LiveInterviewPanel } from '../interviews/LiveInterviewPanel';
 import { useLiveInterviewHistory } from '../../lib/useLiveInterviewHistory';
+import { BarChart, ChartCard, type ChartDatum } from '../charts';
 import { computeInterviewReadiness } from '../../../shared/interviewReadiness';
 import { cvReadinessFromVersions, roleReadinessFromSkills } from '../../../shared/careerMetrics';
 
@@ -112,6 +113,43 @@ export const InterviewsView: React.FC = () => {
   // cache, so the two pages cannot disagree and neither pays for a second
   // request.
   const liveHistory = useLiveInterviewHistory();
+
+  /**
+   * The five dimensions of the report, averaged over every scored interview.
+   *
+   * One interview's report shows its own five numbers; this shows the pattern
+   * across all of them, which is the only way to see which dimension the
+   * candidate keeps scoring low. The average is of the reports that exist: an
+   * interview that was not scored is not a zero in it.
+   */
+  const dimensionAverages: ChartDatum[] = useMemo(() => {
+    const scored = liveHistory.sessions
+      .map((session) => session.evaluation)
+      .filter((evaluation): evaluation is NonNullable<typeof evaluation> => Boolean(evaluation));
+    if (scored.length === 0) return [];
+
+    const dimensions: Array<{ key: keyof (typeof scored)[number]; label: string }> = [
+      { key: 'communication', label: 'Communication' },
+      { key: 'technicalKnowledge', label: 'Technical knowledge' },
+      { key: 'answerQuality', label: 'Answer quality' },
+      { key: 'problemSolving', label: 'Problem solving' },
+      { key: 'languageFluency', label: 'Language fluency' },
+    ];
+
+    return dimensions.map((dimension) => {
+      const total = scored.reduce((sum, evaluation) => {
+        const value = Number(evaluation[dimension.key]);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+      const average = Math.round((total / scored.length) * 10) / 10;
+      return {
+        key: dimension.key,
+        label: t(dimension.label),
+        value: average,
+        hint: `${t(dimension.label)}: ${average} / 10 · ${t('average of')} ${scored.length} ${t('interviews')}`,
+      };
+    });
+  }, [liveHistory.sessions, t]);
 
   const completedTraining = useMemo(() => {
     const courseById = new Map(learningCatalog.map((course) => [course.id, course]));
@@ -318,6 +356,33 @@ export const InterviewsView: React.FC = () => {
           void liveHistory.refresh();
         }}
       />
+
+      {/*
+        THE PATTERN ACROSS INTERVIEWS.
+
+        A single report says how one answer went. This says which of the five
+        dimensions the candidate keeps scoring low, which is what a practice
+        plan can act on. It is drawn only from reports that exist.
+      */}
+      <ChartCard
+        title={t('Where your interview scores stand')}
+        description={t(
+          'The average of each report dimension across every scored interview.'
+        )}
+        empty={dimensionAverages.length === 0}
+        emptyMessage={t(
+          'Complete a scored interview and its five dimensions appear here, averaged with every other scored interview.'
+        )}
+        footnote={t('Each dimension is scored out of ten by the interviewer.')}
+        testId="interview-dimensions-chart"
+      >
+        <BarChart
+          data={dimensionAverages}
+          max={10}
+          formatValue={(value) => `${value} / 10`}
+          ariaLabel={t('Where your interview scores stand')}
+        />
+      </ChartCard>
 
       {/*
         THE VOICE INTERVIEW HISTORY.

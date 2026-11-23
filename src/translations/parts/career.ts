@@ -322,12 +322,45 @@ export const careerAr: Record<string, string> = {
   '1 · Career domain': '1 · المجال المهني',
   '2 · Specialisation in': '2 · التخصّص ضمن',
 
-  // The spiral career timeline
-  'Your career as a spiral: every verified record you own, from the earliest to the newest.':
-    'مسارك المهني في شكل حلزوني: كل سجل موثّق تملكه، من الأقدم إلى الأحدث.',
+  // The Career Timeline dashboard
+  'Every record you own, charted: how much is finished, what it is, and when it happened.':
+    'كل سجل تملكه في رسوم بيانية: كم أُنجز منه، وما نوعه، ومتى حدث.',
   'Your career timeline starts here': 'خطّك الزمني للمهنة يبدأ من هنا',
-  'Add your education, experience, certifications and projects and they will appear on the spiral as your career grows.':
-    'أضف دراستك وخبرتك وشهاداتك ومشاريعك، وستظهر على الحلزون مع نموّ مسارك المهني.',
+  'Add your education, experience, certifications and projects and this dashboard will chart your progress — how much is finished, what each record is, and when it happened.':
+    'أضف دراستك وخبرتك وشهاداتك ومشاريعك، وستعرض هذه اللوحة تقدّمك في رسوم بيانية: كم أُنجز، وما نوع كل سجل، ومتى حدث.',
+  'Records in the timeline': 'سجلات في الخط الزمني',
+  'Every record you own, counted once': 'كل سجل تملكه، محسوبًا مرة واحدة',
+  'Finished and verified by the record itself': 'منتهٍ ومُثبت بحسب السجل نفسه',
+  'Current roles, studies and applications': 'الأدوار والدراسات والطلبات الجارية',
+  'The share of your records that are finished': 'نسبة سجلاتك المنتهية',
+  'Where your career stands': 'أين يقف مسارك المهني الآن',
+  'Every record is finished, happening now, or still ahead. This is the split.':
+    'كل سجل إمّا منتهٍ أو جارٍ الآن أو لم يحدث بعد. وهذا توزيعها.',
+  'completed': 'مكتمل',
+  'What your records are': 'أنواع سجلاتك',
+  'The kinds of record your timeline is built from, and how many of each.':
+    'أنواع السجلات التي يتكوّن منها خطك الزمني، وعدد كل نوع.',
+  'Your records over time': 'سجلاتك عبر الزمن',
+  'The running total of records you had at the end of each year, from the dates your records state.':
+    'العدد التراكمي لسجلاتك في نهاية كل سنة، بحسب التواريخ التي تذكرها سجلاتك.',
+  'records in total': 'سجلًا في الإجمالي',
+  'added that year': 'أُضيفت في تلك السنة',
+  'records added': 'سجلًا مُضافًا',
+  'Add a start date or an end date to your records and the trend of your career appears here. A trend is never drawn from dates the records do not have.':
+    'أضف تاريخ بداية أو نهاية إلى سجلاتك ليظهر هنا منحنى مسارك المهني. لا يُرسم أي منحنى من تواريخ لا تحتويها السجلات.',
+  '{count} of your records carry no date, so they are not on this line.':
+    '{count} من سجلاتك بلا تاريخ، ولهذا لا تظهر على هذا المنحنى.',
+  'Records added by year': 'السجلات المضافة حسب السنة',
+  'How many records each year contributed to your career.':
+    'كم سجلًا أضافته كل سنة إلى مسارك المهني.',
+  'No record states a year yet, so there is nothing to place on this axis.':
+    'لا يوجد سجل يذكر سنة بعد، لذلك لا شيء يُوضع على هذا المحور.',
+  'Progress by record type': 'التقدّم حسب نوع السجل',
+  'How much of each kind of record is finished. The bar is the share of that kind that is complete.':
+    'كم أُنجز من كل نوع سجل. الشريط هو نسبة ذلك النوع المكتملة.',
+  'Every record, newest first': 'كل السجلات، الأحدث أولًا',
+  'Every figure above is counted from your own records. Nothing on this dashboard is estimated.':
+    'كل رقم أعلاه محسوب من سجلاتك الخاصة. لا شيء في هذه اللوحة تقديري.',
   'Journey completed': 'نسبة المسار المُنجَز',
   'Happening now': 'جارٍ الآن',
   'Still to come': 'لم يحدث بعد',
@@ -339,4 +372,18 @@ export const careerAr: Record<string, string> = {
   'Credential': 'رقم الاعتماد',
   'Milestone': 'محطة',
   'Achieved': 'تاريخ الإنجاز',
+
+  // Progress dashboard charts
+  'Where your applications stand': 'أين تقف طلباتك',
+  'Every application you have tracked, at the stage it is really at.':
+    'كل طلب تابعته، في المرحلة التي هو فيها فعلًا.',
+  'Track your first application and this chart will show the stage each one reaches.':
+    'تابع أول طلب لك لتُظهر هذه اللوحة المرحلة التي يصل إليها كل طلب.',
+  'applications': 'طلبات',
+  'Your interview scores over time': 'درجات مقابلاتك عبر الزمن',
+  'The score of each mock interview that was scored, oldest first.':
+    'درجة كل مقابلة تجريبية تم تقييمها، من الأقدم إلى الأحدث.',
+  'Two scored mock interviews are needed before a trend can be drawn. A session that was not scored is not a zero, so it is not on this line.':
+    'يلزم تقييم مقابلتين تجريبيتين لرسم اتجاه. الجلسة غير المُقيَّمة ليست صفرًا، ولهذا لا تظهر على هذا المنحنى.',
+  'Each point is one mock interview, scored out of ten.': 'كل نقطة مقابلة تجريبية واحدة، مُقيَّمة من عشرة.',
 };
