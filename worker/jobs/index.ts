@@ -39,6 +39,9 @@ import { getSupabaseServer } from '../../server/db/supabase.ts';
 import { writeConsumerHeartbeat } from '../../server/jobs/heartbeat.ts';
 import { runSubscriptionMaintenanceSweeps } from '../../server/jobs/maintenance.ts';
 import { runOpportunitySyncIfDue } from '../../server/jobs/tasks/syncOpportunities.ts';
+import { processDueAnnouncements } from '../../server/db/admin.ts';
+import { processEmailQueue } from '../../server/email/queue.ts';
+import { enqueueDueDigests } from '../../server/email/digest.ts';
 
 interface QueueBinding {
   send(body: unknown, options?: { delaySeconds?: number }): Promise<void>;
@@ -311,6 +314,47 @@ export default {
     // dead. The heartbeat is written again at the end of the sweep with the
     // final numbers.
     await writeHeartbeat(env, sweep);
+
+    // Scheduled announcements publish here as well as on API traffic. An
+    // announcement scheduled for 09:00 must go out at 09:00 even if nobody
+    // opens the site.
+    try {
+      const announcements = await processDueAnnouncements();
+      sweep.announcementsPublished = announcements.published;
+      sweep.announcementsExpired = announcements.expired;
+    } catch (error) {
+      sweep.announcementsPublished = 0;
+      console.error('The scheduled announcement sweep failed:', error);
+    }
+
+    // The persistent email queue. This is the half that must never depend on
+    // a browser: a message written by any route, webhook or trigger is sent
+    // here, on the schedule, whether the candidate is online or not.
+    try {
+      const emails = await processEmailQueue({ limit: 20 });
+      sweep.emailsClaimed = emails.claimed;
+      sweep.emailsSent = emails.sent;
+      sweep.emailsBlocked = emails.blocked;
+      sweep.emailsSuppressed = emails.suppressed;
+      sweep.emailsRetried = emails.retried;
+      sweep.emailsDeadLettered = emails.deadLettered;
+      sweep.emailProductionReady = emails.productionReady;
+      if (emails.reason) sweep.emailReason = emails.reason;
+    } catch (error) {
+      sweep.emailsSent = 0;
+      console.error('The email queue sweep failed:', error);
+    }
+
+    // The digests decide for themselves whether they are due. One idempotency
+    // key per account per day/week means a five-minute tick still sends one.
+    try {
+      const digests = await enqueueDueDigests({ maxUsers: 40 });
+      sweep.digestsQueued = digests.dailyQueued + digests.weeklyQueued;
+      sweep.digestsSkipped = digests.skipped;
+    } catch (error) {
+      sweep.digestsQueued = 0;
+      console.error('The digest sweep failed:', error);
+    }
 
     try {
       // The official opportunity sources are read on their own schedule.

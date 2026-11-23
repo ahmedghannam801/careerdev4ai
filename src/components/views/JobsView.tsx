@@ -557,7 +557,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
       </div>
 
       {/* LinkedIn Authorized External Search Entry */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 shadow-xs">
+      <div className="flex flex-col flex-wrap sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-4 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0A66C2]/10 text-[#0A66C2]">
             <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">

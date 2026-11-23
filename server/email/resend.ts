@@ -106,6 +106,12 @@ export interface EmailMessage {
   html: string;
   text: string;
   replyTo?: string;
+  /**
+   * Extra provider headers. Used for `List-Unsubscribe` on marketing mail and
+   * for a stable `X-Aionvia-Category` that the provider dashboard can filter
+   * on without exposing anything about the recipient.
+   */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -141,6 +147,9 @@ export async function sendEmail(
         html: message.html,
         text: message.text,
         ...(message.replyTo ? { reply_to: message.replyTo } : {}),
+        ...(message.headers && Object.keys(message.headers).length > 0
+          ? { headers: message.headers }
+          : {}),
       }),
       signal: controller.signal,
     });

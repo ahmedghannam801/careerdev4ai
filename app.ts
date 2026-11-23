@@ -265,6 +265,16 @@ import {
   requirePermission,
 } from './server/admin/permissions.ts';
 import { emailDeliveryStatus, normalizeRecipient, sendTestEmail } from './server/email/resend.ts';
+import { getEmailDeliveryConfig } from './server/email/config.ts';
+import { registerEmailRoutes } from './server/email/routes.ts';
+import {
+  sendApplicationUpdate,
+  sendAssessmentResult,
+  sendInterviewFeedback,
+  sendLearningCompleted,
+  sendRoadmapUpdate,
+  sendSecurityAlert,
+} from './server/email/lifecycle.ts';
 import { runtimeSecret } from './server/runtimeEnv.ts';
 import {
   isAnnouncementAudience,
@@ -1357,6 +1367,13 @@ app.post('/api/user-skills/assessment', requireAuth, async (req: Request, res: R
       category: str(body.category, 60) ?? undefined,
       level,
       score,
+    });
+
+    void sendAssessmentResult(req.authUser!.id, {
+      skillName: name,
+      score,
+      level,
+      resultId: result.row?.id,
     });
 
     return res.status(201).json({
@@ -3563,6 +3580,12 @@ app.post('/api/account/change-password', requireAuth, accountRateLimit, async (r
       return res.status(400).json({ error: result.error || 'Failed to update password' });
     }
 
+    void sendSecurityAlert(req.authUser!.id, {
+      event: 'password-changed',
+      title: 'Your password was changed',
+      message: 'Your Aionvia password was changed. If this was not you, reset it immediately.',
+    });
+
     return res.json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update password' });
@@ -3584,6 +3607,13 @@ app.post('/api/account/change-email', requireAuth, accountRateLimit, async (req:
     if (!result.ok) {
       return res.status(409).json({ error: result.error || 'Failed to update email' });
     }
+
+    void sendSecurityAlert(req.authUser!.id, {
+      event: 'email-changed',
+      title: 'Your sign-in email was changed',
+      message: 'The email address used to sign in to Aionvia was changed. If this was not you, contact support immediately.',
+      detail: newEmail.toLowerCase(),
+    });
 
     return res.json({ success: true, email: newEmail.toLowerCase(), message: 'Email updated successfully' });
   } catch (error) {
@@ -5635,6 +5665,7 @@ app.patch('/api/job-applications/:id', requireAuth, async (req: Request, res: Re
     if (stage && !APPLICATION_STAGES.includes(stage as (typeof APPLICATION_STAGES)[number])) {
       return res.status(400).json({ error: 'Invalid stage' });
     }
+    const previous = await getJobApplication(req.authUser!.id, req.params.id);
     const application = await updateJobApplication(req.authUser!.id, req.params.id, {
       jobId: body.jobId === null ? undefined : (str(body.jobId, 100) ?? undefined),
       company: str(body.company, 200) ?? undefined,
@@ -5654,6 +5685,16 @@ app.patch('/api/job-applications/:id', requireAuth, async (req: Request, res: Re
           : (str(body.interviewStageDetails, 500) ?? undefined),
     });
     if (!application) return res.status(404).json({ error: 'Application not found' });
+    if (previous && previous.stage !== application.stage) {
+      void sendApplicationUpdate(req.authUser!.id, {
+        applicationId: application.id,
+        company: application.company,
+        role: application.role,
+        stage: application.stage,
+        previousStage: previous.stage,
+        nextStep: application.nextAction ?? undefined,
+      });
+    }
     return res.json({ success: true, application });
   } catch (error) {
     console.error('Failed to update job application:', error);
@@ -5803,6 +5844,14 @@ app.post('/api/interviews/live/complete', requireAuth, async (req: Request, res:
         typeof body.durationSeconds === 'number' && Number.isFinite(body.durationSeconds)
           ? Math.max(0, Math.min(7200, Math.round(body.durationSeconds)))
           : null,
+    });
+
+    void sendInterviewFeedback(req.authUser!.id, {
+      sessionId: session.id,
+      role: roleTitle || undefined,
+      score: evaluation ? evaluation.score * 10 : undefined,
+      summary: evaluation?.summary,
+      kind: 'live',
     });
 
     return res.status(201).json({ success: true, session, evaluation, evaluationError });
@@ -6052,6 +6101,13 @@ app.patch('/api/roadmap/tasks/:taskId', requireAuth, async (req: Request, res: R
     }
     const updated = await updateTaskStatus(req.authUser!.id, req.params.taskId, status);
     if (!updated) return res.status(404).json({ error: 'Task not found' });
+    if (status === 'completed') {
+      void sendRoadmapUpdate(req.authUser!.id, {
+        taskId: req.params.taskId,
+        title: 'A roadmap task is complete',
+        message: 'One task is done. The roadmap has been updated with the new progress.',
+      });
+    }
     const roadmaps = await listRoadmaps(req.authUser!.id);
     return res.json({ success: true, roadmaps, roadmap: roadmaps[0] ?? null });
   } catch (error) {
@@ -7138,6 +7194,12 @@ app.patch('/api/learning/items/:courseId', requireAuth, async (req: Request, res
       recommendationReason,
     });
     if (!item) return res.status(404).json({ error: 'Learning item not found' });
+    if (status === 'completed') {
+      void sendLearningCompleted(req.authUser!.id, {
+        courseId,
+        courseTitle: courseId,
+      });
+    }
     return res.json({ success: true, item });
   } catch (error) {
     console.error('Failed to update learning item:', error);
@@ -7427,7 +7489,15 @@ app.get(
   async (_req: Request, res: Response) => {
     // The recipient itself is not returned: who the owner configures is not
     // something a caller of this endpoint needs in order to read the state.
-    return res.json({ success: true, status: emailDeliveryStatus() });
+    // The domain status is returned because it is the difference between a
+    // deployment that can mail real users and one that cannot.
+    let domain: Awaited<ReturnType<typeof getEmailDeliveryConfig>> | null = null;
+    try {
+      domain = await getEmailDeliveryConfig();
+    } catch {
+      domain = null;
+    }
+    return res.json({ success: true, status: emailDeliveryStatus(), domain });
   }
 );
 
@@ -7722,6 +7792,16 @@ function readAnnouncementInput(body: Record<string, unknown>, partial: boolean) 
   const publishAt = body.publishAt === null ? null : (str(body.publishAt, 60) ?? undefined);
   const expiresAt = body.expiresAt === null ? null : (str(body.expiresAt, 60) ?? undefined);
 
+  // The email campaign flag is a boolean, not a truthy value. A string "false"
+  // from a form or an old client must not turn a campaign on.
+  let emailEnabled: boolean | undefined;
+  if (body.emailEnabled !== undefined) {
+    if (typeof body.emailEnabled !== 'boolean') {
+      throw new AdminError('emailEnabled must be true or false');
+    }
+    emailEnabled = body.emailEnabled;
+  }
+
   for (const [value, label] of [
     [publishAt, 'Publish date'],
     [expiresAt, 'Expiration date'],
@@ -7756,6 +7836,7 @@ function readAnnouncementInput(body: Record<string, unknown>, partial: boolean) 
     ctaUrl,
     publishAt,
     expiresAt,
+    emailEnabled,
   };
 }
 
@@ -7823,6 +7904,7 @@ app.post(
           ctaUrl: input.ctaUrl,
           publishAt: input.publishAt,
           expiresAt: input.expiresAt,
+          emailEnabled: input.emailEnabled,
         },
         req.admin!
       );
@@ -8347,6 +8429,11 @@ registerSubscriptionRoutes(app);
 /* Personal referral links and rewards                                        */
 /* -------------------------------------------------------------------------- */
 registerReferralRoutes(app);
+
+/* -------------------------------------------------------------------------- */
+/* Email delivery: preferences, unsubscribe, webhook and administration      */
+/* -------------------------------------------------------------------------- */
+registerEmailRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* XPay card payments (Egypt) and their webhook                               */

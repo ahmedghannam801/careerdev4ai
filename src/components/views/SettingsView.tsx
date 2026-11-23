@@ -33,6 +33,7 @@ import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
 import { TabButtons } from '../ui/TabButtons';
 import { MembershipPanel } from '../subscription/MembershipPanel';
+import { EmailNotificationSettings } from '../settings/EmailNotificationSettings';
 import { SUPPORT_EMAIL, SUPPORT_PHONE } from '../../../shared/contact.ts';
 
 /**
@@ -359,7 +360,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
       {/* TAB 1: ACCOUNT */}
       {activeTab === 'account' && (
         <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-5 shadow-xs">
+          <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-5 shadow-xs">
             <h2 className="text-base font-bold text-[var(--text-primary)]">
               {t('Account Overview')}
             </h2>
@@ -367,12 +368,12 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('User Name')}</span>
-                <p className="font-semibold text-[var(--text-primary)]">{identity.displayName}</p>
+                <p className="break-words font-semibold text-[var(--text-primary)]">{identity.displayName}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('Primary Email')}</span>
-                <p className="font-semibold text-[var(--text-primary)]">{profile.email}</p>
+                <p className="break-words font-semibold text-[var(--text-primary)]">{profile.email}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] space-y-1">
@@ -418,7 +419,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
           </div>
 
           {/* Danger Zone: Account Deletion */}
-          <div className="p-6 rounded-2xl bg-[var(--color-danger)]/5 border border-[var(--color-danger)]/20 space-y-4">
+          <div className="p-4 sm:p-6 rounded-2xl bg-[var(--color-danger)]/5 border border-[var(--color-danger)]/20 space-y-4">
             <div>
               <h2 className="text-sm font-bold text-[var(--color-danger)] flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4" />
@@ -459,7 +460,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
       {/* TAB 3: SECURITY */}
       {activeTab === 'security' && (
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
               {t('Security & Active Session')}
@@ -501,7 +502,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
       {/* TAB 3: PRIVACY CENTER */}
       {activeTab === 'privacy' && (
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
               {t('Privacy & Data Visibility')}
@@ -608,7 +609,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
       {/* TAB 4: AI PREFERENCES */}
       {activeTab === 'ai' && (
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
               {t('AI Copilot & Writing Assistant Controls')}
@@ -685,15 +686,15 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
       {/* TAB 5: NOTIFICATIONS */}
       {activeTab === 'notifications' && (
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
               {t('Notification Preferences')}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Choose which notification types appear in your Notifications drawer. These
-              preferences are stored in this browser; scheduled email delivery is not enabled in
-              this release.
+              {t(
+                'Choose which notification types appear in your Notifications drawer. In-app alerts are stored on this device; email preferences below are stored on your account.'
+              )}
             </p>
           </div>
 
@@ -750,12 +751,14 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
               />
             </div>
           </div>
+
+          <EmailNotificationSettings />
         </div>
       )}
 
       {/* TAB 6: INTERFACE & LOCALIZATION */}
       {activeTab === 'interface' && (
-        <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">
               {t('Interface & Localization')}
@@ -833,7 +836,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
       {activeTab === 'about' && (
         <div className="space-y-6">
           {/* Platform Overview */}
-          <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3 shadow-xs">
+          <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 className="text-base font-bold text-[var(--text-primary)]">
@@ -850,7 +853,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
           </div>
 
           {/* Developer Information Card */}
-          <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
+          <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-6 shadow-xs">
             <div className="border-b border-[var(--border-subtle)] pb-4">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                 {t('Developed by')}

@@ -366,7 +366,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       {/* Main Content Area & Top Bar */}
       <div className="flex-1 flex flex-col min-w-0 pb-[calc(4.75rem+env(safe-area-inset-bottom))] md:pb-0">
         {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 bg-[var(--surface-main)] border-b border-[var(--border-subtle)] px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
+        <header className="sticky top-0 z-30 bg-[var(--surface-main)] border-b border-[var(--border-subtle)] px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-1.5 sm:gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -377,8 +377,20 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               <Menu className="w-5 h-5" />
             </button>
 
+            {/* Phones have no room for a breadcrumb beside the header
+                controls, and the view's own heading already names the page.
+                The compact wordmark keeps the shell recognisable without
+                truncating both labels to "A…". */}
+            <button
+              type="button"
+              onClick={() => onNavigate('dashboard')}
+              className="shrink-0 text-start text-sm font-bold tracking-tight text-[var(--text-primary)] sm:hidden"
+            >
+              {t('Aionvia')}
+            </button>
+
             {/* Quick Breadcrumb Trail */}
-            <div className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <div className="hidden min-w-0 items-center gap-1.5 text-xs text-[var(--text-secondary)] lg:flex">
               <button 
                 onClick={() => onNavigate('dashboard')} 
                 className="hidden shrink-0 font-medium hover:text-[var(--text-primary)] sm:inline"
@@ -431,7 +443,9 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                   plan label in the header any more: the plan and the tokens
                   are one control, and the sidebar repeats the same identity
                   beside the candidate's name. */}
-              <CreditBalanceBadge onOpenPricing={() => onNavigate('pricing')} />
+              <div className="hidden min-[360px]:flex">
+                <CreditBalanceBadge onOpenPricing={() => onNavigate('pricing')} />
+              </div>
 
               {/* Notifications */}
               <button
@@ -449,7 +463,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               {/* Profile Avatar Button */}
               <button
                 onClick={() => onNavigate('profile')}
-                className="hidden sm:flex items-center gap-2 ps-2 border-s border-[var(--border-subtle)] group"
+                className="hidden lg:flex items-center gap-2 ps-2 border-s border-[var(--border-subtle)] group"
                 title={t('View My Profile')}
               >
                 <AionviaAvatar
