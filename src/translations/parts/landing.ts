@@ -219,6 +219,8 @@ export const landingAr: Record<string, string> = {
   'About': 'عن المنصة',
   'Career roles': 'الوظائف المهنية',
   'Contact Us': 'اتصل بنا',
+  'Business Information': 'المعلومات التجارية',
+  'Refund Policy': 'سياسة الاسترداد',
   'Switch interface language': 'تغيير لغة الواجهة',
 
   // ---- Navigation ------------------------------------------------------

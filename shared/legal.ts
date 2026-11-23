@@ -253,6 +253,150 @@ export function hasApprovedTerms(): boolean {
     TERMS_DOCUMENT.sections.every((section) => section.heading.trim() && section.body.trim());
 }
 
+/**
+ * The Refund Policy published at `/refund-policy`.
+ *
+ * This is a business policy, not a rewrite of the Terms. It describes how a
+ * refund request is reviewed, how an approved refund is paid, and which
+ * statutory rights are unaffected. It deliberately does not invent a fixed
+ * cooling-off period or a processing time: those are owner decisions and are
+ * governed by the applicable consumer-protection rules.
+ */
+export const REFUND_POLICY_VERSION = '2026-11-23';
+
+export const REFUND_POLICY: {
+  approved: boolean;
+  updated: string;
+  sections: ReadonlyArray<{ heading: string; body: string }>;
+  sectionsAr: ReadonlyArray<{ heading: string; body: string }>;
+} = {
+  approved: true,
+  updated: 'November 23, 2026',
+  sections: [
+    {
+      heading: 'Scope',
+      body: `This Refund Policy applies to paid subscriptions and AI credit packs bought through Aionvia's online checkout.
+
+It does not replace your statutory rights under the applicable consumer-protection law. Where those rights give you a stronger remedy than this policy, those rights apply.`,
+    },
+    {
+      heading: 'Your right to request a refund',
+      body: `You may contact us to request a refund if:
+
+• you were charged more than once for the same purchase;
+• you were charged for a purchase you did not authorise;
+• the paid service was not made available to your account and we could not resolve it; or
+• you believe you are entitled to a refund under the applicable consumer-protection law.
+
+A request is reviewed using the account, the payment reference and the records of what was delivered.`,
+    },
+    {
+      heading: 'Purchases that are generally not refundable',
+      body: `Because the service is digital and is consumed immediately, we may decline a refund where:
+
+• the subscription period or credit pack has already been used in full;
+• AI tokens have already been spent on generated content;
+• the request relates to a change of mind after the service has been substantially used; or
+• the account was closed for a breach of the Terms & Conditions.
+
+Nothing in this section removes a right that applicable law says cannot be excluded.`,
+    },
+    {
+      heading: 'How to request a refund',
+      body: `Email the official contact address published on our Business Information page, or use the contact details there.
+
+Please include:
+
+• the email address on your Aionvia account;
+• the date of payment;
+• the XPay payment or order reference, if you have it; and
+• a short description of the problem.
+
+We may ask for additional information needed to identify the payment. Never send a full card number or your password.`,
+    },
+    {
+      heading: 'How an approved refund is paid',
+      body: `An approved refund is returned through the original payment method, using the payment provider that processed the purchase. Aionvia does not ask for new card details in order to pay a refund.
+
+The time it takes for the money to appear depends on the payment provider and your bank. We will tell you when the refund has been submitted.`,
+    },
+    {
+      heading: 'Chargebacks and payment disputes',
+      body: `If you think a charge is wrong, please contact us first so we can identify the payment and respond. Raising a chargeback does not prevent you from contacting us, and contacting us does not limit your right to dispute a charge with your bank or card issuer.`,
+    },
+    {
+      heading: 'Contact',
+      body: `The business name, the Egyptian business address (once the owner has supplied it), the official email address and the telephone number are published on the Business Information page.
+
+That page, the Terms & Conditions and this Refund Policy are public and can be read without creating an account.`,
+    },
+  ],
+  sectionsAr: [
+    {
+      heading: 'نطاق السياسة',
+      body: `تنطبق سياسة الاسترداد هذه على الاشتراكات المدفوعة وحزم رصيد الذكاء الاصطناعي التي تُشترى عبر الدفع الإلكتروني في Aionvia.
+
+لا تحل هذه السياسة محل حقوقك القانونية بموجب قانون حماية المستهلك المعمول به. وإذا منحتك تلك الحقوق علاجًا أقوى من هذه السياسة، فإن تلك الحقوق هي التي تُطبق.`,
+    },
+    {
+      heading: 'حقك في طلب الاسترداد',
+      body: `يمكنك التواصل معنا لطلب استرداد المبلغ إذا:
+
+• خُصم منك المبلغ أكثر من مرة لنفس عملية الشراء؛
+• خُصم منك مبلغ لعملية شراء لم تصرّح بها؛
+• لم تتوفر الخدمة المدفوعة في حسابك ولم نتمكن من حل المشكلة؛ أو
+• كنت ترى أن لك حقًا في الاسترداد بموجب قانون حماية المستهلك المعمول به.
+
+تتم مراجعة الطلب باستخدام الحساب ومرجع الدفع وسجلات ما تم تسليمه.`,
+    },
+    {
+      heading: 'المشتريات التي لا تُرد عمومًا',
+      body: `لأن الخدمة رقمية وتُستهلك فورًا، قد نرفض الاسترداد في الحالات التالية:
+
+• استُخدمت فترة الاشتراك أو حزمة الرصيد بالكامل؛
+• أُنفق رصيد الذكاء الاصطناعي بالفعل على محتوى تم إنشاؤه؛
+• كان الطلب بسبب تغيير الرأي بعد الاستخدام الجوهري للخدمة؛ أو
+• أُغلق الحساب لمخالفة الشروط والأحكام.
+
+لا يحذف أي بند في هذا القسم حقًا يقرر القانون المعمول به أنه لا يجوز استبعاده.`,
+    },
+    {
+      heading: 'كيفية طلب الاسترداد',
+      body: `أرسل بريدًا إلكترونيًا إلى عنوان الاتصال الرسمي المنشور في صفحة المعلومات التجارية، أو استخدم بيانات الاتصال الواردة هناك.
+
+يرجى تضمين:
+
+• البريد الإلكتروني المسجل في حساب Aionvia؛
+• تاريخ الدفع؛
+• مرجع الدفع أو الطلب لدى XPay إن كان متاحًا؛ و
+• وصف موجز للمشكلة.
+
+قد نطلب معلومات إضافية لتحديد عملية الدفع. لا ترسل رقم البطاقة كاملًا أو كلمة المرور.`,
+    },
+    {
+      heading: 'كيفية صرف الاسترداد المعتمد',
+      body: `يُعاد المبلغ المعتمد عبر وسيلة الدفع الأصلية، باستخدام مزود الدفع الذي نفّذ عملية الشراء. لا تطلب Aionvia بيانات بطاقة جديدة لصرف الاسترداد.
+
+تختلف المدة التي يظهر بعدها المبلغ حسب مزود الدفع والبنك. وسنخبرك عند إرسال الاسترداد.`,
+    },
+    {
+      heading: 'الاعتراضات ونزاعات الدفع',
+      body: `إذا كنت تعتقد أن هناك خصمًا خاطئًا، يرجى التواصل معنا أولًا حتى نتمكن من تحديد عملية الدفع والرد عليها. رفع اعتراض لدى البنك لا يمنعك من التواصل معنا، والتواصل معنا لا يحد من حقك في الاعتراض لدى البنك أو جهة إصدار البطاقة.`,
+    },
+    {
+      heading: 'التواصل',
+      body: `اسم النشاط التجاري والعنوان التجاري في مصر (بعد أن يوفره المالك) والبريد الإلكتروني الرسمي ورقم الهاتف منشورة في صفحة المعلومات التجارية.
+
+وهذه الصفحة والشروط والأحكام وسياسة الاسترداد متاحة للعامة ويمكن قراءتها دون إنشاء حساب.`,
+    },
+  ],
+};
+
+export function hasApprovedRefundPolicy(): boolean {
+  return REFUND_POLICY.approved && REFUND_POLICY.sections.length > 0 &&
+    REFUND_POLICY.sections.every((section) => section.heading.trim() && section.body.trim());
+}
+
 /** The current version identifier for the existing Privacy Policy. */
 export const PRIVACY_VERSION = '2026-11-03';
 
@@ -261,6 +405,12 @@ export const TERMS_PATH = '/terms';
 
 /** The canonical public path of the Privacy Policy. */
 export const PRIVACY_PATH = '/privacy';
+
+/** The canonical public path of the Refund Policy. */
+export const REFUND_PATH = '/refund-policy';
+
+/** The canonical public path of the Business Information page. */
+export const BUSINESS_INFORMATION_PATH = '/contact';
 
 /** The consent vocabulary stored in public.user_consents.status. */
 export type ConsentRecordStatus = 'accepted' | 'withdrawn';
