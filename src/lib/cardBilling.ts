@@ -14,7 +14,7 @@
  * has no business knowing which keys exist.
  */
 
-import { fetchStripeBillingStatus, startStripeCheckout } from './stripeApi';
+import { fetchStripeBillingStatus, goToStripe, startStripeCheckout } from './stripeApi';
 import { fetchXPayStatus, goToHostedPage, startXPayCheckout, type XPayStatus } from './xpayApi';
 
 export type CardProvider = 'xpay' | 'stripe' | 'none';
@@ -97,7 +97,6 @@ export async function beginCardPayment(input: CardPaymentInput): Promise<CardPro
       billingCycle: input.billingCycle,
       promotionCode: input.couponCode,
     });
-    const { goToStripe } = await import('./stripeApi');
     await goToStripe(session.url);
     return 'stripe';
   }
