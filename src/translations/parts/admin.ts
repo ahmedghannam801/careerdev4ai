@@ -267,4 +267,16 @@ export const adminAr: Record<string, string> = {
   'The test message was sent.': 'تم إرسال رسالة الاختبار.',
   'The test message was accepted by the provider.': 'قبل مزوّد الخدمة رسالة الاختبار.',
   'The test message could not be sent.': 'تعذّر إرسال رسالة الاختبار.',
+  'Provider key': 'مفتاح المزوّد',
+  'Test recipient': 'مستلم الاختبار',
+  'Configured': 'مضبوط',
+  'Not configured': 'غير مضبوط',
+  'Sending from': 'الإرسال من',
+  'The email configuration could not be read.': 'تعذّرت قراءة إعدادات البريد الإلكتروني.',
+  'This deployment has no provider key, so no message can be sent yet. The owner has to add it to the server’s secrets.':
+    'لا يوجد في هذه النسخة مفتاح للمزوّد، لذا لا يمكن إرسال أي رسالة بعد. على المالك إضافته إلى أسرار الخادم.',
+  'This deployment has no test recipient, so there is nowhere to send the check. The owner has to configure one.':
+    'لا يوجد في هذه النسخة مستلم للاختبار، لذا لا مكان لإرسال الفحص. على المالك ضبطه.',
+  'Messages are sent from the provider’s shared test address, which only delivers to the account owner. Verify a domain and set the sender address before sending to anyone else.':
+    'تُرسل الرسائل من عنوان الاختبار المشترك للمزوّد، وهو لا يصل إلا إلى صاحب الحساب. وثّق نطاقًا واضبط عنوان المرسل قبل الإرسال إلى أي شخص آخر.',
 };

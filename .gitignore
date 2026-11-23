@@ -64,3 +64,7 @@ dist-legacy-redirect/
 # Local Supabase CLI state (project ref, pooler URL — machine specific)
 supabase/.temp/
 .dyad/
+
+# A Resend key dropped here for scripts/connect-resend.ts. The script deletes it
+# after storing the key, and it must never be committed.
+.resend-key

@@ -264,7 +264,7 @@ import {
   requireAnyPermission,
   requirePermission,
 } from './server/admin/permissions.ts';
-import { sendTestEmail } from './server/email/resend.ts';
+import { emailDeliveryStatus, normalizeRecipient, sendTestEmail } from './server/email/resend.ts';
 import { runtimeSecret } from './server/runtimeEnv.ts';
 import {
   isAnnouncementAudience,
@@ -7416,6 +7416,21 @@ app.get('/api/admin/me', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Whether this deployment can send mail, and from which address. A missing key
+// is a configuration fact rather than a delivery failure, so the admin screen
+// can say which it is before anyone presses a button.
+app.get(
+  '/api/admin/email/status',
+  requireAuth,
+  requireAdmin,
+  requirePermission('admin.manage'),
+  async (_req: Request, res: Response) => {
+    // The recipient itself is not returned: who the owner configures is not
+    // something a caller of this endpoint needs in order to read the state.
+    return res.json({ success: true, status: emailDeliveryStatus() });
+  }
+);
+
 // Sends only to the owner-configured, Resend-verified test recipient. The
 // caller cannot supply an address or message content.
 app.post(
@@ -7425,8 +7440,8 @@ app.post(
   requirePermission('admin.manage'),
   rateLimit(1, 5 * 60_000, 'resend-test'),
   async (req: Request, res: Response) => {
-    const recipient = runtimeSecret('RESEND_TEST_RECIPIENT');
-    if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 320) {
+    const recipient = normalizeRecipient(runtimeSecret('RESEND_TEST_RECIPIENT'));
+    if (!recipient) {
       return res.status(503).json({ error: 'Email test recipient is not configured.' });
     }
     const idempotencyKey = `aionvia-test/${req.authUser!.id}/${Math.floor(Date.now() / 300_000)}`;

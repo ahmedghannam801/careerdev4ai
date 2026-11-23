@@ -79,7 +79,7 @@ const OPTIONAL_SECRET_KEYS = [
  * run of this script does not report a credential the deployment still holds
  * as one that should be removed.
  */
-const OPTIONAL_EMAIL_SECRET_KEYS = ['RESEND_API_KEY', 'RESEND_TEST_RECIPIENT'];
+const OPTIONAL_EMAIL_SECRET_KEYS = ['RESEND_API_KEY', 'RESEND_FROM', 'RESEND_TEST_RECIPIENT'];
 
 /**
  * The build-time variables. They are public by design — they already ship

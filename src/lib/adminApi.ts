@@ -687,6 +687,33 @@ export async function grantAdminCredits(
 }
 
 /**
+ * What the server knows about its own email configuration.
+ *
+ * The recipient address is deliberately absent: the panel only needs to know
+ * whether one is set, and who the messages come from.
+ */
+export interface AdminEmailStatus {
+  apiKeyConfigured: boolean;
+  recipientConfigured: boolean;
+  sender: string;
+  senderIsSharedTestAddress: boolean;
+}
+
+/**
+ * Reads whether this deployment can send mail, before anything is sent.
+ *
+ * A missing key and a rejected key are different problems with different
+ * owners, so the panel distinguishes them instead of discovering them from a
+ * failed send.
+ */
+export async function fetchAdminEmailStatus(): Promise<AdminEmailStatus> {
+  const response = await request<{ success: boolean; status: AdminEmailStatus }>(
+    '/api/admin/email/status'
+  );
+  return response.status;
+}
+
+/**
  * Asks the server to send a test message to the owner-configured recipient.
  *
  * The recipient is not sent by the caller: the server owns it, so the endpoint
