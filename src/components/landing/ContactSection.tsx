@@ -67,6 +67,20 @@ export const ContactSection: React.FC = () => {
             {t('Privacy')}
             <ExternalLink className="h-3 w-3" />
           </a>
+          <a
+            href={PUBLIC_PATHS.refundPolicy}
+            className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--color-border-strong)]"
+          >
+            {t('Refund Policy')}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+          <a
+            href={PUBLIC_PATHS.businessInformation}
+            className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--color-border-strong)]"
+          >
+            {t('Business Information')}
+            <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
       </div>
 

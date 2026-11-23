@@ -150,8 +150,9 @@ describe('the contact page', () => {
     assert.ok(page, '/contact should resolve to a page');
     assert.equal(page.status, 200);
     assert.match(page.contentType, /text\/html/);
-    assert.match(page.html, /<h1>Contact Us<\/h1>/);
-    assert.match(page.html, /Business contact details/);
+    assert.match(page.html, /<h1>Business Information &amp; Contact Us<\/h1>/);
+    assert.match(page.html, /Business details/);
+    assert.match(page.html, /href="\/refund-policy"/);
     assert.match(page.html, /Business address/);
     assert.match(page.html, /Telephone/);
     assert.match(page.html, /Email/);

@@ -41,6 +41,8 @@ export const PUBLIC_PATHS = {
   learning: '/learning',
   opportunities: '/opportunities',
   contact: '/contact',
+  businessInformation: '/contact',
+  refundPolicy: '/refund-policy',
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -49,6 +51,11 @@ export const PUBLIC_PATHS = {
 
 /**
  * The postal address of the business.
+ *
+ * CONFIGURATION REQUIRED — the owner must supply the verified Egyptian
+ * business address here. Do not replace a null with a plausible-looking
+ * address: an invented address on a merchant-verification page is a false
+ * business detail.
  *
  * The fields are the ones schema.org's `PostalAddress` uses, so what the page
  * shows and what the structured data says cannot drift apart. The country is

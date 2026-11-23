@@ -80,6 +80,10 @@ export interface PublicPage {
   noindex?: boolean;
   /** Extra links shown in the footer of this page. */
   footerLinks?: PublicLink[];
+  /** Extra links shown in the header of this page (localised pages pass these). */
+  headerLinks?: PublicLink[];
+  /** The document language. English is the default. */
+  language?: 'en' | 'ar';
 }
 
 /** The stylesheet shared by every public page. */
@@ -164,6 +168,11 @@ ul.clean li:last-child { border-bottom: 0; }
 .site-footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 .site-footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
 .site-footer a { color: var(--text-2); }
+[dir="rtl"] body { text-align: right; }
+[dir="rtl"] .notice { border-left: 1px solid var(--border); border-right: 3px solid var(--primary); }
+[dir="rtl"] .contact-label,
+[dir="rtl"] .chip-pending { letter-spacing: 0; }
+[dir="rtl"] .breadcrumb span[aria-hidden="true"] { display: inline-block; }
 @media (max-width: 640px) {
   .site-nav { gap: 14px; font-size: 0.85rem; }
   main { padding: 32px 0 56px; }
@@ -240,6 +249,7 @@ const FOOTER_LINKS: PublicLink[] = [
   { href: '/careers', label: 'Careers' },
   { href: '/learning', label: 'Learning' },
   { href: '/opportunities', label: 'Opportunities' },
+  { href: '/business-information', label: 'Business Information' },
   { href: '/contact', label: 'Contact Us' },
 ];
 
@@ -320,9 +330,12 @@ export function renderPublicPage(page: PublicPage): string {
   const links = (page.footerLinks ?? FOOTER_LINKS)
     .map((link) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`)
     .join('');
+  const language = page.language ?? 'en';
+  const direction = language === 'ar' ? 'rtl' : 'ltr';
+  const headerLinks = page.headerLinks ?? HEADER_LINKS;
 
   return `<!doctype html>
-<html lang="en" dir="ltr">
+<html lang="${language}" dir="${direction}">
 ${renderHead(page)}
   <body>
     <header class="site-header">
@@ -331,8 +344,8 @@ ${renderHead(page)}
           <img src="/brand/icon-512.png" width="34" height="34" alt="" />
           <span>${escapeHtml(SITE_NAME)}</span>
         </a>
-        <nav class="site-nav" aria-label="Main">
-${HEADER_LINKS.map((link) => `          <a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join('\n')}
+        <nav class="site-nav" aria-label="${language === 'ar' ? 'التنقل الرئيسي' : 'Main'}">
+${headerLinks.map((link) => `          <a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join('\n')}
         </nav>
       </div>
     </header>
@@ -348,7 +361,7 @@ ${page.body}
           <strong>${escapeHtml(SITE_NAME)}</strong><br />
           ${escapeHtml(SITE_TAGLINE)}. &copy; 2026 ${escapeHtml(SITE_NAME)}.
         </div>
-        <nav aria-label="Footer">
+        <nav aria-label="${language === 'ar' ? 'روابط التذييل' : 'Footer'}">
 ${links}
         </nav>
       </div>

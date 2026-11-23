@@ -122,6 +122,7 @@ export function contactPageSchema(input: {
   name: string;
   description: string;
   path: string;
+  language?: string;
   business: {
     name: string;
     url?: string;
@@ -142,7 +143,7 @@ export function contactPageSchema(input: {
     name: input.name,
     description: input.description,
     url: absoluteUrl(input.path),
-    inLanguage: 'en',
+    inLanguage: input.language ?? 'en',
   };
 
   const business: Record<string, unknown> = {
@@ -178,6 +179,7 @@ export function webPageSchema(input: {
   description: string;
   path: string;
   hasBreadcrumb?: boolean;
+  language?: string;
 }): Record<string, unknown> {
   const schema: Record<string, unknown> = {
     '@context': 'https://schema.org',
@@ -191,7 +193,7 @@ export function webPageSchema(input: {
       alternateName: [...SITE_ALTERNATE_NAMES],
       url: siteUrl(),
     },
-    inLanguage: 'en',
+    inLanguage: input.language ?? 'en',
   };
   if (input.hasBreadcrumb) {
     schema.breadcrumb = { '@id': breadcrumbId(input.path) };
