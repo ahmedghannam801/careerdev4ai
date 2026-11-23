@@ -38,7 +38,7 @@ import {
   type CheckoutResponse,
 } from '../../lib/paymentApi';
 import { validateCoupon } from '../../lib/creditsApi';
-import { beginCardCheckout, fetchStripeBillingStatus } from '../../lib/stripeApi';
+import { beginCardPayment, fetchCardBillingStatus } from '../../lib/cardBilling';
 import type { PaymentMethod, PaymentStatus } from '../../../shared/payments';
 import { formatEgpPrice } from '../../../shared/subscriptions';
 import { backdropVariants, dialogVariants, MOTION_EASE } from '../../lib/motion';
@@ -166,14 +166,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isOpen, planCode]);
 
-  // The card option only exists when this deployment has a Stripe key. Asking
-  // the authenticated status endpoint beats offering a button that always
-  // answers 503.
+  // The card option only exists when this deployment has a card provider —
+  // XPay first, Stripe while it is still configured. Asking the authenticated
+  // status endpoint beats offering a button that always answers 503.
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     setCardStatusLoading(true);
-    void fetchStripeBillingStatus()
+    void fetchCardBillingStatus()
       .then((status) => {
         if (cancelled) return;
         const ready = Boolean(status.configured && status.checkoutReady);
@@ -256,13 +256,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setLoading(true);
       setError(null);
       try {
-        // The browser leaves this document for Stripe's hosted page. The
-        // session is created server-side, so the secret key never reaches
+        // The browser leaves this document for the provider's hosted page.
+        // The session is created server-side, so the secret key never reaches
         // the client and no card field is ever rendered here.
-        await beginCardCheckout({ planCode, billingCycle });
+        await beginCardPayment({
+          planCode,
+          billingCycle,
+          // The coupon is applied on the server before the session exists, so
+          // the amount on the hosted page is the amount the candidate agreed to.
+          couponCode: couponDiscountPiasters > 0 ? couponCode : undefined,
+        });
       } catch (err: any) {
         setError(
-          err?.code === 'STRIPE_NOT_CONFIGURED'
+          err?.code === 'STRIPE_NOT_CONFIGURED' || err?.code === 'XPAY_NOT_CONFIGURED' || err?.code === 'CARD_NOT_CONFIGURED'
             ? t('Card payments are not available right now. Please choose Vodafone Cash or InstaPay.')
             : err?.message || t('Failed to start card checkout')
         );

@@ -42,7 +42,8 @@
     "cf:jobs:tail": "wrangler tail -c worker/jobs/wrangler.jsonc",
     "stripe:sync": "tsx scripts/stripe-sync-catalog.ts",
     "stripe:listen": "npx --yes @stripe/cli@latest listen --forward-to localhost:3000/api/stripe/webhook",
-    "resend:connect": "tsx scripts/connect-resend.ts"
+    "resend:connect": "tsx scripts/connect-resend.ts",
+    "xpay:connect": "tsx scripts/connect-xpay.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

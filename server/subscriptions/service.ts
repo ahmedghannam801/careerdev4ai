@@ -12,6 +12,7 @@ import {
 } from '../db/subscriptions.ts';
 import { getActiveTemporaryAccessPayment } from '../db/payments.ts';
 import { getActiveStripeSubscription } from '../stripe/store.ts';
+import { getActiveXPayAccess } from '../xpay/store.ts';
 import type {
   SubscriptionDTO,
   SubscriptionPlanDTO,
@@ -36,11 +37,14 @@ export interface UserSubscriptionSummary {
 export async function getUserSubscriptionSummary(
   profileId: string
 ): Promise<UserSubscriptionSummary> {
-  const [activeSub, tempPayment, history, stripeSub] = await Promise.all([
+  const [activeSub, tempPayment, history, stripeSub, xpayPurchase] = await Promise.all([
     getActiveSubscription(profileId),
     getActiveTemporaryAccessPayment(profileId),
     listSubscriptionsForUser(profileId),
     getActiveStripeSubscription(profileId),
+    // A period bought through XPay behaves the same way from the candidate's
+    // side: it is active until a date, and it is renewed by hand.
+    getActiveXPayAccess(profileId).catch(() => null),
   ]);
 
   // Card subscriptions live in their own mirror because Stripe, not an
@@ -57,6 +61,21 @@ export async function getUserSubscriptionSummary(
       temporaryPaymentId: null,
       expiresAt: stripeSub.current_period_end,
       autoRenew: !stripeSub.cancel_at_period_end,
+      history,
+    };
+  }
+
+  if (xpayPurchase?.plan_code) {
+    const plan = await getPlanByCode(xpayPurchase.plan_code);
+    return {
+      planCode: xpayPurchase.plan_code as SubscriptionPlanCode,
+      planNameEn: plan?.nameEn ?? xpayPurchase.plan_code,
+      planNameAr: plan?.nameAr ?? xpayPurchase.plan_code,
+      status: 'active',
+      activeSubscription: null,
+      temporaryPaymentId: null,
+      expiresAt: xpayPurchase.access_ends_at,
+      autoRenew: false,
       history,
     };
   }

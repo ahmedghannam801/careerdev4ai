@@ -9,6 +9,7 @@ import type { AuthedRequest } from '../auth/require-auth.ts';
 import { getActiveSubscription } from '../db/subscriptions.ts';
 import { getActiveTemporaryAccessPayment } from '../db/payments.ts';
 import { getActiveStripeSubscription } from '../stripe/store.ts';
+import { getActiveXPayAccess } from '../xpay/store.ts';
 import {
   type EntitlementFeature,
   type SubscriptionPlanCode,
@@ -55,6 +56,19 @@ export async function getUserEffectivePlan(profileId: string): Promise<Effective
         planCode: stripeSub.plan_code as SubscriptionPlanCode,
         isTemporary: false,
         expiresAt: stripeSub.current_period_end,
+      };
+    }
+
+    // A plan period bought through XPay. It is a one-time payment with a fixed
+    // end date — there is no mandate on file — so the period end is the whole
+    // entitlement, and it sits alongside the Stripe check rather than replacing
+    // it: a candidate keeps whatever either rail granted.
+    const xpayPurchase = await getActiveXPayAccess(profileId);
+    if (xpayPurchase?.plan_code && xpayPurchase.access_ends_at) {
+      return {
+        planCode: xpayPurchase.plan_code as SubscriptionPlanCode,
+        isTemporary: false,
+        expiresAt: xpayPurchase.access_ends_at,
       };
     }
 

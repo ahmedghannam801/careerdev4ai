@@ -35,6 +35,8 @@ import {
   goToStripe,
   type StripeBillingStatus,
 } from '../../lib/stripeApi';
+import { isXPaySessionId } from '../../lib/cardBilling';
+import { syncXPaySession } from '../../lib/xpayApi';
 import { useRoute } from '../../lib/useRouteParams';
 import { buildRouteHash } from '../../lib/routing';
 
@@ -203,10 +205,14 @@ export const PricingView: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState<PlanDefinition | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  // A Stripe redirect lands on `#/pricing?stripe=success|cancelled`. The result
-  // is copied into local state and stripped from the URL so a refresh does not
-  // replay the banner.
-  const [checkoutNotice, setCheckoutNotice] = useState<'success' | 'cancelled' | null>(null);
+  // A hosted-checkout redirect lands on `#/pricing?stripe=success` or
+  // `#/pricing?xpay=success&session_id=cs_test_...`. The result is copied into
+  // local state and stripped from the URL so a refresh does not replay the
+  // banner.
+  const [checkoutNotice, setCheckoutNotice] = useState<'success' | 'cancelled' | 'pending' | null>(null);
+  // A Fawry payment is complete before it is paid. Until XPay says `paid`, the
+  // page says so instead of claiming the plan is active.
+  const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [stripeStatus, setStripeStatus] = useState<StripeBillingStatus | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
@@ -225,6 +231,55 @@ export const PricingView: React.FC = () => {
   useEffect(() => {
     void loadStripeStatus();
   }, [loadStripeStatus]);
+
+  /**
+   * The XPay return.
+   *
+   * `?xpay=success` proves only that the browser came back. The session is
+   * reconciled with XPay before anything is claimed, and a payment that is
+   * still unpaid — a Fawry reference waiting at an outlet — is reported as
+   * waiting rather than as received.
+   */
+  useEffect(() => {
+    const result = params.xpay;
+    if (result !== 'success' && result !== 'cancelled') return;
+
+    const sessionId = params.session_id;
+    setCheckoutNotice(result);
+    window.history.replaceState(null, '', buildRouteHash('pricing'));
+
+    if (result !== 'success' || !isXPaySessionId(sessionId)) {
+      if (result === 'success') {
+        // A return without a session id cannot be checked, so it is reported
+        // as unconfirmed rather than assumed.
+        setCheckoutNotice('pending');
+      }
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const synced = await syncXPaySession(sessionId);
+        if (cancelled) return;
+        if (synced.paid) {
+          setCheckoutNotice('success');
+          setPendingReference(null);
+        } else {
+          setCheckoutNotice('pending');
+          setPendingReference(synced.voucher.reference ?? null);
+        }
+        await refreshSubscription();
+        await refreshCredits();
+      } catch {
+        if (!cancelled) setCheckoutNotice('pending');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params.xpay, params.session_id, refreshSubscription, refreshCredits]);
 
   useEffect(() => {
     const result = params.stripe;
@@ -483,15 +538,30 @@ export const PricingView: React.FC = () => {
             <div className="font-bold text-foreground">
               {checkoutNotice === 'success'
                 ? t('Payment received')
-                : t('Card checkout cancelled')}
+                : checkoutNotice === 'pending'
+                  ? t('Waiting for your payment')
+                  : t('Card checkout cancelled')}
             </div>
             <p className="text-xs text-muted mt-0.5">
               {checkoutNotice === 'success'
                 ? t(
-                    'Your plan and credits activate as soon as Stripe confirms the payment — usually within a few seconds.'
+                    'Your plan and credits activate as soon as the payment is confirmed — usually within a few seconds.'
                   )
-                : t('Nothing was charged. You can try again, or pay with Vodafone Cash or InstaPay.')}
+                : checkoutNotice === 'pending'
+                  ? pendingReference
+                    ? t(
+                        'Your payment is not confirmed yet. Pay the reference from your receipt at any Fawry outlet or in the Fawry app, and the plan unlocks the moment the money arrives.'
+                      )
+                    : t(
+                        'This payment is not confirmed yet. If you were charged, the plan unlocks as soon as the provider confirms it — refresh this page in a moment.'
+                      )
+                  : t('Nothing was charged. You can try again, or pay with Vodafone Cash or InstaPay.')}
             </p>
+            {pendingReference && checkoutNotice === 'pending' && (
+              <p className="mt-1 font-mono text-xs font-semibold text-foreground" dir="ltr">
+                {pendingReference}
+              </p>
+            )}
           </div>
           <button
             type="button"

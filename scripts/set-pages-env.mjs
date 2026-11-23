@@ -82,6 +82,17 @@ const OPTIONAL_SECRET_KEYS = [
 const OPTIONAL_EMAIL_SECRET_KEYS = ['RESEND_API_KEY', 'RESEND_FROM', 'RESEND_TEST_RECIPIENT'];
 
 /**
+ * The XPay secrets. Optional in the same way: an absent key means card
+ * payments through XPay are not offered, not that the deployment is broken.
+ */
+const OPTIONAL_XPAY_SECRET_KEYS = [
+  'XPAY_SECRET_KEY',
+  'XPAY_WEBHOOK_SECRET',
+  'XPAY_ALLOW_LIVE',
+  'XPAY_PAYMENT_METHOD_CONFIGURATION_ID',
+];
+
+/**
  * The build-time variables. They are public by design — they already ship
  * inside the browser bundle — and they are plain text so the build can read
  * them.
@@ -226,7 +237,11 @@ async function call(method, body) {
 function buildEnvVars() {
   const vars = {};
   for (const key of SECRET_KEYS) vars[key] = { type: 'secret_text', value: env[key] };
-  for (const key of [...OPTIONAL_SECRET_KEYS, ...OPTIONAL_EMAIL_SECRET_KEYS]) {
+  for (const key of [
+    ...OPTIONAL_SECRET_KEYS,
+    ...OPTIONAL_EMAIL_SECRET_KEYS,
+    ...OPTIONAL_XPAY_SECRET_KEYS,
+  ]) {
     // Only a key that is actually configured is sent. A half-configured
     // deployment — a key without a webhook secret — is worse than an
     // unconfigured one, because the server would refuse every session
@@ -273,6 +288,7 @@ function staleEnvVars(current) {
     ...SECRET_KEYS,
     ...OPTIONAL_SECRET_KEYS,
     ...OPTIONAL_EMAIL_SECRET_KEYS,
+    ...OPTIONAL_XPAY_SECRET_KEYS,
     ...PLAIN_KEYS,
   ]);
   return Object.keys(current ?? {}).filter((name) => !keep.has(name));

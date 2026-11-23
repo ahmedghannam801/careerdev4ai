@@ -69,6 +69,7 @@ import { currentCvTemplateRecord } from './server/cvTemplates/service.ts';
 import { registerCreditMonitorRoutes } from './server/admin/creditMonitor.ts';
 import { registerReferralRoutes } from './server/referrals/routes.ts';
 import { registerStripeRoutes } from './server/stripe/routes.ts';
+import { registerXPayRoutes } from './server/xpay/routes.ts';
 import {
   requireCredits,
   markAiCreditCompleted,
@@ -8352,6 +8353,11 @@ registerReferralRoutes(app);
 /* Stripe card payments, subscriptions, and webhooks                          */
 /* -------------------------------------------------------------------------- */
 registerStripeRoutes(app);
+
+/* -------------------------------------------------------------------------- */
+/* XPay card payments (Egypt) and their webhook                               */
+/* -------------------------------------------------------------------------- */
+registerXPayRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* Public SEO pages                                                           */

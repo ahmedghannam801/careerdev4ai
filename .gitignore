@@ -68,3 +68,6 @@ supabase/.temp/
 # A Resend key dropped here for scripts/connect-resend.ts. The script deletes it
 # after storing the key, and it must never be committed.
 .resend-key
+
+# An XPay key dropped here for scripts/connect-xpay.ts. Deleted by the script.
+.xpay-key
