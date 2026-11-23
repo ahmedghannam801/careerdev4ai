@@ -921,6 +921,18 @@ const navLinks = [
                 {t('Privacy')}
               </a>
               <a
+                href={PUBLIC_PATHS.businessInformation}
+                className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Business Information')}
+              </a>
+              <a
+                href={PUBLIC_PATHS.refundPolicy}
+                className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Refund Policy')}
+              </a>
+              <a
                 href={PUBLIC_PATHS.about}
                 className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
               >
