@@ -16,6 +16,7 @@ import type { BillingCycle } from '../../shared/subscriptions.ts';
 import { grantAiCredits } from '../credits/grant.ts';
 import { getPlanByCode } from '../db/subscriptions.ts';
 import { redeemBirthdayReward } from '../birthday/service.ts';
+import { enqueueBillingEmail } from '../email/billing.ts';
 import type { XPaySessionResponse } from './checkout.ts';
 import {
   getXPayPurchaseBySession,
@@ -278,6 +279,22 @@ export async function fulfillPaidSession(
       });
     }
   }
+
+  // The money half is committed. The receipt is the notification half and
+  // never changes a balance; a failure to queue it must not turn a recorded
+  // payment into a retried webhook. The call is idempotent on the session id.
+  void enqueueBillingEmail({
+    profileId: stored.profile_id,
+    kind: stored.purchase_kind === 'subscription' ? 'subscription_activated' : 'payment_confirmed',
+    planCode: stored.plan_code ?? undefined,
+    billingCycle: stored.billing_cycle ?? undefined,
+    amountTotal: stored.amount_total / 100,
+    currency: stored.currency,
+    sessionId: session.id,
+    periodEnd: accessEndsAt ?? undefined,
+  }).catch((error) => {
+    console.error(`Billing email for XPay session ${session.id} was not queued:`, error);
+  });
 
   return { purchase, created: true };
 }
