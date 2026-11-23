@@ -91,7 +91,7 @@ export function buildBusinessInformationPage(language: Language = 'en'): PublicP
        <p><span class="chip-pending">${ar ? 'قيد النشر' : 'To be published'}</span></p>`;
 
   const phoneValue = details.phone?.trim()
-    ? `<p class="contact-value"><a href="${escapeHtml(phoneHref ?? '')}">${escapeHtml(
+    ? `<p class="contact-value" dir="ltr"><a href="${escapeHtml(phoneHref ?? '')}">${escapeHtml(
         details.phone.trim()
       )}</a></p>`
     : `<div class="pending"><p class="contact-value">+20 XX XXX XXXX</p></div>
@@ -213,8 +213,8 @@ ${pendingNotice}
           { href: '/careers', label: 'المسارات المهنية' },
           { href: '/learning', label: 'التعلّم' },
           { href: '/opportunities', label: 'الفرص' },
-          { href: '/contact', label: 'المعلومات التجارية' },
-          { href: '/contact/ar', label: 'هذه الصفحة بالعربية' },
+          { href: '/contact/ar', label: 'المعلومات التجارية' },
+          { href: '/refund-policy/ar', label: 'سياسة الاسترداد' },
         ]
       : undefined,
     jsonLd: [
@@ -326,8 +326,8 @@ export function buildRefundPolicyPage(language: Language = 'en'): PublicPage {
           { href: '/careers', label: 'المسارات المهنية' },
           { href: '/learning', label: 'التعلّم' },
           { href: '/opportunities', label: 'الفرص' },
-          { href: '/contact', label: 'المعلومات التجارية' },
-          { href: '/contact/ar', label: 'هذه الصفحة بالعربية' },
+          { href: '/contact/ar', label: 'المعلومات التجارية' },
+          { href: '/refund-policy/ar', label: 'سياسة الاسترداد' },
         ]
       : undefined,
     jsonLd: [
