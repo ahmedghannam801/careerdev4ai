@@ -128,6 +128,46 @@ function uploadSecret(name: string, value: string): boolean {
   return result.status === 0;
 }
 
+/**
+ * Confirms the three XPay tables exist.
+ *
+ * It reads one row from each with `limit=1`: a table that is absent answers
+ * PostgREST with `PGRST205`, which is exactly the failure the server would hit
+ * when a payment arrived.
+ */
+async function checkBillingStorage(): Promise<{
+  ok: boolean;
+  missing: string[];
+  error?: string;
+}> {
+  const url = readEnvValue(path.join(ROOT, '.env'), 'SUPABASE_URL') ?? process.env.SUPABASE_URL;
+  const key =
+    readEnvValue(path.join(ROOT, '.env'), 'SUPABASE_SERVICE_ROLE_KEY') ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    return { ok: false, missing: [], error: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set' };
+  }
+
+  const tables = ['xpay_webhook_events', 'xpay_checkout_sessions', 'xpay_purchases'];
+  const missing: string[] = [];
+
+  for (const table of tables) {
+    const response = await fetch(`${url.replace(/\/+$/, '')}/rest/v1/${table}?select=id&limit=1`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    }).catch(() => null);
+
+    if (!response) return { ok: false, missing: [], error: 'the Supabase endpoint could not be reached' };
+    if (response.status === 404) {
+      missing.push(table);
+      continue;
+    }
+    // Any other status means the table exists and answered (200 with RLS, or a
+    // permission error we do not care about here).
+  }
+
+  return { ok: missing.length === 0, missing };
+}
+
 async function main() {
   const secretKey = (process.env.XPAY_SECRET_KEY ?? readKeyFile() ?? '').trim();
   if (!/^(sk|rk)_(test|live)_/.test(secretKey)) {
@@ -181,6 +221,35 @@ async function main() {
   if (!methods.applePayWebsiteReady && methods.methods.includes('apple_pay')) {
     console.log('Apple Pay is available but not set up for your own website; hosted checkout needs no extra setup.');
   }
+
+  /**
+   * The database has to be able to hold a purchase before the key is stored.
+   *
+   * A key without its tables is the worst of both worlds: checkout would create
+   * sessions that no row can record, and the entitlement lookup would be reading
+   * a table that is not there. The migration is checked through the project's
+   * own REST endpoint, because that is the same path the server uses.
+   */
+  const storage = await checkBillingStorage();
+  if (!storage.ok) {
+    console.error(
+      [
+        'The XPay billing tables are missing, so nothing was stored.',
+        '',
+        storage.missing.length
+          ? `Missing: ${storage.missing.join(', ')}`
+          : `The check failed: ${storage.error ?? 'unknown error'}`,
+        '',
+        'Apply the migration first, then run this again:',
+        '  supabase db push                                  (linked project)',
+        `  or paste supabase/migrations/20261130000002_xpay_billing.sql into the SQL editor`,
+      ].join('
+')
+    );
+    process.exitCode = 1;
+    return;
+  }
+  console.log('Billing storage: xpay_webhook_events, xpay_checkout_sessions, xpay_purchases are present.');
 
   // The signing secret is returned once, at creation. It is written straight
   // into the environment and the Pages project, never printed.

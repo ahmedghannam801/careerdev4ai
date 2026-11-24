@@ -48,7 +48,24 @@ export async function getUserEffectivePlan(profileId: string): Promise<Effective
     // arrived and the period end is the whole entitlement. It is checked first
     // so a candidate who pays by card unlocks the plan the moment the verified
     // webhook lands.
-    const xpayPurchase = await getActiveXPayAccess(profileId);
+    //
+    // ITS FAILURE IS NOT EVERYONE'S FAILURE
+    // This read is isolated on purpose. The gateway's tables are the newest on
+    // the platform, and a deployment that has not applied that migration — or a
+    // moment when PostgREST cannot reach it — must not take a subscription the
+    // candidate already paid for down with it. Before this guard, one failed
+    // lookup sent the whole function to its catch block, which answers `free`:
+    // a paying candidate was silently downgraded by a missing table.
+    let xpayPurchase: Awaited<ReturnType<typeof getActiveXPayAccess>> = null;
+    try {
+      xpayPurchase = await getActiveXPayAccess(profileId);
+    } catch (error) {
+      console.error(
+        'XPay access lookup failed; continuing with the subscription record:',
+        profileId,
+        error
+      );
+    }
     if (xpayPurchase?.plan_code && xpayPurchase.access_ends_at) {
       return {
         planCode: xpayPurchase.plan_code as SubscriptionPlanCode,

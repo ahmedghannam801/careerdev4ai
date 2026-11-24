@@ -336,9 +336,20 @@ export interface XPayBillingStatus {
 /** Everything a billing screen needs about this candidate, in one call. */
 export async function getXPayBillingStatus(profileId: string): Promise<XPayBillingStatus> {
   const config = describeXPayConfig();
+
+  // A storage failure is reported, not thrown: the pricing page asks this
+  // question on every visit, and a 500 here would hide the plans behind an
+  // error. When the tables are missing the screen still gets the readiness
+  // answer, which is the part that decides whether checkout may open.
   const [purchase, sessions] = await Promise.all([
-    getActiveXPayAccess(profileId),
-    listXPaySessionsForProfile(profileId),
+    getActiveXPayAccess(profileId).catch((error) => {
+      console.error('XPay billing status: purchase lookup failed:', profileId, error);
+      return null;
+    }),
+    listXPaySessionsForProfile(profileId).catch((error) => {
+      console.error('XPay billing status: session listing failed:', profileId, error);
+      return [];
+    }),
   ]);
 
   let paymentMethods: PaymentMethodAvailability | null = null;
