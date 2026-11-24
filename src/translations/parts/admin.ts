@@ -279,4 +279,17 @@ export const adminAr: Record<string, string> = {
     'لا يوجد في هذه النسخة مستلم للاختبار، لذا لا مكان لإرسال الفحص. على المالك ضبطه.',
   'Messages are sent from the provider’s shared test address, which only delivers to the account owner. Verify a domain and set the sender address before sending to anyone else.':
     'تُرسل الرسائل من عنوان الاختبار المشترك للمزوّد، وهو لا يصل إلا إلى صاحب الحساب. وثّق نطاقًا واضبط عنوان المرسل قبل الإرسال إلى أي شخص آخر.',
+  'XPay (cards, Apple Pay, Fawry, ValU)': 'XPay (بطاقات، آبل باي، فوري، فاليو)',
+  'paid purchases': 'عملية دفع مكتملة',
+  'credit packs sold': 'باقة توكنات مُباعة',
+  'XPay figures are unavailable on this deployment.': 'أرقام XPay غير متاحة على هذا الإصدار.',
+  'XPay purchases could not be read on this deployment.': 'تعذّر قراءة عمليات XPay على هذا الإصدار.',
+  'Collected before XPay (no longer accepted)': 'ما تم تحصيله قبل XPay (لم يعد مقبولاً)',
+  'Wallet transfers (closed)': 'تحويلات المحافظ (مغلقة)',
+  'Bank transfer (closed)': 'تحويل بنكي (مغلق)',
+  'Manual transfers (historical, no longer accepted)': 'تحويلات يدوية (تاريخية، لم تعد مقبولة)',
+  'No manual transfers in this period.': 'لا توجد تحويلات يدوية في هذه الفترة.',
+  'Recent payments through XPay': 'أحدث المدفوعات عبر XPay',
+  'No payment has been completed through XPay yet.': 'لم تكتمل أي عملية دفع عبر XPay بعد.',
+  'Wallet transfer (closed)': 'تحويل محفظة (مغلق)',
 };

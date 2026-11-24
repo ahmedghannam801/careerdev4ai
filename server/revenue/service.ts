@@ -1,15 +1,24 @@
 /**
  * Revenue aggregation for the Admin Center.
  *
- * Pure: the route loads the mirror rows and this module turns them into the
- * figures the panel renders. Keeping the arithmetic here is what makes it
- * testable — especially the rules that prevent double counting:
+ * Pure: the route loads the rows and this module turns them into the figures
+ * the panel renders. Keeping the arithmetic here is what makes it testable —
+ * especially the rules that prevent double counting:
  *
  *   * a refunded offline payment is counted in gross and then subtracted once;
  *   * a card invoice is counted once, by its `amount_paid`, never by both the
  *     invoice and the charge;
- *   * a refund is counted only when Stripe reports `status = succeeded`;
- *   * test-mode invoices are listed but never added to revenue.
+ *   * a refund is counted only when it reports `status = succeeded`;
+ *   * a test-mode row is listed but never added to revenue.
+ *
+ * WHAT IS COUNTED, AND WHY IT IS MORE THAN ONE THING
+ * --------------------------------------------------
+ * XPay is the only gateway now, so `xpay` is the block that grows. The other
+ * blocks are history: the manual wallet transfers recorded in `payments`, and
+ * the card invoices the previous gateway mirrored into `stripe_invoices`. Those
+ * rows are money that was really collected, so deleting them from the report
+ * would understate the platform's own past. They are read-only here, their
+ * tables keep their names, and nothing new can be written to them.
  */
 
 export interface RevenueDateRange {
@@ -30,7 +39,7 @@ export interface OfflinePaymentRow {
   plan_code: string | null;
 }
 
-export interface StripeInvoiceRevenueRow {
+export interface LegacyCardInvoiceRow {
   id: string;
   number: string | null;
   status: string | null;
@@ -48,7 +57,7 @@ export interface StripeInvoiceRevenueRow {
   created_at: string | null;
 }
 
-export interface StripeRefundRevenueRow {
+export interface LegacyCardRefundRow {
   id: string;
   amount: number | null;
   currency: string | null;
@@ -61,7 +70,7 @@ export interface StripeRefundRevenueRow {
   created_at: string | null;
 }
 
-export interface StripeDisputeRevenueRow {
+export interface LegacyCardDisputeRow {
   id: string;
   amount: number | null;
   currency: string | null;
@@ -72,14 +81,36 @@ export interface StripeDisputeRevenueRow {
   created_at: string | null;
 }
 
-export interface RevenueInput {
-  payments: OfflinePaymentRow[];
-  invoices: StripeInvoiceRevenueRow[];
-  refunds: StripeRefundRevenueRow[];
-  disputes: StripeDisputeRevenueRow[];
+/**
+ * One paid (or attempted) XPay purchase, as `xpay_purchases` stores it.
+ *
+ * The amount is in piasters, like every other amount on the platform, and
+ * `livemode` decides whether it belongs in revenue or in the test count.
+ */
+export interface XPayPurchaseRow {
+  id: string;
+  session_id: string | null;
+  purchase_kind: string | null;
+  plan_code: string | null;
+  billing_cycle: string | null;
+  credits: number | null;
+  amount_total: number | null;
+  currency: string | null;
+  status: string;
+  paid_at: string | null;
+  created_at: string | null;
+  livemode: boolean;
 }
 
-export interface AdminStripeInvoiceView {
+export interface RevenueInput {
+  payments: OfflinePaymentRow[];
+  xpay: XPayPurchaseRow[];
+  invoices: LegacyCardInvoiceRow[];
+  refunds: LegacyCardRefundRow[];
+  disputes: LegacyCardDisputeRow[];
+}
+
+export interface AdminCardInvoiceView {
   id: string;
   number: string | null;
   status: string | null;
@@ -94,7 +125,7 @@ export interface AdminStripeInvoiceView {
   hostedInvoiceUrl: string | null;
 }
 
-export interface AdminStripeRefundView {
+export interface AdminCardRefundView {
   id: string;
   amountPiasters: number;
   currency: string;
@@ -103,6 +134,19 @@ export interface AdminStripeRefundView {
   livemode: boolean;
   createdAt: string | null;
   invoiceId: string | null;
+}
+
+export interface AdminXPayPurchaseView {
+  id: string;
+  sessionId: string | null;
+  purchaseKind: string | null;
+  planCode: string | null;
+  billingCycle: string | null;
+  credits: number | null;
+  amountPiasters: number;
+  currency: string;
+  status: string;
+  paidAt: string | null;
 }
 
 export interface AdminOfflineTransactionView {
@@ -128,7 +172,8 @@ export interface AdminRevenueResult {
   pendingPaymentCount: number;
   failedPaymentCount: number;
   refundCount: number;
-  stripe: {
+  /** Card invoices from the gateway that was replaced. Read-only history. */
+  legacyCards: {
     available: boolean;
     testMode: boolean;
     paidInvoiceCount: number;
@@ -139,10 +184,23 @@ export interface AdminRevenueResult {
     failedInvoiceCount: number;
     subscriptionRevenuePiasters: number;
     packRevenuePiasters: number;
-    recentInvoices: AdminStripeInvoiceView[];
-    recentRefunds: AdminStripeRefundView[];
+    recentInvoices: AdminCardInvoiceView[];
+    recentRefunds: AdminCardRefundView[];
     disputeCount: number;
     disputedPiasters: number;
+  };
+  /** The live gateway: what XPay actually collected in the period. */
+  xpay: {
+    available: boolean;
+    purchaseCount: number;
+    grossPiasters: number;
+    subscriptionRevenuePiasters: number;
+    packRevenuePiasters: number;
+    creditPacksSold: number;
+    testPurchaseCount: number;
+    pendingCount: number;
+    failedCount: number;
+    recentPurchases: AdminXPayPurchaseView[];
   };
   offline: {
     refundedPiasters: number;
@@ -206,8 +264,8 @@ function inRange(
   return true;
 }
 
-const STRIPE_PENDING_STATUSES = new Set(['open', 'draft']);
-const STRIPE_FAILED_STATUSES = new Set(['uncollectible', 'void']);
+const LEGACY_CARD_PENDING_STATUSES = new Set(['open', 'draft']);
+const LEGACY_CARD_FAILED_STATUSES = new Set(['uncollectible', 'void']);
 
 export function computeAdminRevenue(
   input: RevenueInput,
@@ -215,9 +273,14 @@ export function computeAdminRevenue(
     testMode: boolean;
     range: RevenueDateRange;
     stripeAvailable?: boolean;
+    /** False when `xpay_purchases` could not be read on this deployment. */
+    xpayAvailable?: boolean;
   }
 ): AdminRevenueResult {
   const { range, testMode } = options;
+  // The keys are the values `payments.payment_method` and the legacy invoice
+  // mirror actually store. They are data from closed rails, kept so the report
+  // attributes old money to the rail that collected it; `xpay` is the live one.
   const byMethod: Record<string, number> = { vodafone_cash: 0, instapay: 0, stripe: 0 };
   const byPlan: Record<string, number> = {};
   const byCycle: Record<string, number> = { monthly: 0, annual: 0 };
@@ -279,15 +342,15 @@ export function computeAdminRevenue(
     }
   }
 
-  let stripeGross = 0;
-  let stripeRefunded = 0;
-  let stripeSubscription = 0;
-  let stripePack = 0;
+  let legacyCardGross = 0;
+  let legacyCardRefunded = 0;
+  let legacyCardSubscription = 0;
+  let legacyCardPack = 0;
   let paidInvoiceCount = 0;
   let testInvoiceCount = 0;
   let pendingInvoiceCount = 0;
   let failedInvoiceCount = 0;
-  const recentInvoices: AdminStripeInvoiceView[] = [];
+  const recentInvoices: AdminCardInvoiceView[] = [];
 
   for (const invoice of input.invoices) {
     const createdAt = invoice.invoice_created_at ?? invoice.created_at;
@@ -299,14 +362,14 @@ export function computeAdminRevenue(
     if (!invoice.livemode) {
       testInvoiceCount += 1;
     } else if (invoice.paid && amountPaid > 0 && invoice.currency?.toLowerCase() === 'egp') {
-      stripeGross += amountPaid;
+      legacyCardGross += amountPaid;
       paidInvoiceCount += 1;
 
       if (invoice.purchase_kind === 'credit_pack') {
-        stripePack += amountPaid;
+        legacyCardPack += amountPaid;
         bySource.credit_pack += amountPaid;
       } else {
-        stripeSubscription += amountPaid;
+        legacyCardSubscription += amountPaid;
         bySource.subscription += amountPaid;
       }
 
@@ -316,9 +379,9 @@ export function computeAdminRevenue(
 
       const cycle = invoice.billing_cycle === 'annual' ? 'annual' : 'monthly';
       byCycle[cycle] = (byCycle[cycle] ?? 0) + amountPaid;
-    } else if (invoice.livemode && STRIPE_PENDING_STATUSES.has(invoice.status ?? '')) {
+    } else if (invoice.livemode && LEGACY_CARD_PENDING_STATUSES.has(invoice.status ?? '')) {
       pendingInvoiceCount += 1;
-    } else if (invoice.livemode && STRIPE_FAILED_STATUSES.has(invoice.status ?? '')) {
+    } else if (invoice.livemode && LEGACY_CARD_FAILED_STATUSES.has(invoice.status ?? '')) {
       failedInvoiceCount += 1;
     }
 
@@ -340,8 +403,8 @@ export function computeAdminRevenue(
     }
   }
 
-  let stripeRefundCount = 0;
-  const recentRefunds: AdminStripeRefundView[] = [];
+  let legacyCardRefundCount = 0;
+  const recentRefunds: AdminCardRefundView[] = [];
   for (const refund of input.refunds) {
     if (!refund.livemode) continue;
     const createdAt = refund.refund_created_at ?? refund.created_at;
@@ -361,8 +424,8 @@ export function computeAdminRevenue(
     }
 
     if (refund.status !== 'succeeded' || refund.currency?.toLowerCase() !== 'egp') continue;
-    stripeRefunded += Number(refund.amount ?? 0);
-    stripeRefundCount += 1;
+    legacyCardRefunded += Number(refund.amount ?? 0);
+    legacyCardRefundCount += 1;
   }
 
   let disputeCount = 0;
@@ -373,6 +436,81 @@ export function computeAdminRevenue(
     if (!inRange(createdAt, range)) continue;
     disputeCount += 1;
     disputedPiasters += Number(dispute.amount ?? 0);
+  }
+
+  /* ------------------------------------------------------------------------
+   * XPAY — the only live gateway
+   *
+   * Counted from `xpay_purchases`, and only when the row is paid and belongs to
+   * the deployment's own mode: a test purchase must never appear as revenue on
+   * a live deployment. The status is what the signed webhook wrote after the
+   * provider confirmed the money, so this block cannot be inflated by a browser.
+   * --------------------------------------------------------------------- */
+  let xpayGross = 0;
+  let xpaySubscription = 0;
+  let xpayPack = 0;
+  let xpayPurchaseCount = 0;
+  let xpayCreditPacksSold = 0;
+  let xpayTestCount = 0;
+  let xpayPendingCount = 0;
+  let xpayFailedCount = 0;
+  const recentXPay: AdminXPayPurchaseView[] = [];
+
+  for (const purchase of input.xpay) {
+    const createdAt = purchase.paid_at ?? purchase.created_at;
+    if (!inRange(createdAt, range)) continue;
+
+    const amount = Number(purchase.amount_total ?? 0);
+
+    if (!purchase.livemode) {
+      xpayTestCount += 1;
+      continue;
+    }
+
+    if (purchase.status === 'pending') {
+      xpayPendingCount += 1;
+      continue;
+    }
+    if (purchase.status !== 'paid') {
+      xpayFailedCount += 1;
+      continue;
+    }
+    if (purchase.currency && purchase.currency.toUpperCase() !== 'EGP') continue;
+
+    xpayGross += amount;
+    xpayPurchaseCount += 1;
+
+    if (purchase.purchase_kind === 'credit_pack') {
+      xpayPack += amount;
+      xpayCreditPacksSold += Number(purchase.credits ?? 0);
+      bySource.credit_pack += amount;
+    } else {
+      xpaySubscription += amount;
+      bySource.subscription += amount;
+    }
+
+    const planKey =
+      purchase.plan_code ||
+      (purchase.purchase_kind === 'credit_pack' ? 'credit_pack' : 'subscription');
+    byPlan[planKey] = (byPlan[planKey] ?? 0) + amount;
+
+    const cycle = purchase.billing_cycle === 'annual' ? 'annual' : 'monthly';
+    byCycle[cycle] = (byCycle[cycle] ?? 0) + amount;
+
+    if (recentXPay.length < 10) {
+      recentXPay.push({
+        id: purchase.id,
+        sessionId: purchase.session_id,
+        purchaseKind: purchase.purchase_kind,
+        planCode: purchase.plan_code,
+        billingCycle: purchase.billing_cycle,
+        credits: purchase.credits,
+        amountPiasters: amount,
+        currency: purchase.currency ?? 'EGP',
+        status: purchase.status,
+        paidAt: createdAt,
+      });
+    }
   }
 
   byMethod.vodafone_cash = 0;
@@ -392,10 +530,11 @@ export function computeAdminRevenue(
   // is zero, so no second subtraction is applied here.
 
   bySource.subscription += offlineGross - offlineRefunded;
-  byMethod.stripe = stripeGross - stripeRefunded;
+  byMethod.stripe = legacyCardGross - legacyCardRefunded;
+  byMethod.xpay = xpayGross;
 
-  const gross = offlineGross + stripeGross;
-  const refunded = offlineRefunded + stripeRefunded;
+  const gross = offlineGross + legacyCardGross + xpayGross;
+  const refunded = offlineRefunded + legacyCardRefunded;
   const net = gross - refunded;
 
   return {
@@ -404,29 +543,41 @@ export function computeAdminRevenue(
     grossCollectedPiasters: gross,
     refundedPiasters: refunded,
     totalCollectedEgp: Math.round(net / 100),
-    transactionCount: offlineTransactionCount + paidInvoiceCount,
+    transactionCount: offlineTransactionCount + paidInvoiceCount + xpayPurchaseCount,
     breakdownByMethodPiasters: byMethod,
     breakdownByPlanPiasters: byPlan,
     breakdownByCyclePiasters: byCycle,
     breakdownBySourcePiasters: bySource,
-    pendingPaymentCount: offlinePendingCount + pendingInvoiceCount,
-    failedPaymentCount: offlineFailedCount + failedInvoiceCount,
-    refundCount: offlineRefundCount + stripeRefundCount,
-    stripe: {
+    pendingPaymentCount: offlinePendingCount + pendingInvoiceCount + xpayPendingCount,
+    failedPaymentCount: offlineFailedCount + failedInvoiceCount + xpayFailedCount,
+    refundCount: offlineRefundCount + legacyCardRefundCount,
+    legacyCards: {
       available: options.stripeAvailable !== false,
       testMode,
       paidInvoiceCount,
-      paidGrossPiasters: stripeGross,
-      refundedPiasters: stripeRefunded,
+      paidGrossPiasters: legacyCardGross,
+      refundedPiasters: legacyCardRefunded,
       testInvoiceCount,
       pendingInvoiceCount,
       failedInvoiceCount,
-      subscriptionRevenuePiasters: stripeSubscription,
-      packRevenuePiasters: stripePack,
+      subscriptionRevenuePiasters: legacyCardSubscription,
+      packRevenuePiasters: legacyCardPack,
       recentInvoices,
       recentRefunds,
       disputeCount,
       disputedPiasters,
+    },
+    xpay: {
+      available: options.xpayAvailable !== false,
+      purchaseCount: xpayPurchaseCount,
+      grossPiasters: xpayGross,
+      subscriptionRevenuePiasters: xpaySubscription,
+      packRevenuePiasters: xpayPack,
+      creditPacksSold: xpayCreditPacksSold,
+      testPurchaseCount: xpayTestCount,
+      pendingCount: xpayPendingCount,
+      failedCount: xpayFailedCount,
+      recentPurchases: recentXPay,
     },
     offline: {
       refundedPiasters: offlineRefunded,

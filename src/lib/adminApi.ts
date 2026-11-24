@@ -500,7 +500,7 @@ export interface AdminSubscriptionRow {
   };
 }
 
-export interface AdminStripeInvoiceRow {
+export interface AdminLegacyCardInvoice {
   id: string;
   number: string | null;
   status: string | null;
@@ -515,7 +515,7 @@ export interface AdminStripeInvoiceRow {
   hostedInvoiceUrl: string | null;
 }
 
-export interface AdminStripeRefundRow {
+export interface AdminLegacyCardRefund {
   id: string;
   amountPiasters: number;
   currency: string;
@@ -526,9 +526,15 @@ export interface AdminStripeRefundRow {
   invoiceId: string | null;
 }
 
-export interface AdminStripeRevenue {
+/**
+ * The card invoices the platform's previous gateway mirrored.
+ *
+ * Read-only history: those tables stopped being written when the gateway was
+ * replaced, and the rows are money that was really collected, so the report
+ * keeps counting them. Nothing here can start a payment.
+ */
+export interface AdminLegacyCardRevenue {
   available: boolean;
-  /** True when the server is using a `sk_test_...` key. */
   testMode: boolean;
   paidInvoiceCount: number;
   paidGrossPiasters: number;
@@ -538,10 +544,37 @@ export interface AdminStripeRevenue {
   failedInvoiceCount: number;
   subscriptionRevenuePiasters: number;
   packRevenuePiasters: number;
-  recentInvoices: AdminStripeInvoiceRow[];
-  recentRefunds: AdminStripeRefundRow[];
+  recentInvoices: AdminLegacyCardInvoice[];
+  recentRefunds: AdminLegacyCardRefund[];
   disputeCount: number;
   disputedPiasters: number;
+}
+
+/** One purchase through XPay, the platform's only gateway. */
+export interface AdminXPayPurchase {
+  id: string;
+  sessionId: string | null;
+  purchaseKind: string | null;
+  planCode: string | null;
+  billingCycle: string | null;
+  credits: number | null;
+  amountPiasters: number;
+  currency: string;
+  status: string;
+  paidAt: string | null;
+}
+
+export interface AdminXPayRevenue {
+  available: boolean;
+  purchaseCount: number;
+  grossPiasters: number;
+  subscriptionRevenuePiasters: number;
+  packRevenuePiasters: number;
+  creditPacksSold: number;
+  testPurchaseCount: number;
+  pendingCount: number;
+  failedCount: number;
+  recentPurchases: AdminXPayPurchase[];
 }
 
 export interface AdminOfflineTransaction {
@@ -575,7 +608,11 @@ export interface AdminRevenueMetrics {
   pendingPaymentCount: number;
   failedPaymentCount: number;
   refundCount: number;
-  stripe?: AdminStripeRevenue;
+  /** The live gateway. This is the block that grows. */
+  xpay?: AdminXPayRevenue;
+  /** Card invoices from the gateway that was replaced, kept as history. */
+  legacyCards?: AdminLegacyCardRevenue;
+  /** Manual wallet transfers, kept as history. */
   offline?: AdminOfflineRevenue;
 }
 

@@ -605,7 +605,7 @@ app.use((req: Request, res: Response, next: () => void) => {
 
   collectRequestBody(req)
     .then((buffer) => {
-      // Keep the exact bytes. Stripe signs the raw payload, and re-serialising
+      // Keep the exact bytes. XPay signs the raw payload, and re-serialising
       // the parsed JSON changes whitespace and key order, which invalidates
       // the signature. The buffer is small: the same 15 MB ceiling applies.
       (req as Request & { rawBody?: Buffer }).rawBody = buffer;

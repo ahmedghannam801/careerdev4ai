@@ -22,7 +22,7 @@ import {
   Plus,
   Check,
   ExternalLink,
-  Landmark,
+  History,
   Calendar,
   RotateCcw,
   AlertTriangle,
@@ -116,12 +116,16 @@ export const AdminRevenuePanel: React.FC = () => {
     }
   };
 
+  // The live gateway, and the two historical rails. The names say which is
+  // which, because this panel must not read as an offer to pay by any of them.
+  const xpayRevenue = metrics?.xpay;
+  const xpayPurchases = xpayRevenue?.recentPurchases ?? [];
   const vfCashPiasters = metrics?.breakdownByMethodPiasters?.['vodafone_cash'] ?? 0;
   const instaPayPiasters = metrics?.breakdownByMethodPiasters?.['instapay'] ?? 0;
-  const stripePiasters = metrics?.breakdownByMethodPiasters?.['stripe'] ?? 0;
-  const stripeRevenue = metrics?.stripe;
-  const stripeInvoices = stripeRevenue?.recentInvoices ?? [];
-  const stripeRefunds = stripeRevenue?.recentRefunds ?? [];
+  const legacyCardPiasters = metrics?.breakdownByMethodPiasters?.['stripe'] ?? 0;
+  const legacyCardRevenue = metrics?.legacyCards;
+  const legacyCardInvoices = legacyCardRevenue?.recentInvoices ?? [];
+  const legacyCardRefunds = legacyCardRevenue?.recentRefunds ?? [];
   const offline = metrics?.offline;
   const offlineTransactions = offline?.recentTransactions ?? [];
   const subscriptionRevenue = metrics?.breakdownBySourcePiasters?.['subscription'] ?? 0;
@@ -258,54 +262,59 @@ export const AdminRevenuePanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Method + source breakdown */}
+      {/* Method + source breakdown.
+          *
+          * XPay is the only gateway, so it is the first and largest block. The
+          * rails below it were switched off; the money they took is still part
+          * of the platform's past, so it is counted — under a heading that says
+          * it can no longer be chosen. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className={`${CARD} p-5 space-y-4`}>
-          <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-red-600" />
-            <span>{t('Revenue by payment method')}</span>
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-[var(--color-success-strong)]" />
+              <span>{t('Revenue by payment method')}</span>
+            </h3>
+            <span className="rounded-full bg-[var(--color-success-surface)] px-2 py-0.5 text-[10px] font-bold text-[var(--color-success-strong)]">
+              XPay
+            </span>
+          </div>
 
           <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-[var(--surface-raised)] border border-[var(--border-subtle)] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-4 h-4 text-red-600" />
-                <span className="text-xs font-bold text-[var(--text-primary)]">Vodafone Cash</span>
-              </div>
-              <span className="font-mono font-extrabold text-sm text-[var(--text-primary)]">
-                {formatEgpPrice(vfCashPiasters)}
-              </span>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[var(--surface-raised)] border border-[var(--border-subtle)] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Landmark className="w-4 h-4 text-purple-600" />
-                <span className="text-xs font-bold text-[var(--text-primary)]">InstaPay</span>
-              </div>
-              <span className="font-mono font-extrabold text-sm text-[var(--text-primary)]">
-                {formatEgpPrice(instaPayPiasters)}
-              </span>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[var(--surface-raised)] border border-[var(--border-subtle)] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-bold text-[var(--text-primary)]">
-                  {t('Card (previous gateway)')}
+            <div className="rounded-xl border border-[var(--color-success-strong)]/25 bg-[var(--surface-raised)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <CreditCard className="w-4 h-4 shrink-0 text-[var(--color-success-strong)]" aria-hidden="true" />
+                  <span className="truncate text-xs font-bold text-[var(--text-primary)]">
+                    {t('XPay (cards, Apple Pay, Fawry, ValU)')}
+                  </span>
+                </div>
+                <span className="font-mono font-extrabold text-sm text-[var(--text-primary)]">
+                  {formatEgpPrice(xpayRevenue?.grossPiasters ?? 0)}
                 </span>
-                {stripeRevenue?.testMode && (
-                  <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 text-[9px] font-extrabold uppercase">
-                    {t('Test')}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
+                <span>
+                  {xpayRevenue?.purchaseCount ?? 0} {t('paid purchases')}
+                </span>
+                {(xpayRevenue?.creditPacksSold ?? 0) > 0 && (
+                  <span>
+                    {xpayRevenue?.creditPacksSold} {t('credit packs sold')}
+                  </span>
+                )}
+                {(xpayRevenue?.pendingCount ?? 0) > 0 && (
+                  <span>
+                    {xpayRevenue?.pendingCount} {t('pending')}
+                  </span>
+                )}
+                {xpayRevenue?.available === false && (
+                  <span className="font-semibold text-[var(--color-warning)]">
+                    {t('XPay figures are unavailable on this deployment.')}
                   </span>
                 )}
               </div>
-              <span className="font-mono font-extrabold text-sm text-[var(--text-primary)]">
-                {formatEgpPrice(stripePiasters)}
-              </span>
             </div>
-          </div>
 
-          <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-[var(--text-muted)]">{t('Subscription revenue')}</span>
               <span className="font-mono font-bold text-[var(--text-primary)]">
@@ -316,6 +325,31 @@ export const AdminRevenuePanel: React.FC = () => {
               <span className="font-semibold text-[var(--text-muted)]">{t('Credit pack revenue')}</span>
               <span className="font-mono font-bold text-[var(--text-primary)]">
                 {formatEgpPrice(packRevenue)}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-[var(--border-subtle)] pt-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              <History className="w-3 h-3" aria-hidden="true" />
+              <span>{t('Collected before XPay (no longer accepted)')}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-[var(--surface-raised)] px-3 py-2">
+              <span className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+                <Smartphone className="w-3.5 h-3.5 text-[var(--text-muted)]" aria-hidden="true" />
+                {t('Wallet transfers (closed)')}
+              </span>
+              <span className="font-mono text-xs font-semibold text-[var(--text-primary)]">
+                {formatEgpPrice(vfCashPiasters + instaPayPiasters)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-[var(--surface-raised)] px-3 py-2">
+              <span className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+                <CreditCard className="w-3.5 h-3.5 text-[var(--text-muted)]" aria-hidden="true" />
+                {t('Card (previous gateway)')}
+              </span>
+              <span className="font-mono text-xs font-semibold text-[var(--text-primary)]">
+                {formatEgpPrice(legacyCardPiasters)}
               </span>
             </div>
           </div>
@@ -392,13 +426,78 @@ export const AdminRevenuePanel: React.FC = () => {
         </div>
       </div>
 
+      {/* What XPay collected, newest first. This is the only payment list that
+          can grow from here on: it is written by the signed webhook when the
+          provider confirms the money. */}
+      <div className={`${CARD} p-5 space-y-4`} data-admin-xpay-purchases>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-[var(--color-success-strong)]" />
+            <span>{t('Recent payments through XPay')}</span>
+          </h3>
+          <div className="text-[11px] text-[var(--text-muted)] font-semibold">
+            {xpayRevenue
+              ? `${xpayRevenue.purchaseCount} ${t('paid purchases')} · ${formatEgpPrice(xpayRevenue.grossPiasters)}`
+              : '—'}
+          </div>
+        </div>
+
+        {xpayPurchases.length === 0 ? (
+          <p className="text-xs text-[var(--text-muted)]">
+            {xpayRevenue?.available === false
+              ? t('XPay purchases could not be read on this deployment.')
+              : t('No payment has been completed through XPay yet.')}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {xpayPurchases.map((purchase) => (
+              <li
+                key={purchase.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-xs font-bold text-[var(--text-primary)]">
+                    {purchase.sessionId ?? purchase.id}
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+                    <span>{formatDate(purchase.paidAt, isAr)}</span>
+                    <span>·</span>
+                    <span>{purchase.status}</span>
+                    {purchase.planCode && (
+                      <>
+                        <span>·</span>
+                        <span className="font-mono">{purchase.planCode}</span>
+                      </>
+                    )}
+                    {purchase.purchaseKind === 'credit_pack' && (
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                        {purchase.credits ?? 0} {t('Tokens')}
+                      </span>
+                    )}
+                    {purchase.billingCycle && (
+                      <>
+                        <span>·</span>
+                        <span>{purchase.billingCycle === 'annual' ? t('Annual') : t('Monthly')}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <span className="shrink-0 font-mono text-xs font-extrabold text-[var(--text-primary)]">
+                  {formatEgpPrice(purchase.amountPiasters)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {/* Card invoices and refunds, kept as history */}
       <div className={`${CARD} p-5 space-y-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-blue-600" />
             <span>{t('Card invoices (previous gateway)')}</span>
-            {stripeRevenue?.testMode && (
+            {legacyCardRevenue?.testMode && (
               <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] font-extrabold uppercase tracking-wider">
                 {t('Test mode')}
               </span>
@@ -406,60 +505,60 @@ export const AdminRevenuePanel: React.FC = () => {
           </h3>
           <div className="text-[11px] text-[var(--text-muted)] font-semibold flex flex-wrap items-center gap-2">
             <span>
-              {stripeRevenue
-                ? `${stripeRevenue.paidInvoiceCount} ${t('paid invoices')} · ${formatEgpPrice(
-                    stripeRevenue.paidGrossPiasters
+              {legacyCardRevenue
+                ? `${legacyCardRevenue.paidInvoiceCount} ${t('paid invoices')} · ${formatEgpPrice(
+                    legacyCardRevenue.paidGrossPiasters
                   )}`
                 : '—'}
             </span>
-            {stripeRevenue && stripeRevenue.refundedPiasters > 0 && (
+            {legacyCardRevenue && legacyCardRevenue.refundedPiasters > 0 && (
               <span className="text-amber-600">
-                −{formatEgpPrice(stripeRevenue.refundedPiasters)} {t('refunded')}
+                −{formatEgpPrice(legacyCardRevenue.refundedPiasters)} {t('refunded')}
               </span>
             )}
           </div>
         </div>
 
-        {stripeRevenue && (
+        {legacyCardRevenue && (
           <div className="flex flex-wrap gap-2 text-[11px]">
             <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-raised)] border border-[var(--border-subtle)]">
-              {t('Subscriptions')}: <strong>{formatEgpPrice(stripeRevenue.subscriptionRevenuePiasters)}</strong>
+              {t('Subscriptions')}: <strong>{formatEgpPrice(legacyCardRevenue.subscriptionRevenuePiasters)}</strong>
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-raised)] border border-[var(--border-subtle)]">
-              {t('Credit packs')}: <strong>{formatEgpPrice(stripeRevenue.packRevenuePiasters)}</strong>
+              {t('Credit packs')}: <strong>{formatEgpPrice(legacyCardRevenue.packRevenuePiasters)}</strong>
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700">
-              {t('Pending')}: <strong>{stripeRevenue.pendingInvoiceCount}</strong>
+              {t('Pending')}: <strong>{legacyCardRevenue.pendingInvoiceCount}</strong>
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600">
-              {t('Failed')}: <strong>{stripeRevenue.failedInvoiceCount}</strong>
+              {t('Failed')}: <strong>{legacyCardRevenue.failedInvoiceCount}</strong>
             </span>
-            {stripeRevenue.disputeCount > 0 && (
+            {legacyCardRevenue.disputeCount > 0 && (
               <span className="px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
-                {t('Disputes')}: <strong>{stripeRevenue.disputeCount}</strong> ({formatEgpPrice(stripeRevenue.disputedPiasters)})
+                {t('Disputes')}: <strong>{legacyCardRevenue.disputeCount}</strong> ({formatEgpPrice(legacyCardRevenue.disputedPiasters)})
               </span>
             )}
           </div>
         )}
 
-        {stripeRevenue && stripeRevenue.testInvoiceCount > 0 && (
+        {legacyCardRevenue && legacyCardRevenue.testInvoiceCount > 0 && (
           <p className="text-[11px] text-amber-600 font-medium">
-            {stripeRevenue.testInvoiceCount} {t('test-mode invoices are excluded from revenue')}
+            {legacyCardRevenue.testInvoiceCount} {t('test-mode invoices are excluded from revenue')}
           </p>
         )}
 
-        {stripeRevenue && !stripeRevenue.available ? (
+        {legacyCardRevenue && !legacyCardRevenue.available ? (
           <p className="text-xs text-amber-600">
             {t('No card invoice history is available on this deployment.')}
           </p>
-        ) : stripeInvoices.length === 0 ? (
+        ) : legacyCardInvoices.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)]">
             {t('No card invoices yet. Test-mode invoices are listed here but excluded from revenue.')}
           </p>
         ) : (
           <ul className="space-y-2">
-            {stripeInvoices.map((invoice) => (
+            {legacyCardInvoices.map((invoice) => (
               <li
                 key={invoice.id}
                 className="p-3 rounded-xl bg-[var(--surface-raised)] border border-[var(--border-subtle)] flex items-center justify-between gap-3"
@@ -511,14 +610,14 @@ export const AdminRevenuePanel: React.FC = () => {
           </ul>
         )}
 
-        {stripeRefunds.length > 0 && (
+        {legacyCardRefunds.length > 0 && (
           <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2">
             <h4 className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
               <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
               <span>{t('Recent card refunds')}</span>
             </h4>
             <ul className="space-y-1.5">
-              {stripeRefunds.map((refund) => (
+              {legacyCardRefunds.map((refund) => (
                 <li key={refund.id} className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="font-mono text-[var(--text-muted)] truncate">{refund.id}</span>
                   <span className="flex items-center gap-2 shrink-0">
@@ -539,7 +638,7 @@ export const AdminRevenuePanel: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
             <ReceiptText className="w-4 h-4 text-emerald-600" />
-            <span>{t('Manual wallet transfers (historical)')}</span>
+            <span>{t('Manual transfers (historical, no longer accepted)')}</span>
           </h3>
           <div className="text-[11px] text-[var(--text-muted)] font-semibold">
             {offline
@@ -551,7 +650,7 @@ export const AdminRevenuePanel: React.FC = () => {
         </div>
 
         {offlineTransactions.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)]">{t('No wallet transactions in this period.')}</p>
+          <p className="text-xs text-[var(--text-muted)]">{t('No manual transfers in this period.')}</p>
         ) : (
           <ul className="space-y-2">
             {offlineTransactions.map((transaction, index) => (
@@ -564,7 +663,11 @@ export const AdminRevenuePanel: React.FC = () => {
                     {transaction.reference || t('No reference')}
                   </div>
                   <div className="text-[11px] text-[var(--text-muted)] mt-0.5 flex items-center gap-1.5 flex-wrap">
-                    <span>{transaction.method === 'instapay' ? 'InstaPay' : 'Vodafone Cash'}</span>
+                    <span>
+                      {transaction.method === 'instapay'
+                        ? t('Bank transfer (closed)')
+                        : t('Wallet transfer (closed)')}
+                    </span>
                     <span>·</span>
                     <span>{formatDate(transaction.paidAt ?? transaction.createdAt, isAr)}</span>
                     <span>·</span>

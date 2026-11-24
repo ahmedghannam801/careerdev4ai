@@ -35,6 +35,7 @@ import { useCareer } from '../../context/CareerContext';
 import { validateCoupon } from '../../lib/creditsApi';
 import { goToHostedPage, startXPayCheckout, type XPayStatus } from '../../lib/xpayApi';
 import { fetchXPayStatus } from '../../lib/xpayApi';
+import { resolvePaymentAvailability } from '../../lib/paymentAvailability';
 import { formatEgpPrice } from '../../../shared/subscriptions';
 import { backdropVariants, MOTION_EASE } from '../../lib/motion';
 
@@ -192,8 +193,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const shownDiscountPiasters = couponDiscountPiasters || birthdayDiscountPiasters;
   const totalPiasters = Math.max(0, originalAmountPiasters - shownDiscountPiasters);
 
-  const methods = status?.paymentMethods?.methodsForEgp ?? [];
-  const ready = Boolean(status?.checkoutReady) && methods.length > 0;
+  // The same rules the pricing page uses, so the dialog cannot offer a payment
+  // the page says is paused. `lib/paymentAvailability.ts` owns the decision.
+  const availability = resolvePaymentAvailability(status, statusLoading);
+  const methods = availability.methods;
+  const ready = availability.canStartCheckout;
 
   const handleApplyCoupon = useCallback(async () => {
     if (!couponCode.trim()) return;
@@ -351,23 +355,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 {t('Payment methods')}
               </span>
 
-              {statusLoading ? (
+              {availability.state === 'checking' ? (
                 <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 text-xs text-[var(--text-muted)]">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   {t('Checking which payment methods are available…')}
                 </div>
-              ) : !status ? (
-                <div className="flex items-start gap-2 rounded-2xl border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 p-3 text-xs text-[var(--text-primary)]">
-                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-danger)]" />
-                  <span>{t('Card payment is not available right now. Nothing was charged.')}</span>
-                </div>
-              ) : methods.length === 0 ? (
-                <div className="flex items-start gap-2 rounded-2xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 p-3 text-xs text-[var(--text-primary)]">
+              ) : !ready ? (
+                <div
+                  className="flex items-start gap-2 rounded-2xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/10 p-3 text-xs text-[var(--text-primary)]"
+                  data-payments-paused={availability.reason}
+                >
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-warning)]" />
                   <span>
-                    {status.paymentMethods?.egpSupported === false
-                      ? t('This account cannot charge in Egyptian pounds yet, so payment is unavailable.')
-                      : t('No payment method is enabled on this account yet, so payment is unavailable.')}
+                    <span className="block font-bold">{t(availability.titleKey)}</span>
+                    <span className="mt-0.5 block">{t(availability.messageKey)}</span>
                   </span>
                 </div>
               ) : (

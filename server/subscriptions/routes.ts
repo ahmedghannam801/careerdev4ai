@@ -33,9 +33,10 @@ import {
   computeAdminRevenue,
   parseRevenueDateRange,
   type OfflinePaymentRow,
-  type StripeDisputeRevenueRow,
-  type StripeInvoiceRevenueRow,
-  type StripeRefundRevenueRow,
+  type LegacyCardDisputeRow,
+  type LegacyCardInvoiceRow,
+  type LegacyCardRefundRow,
+  type XPayPurchaseRow,
 } from '../revenue/service.ts';
 
 export function registerSubscriptionRoutes(app: Express): void {
@@ -95,10 +96,9 @@ export function registerSubscriptionRoutes(app: Express): void {
   });
 
   /* -------------------------------------------------------------------------- */
-  /* Payments & Checkout Routes (Vodafone Cash & InstaPay)                      */
+  /* Token balance                                                              */
   /* -------------------------------------------------------------------------- */
 
-  // Candidate: Create payment checkout intent
   app.get('/api/credits/balance', requireAuth, async (req: AuthedRequest, res: Response) => {
     try {
       const balance = await getUserCreditsWithTrial(req.authUser!.id);
@@ -309,10 +309,11 @@ export function registerSubscriptionRoutes(app: Express): void {
           };
         });
 
-        // Stripe invoices are a mirror written by the signed webhook. The
-        // mirror is optional: a deployment that has not applied the Stripe
-        // migration must still render this page, so a failure is logged and
-        // reported rather than thrown.
+        // The card invoices the previous gateway mirrored. Nothing writes to
+        // these tables any more, and the rows are money that was collected, so
+        // they are read and counted. The table names are kept: renaming a table
+        // of historical financial records to tidy a report is not a trade worth
+        // making.
         const { data: stripeInvoiceRows, error: stripeInvoiceError } = await getSupabaseServer()
           .from('stripe_invoices')
           .select(`
@@ -323,9 +324,9 @@ export function registerSubscriptionRoutes(app: Express): void {
           .order('created_at', { ascending: false });
 
         if (stripeInvoiceError) {
-          console.error('Admin revenue: Stripe invoice query failed:', stripeInvoiceError);
+          console.error('Admin revenue: legacy card invoice query failed:', stripeInvoiceError);
         }
-        const invoices: StripeInvoiceRevenueRow[] = stripeInvoiceError
+        const invoices: LegacyCardInvoiceRow[] = stripeInvoiceError
           ? []
           : (stripeInvoiceRows ?? []).map((row: any) => ({
               id: String(row.id),
@@ -354,9 +355,9 @@ export function registerSubscriptionRoutes(app: Express): void {
           .order('created_at', { ascending: false });
 
         if (refundError) {
-          console.error('Admin revenue: Stripe refund query failed:', refundError);
+          console.error('Admin revenue: legacy card refund query failed:', refundError);
         }
-        const refunds: StripeRefundRevenueRow[] = refundError
+        const refunds: LegacyCardRefundRow[] = refundError
           ? []
           : (refundRows ?? []).map((row: any) => ({
               id: String(row.id),
@@ -377,9 +378,9 @@ export function registerSubscriptionRoutes(app: Express): void {
           .order('created_at', { ascending: false });
 
         if (disputeError) {
-          console.error('Admin revenue: Stripe dispute query failed:', disputeError);
+          console.error('Admin revenue: legacy card dispute query failed:', disputeError);
         }
-        const disputes: StripeDisputeRevenueRow[] = disputeError
+        const disputes: LegacyCardDisputeRow[] = disputeError
           ? []
           : (disputeRows ?? []).map((row: any) => ({
               id: String(row.id),
@@ -392,8 +393,39 @@ export function registerSubscriptionRoutes(app: Express): void {
               created_at: row.created_at ?? null,
             }));
 
+        // The live gateway. A deployment that has not applied the XPay
+        // migration must still render this page, so a failure here is reported
+        // rather than thrown — and the panel says the figures are unavailable
+        // instead of showing a confident zero.
+        const { data: xpayRows, error: xpayError } = await getSupabaseServer()
+          .from('xpay_purchases')
+          .select(
+            'id, session_id, purchase_kind, plan_code, billing_cycle, credits, amount_total, currency, status, paid_at, created_at, livemode'
+          )
+          .order('created_at', { ascending: false });
+
+        if (xpayError) {
+          console.error('Admin revenue: XPay purchase query failed:', xpayError);
+        }
+        const xpay: XPayPurchaseRow[] = xpayError
+          ? []
+          : (xpayRows ?? []).map((row: any) => ({
+              id: String(row.id),
+              session_id: row.session_id ?? null,
+              purchase_kind: row.purchase_kind ?? null,
+              plan_code: row.plan_code ?? null,
+              billing_cycle: row.billing_cycle ?? null,
+              credits: row.credits ?? null,
+              amount_total: row.amount_total,
+              currency: row.currency ?? 'EGP',
+              status: String(row.status ?? ''),
+              paid_at: row.paid_at ?? null,
+              created_at: row.created_at ?? null,
+              livemode: row.livemode === true,
+            }));
+
         const metrics = computeAdminRevenue(
-          { payments, invoices, refunds, disputes },
+          { payments, invoices, refunds, disputes, xpay },
           {
             // The card rail that wrote these invoice rows is gone; the rows are
             // history and stay countable. There is no live mode to compare them
@@ -401,6 +433,7 @@ export function registerSubscriptionRoutes(app: Express): void {
             testMode: false,
             range: parsedRange.range,
             stripeAvailable: !stripeInvoiceError,
+            xpayAvailable: !xpayError,
           }
         );
 

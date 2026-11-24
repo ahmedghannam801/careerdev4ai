@@ -7,9 +7,9 @@
  * lets a webhook be retried safely, so every caller passes a key derived from
  * the payment — never a random one.
  *
- * This lived in the Stripe store because Stripe was the only rail that granted
- * credits. The rail is gone; the grant is not, and it does not depend on any
- * provider.
+ * This lived in the old card provider's store, because that was the only rail
+ * that granted credits. That rail is gone; the grant is not, and it does not
+ * depend on any provider.
  */
 
 import { getSupabaseServer } from '../db/supabase.ts';

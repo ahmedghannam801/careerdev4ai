@@ -207,9 +207,9 @@ export type BillingEmailTemplate =
 /**
  * One billing email.
  *
- * This is provider-agnostic on purpose. The Stripe adapter below and the XPay
- * adapter (when it lands) call the same function, so the account receives the
- * same message whichever provider processed the payment.
+ * This is provider-agnostic on purpose: the XPay webhook is the only caller
+ * today, and it takes plain values so a receipt never depends on one provider's
+ * event shape.
  */
 export async function sendBillingEmail(input: {
   userId: string;
@@ -244,7 +244,7 @@ export async function sendBillingEmail(input: {
   });
 }
 
-/** A small, safe amount label. The amount is minor units in Stripe. */
+/** A small, safe amount label. The amount is given in minor units (piasters). */
 export function formatAmount(
   amount: number | null | undefined,
   currency: string | null | undefined,

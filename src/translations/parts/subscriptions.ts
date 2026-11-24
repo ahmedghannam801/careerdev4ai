@@ -37,8 +37,6 @@ export const subscriptionsAr: Record<string, string> = {
   // Checkout & Payment Modal
   'Complete Your Subscription': 'إتمام الاشتراك',
   'Select Payment Method': 'اختر طريقة الدفع',
-  'Vodafone Cash': 'فودافون كاش',
-  'InstaPay': 'إنستاباي',
   'Transfer Instructions': 'تعليمات التحويل',
   'Submit Payment Evidence': 'إرسال إثبات التحويل',
   'Transaction Reference ID': 'الرقم المرجعي للعملية (Reference ID)',
@@ -153,7 +151,7 @@ export const subscriptionsAr: Record<string, string> = {
   'Amount (Tokens)': 'الكمية (توكن)',
   'Reason for Grant': 'سبب المنح',
 
-  // Card payments (Stripe)
+  // Payments
   'Card': 'بطاقة بنكية',
   'Continue to secure card payment': 'المتابعة إلى الدفع الآمن بالبطاقة',
   'Failed to start card checkout': 'تعذر بدء الدفع بالبطاقة',
@@ -332,4 +330,12 @@ export const subscriptionsAr: Record<string, string> = {
   'Your plan and credits activate as soon as the payment is confirmed — usually within a few seconds.':
     'يُفعّل اشتراكك ونقاطك بمجرد تأكيد الدفع — عادةً في خلال ثوانٍ.',
   'Card (previous gateway)': 'البطاقات (المزوّد السابق)',
+  'Payments are temporarily unavailable': 'الدفع غير متاح مؤقتاً',
+  'Payments temporarily unavailable': 'الدفع غير متاح مؤقتاً',
+  'Checking the payment provider. This takes a moment.': 'جارٍ التحقق من مزوّد الدفع. الأمر يستغرق لحظة.',
+  'We are finishing the setup of our payment provider. Plans, prices and your current access are unchanged, and nothing can be charged until checkout is live again.': 'نستكمل الآن إعداد مزوّد الدفع. الخطط والأسعار ووصولك الحالي كما هي، ولن يُخصم أي مبلغ حتى تعود صفحة الدفع للعمل.',
+  'Our payment account cannot take Egyptian pounds yet, so checkout is paused. Nothing will be charged and your plan stays as it is.': 'حساب الدفع لدينا لا يستطيع التحصيل بالجنيه المصري بعد، لذا الدفع متوقف مؤقتاً. لن يُخصم أي مبلغ وسيظل اشتراكك كما هو.',
+  'No payment method is enabled on our payment account yet, so checkout is paused. Nothing will be charged and your plan stays as it is.': 'لم يتم تفعيل أي طريقة دفع على حساب الدفع لدينا بعد، لذا الدفع متوقف مؤقتاً. لن يُخصم أي مبلغ وسيظل اشتراكك كما هو.',
+  'We could not reach the payment provider just now, so checkout is paused. Nothing was charged — please try again in a few minutes.': 'تعذّر الوصول إلى مزوّد الدفع حالياً، لذا الدفع متوقف مؤقتاً. لم يُخصم أي مبلغ — يرجى المحاولة بعد دقائق.',
+  'No payment method is available right now.': 'لا توجد طريقة دفع متاحة الآن.',
 };

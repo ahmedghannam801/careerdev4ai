@@ -16,10 +16,12 @@ import {
   ArrowRight,
   ArrowLeft,
   AlertCircle,
+  Lock,
   X,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { CheckoutModal } from '../subscription/CheckoutModal';
+import { resolvePaymentAvailability } from '../../lib/paymentAvailability';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 import { formatEgpPrice } from '../../../shared/subscriptions';
@@ -223,14 +225,22 @@ export const PricingView: React.FC = () => {
   // which reads it from XPay: a method the account was not provisioned for is
   // never advertised here.
   const [xpayStatus, setXpayStatus] = useState<XPayStatus | null>(null);
+  // True until the first answer arrives. "We have not asked yet" and "we asked
+  // and there is no answer" are different states and read differently.
+  const [xpayLoading, setXpayLoading] = useState(true);
 
   const currentPlanCode = subscription?.planCode ?? 'free';
 
   const loadXPayStatus = useCallback(async () => {
+    setXpayLoading(true);
     try {
       setXpayStatus(await fetchXPayStatus());
     } catch {
-      // Payments being unavailable must not break the pricing page.
+      // Payments being unavailable must not break the pricing page: the page
+      // still shows the plans, and the notice says checkout is paused.
+      setXpayStatus(null);
+    } finally {
+      setXpayLoading(false);
     }
   }, []);
 
@@ -287,16 +297,21 @@ export const PricingView: React.FC = () => {
     };
   }, [params.xpay, params.session_id, refreshSubscription, refreshCredits]);
 
+  // XPay is the only gateway, so this one answer decides every payment control
+  // on the page: the plan buttons, the pack buttons and the methods banner.
+  // The rules live in `lib/paymentAvailability.ts` and are tested there.
+  const availability = resolvePaymentAvailability(xpayStatus, xpayLoading);
+  const canPay = availability.canStartCheckout;
+  const paymentMethods = availability.methods;
+
   const handleSelectPlan = (plan: PlanDefinition) => {
     if (plan.code === 'free') return;
+    // Nothing opens while checkout is paused: no dialog, no error, no fake
+    // payment. The notice on the page is the answer.
+    if (!canPay) return;
     setSelectedPlan(plan);
     setCheckoutOpen(true);
   };
-
-  // Payments are offered only when the server says the merchant account can
-  // take them: a key, a webhook secret, and EGP provisioned.
-  const xpayReady = Boolean(xpayStatus?.checkoutReady);
-  const paymentMethods = xpayStatus?.paymentMethods?.methodsForEgp ?? [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
@@ -480,6 +495,30 @@ export const PricingView: React.FC = () => {
         </div>
       )}
 
+      {/* Payments paused.
+
+          XPay is the only gateway, and it is not ready yet: no key, no signing
+          secret, or no method enabled on the merchant account. The plans stay
+          on the page — a candidate can still read what they cost — but no
+          control here can start a checkout, so nobody can be charged by a
+          payment that would not be verified. The sentence says that in the
+          candidate's language, and it says nothing was charged. */}
+      {availability.state !== 'ready' && (
+        <div
+          role="status"
+          aria-live="polite"
+          id="payments-paused-notice"
+          data-payments-paused={availability.reason}
+          className="mx-auto flex w-full max-w-3xl items-start gap-3 rounded-2xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 p-4"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-warning)]" aria-hidden="true" />
+          <div className="min-w-0 text-sm leading-relaxed">
+            <p className="font-bold text-[var(--text-primary)]">{t(availability.titleKey)}</p>
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{t(availability.messageKey)}</p>
+          </div>
+        </div>
+      )}
+
       {/* Pricing Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
         {PLANS.map((plan) => {
@@ -576,16 +615,26 @@ export const PricingView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleSelectPlan(plan)}
-                    className={`w-full py-3 rounded-2xl text-xs font-extrabold shadow-md flex items-center justify-center gap-1.5 transition-all ${
-                      plan.isPopular
-                        ? 'bg-primary text-white hover:bg-primary-hover shadow-primary/20'
-                        : plan.isBestValue
-                        ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-600/20'
-                        : 'bg-foreground text-surface hover:opacity-90'
+                    disabled={!canPay}
+                    aria-disabled={!canPay}
+                    aria-describedby={!canPay ? 'payments-paused-notice' : undefined}
+                    title={!canPay ? t(availability.actionLabelKey) : undefined}
+                    className={`w-full py-3 rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
+                      !canPay
+                        ? 'cursor-not-allowed border border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--text-muted)]'
+                        : plan.isPopular
+                          ? 'bg-primary text-white hover:bg-primary-hover shadow-md shadow-primary/20'
+                          : plan.isBestValue
+                            ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-md shadow-purple-600/20'
+                            : 'bg-foreground text-surface shadow-md hover:opacity-90'
                     }`}
                   >
-                    <span>{t('Upgrade Now')}</span>
-                    {isAr ? <ArrowLeft className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
+                    <span>{canPay ? t('Upgrade Now') : t(availability.actionLabelKey)}</span>
+                    {canPay ? (
+                      isAr ? <ArrowLeft className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                    )}
                   </button>
                 )}
               </div>
@@ -624,7 +673,11 @@ export const PricingView: React.FC = () => {
               </div>
               <button
                 type="button"
+                disabled={!canPay}
+                aria-disabled={!canPay}
+                title={!canPay ? t(availability.actionLabelKey) : undefined}
                 onClick={() => {
+                  if (!canPay) return;
                   setSelectedPlan({
                     code: pack.id,
                     nameEn: pack.nameEn,
@@ -639,7 +692,11 @@ export const PricingView: React.FC = () => {
                   });
                   setCheckoutOpen(true);
                 }}
-                className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-xs hover:bg-primary hover:text-white transition-all"
+                className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
+                  canPay
+                    ? 'bg-primary/10 border-primary/20 text-primary hover:bg-primary hover:text-white'
+                    : 'cursor-not-allowed border-[var(--border-subtle)] bg-[var(--surface-secondary)] text-[var(--text-muted)]'
+                }`}
               >
                 {formatEgpPrice(pack.pricePiasters)}
               </button>
@@ -658,19 +715,19 @@ export const PricingView: React.FC = () => {
             </h3>
           </div>
           <p className="text-xs text-muted max-w-xl leading-relaxed">
-            {xpayStatus?.paymentMethods?.egpSupported === false
+            {canPay
               ? t(
-                  'Card payment is not enabled for this account yet, so checkout is unavailable. Nothing is charged and no plan changes.'
-                )
-              : t(
                   'You pay on XPay’s secure page; Aionvia never sees or stores your card number. Your plan activates as soon as the payment is confirmed, and a Fawry reference activates it when the money arrives.'
-                )}
+                )
+              : t(availability.messageKey)}
           </p>
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-center gap-3">
           {paymentMethods.length === 0 ? (
             <span className="text-[11px] text-muted">
-              {xpayStatus ? t('No payment method is enabled yet.') : t('Checking available payment methods…')}
+              {availability.state === 'checking'
+                ? t('Checking available payment methods…')
+                : t('No payment method is available right now.')}
             </span>
           ) : (
             paymentMethods.map((method) => (
@@ -715,7 +772,7 @@ export const PricingView: React.FC = () => {
             </div>
           ))}
 
-          {xpayReady && (
+          {canPay && (
             <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
               <h4 className="font-bold text-sm text-foreground">
                 {t('Can I pay by bank card?')}
