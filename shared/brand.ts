@@ -7,9 +7,9 @@
  * hunt through a hundred strings that can drift apart.
  *
  * The *technical* names are deliberately not here: the Supabase project, the
- * queue name, the Stripe lookup-key prefix and the historical storage keys are
- * integration identifiers. Renaming one of those would break live data or a
- * live webhook, so they stay as they are and are documented where they live.
+ * queue name and the historical storage keys are integration identifiers.
+ * Renaming one of those would break live data or a live integration, so they
+ * stay as they are and are documented where they live.
  */
 
 /** The official product name. */

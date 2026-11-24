@@ -6,9 +6,8 @@
  * and it runs only after that handler has succeeded. It enqueues one receipt or
  * lifecycle message; it never changes a subscription or a balance.
  *
- * It used to carry a Stripe adapter as well. The card rail is XPay now, so the
- * only entry point is `enqueueBillingEmail`, which takes plain values and knows
- * nothing about any provider's event shape.
+ * The card rail is XPay, so the only entry point is `enqueueBillingEmail`, which
+ * takes plain values and knows nothing about any provider's event shape.
  */
 
 import { formatAmount, sendBillingEmail } from './lifecycle.ts';
