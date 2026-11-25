@@ -11,6 +11,8 @@
  * platform until the user accepts the new text.
  */
 
+import { BUSINESS_EMAIL, businessLocation } from './contact.ts';
+
 /**
  * The current consent versions.
  *
@@ -258,11 +260,19 @@ export function hasApprovedTerms(): boolean {
  *
  * This is a business policy, not a rewrite of the Terms. It describes how a
  * refund request is reviewed, how an approved refund is paid, and which
- * statutory rights are unaffected. It deliberately does not invent a fixed
- * cooling-off period or a processing time: those are owner decisions and are
- * governed by the applicable consumer-protection rules.
+ * statutory rights are unaffected.
+ *
+ * It is written against the way the platform actually sells: a subscription
+ * period and a credit pack are each one charge for a fixed term, delivered
+ * online, and are not renewed automatically. It deliberately does not invent a
+ * fixed cooling-off period or a processing time: those are owner decisions and
+ * are governed by the applicable consumer-protection rules.
+ *
+ * The contact address and the business location are interpolated from
+ * `shared/contact.ts`, so the policy can never name an address the business
+ * does not publish.
  */
-export const REFUND_POLICY_VERSION = '2026-11-23';
+export const REFUND_POLICY_VERSION = '2026-11-25';
 
 export const REFUND_POLICY: {
   approved: boolean;
@@ -271,13 +281,34 @@ export const REFUND_POLICY: {
   sectionsAr: ReadonlyArray<{ heading: string; body: string }>;
 } = {
   approved: true,
-  updated: 'November 23, 2026',
+  updated: 'November 25, 2026',
   sections: [
     {
       heading: 'Scope',
-      body: `This Refund Policy applies to paid subscriptions and AI credit packs bought through Aionvia's online checkout.
+      body: `This Refund Policy applies to paid subscriptions and AI credit packs bought through Aionvia's online checkout at ${businessLocation()}.
 
 It does not replace your statutory rights under the applicable consumer-protection law. Where those rights give you a stronger remedy than this policy, those rights apply.`,
+    },
+    {
+      heading: 'How Aionvia is sold',
+      body: `Aionvia is an online career development SaaS platform. Everything you buy is a digital service that is delivered to your account online.
+
+• A subscription plan is sold as one charge for one period — a month or a year, depending on what you chose. The period is not renewed automatically: when it ends, your access ends and your account returns to the free tier unless you buy another period.
+• An AI credit pack is sold as one charge for a fixed number of AI credits, added to your account as soon as the payment is confirmed.
+
+Because nothing renews on its own, you are never charged again without a new purchase.`,
+    },
+    {
+      heading: 'Cancelling a subscription',
+      body: `You can cancel a subscription at any time by writing to ${BUSINESS_EMAIL} from the email address on your Aionvia account.
+
+When you cancel:
+
+• the subscription is marked as cancelled and it is not renewed;
+• your access to the paid plan continues until the end of the period you have already paid for;
+• the unused part of the period is not paid back automatically — if you want the remainder considered for a refund, say so in the same message and the request is reviewed under "Your right to request a refund" below.
+
+Cancelling a subscription does not delete your account or the documents you have already created and stored in it.`,
     },
     {
       heading: 'Your right to request a refund',
@@ -285,31 +316,34 @@ It does not replace your statutory rights under the applicable consumer-protecti
 
 • you were charged more than once for the same purchase;
 • you were charged for a purchase you did not authorise;
-• the paid service was not made available to your account and we could not resolve it; or
+• the paid service was not made available to your account and we could not resolve it;
+• the purchase was made in error and you have not used the service; or
 • you believe you are entitled to a refund under the applicable consumer-protection law.
 
 A request is reviewed using the account, the payment reference and the records of what was delivered.`,
     },
     {
       heading: 'Purchases that are generally not refundable',
-      body: `Because the service is digital and is consumed immediately, we may decline a refund where:
+      body: `Because the service is digital and is consumed as it is used, we may decline a refund where:
 
-• the subscription period or credit pack has already been used in full;
-• AI tokens have already been spent on generated content;
-• the request relates to a change of mind after the service has been substantially used; or
-• the account was closed for a breach of the Terms & Conditions.
+• the subscription period or the credit pack has already been used in full;
+• the AI credits have already been spent on generated content;
+• the request relates to a change of mind after the service has been substantially used;
+• the account was closed for a breach of the Terms & Conditions; or
+• the request is made long after the purchase and the service has been delivered and used in the meantime.
 
 Nothing in this section removes a right that applicable law says cannot be excluded.`,
     },
     {
       heading: 'How to request a refund',
-      body: `Email the official contact address published on our Business Information page, or use the contact details there.
+      body: `Email ${BUSINESS_EMAIL} with the subject "Refund request" and tell us what happened. You can also use the contact details published on the Business Information page.
 
 Please include:
 
 • the email address on your Aionvia account;
 • the date of payment;
-• the XPay payment or order reference, if you have it; and
+• the XPay payment or order reference, if you have it;
+• the amount you paid; and
 • a short description of the problem.
 
 We may ask for additional information needed to identify the payment. Never send a full card number or your password.`,
@@ -321,22 +355,51 @@ We may ask for additional information needed to identify the payment. Never send
 The time it takes for the money to appear depends on the payment provider and your bank. We will tell you when the refund has been submitted.`,
     },
     {
-      heading: 'Chargebacks and payment disputes',
-      body: `If you think a charge is wrong, please contact us first so we can identify the payment and respond. Raising a chargeback does not prevent you from contacting us, and contacting us does not limit your right to dispute a charge with your bank or card issuer.`,
+      heading: 'Billing disputes and payment issues',
+      body: `If you think a charge is wrong, please contact us first so we can identify the payment and respond. This covers a charge for a purchase you do not recognise, a duplicate charge, a payment that went through twice, a wrong amount, and a payment that left your account without giving you access.
+
+Raising a chargeback does not prevent you from contacting us, and contacting us does not limit your right to dispute a charge with your bank or card issuer.`,
+    },
+    {
+      heading: 'If we decline a request',
+      body: `If we decline a refund request, we tell you why and, where we can, what would change the outcome — for example a payment we cannot identify, or a service that has already been used. If you disagree, you can reply and ask for a review, and you can raise the matter with your bank or card issuer at any time.`,
     },
     {
       heading: 'Contact',
-      body: `The business name, the Egyptian business address (once the owner has supplied it), the official email address and the telephone number are published on the Business Information page.
+      body: `The business behind Aionvia is located in ${businessLocation()}.
 
-That page, the Terms & Conditions and this Refund Policy are public and can be read without creating an account.`,
+The business email address is ${BUSINESS_EMAIL}, and it is the address that handles refund requests, billing disputes and privacy requests.
+
+The Business Information page, the Terms & Conditions and this Refund Policy are public and can be read without creating an account.`,
     },
   ],
   sectionsAr: [
     {
       heading: 'نطاق السياسة',
-      body: `تنطبق سياسة الاسترداد هذه على الاشتراكات المدفوعة وحزم رصيد الذكاء الاصطناعي التي تُشترى عبر الدفع الإلكتروني في Aionvia.
+      body: `تنطبق سياسة الاسترداد هذه على الاشتراكات المدفوعة وحزم رصيد الذكاء الاصطناعي التي تُشترى عبر الدفع الإلكتروني في Aionvia من ${businessLocation()}.
 
 لا تحل هذه السياسة محل حقوقك القانونية بموجب قانون حماية المستهلك المعمول به. وإذا منحتك تلك الحقوق علاجًا أقوى من هذه السياسة، فإن تلك الحقوق هي التي تُطبق.`,
+    },
+    {
+      heading: 'كيف تُباع Aionvia',
+      body: `Aionvia منصة برمجية مهنية عبر الإنترنت (SaaS) لتطوير المسار المهني. كل ما تشتريه خدمة رقمية تُسلَّم إلى حسابك عبر الإنترنت.
+
+• تُباع باقة الاشتراك دفعة واحدة تغطي فترة واحدة — شهر أو سنة حسب اختيارك. لا تتجدد الفترة تلقائيًا: عند انتهائها تنتهي صلاحية الوصول ويعود حسابك إلى المستوى المجاني ما لم تشترِ فترة أخرى.
+• تُباع حزمة رصيد الذكاء الاصطناعي دفعة واحدة مقابل عدد محدد من الأرصدة، وتُضاف إلى حسابك فور تأكيد الدفع.
+
+ولأن لا شيء يتجدد تلقائيًا، فأنت لا تُخصم لك أي دفعة أخرى دون عملية شراء جديدة.`,
+    },
+    {
+      heading: 'إلغاء الاشتراك',
+      body: `يمكنك إلغاء الاشتراك في أي وقت بمراسلة ${BUSINESS_EMAIL} من البريد الإلكتروني المسجل في حساب Aionvia.
+
+وعند الإلغاء:
+
+• يُعلَّم الاشتراك كملغى ولا يُجدَّد؛
+• تستمر صلاحية الوصول إلى الباقة المدفوعة حتى نهاية الفترة التي دفعت مقابلها؛
+• لا تُردّ الفترة غير المستخدمة تلقائيًا — وإذا أردت النظر في ردّها، اذكر ذلك في الرسالة نفسها، ويُراجَع الطلب وفق بند «حقك في طلب الاسترداد» أدناه.
+
+وإلغاء الاشتراك لا يحذف حسابك ولا المستندات التي أنشأتها واحتفظت بها فيه.`,
     },
     {
       heading: 'حقك في طلب الاسترداد',
@@ -344,31 +407,34 @@ That page, the Terms & Conditions and this Refund Policy are public and can be r
 
 • خُصم منك المبلغ أكثر من مرة لنفس عملية الشراء؛
 • خُصم منك مبلغ لعملية شراء لم تصرّح بها؛
-• لم تتوفر الخدمة المدفوعة في حسابك ولم نتمكن من حل المشكلة؛ أو
+• لم تتوفر الخدمة المدفوعة في حسابك ولم نتمكن من حل المشكلة؛
+• كان الشراء قد تم بالخطأ ولم تستخدم الخدمة؛ أو
 • كنت ترى أن لك حقًا في الاسترداد بموجب قانون حماية المستهلك المعمول به.
 
 تتم مراجعة الطلب باستخدام الحساب ومرجع الدفع وسجلات ما تم تسليمه.`,
     },
     {
       heading: 'المشتريات التي لا تُرد عمومًا',
-      body: `لأن الخدمة رقمية وتُستهلك فورًا، قد نرفض الاسترداد في الحالات التالية:
+      body: `لأن الخدمة رقمية وتُستهلك أثناء استخدامها، قد نرفض الاسترداد في الحالات التالية:
 
 • استُخدمت فترة الاشتراك أو حزمة الرصيد بالكامل؛
 • أُنفق رصيد الذكاء الاصطناعي بالفعل على محتوى تم إنشاؤه؛
-• كان الطلب بسبب تغيير الرأي بعد الاستخدام الجوهري للخدمة؛ أو
-• أُغلق الحساب لمخالفة الشروط والأحكام.
+• كان الطلب بسبب تغيير الرأي بعد استخدام الخدمة بشكل جوهري؛
+• أُغلق الحساب لمخالفة الشروط والأحكام؛ أو
+• قُدّم الطلب بعد مضي وقت طويل على الشراء، وقد سُلِّمت الخدمة واستُخدمت في هذه الأثناء.
 
 لا يحذف أي بند في هذا القسم حقًا يقرر القانون المعمول به أنه لا يجوز استبعاده.`,
     },
     {
       heading: 'كيفية طلب الاسترداد',
-      body: `أرسل بريدًا إلكترونيًا إلى عنوان الاتصال الرسمي المنشور في صفحة المعلومات التجارية، أو استخدم بيانات الاتصال الواردة هناك.
+      body: `أرسل بريدًا إلكترونيًا إلى ${BUSINESS_EMAIL} بعنوان «طلب استرداد» وأخبرنا بما حدث. ويمكنك أيضًا استخدام بيانات الاتصال المنشورة في صفحة المعلومات التجارية.
 
 يرجى تضمين:
 
 • البريد الإلكتروني المسجل في حساب Aionvia؛
 • تاريخ الدفع؛
-• مرجع الدفع أو الطلب لدى XPay إن كان متاحًا؛ و
+• مرجع الدفع أو الطلب لدى XPay إن كان متاحًا؛
+• المبلغ الذي دفعته؛ و
 • وصف موجز للمشكلة.
 
 قد نطلب معلومات إضافية لتحديد عملية الدفع. لا ترسل رقم البطاقة كاملًا أو كلمة المرور.`,
@@ -380,14 +446,22 @@ That page, the Terms & Conditions and this Refund Policy are public and can be r
 تختلف المدة التي يظهر بعدها المبلغ حسب مزود الدفع والبنك. وسنخبرك عند إرسال الاسترداد.`,
     },
     {
-      heading: 'الاعتراضات ونزاعات الدفع',
-      body: `إذا كنت تعتقد أن هناك خصمًا خاطئًا، يرجى التواصل معنا أولًا حتى نتمكن من تحديد عملية الدفع والرد عليها. رفع اعتراض لدى البنك لا يمنعك من التواصل معنا، والتواصل معنا لا يحد من حقك في الاعتراض لدى البنك أو جهة إصدار البطاقة.`,
+      heading: 'نزاعات الدفع ومشكلات الفوترة',
+      body: `إذا كنت تعتقد أن هناك خصمًا خاطئًا، يرجى التواصل معنا أولًا حتى نتمكن من تحديد عملية الدفع والرد عليها. ويشمل ذلك خصمًا لعملية شراء لا تتعرف عليها، أو خصمًا مكررًا، أو عملية دفع تمت مرتين، أو مبلغًا غير صحيح، أو عملية دفع خرجت من حسابك دون أن تحصل على الخدمة.
+
+رفع اعتراض لدى البنك لا يمنعك من التواصل معنا، والتواصل معنا لا يحد من حقك في الاعتراض لدى البنك أو جهة إصدار البطاقة.`,
+    },
+    {
+      heading: 'إذا رُفض الطلب',
+      body: `إذا رفضنا طلب استرداد، نوضح لك السبب، ونذكر ما يمكن أن يغيّر النتيجة — مثل دفعة لا نستطيع تحديدها، أو خدمة استُخدمت بالفعل. وإذا لم توافق، يمكنك الرد وطلب مراجعة الطلب، ويمكنك في أي وقت طرح الأمر لدى البنك أو جهة إصدار البطاقة.`,
     },
     {
       heading: 'التواصل',
-      body: `اسم النشاط التجاري والعنوان التجاري في مصر (بعد أن يوفره المالك) والبريد الإلكتروني الرسمي ورقم الهاتف منشورة في صفحة المعلومات التجارية.
+      body: `النشاط التجاري خلف Aionvia يقع في ${businessLocation()}.
 
-وهذه الصفحة والشروط والأحكام وسياسة الاسترداد متاحة للعامة ويمكن قراءتها دون إنشاء حساب.`,
+البريد الإلكتروني الرسمي هو ${BUSINESS_EMAIL}، وهو العنوان الذي يتولى طلبات الاسترداد ونزاعات الدفع وطلبات الخصوصية.
+
+صفحة المعلومات التجارية والشروط والأحكام وسياسة الاسترداد متاحة للعامة ويمكن قراءتها دون إنشاء حساب.`,
     },
   ],
 };
@@ -410,7 +484,7 @@ export const PRIVACY_PATH = '/privacy';
 export const REFUND_PATH = '/refund-policy';
 
 /** The canonical public path of the Business Information page. */
-export const BUSINESS_INFORMATION_PATH = '/contact';
+export const BUSINESS_INFORMATION_PATH = '/business-information';
 
 /** The consent vocabulary stored in public.user_consents.status. */
 export type ConsentRecordStatus = 'accepted' | 'withdrawn';

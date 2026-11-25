@@ -61,6 +61,8 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
     { path: '/opportunities', priority: 0.8, changefreq: 'daily' },
     { path: '/contact', priority: 0.8, changefreq: 'monthly' },
     { path: '/contact/ar', priority: 0.6, changefreq: 'monthly' },
+    { path: '/business-information', priority: 0.8, changefreq: 'monthly' },
+    { path: '/business-information/ar', priority: 0.6, changefreq: 'monthly' },
     { path: '/refund-policy', priority: 0.4, changefreq: 'yearly' },
     { path: '/refund-policy/ar', priority: 0.3, changefreq: 'yearly' },
     { path: '/privacy', priority: 0.3, changefreq: 'yearly' },

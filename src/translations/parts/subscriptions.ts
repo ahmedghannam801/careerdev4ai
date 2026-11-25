@@ -314,6 +314,8 @@ export const subscriptionsAr: Record<string, string> = {
   'Pay with your Visa or Mastercard, protected by 3-D Secure.': 'ادفع ببطاقة فيزا أو ماستركارد محمية بـ 3-D Secure.',
   'Card payment is not available right now. Nothing was charged.': 'الدفع بالبطاقة غير متاح الآن. لم يتم خصم أي مبلغ.',
   'This plan is already active on your account.': 'هذا الاشتراك مفعّل بالفعل على حسابك.',
+  'Subscriptions are sold for one fixed period and are not renewed automatically.':
+    'تُباع الاشتراكات لفترة ثابتة واحدة ولا تتجدد تلقائيًا.',
   'The free plan needs no payment.': 'الخطة المجانية لا تحتاج إلى دفع.',
   'Failed to start the payment': 'تعذّر بدء عملية الدفع',
   'Secure payments through XPay': 'دفع آمن عبر XPay',

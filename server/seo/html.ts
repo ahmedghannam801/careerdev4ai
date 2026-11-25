@@ -242,8 +242,9 @@ const HEADER_LINKS: PublicLink[] = [
  * The links shown in the footer of every public page.
  *
  * The footer carries the whole set of public destinations rather than a
- * selection of them: the footer is where a reader looks for the way to reach
- * the business, so the Contact Us page is one of its links.
+ * selection of them: the footer is where a reader — and a payment provider
+ * checking the business — looks for the business details, the contact page and
+ * the legal documents, so all of them are one link away.
  */
 const FOOTER_LINKS: PublicLink[] = [
   { href: '/about', label: 'About' },
@@ -251,8 +252,10 @@ const FOOTER_LINKS: PublicLink[] = [
   { href: '/learning', label: 'Learning' },
   { href: '/opportunities', label: 'Opportunities' },
   { href: '/business-information', label: 'Business Information' },
-  { href: '/refund-policy', label: 'Refund Policy' },
   { href: '/contact', label: 'Contact Us' },
+  { href: '/refund-policy', label: 'Refund Policy' },
+  { href: '/terms', label: 'Terms of Service' },
+  { href: '/privacy', label: 'Privacy Policy' },
 ];
 
 /**

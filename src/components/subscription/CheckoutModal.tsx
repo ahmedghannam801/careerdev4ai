@@ -37,6 +37,7 @@ import { goToHostedPage, startXPayCheckout, type XPayStatus } from '../../lib/xp
 import { fetchXPayStatus } from '../../lib/xpayApi';
 import { resolvePaymentAvailability } from '../../lib/paymentAvailability';
 import { formatEgpPrice } from '../../../shared/subscriptions';
+import { PUBLIC_PATHS } from '../../../shared/contact.ts';
 import { backdropVariants, MOTION_EASE } from '../../lib/motion';
 
 interface CheckoutModalProps {
@@ -530,6 +531,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </button>
             <p className="mt-2 text-center text-[11px] text-[var(--text-muted)]">
               {t('Your plan activates as soon as the payment is confirmed — not before.')}
+            </p>
+            {/* The documents a buyer is entitled to read before paying. */}
+            <p className="mt-1 text-center text-[11px] text-[var(--text-muted)]">
+              <a
+                href={PUBLIC_PATHS.refundPolicy}
+                className="font-semibold text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Refund Policy')}
+              </a>
+              {' · '}
+              <a
+                href={PUBLIC_PATHS.terms}
+                className="font-semibold text-[var(--color-primary-text)] hover:underline"
+              >
+                {t('Terms of Service')}
+              </a>
             </p>
           </motion.div>
         </motion.div>

@@ -221,6 +221,11 @@ export const landingAr: Record<string, string> = {
   'Contact Us': 'اتصل بنا',
   'Business Information': 'المعلومات التجارية',
   'Refund Policy': 'سياسة الاسترداد',
+  'Terms of Service': 'الشروط والأحكام',
+  'Privacy Policy': 'سياسة الخصوصية',
+  'Business information': 'المعلومات التجارية',
+  'Where the business is located, and the address it answers business enquiries on.':
+    'موقع النشاط التجاري، والعنوان الذي ترد عليه الشركة على الاستفسارات التجارية.',
   'Switch interface language': 'تغيير لغة الواجهة',
 
   // ---- Navigation ------------------------------------------------------

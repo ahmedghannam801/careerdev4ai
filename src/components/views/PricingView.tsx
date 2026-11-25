@@ -25,6 +25,7 @@ import { resolvePaymentAvailability } from '../../lib/paymentAvailability';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
 import { formatEgpPrice } from '../../../shared/subscriptions';
+import { PUBLIC_PATHS } from '../../../shared/contact.ts';
 import { CREDIT_PACKS } from '../../../shared/credits';
 import { CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS } from '../../../shared/cvTemplates';
 import { fetchXPayStatus, type XPayStatus } from '../../lib/xpayApi';
@@ -746,6 +747,30 @@ export const PricingView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* The legal documents a buyer needs before they pay.
+          *
+          * A plan is one charge for one fixed period and is not renewed
+          * automatically, and the Refund Policy is where the conditions for a
+          * refund and the cancellation route are written down. Both are linked
+          * from the page the purchase is made on. */}
+      <p className="text-xs text-muted text-center leading-relaxed">
+        {t('Subscriptions are sold for one fixed period and are not renewed automatically.')}
+        {' · '}
+        <a
+          href={PUBLIC_PATHS.refundPolicy}
+          className="font-semibold text-[var(--color-primary-text)] hover:underline"
+        >
+          {t('Refund Policy')}
+        </a>
+        {' · '}
+        <a
+          href={PUBLIC_PATHS.terms}
+          className="font-semibold text-[var(--color-primary-text)] hover:underline"
+        >
+          {t('Terms of Service')}
+        </a>
+      </p>
 
       {/* FAQ Accordion
           *

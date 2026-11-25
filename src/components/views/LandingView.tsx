@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, CheckCircle2, Sparkles, ArrowUpRight, Menu, X, Languages } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { TARGET_ROLES } from '../../data/rolesData';
-import { PUBLIC_PATHS, OPERATOR_LINKEDIN_URL } from '../../../shared/contact.ts';
+import { PUBLIC_PATHS, OPERATOR_LINKEDIN_URL, BUSINESS_EMAIL, businessLocation } from '../../../shared/contact.ts';
 import { Logo } from '../brand/Logo';
 import { CareerJourneyVisual } from '../brand/CareerJourneyVisual';
 import { HeroEcosystem } from '../landing/HeroEcosystem';
@@ -906,19 +906,32 @@ const navLinks = [
                   {t('Ahmed Ebrahim')}
                 </a>
               </span>
+              {/* The business facts a customer, a partner or a payment provider
+                  checks: where the business is and the mailbox it answers on. */}
+              <span className="mx-2 text-[var(--border-subtle)]">·</span>
+              <span dir="ltr">
+                {businessLocation()}
+                <span className="mx-2 text-[var(--border-subtle)]">·</span>
+                <a
+                  href={`mailto:${BUSINESS_EMAIL}`}
+                  className="font-medium text-[var(--text-secondary)] hover:text-[var(--color-primary-text)] underline transition-colors"
+                >
+                  {BUSINESS_EMAIL}
+                </a>
+              </span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-end">
               <a
                 href={PUBLIC_PATHS.terms}
                 className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
               >
-                {t('Terms')}
+                {t('Terms of Service')}
               </a>
               <a
                 href={PUBLIC_PATHS.privacy}
                 className="font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--color-primary-text)] hover:underline"
               >
-                {t('Privacy')}
+                {t('Privacy Policy')}
               </a>
               <a
                 href={PUBLIC_PATHS.businessInformation}

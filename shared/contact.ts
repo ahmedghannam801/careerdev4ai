@@ -14,6 +14,21 @@ import { BRAND_NAME } from './brand';
 export const SUPPORT_EMAIL = 'ahmedghannam801@gmail.com';
 
 /**
+ * The business contact address.
+ *
+ * This is the mailbox a customer, a partner or a merchant reviewer writes to
+ * about the business itself: the published business information, the legal
+ * documents, a refund request or a billing dispute. It is deliberately a
+ * separate constant from the product's support mailbox, because the two are
+ * different promises — but both are real addresses, and the Business
+ * Information page publishes this one.
+ *
+ * The Refund Policy and the Terms point at this address rather than writing it
+ * out, so there is exactly one place to change it.
+ */
+export const BUSINESS_EMAIL = 'aionvia09@gmail.com';
+
+/**
  * The support phone number, in international format.
  *
  * It is the number the operator answers on. It used to be read from the manual
@@ -41,7 +56,7 @@ export const PUBLIC_PATHS = {
   learning: '/learning',
   opportunities: '/opportunities',
   contact: '/contact',
-  businessInformation: '/contact',
+  businessInformation: '/business-information',
   refundPolicy: '/refund-policy',
 } as const;
 
@@ -52,14 +67,19 @@ export const PUBLIC_PATHS = {
 /**
  * The postal address of the business.
  *
- * CONFIGURATION REQUIRED — the owner must supply the verified Egyptian
- * business address here. Do not replace a null with a plausible-looking
- * address: an invented address on a merchant-verification page is a false
- * business detail.
+ * The city and the country are the business's published location: Aionvia is
+ * based in Tanta, Egypt. They are the only parts of the address that are
+ * published, because they are the only parts that have been confirmed.
+ *
+ * The finer-grained fields — street, district, governorate and postal code —
+ * stay `null` until the operator supplies them. Do not replace a null with a
+ * plausible-looking address: an invented address on a merchant-verification
+ * page is a false business detail, and a made-up street is worse than an
+ * honest city.
  *
  * The fields are the ones schema.org's `PostalAddress` uses, so what the page
- * shows and what the structured data says cannot drift apart. The country is
- * known; the rest is what the operator has to supply.
+ * shows and what the structured data says cannot drift apart. The structured
+ * data omits every field that is `null`, rather than asserting something untrue.
  */
 export interface BusinessAddress {
   /** The street address: building, street, floor, unit. */
@@ -79,11 +99,11 @@ export interface BusinessAddress {
 }
 
 /**
- * The business details published on the Contact Us page.
+ * The business details published on the Business Information page.
  *
- * A merchant onboarding reviewer asks for three things: a business address in
- * Egypt, a telephone number reachable on +20, and an address the business
- * answers on. This object is the single place those three answers live.
+ * A merchant onboarding reviewer asks for three things: where the business is,
+ * a telephone number reachable on +20, and an address the business answers on.
+ * This object is the single place those three answers live.
  *
  * A field that has not been supplied yet is `null`. It is never a plausible
  * value: a made-up address or a made-up number on a compliance page is a
@@ -110,16 +130,16 @@ export interface BusinessContactDetails {
 /**
  * The published business contact details.
  *
- * To complete the page, fill in the fields that are `null`:
+ * The location, the telephone number and the business email address are
+ * published. The finer address fields are not, and stay `null` until the
+ * operator supplies them:
  *
- *   - `address.street`, `address.locality`, `address.city`,
- *     `address.governorate`, `address.postalCode` — the registered address;
- *   - `email` — a mailbox the business answers on, if the published support
- *     address is not the one to put in front of a reviewer;
+ *   - `address.street`, `address.locality`, `address.governorate`,
+ *     `address.postalCode` — the registered address, if it is ever published;
  *   - `businessHours` — optional, and left unpublished when it is unknown.
  *
- * The telephone number is already published, in the international form a
- * reviewer expects: the +20 country code, then the national number.
+ * The telephone number is published in the international form a reviewer
+ * expects: the +20 country code, then the national number.
  *
  * Nothing else has to change: the page, the footer link, the sitemap and the
  * structured data all read from this one object.
@@ -129,16 +149,34 @@ export const BUSINESS_CONTACT: BusinessContactDetails = {
   address: {
     street: null,
     locality: null,
-    city: null,
+    city: 'Tanta',
     governorate: null,
     postalCode: null,
     country: 'Egypt',
     countryCode: 'EG',
   },
   phone: '+20 10 2705 3876',
-  email: SUPPORT_EMAIL,
+  email: BUSINESS_EMAIL,
   businessHours: null,
 };
+
+/**
+ * The business location, as it is read on the page.
+ *
+ * This is the one business fact a payment provider checks first: where the
+ * business is. It is derived from the address rather than written out again,
+ * so the page, the structured data and the legal documents cannot drift apart.
+ *
+ * It is a location, not a postal address. Nothing here claims a street, a
+ * building or a registered address, because none of those has been confirmed.
+ */
+export function businessLocation(details: BusinessContactDetails = BUSINESS_CONTACT): string {
+  const { address } = details;
+  const city = address.city?.trim();
+  const country = address.country?.trim();
+  if (city && country) return `${city}, ${country}`;
+  return city || country || '';
+}
 
 /**
  * Whether every detail a reviewer asks for has been supplied.
@@ -146,13 +184,17 @@ export const BUSINESS_CONTACT: BusinessContactDetails = {
  * The Contact Us page uses this to say plainly which details are still
  * outstanding, rather than letting a reader assume a detail was published
  * because it was not.
+ *
+ * A location is complete when the city and the country are known. The finer
+ * address fields are not part of the test: a business that publishes its city
+ * and country — and no invented street — has published its location.
  */
 export function isBusinessContactComplete(details: BusinessContactDetails = BUSINESS_CONTACT): boolean {
   const { address } = details;
   return Boolean(
     details.businessName?.trim() &&
-      address.street?.trim() &&
       address.city?.trim() &&
+      address.country?.trim() &&
       details.phone?.trim() &&
       details.email?.trim()
   );

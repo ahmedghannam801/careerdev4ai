@@ -1,9 +1,11 @@
 import React from 'react';
-import { ExternalLink, Mail, Scale, ShieldCheck } from 'lucide-react';
+import { ExternalLink, Mail, MapPin, Scale, ShieldCheck } from 'lucide-react';
 
 import { useCareer } from '../../context/CareerContext';
 import {
   SUPPORT_EMAIL,
+  BUSINESS_EMAIL,
+  businessLocation,
   OPERATOR_LINKEDIN_URL,
   PUBLIC_PATHS,
 } from '../../../shared/contact.ts';
@@ -25,7 +27,7 @@ export const ContactSection: React.FC = () => {
   const { t } = useCareer();
 
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
       {/* Support */}
       <a
         href={`mailto:${SUPPORT_EMAIL}`}
@@ -43,6 +45,26 @@ export const ContactSection: React.FC = () => {
         </span>
       </a>
 
+      {/* The business itself: where it is, and the mailbox it answers on. */}
+      <a
+        href={PUBLIC_PATHS.businessInformation}
+        className="group flex h-full flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)] hover:shadow-[var(--shadow-card)]"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-surface)] text-[var(--color-primary-text)]">
+          <MapPin className="h-4 w-4" />
+        </span>
+        <h3 className="mt-3.5 text-sm font-bold text-[var(--text-primary)]">{t('Business information')}</h3>
+        <p className="mt-1.5 flex-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+          {t('Where the business is located, and the address it answers business enquiries on.')}
+        </p>
+        <span className="mt-3 text-[11px] font-semibold text-[var(--color-primary-text)]" dir="ltr">
+          {businessLocation()}
+        </span>
+        <span className="mt-1 break-all text-[11px] font-semibold text-[var(--color-primary-text)]" dir="ltr">
+          {BUSINESS_EMAIL}
+        </span>
+      </a>
+
       {/* Legal documents */}
       <div className="flex h-full flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-accent-surface)] text-[var(--color-primary-text)]">
@@ -57,14 +79,14 @@ export const ContactSection: React.FC = () => {
             href={PUBLIC_PATHS.terms}
             className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--color-border-strong)]"
           >
-            {t('Terms')}
+            {t('Terms of Service')}
             <ExternalLink className="h-3 w-3" />
           </a>
           <a
             href={PUBLIC_PATHS.privacy}
             className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--color-border-strong)]"
           >
-            {t('Privacy')}
+            {t('Privacy Policy')}
             <ExternalLink className="h-3 w-3" />
           </a>
           <a

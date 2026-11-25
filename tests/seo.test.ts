@@ -150,12 +150,34 @@ describe('the contact page', () => {
     assert.ok(page, '/contact should resolve to a page');
     assert.equal(page.status, 200);
     assert.match(page.contentType, /text\/html/);
-    assert.match(page.html, /<h1>Business Information &amp; Contact Us<\/h1>/);
-    assert.match(page.html, /Business details/);
-    assert.match(page.html, /href="\/refund-policy"/);
-    assert.match(page.html, /Business address/);
+    assert.match(page.html, /<h1>Contact Us<\/h1>/);
+    assert.match(page.html, /Business location/);
     assert.match(page.html, /Telephone/);
     assert.match(page.html, /Email/);
+    assert.match(page.html, /href="\/business-information"/);
+  });
+
+  it('serves the business information page without a session', async () => {
+    const page = await resolvePublicPage('/business-information');
+    assert.ok(page, '/business-information should resolve to a page');
+    assert.equal(page.status, 200);
+    assert.match(page.contentType, /text\/html/);
+    assert.match(page.html, /<h1>Business Information<\/h1>/);
+    assert.match(page.html, /Business details/);
+    assert.match(page.html, /Tanta, Egypt/);
+    assert.match(page.html, /aionvia09@gmail\.com/);
+    assert.match(page.html, /href="\/refund-policy"/);
+    assert.match(page.html, /href="\/terms"/);
+    assert.match(page.html, /href="\/privacy"/);
+  });
+
+  it('serves the refund policy without a session', async () => {
+    const page = await resolvePublicPage('/refund-policy');
+    assert.ok(page, '/refund-policy should resolve to a page');
+    assert.equal(page.status, 200);
+    assert.match(page.contentType, /text\/html/);
+    assert.match(page.html, /<h1>Refund Policy<\/h1>/);
+    assert.match(page.html, /aionvia09@gmail\.com/);
   });
 
   it('is linked from the footer of every public page', async () => {
@@ -166,6 +188,26 @@ describe('the contact page', () => {
         page.html,
         /<a href="\/contact">Contact Us<\/a>/,
         `${path} has no footer link to the contact page`
+      );
+      assert.match(
+        page.html,
+        /<a href="\/business-information">Business Information<\/a>/,
+        `${path} has no footer link to the business information page`
+      );
+      assert.match(
+        page.html,
+        /<a href="\/refund-policy">Refund Policy<\/a>/,
+        `${path} has no footer link to the refund policy`
+      );
+      assert.match(
+        page.html,
+        /<a href="\/terms">Terms of Service<\/a>/,
+        `${path} has no footer link to the terms`
+      );
+      assert.match(
+        page.html,
+        /<a href="\/privacy">Privacy Policy<\/a>/,
+        `${path} has no footer link to the privacy policy`
       );
     }
   });
@@ -181,21 +223,20 @@ describe('the contact page', () => {
       assert.equal(page.html.includes('tel:'), false, 'the page links to a phone that is not published');
     }
 
-    // The same holds for the address: with no street published, the page must
-    // not describe one.
-    if (!details.address.street?.trim() && !details.address.city?.trim()) {
+    // The same holds for the street address: the location is published, but a
+    // street that has not been supplied must not appear in the markup or in
+    // the structured data.
+    if (!details.address.street?.trim()) {
       assert.equal(
         page.html.includes('streetAddress'),
         false,
         'the structured data describes a street that is not published'
       );
-      assert.match(page.html, /To be published/);
     }
 
-    // An address that has been supplied is published in full.
-    if (details.address.street?.trim()) {
-      assert.ok(page.html.includes(details.address.street.trim()));
-    }
+    // The location that has been supplied is published in full.
+    assert.match(page.html, /Tanta, Egypt/);
+    assert.match(page.html, /"addressLocality":"Tanta"/);
   });
 
   it('publishes the telephone number on the +20 country code', async () => {

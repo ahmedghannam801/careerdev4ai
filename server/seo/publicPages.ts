@@ -23,12 +23,21 @@
  */
 
 import { CAREER_DOMAINS, getCareerDomain } from '../../shared/careerDomains.ts';
+import {
+  BUSINESS_CONTACT,
+  BUSINESS_EMAIL,
+  businessLocation,
+} from '../../shared/contact.ts';
 import { hasApprovedTerms, TERMS_DOCUMENT } from '../../shared/legal.ts';
 import { CAREER_ROLES } from '../../shared/careerRoles.ts';
 import type { TargetRole } from '../../shared/careerTypes.ts';
 import { getSupabaseServer } from '../db/supabase.ts';
 import { SITE_NAME, clampDescription, slugify } from './config.ts';
-import { buildBusinessInformationPage, buildRefundPolicyPage } from './businessInfo.ts';
+import {
+  buildBusinessInformationPage,
+  buildContactPage as buildContactDocument,
+  buildRefundPolicyPage,
+} from './businessInfo.ts';
 import { escapeHtml, renderPublicPage, type PublicPage } from './html.ts';
 import {
   breadcrumbSchema,
@@ -439,7 +448,7 @@ function buildPrivacyPage(): PublicPage {
  * Arabic RTL version at `/contact/ar`.
  */
 function buildContactPage(): PublicPage {
-  return buildBusinessInformationPage('en');
+  return buildContactDocument('en');
 }
 
 /**
@@ -464,7 +473,19 @@ function buildTermsPage(): PublicPage {
     title: `Terms & Conditions | ${SITE_NAME}`,
     description,
     body: available
-      ? `<section class="hero"><h1>Terms &amp; Conditions</h1></section>${content}`
+      ? `<section class="hero"><h1>Terms &amp; Conditions</h1></section>${content}
+      <section>
+        <h2>Contact information</h2>
+        <p>${escapeHtml(BUSINESS_CONTACT.businessName)} is located in ${escapeHtml(
+          businessLocation()
+        )}. Questions, complaints and requests concerning these Terms are answered at ${escapeHtml(
+          BUSINESS_CONTACT.email ?? BUSINESS_EMAIL
+        )}.</p>
+        <div class="cta">
+          ${appLink('/business-information', 'Business Information', true)}
+          ${appLink('/refund-policy', 'Refund Policy', true)}
+        </div>
+      </section>`
       : content,
     noindex: !available,
   };
@@ -1105,12 +1126,13 @@ export async function resolvePublicPage(pathname: string): Promise<PublicPageRes
     page = buildPrivacyPage();
   } else if (path === '/contact') {
     page = buildContactPage();
+  } else if (path === '/contact/ar') {
+    page = buildContactDocument('ar');
   } else if (path === '/business-information') {
-    // The merchant-verification link. It is an alias of the public Contact
-    // page, so there is one canonical business-information document rather
-    // than two copies that could drift apart.
+    // The merchant-verification page: the business name, its location, the
+    // address it answers on, the website and the legal documents.
     page = buildBusinessInformationPage('en');
-  } else if (path === '/contact/ar' || path === '/business-information/ar') {
+  } else if (path === '/business-information/ar') {
     page = buildBusinessInformationPage('ar');
   } else if (path === '/refund-policy') {
     page = buildRefundPolicyPage('en');

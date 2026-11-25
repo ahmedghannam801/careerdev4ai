@@ -33,7 +33,7 @@ import {
   Rocket,
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { PUBLIC_PATHS } from '../../../shared/contact.ts';
+import { PUBLIC_PATHS, businessLocation } from '../../../shared/contact.ts';
 import { useFeedback } from '../../context/FeedbackContext';
 import { FEEDBACK_FORM_URL } from '../../../shared/feedback';
 import { Logo } from '../brand/Logo';
@@ -588,15 +588,21 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         <footer className="mt-auto border-t border-[var(--border-subtle)] px-4 sm:px-8 py-3 text-xs text-[var(--text-muted)]">
           <div className="flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-2">
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-              <span>© 2026 Aionvia</span>
+              <span dir="ltr">© 2026 Aionvia · {businessLocation()}</span>
               <a href={PUBLIC_PATHS.businessInformation} className="hover:text-[var(--text-secondary)] hover:underline">
                 {t('Business Information')}
               </a>
+              <a href={PUBLIC_PATHS.contact} className="hover:text-[var(--text-secondary)] hover:underline">
+                {t('Contact Us')}
+              </a>
               <a href={PUBLIC_PATHS.terms} className="hover:text-[var(--text-secondary)] hover:underline">
-                {t('Terms')}
+                {t('Terms of Service')}
               </a>
               <a href={PUBLIC_PATHS.refundPolicy} className="hover:text-[var(--text-secondary)] hover:underline">
                 {t('Refund Policy')}
+              </a>
+              <a href={PUBLIC_PATHS.privacy} className="hover:text-[var(--text-secondary)] hover:underline">
+                {t('Privacy Policy')}
               </a>
             </div>
             <span>
