@@ -134,18 +134,24 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // The navigation is grouped into the five pillars the product is built
-  // around:
+  // The navigation is grouped into the pillars the product is built around:
   //
   //   My Career      — where you are and what is still open
   //   Learn & Practise — how you close the gaps
   //   Get Hired      — the CV, the openings, the applications
   //   Portfolio      — the proof of what you can do
+  //   Insights       — the pages that read your own numbers back to you
   //   Account        — who you are and how the platform behaves
   //
   // Every route is still reachable; the grouping only says what kind of
   // thing it is. A route appears in exactly one pillar: a destination listed
   // twice makes the navigation longer without making it clearer.
+  //
+  // The four pages that are mostly charts — progress, job discovery, the
+  // evidence log and the activity log — share the bottom group. They are
+  // places a candidate goes to look rather than to do, so keeping them
+  // together leaves the working groups short and puts the reporting in one
+  // block under the portfolio.
   const navGroups = [
     {
       id: 'my-career',
@@ -154,7 +160,9 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
         { id: 'my-career', label: t('Overview'), icon: Compass },
         { id: 'skills', label: t('navSkills'), icon: Award },
         { id: 'roadmap', label: t('navRoadmap'), icon: Layers },
-        { id: 'progress', label: t('navProgress'), icon: TrendingUp },
+        // Interviews took the slot that used to hold Progress: practising an
+        // interview is work, and the numbers moved down with the other charts.
+        { id: 'interviews', label: t('navInterviews'), icon: Target },
       ],
     },
     {
@@ -174,17 +182,22 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       items: [
         { id: 'cv-studio', label: t('navCV'), icon: FileText },
         { id: 'jobs', label: t('navJobs'), icon: Briefcase },
-        { id: 'job-discovery', label: t('navJobDiscovery'), icon: BarChart3 },
         { id: 'applications', label: t('navApplications'), icon: Calendar },
-        { id: 'interviews', label: t('navInterviews'), icon: Target },
       ],
     },
     {
       id: 'portfolio',
       label: t('Portfolio'),
+      items: [{ id: 'documents', label: t('My Documents'), icon: FolderClosed }],
+    },
+    {
+      id: 'insights',
+      label: t('Insights'),
       items: [
-        { id: 'documents', label: t('My Documents'), icon: FolderClosed },
+        { id: 'progress', label: t('navProgress'), icon: TrendingUp },
+        { id: 'job-discovery', label: t('navJobDiscovery'), icon: BarChart3 },
         { id: 'evidence', label: t('Evidence'), icon: Activity },
+        { id: 'activity', label: t('Recent Activity'), icon: Activity },
       ],
     },
     {
@@ -193,7 +206,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
       items: [
         { id: 'profile', label: t('My Profile'), icon: User },
         { id: 'settings', label: t('navSettings'), icon: Settings },
-        { id: 'activity', label: t('Recent Activity'), icon: Activity },
       ],
     },
   ];

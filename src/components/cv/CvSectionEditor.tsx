@@ -24,6 +24,7 @@ import {
   BookOpen,
   Briefcase,
   Check,
+  ChevronDown,
   FolderGit2,
   GraduationCap,
   HeartHandshake,
@@ -95,6 +96,68 @@ const LINK_INPUT_CLASS =
 const LABEL_CLASS =
   'block text-[11px] font-semibold text-[var(--text-secondary)] mb-1';
 
+/**
+ * One editable section of the document, folded away.
+ *
+ * The editor used to draw all nine sections at once, so the candidate met a
+ * wall of fields and had to scroll past their education to reach their
+ * projects. Now the basic details are open, and every other section shows one
+ * line about what it holds — the first role, the first project, the skills
+ * themselves — and opens when it is clicked. Nothing is hidden from a screen
+ * reader: the button says whether its section is open, and a closed section
+ * still carries its title and its summary line.
+ */
+const CvEditorSection: React.FC<{
+  title: string;
+  icon?: React.ReactNode;
+  summary?: string;
+  /** A section-level action (Clear, Clear All Skills) kept out of the toggle. */
+  action?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}> = ({ title, icon, summary, action, defaultOpen = false, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">
+      <div className="flex items-start justify-between gap-2 px-4 py-2.5 sm:px-5">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg py-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40"
+        >
+          {icon && (
+            <span className="shrink-0 text-[var(--text-muted)]" aria-hidden="true">
+              {icon}
+            </span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-[var(--text-primary)]">{title}</span>
+            {summary && !open && (
+              <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">
+                {summary}
+              </span>
+            )}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform ${
+              open ? 'rotate-180' : ''
+            }`}
+            aria-hidden="true"
+          />
+        </button>
+        {action && <div className="shrink-0 pt-1">{action}</div>}
+      </div>
+      {open && (
+        <div className="space-y-3 border-t border-[var(--border-subtle)] px-4 pb-5 pt-4 sm:px-5">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+};
+
 export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
   cv,
   update,
@@ -135,14 +198,15 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
   return (
     <div className="space-y-4">
       {/* ---- Contact & Header ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-            <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-            {t('Contact & Header')}
-          </h3>
+      <CvEditorSection
+        title={t('Contact & Header')}
+        icon={<Link2 className="h-3.5 w-3.5" />}
+        defaultOpen
+        summary={[cv.fullName, cv.email, cv.location].filter(Boolean).join(' · ') || undefined}
+        action={
           <button type="button" onClick={() => update({ email: '', phone: '', location: '', links: [], hiddenContactFields: ['email', 'phone', 'location'], hiddenRecordIds: [...new Set([...(cv.hiddenRecordIds ?? []), ...links.map((link) => link.id)])] })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear')}</button>
-        </div>
+        }
+      >
         <div className="space-y-3">
           <div>
             <label className={LABEL_CLASS}>{t('Full Name')}</label>
@@ -199,7 +263,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             />
           </div>
         </div>
-      </section>
+      </CvEditorSection>
 
       {/* ---- Target Role Tracks ---- */}
       <TargetRoleTracks />
@@ -213,11 +277,13 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
       />
 
       {/* ---- Executive Summary ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('Executive Summary')}</h3>
+      <CvEditorSection
+        title={t('Executive Summary')}
+        summary={cv.hiddenSummary ? undefined : cv.summary.slice(0, 90) || undefined}
+        action={
           <button type="button" onClick={() => update({ summary: '', hiddenSummary: true })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear')}</button>
-        </div>
+        }
+      >
         <CvSectionAdvice section="summary" report={advice ?? null} />
         <textarea
           rows={4}
@@ -234,14 +300,18 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
         <div className="text-[11px] text-[var(--text-muted)]">
           {t('Tip: Quantify your results using the X-Y-Z format: "Accomplished [X], as measured by [Y], by doing [Z]".')}
         </div>
-      </section>
+      </CvEditorSection>
 
       {/* ---- Experience ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <Briefcase className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Work Experience')}
-        </h3>
+      <CvEditorSection
+        title={t('Work Experience')}
+        icon={<Briefcase className="h-3.5 w-3.5" />}
+        summary={
+          cv.experiences[0]
+            ? `${cv.experiences[0].role}${cv.experiences[0].company ? ` — ${cv.experiences[0].company}` : ''}`
+            : t('No work experience yet.')
+        }
+      >
         <CvSectionAdvice section="experience" report={advice ?? null} />
         {cv.experiences.length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No work experience yet.')}</p>
@@ -288,14 +358,18 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             </div>
           ))
         )}
-      </section>
+      </CvEditorSection>
 
       {/* ---- Education ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <GraduationCap className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Education')}
-        </h3>
+      <CvEditorSection
+        title={t('Education')}
+        icon={<GraduationCap className="h-3.5 w-3.5" />}
+        summary={
+          cv.education[0]
+            ? `${cv.education[0].degree}${cv.education[0].institution ? ` — ${cv.education[0].institution}` : ''}`
+            : t('No education yet.')
+        }
+      >
         {cv.education.length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No education yet.')}</p>
         ) : (
@@ -348,17 +422,22 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             </div>
           ))
         )}
-      </section>
+      </CvEditorSection>
 
       {/* ---- Skills ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-            <Wrench className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-            {t('Core Skills & Technologies')}
-          </h3>
-          {cv.skillsList.length > 0 && <button type="button" onClick={() => update({ skillsList: [] })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear All Skills')}</button>}
-        </div>
+      <CvEditorSection
+        title={t('Core Skills & Technologies')}
+        icon={<Wrench className="h-3.5 w-3.5" />}
+        summary={
+          cv.skillsList.length > 0
+            ? cv.skillsList.slice(0, 6).join(' · ') +
+              (cv.skillsList.length > 6 ? ` +${cv.skillsList.length - 6}` : '')
+            : t('No skills yet.')
+        }
+        action={
+          cv.skillsList.length > 0 && <button type="button" onClick={() => update({ skillsList: [] })} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--color-danger)]">{t('Clear All Skills')}</button>
+        }
+      >
         <CvSectionAdvice section="skills" report={advice ?? null} />
         {cv.skillsList.length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No skills yet.')}</p>
@@ -402,14 +481,14 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             })
           }
         />
-      </section>
+      </CvEditorSection>
 
       {/* ---- Projects ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <FolderGit2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Projects')}
-        </h3>
+      <CvEditorSection
+        title={t('Projects')}
+        icon={<FolderGit2 className="h-3.5 w-3.5" />}
+        summary={cv.projects[0]?.title ?? t('No projects yet.')}
+      >
         <CvSectionAdvice section="projects" report={advice ?? null} />
         {cv.projects.length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No projects yet.')}</p>
@@ -456,14 +535,18 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             </div>
           ))
         )}
-      </section>
+      </CvEditorSection>
 
       {/* ---- Volunteering ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <HeartHandshake className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Volunteering')}
-        </h3>
+      <CvEditorSection
+        title={t('Volunteering')}
+        icon={<HeartHandshake className="h-3.5 w-3.5" />}
+        summary={
+          (cv.volunteering ?? [])[0]
+            ? `${(cv.volunteering ?? [])[0].role} — ${(cv.volunteering ?? [])[0].organization}`
+            : t('No volunteering yet.')
+        }
+      >
         {(cv.volunteering ?? []).length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No volunteering yet.')}</p>
         ) : (
@@ -509,14 +592,14 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             </div>
           ))
         )}
-      </section>
+      </CvEditorSection>
 
       {/* ---- Certifications ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <Award className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Certifications')}
-        </h3>
+      <CvEditorSection
+        title={t('Certifications')}
+        icon={<Award className="h-3.5 w-3.5" />}
+        summary={(cv.certificationDetails ?? [])[0]?.name ?? t('No certifications yet.')}
+      >
         {(cv.certificationDetails ?? []).length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No certifications yet.')}</p>
         ) : (
@@ -564,14 +647,14 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             </div>
           ))
         )}
-      </section>
+      </CvEditorSection>
 
       {/* ---- Courses ---- */}
-      <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <BookOpen className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Completed courses')}
-        </h3>
+      <CvEditorSection
+        title={t('Completed courses')}
+        icon={<BookOpen className="h-3.5 w-3.5" />}
+        summary={(cv.courses ?? [])[0]?.title ?? t('No completed courses yet.')}
+      >
         {(cv.courses ?? []).length === 0 ? (
           <p className="text-[11px] text-[var(--text-muted)]">{t('No completed courses yet.')}</p>
         ) : (
@@ -617,7 +700,7 @@ export const CvSectionEditor: React.FC<CvSectionEditorProps> = ({
             </div>
           ))
         )}
-      </section>
+      </CvEditorSection>
     </div>
   );
 };
@@ -674,18 +757,20 @@ const TargetRoleTracks: React.FC = () => {
   };
 
   return (
-    <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-      <div>
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <Target className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Target Role Tracks')}
-        </h3>
-        <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
-          {t(
-            'Add every role this CV is aimed at. Each track stays independent; the primary track drives your roadmap and ATS audit.'
-          )}
-        </p>
-      </div>
+    <CvEditorSection
+      title={t('Target Role Tracks')}
+      icon={<Target className="h-3.5 w-3.5" />}
+      summary={
+        [targetRole?.title, ...additional.map((role) => role.title)]
+          .filter(Boolean)
+          .join(' · ') || undefined
+      }
+    >
+      <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
+        {t(
+          'Add every role this CV is aimed at. Each track stays independent; the primary track drives your roadmap and ATS audit.'
+        )}
+      </p>
 
       <div className="flex flex-wrap gap-1.5">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--text-primary)]">
@@ -760,7 +845,7 @@ const TargetRoleTracks: React.FC = () => {
           </button>
         </div>
       )}
-    </section>
+    </CvEditorSection>
   );
 };
 
@@ -1150,12 +1235,15 @@ const ProfessionalLinksEditor: React.FC<{
   };
 
   return (
-    <section className="p-5 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <Link2 className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-          {t('Professional Links')}
-        </h3>
+    <CvEditorSection
+      title={t('Professional Links')}
+      icon={<Link2 className="h-3.5 w-3.5" />}
+      summary={
+        links.length > 0
+          ? links.map((link) => cvLinkLabel(link.kind, link.label)).join(' · ')
+          : t('No links yet.')
+      }
+      action={
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -1178,7 +1266,8 @@ const ProfessionalLinksEditor: React.FC<{
             <span>{t('Add link')}</span>
           </button>
         </div>
-      </div>
+      }
+    >
 
       {error && (
         <div
@@ -1263,6 +1352,6 @@ const ProfessionalLinksEditor: React.FC<{
           ))}
         </ul>
       )}
-    </section>
+    </CvEditorSection>
   );
 };

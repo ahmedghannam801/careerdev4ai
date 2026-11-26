@@ -145,12 +145,12 @@ const RoadmapViewSwitcher: React.FC<{
     tabs={[
       {
         id: 'tree',
-        label: t('Interactive Tree View (roadmap.sh Style)'),
+        label: t('Interactive Tree View'),
         icon: GitBranch,
       },
       {
         id: 'guided',
-        label: t('Guided Stages View (Classic Card Journey)'),
+        label: t('Guided Stages View'),
         icon: Compass,
       },
     ]}

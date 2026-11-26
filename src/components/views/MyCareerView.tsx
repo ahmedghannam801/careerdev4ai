@@ -379,6 +379,32 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         </div>
       </div>
 
+      {/* The Career Timeline dashboard. It answers "how far along am I" in
+          a number, so it follows the journey banner and comes before the
+          diagnostics. It used to sit at the foot of the page, beneath the
+          milestone list, where the first question on the page was answered
+          last. */}
+      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-[var(--color-primary-text)]" />
+            <div>
+              <h2 className="text-base font-bold text-[var(--text-primary)]">
+                {t('Career Timeline')}
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {t('Every record you own, charted: how much is finished, what it is, and when it happened.')}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <CareerTimelineDashboard
+          milestones={spiralMilestones}
+          t={t}
+          locale={settings.language === 'ar' ? 'ar' : 'en-GB'}
+        />
+      </div>
       {/* "What's Blocking You?" Actionable Blockers Engine */}
       <div data-tour="career-recommendations-list" className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
@@ -582,10 +608,9 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
         </Stagger>
       </div>
 
-      {/* Career Milestones & Career Timeline Dual Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Personal Career Milestones */}
-        <div className="lg:col-span-1 p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
+      {/* Personal Career Milestones. The timeline moved up to the top of the
+          page, so this is no longer half of a two-column pair. */}
+      <div className="p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
               <Star className="w-4 h-4 text-[var(--color-accent-strong)]" />
@@ -623,30 +648,6 @@ export const MyCareerView: React.FC<{ onNavigate: (view: string) => void }> = ({
             ))}
           </div>
         </div>
-
-        {/* The Career Timeline dashboard. */}
-        <div className="lg:col-span-2 p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[var(--color-primary-text)]" />
-              <div>
-                <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  {t('Career Timeline')}
-                </h2>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  {t('Every record you own, charted: how much is finished, what it is, and when it happened.')}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <CareerTimelineDashboard
-            milestones={spiralMilestones}
-            t={t}
-            locale={settings.language === 'ar' ? 'ar' : 'en-GB'}
-          />
-        </div>
-      </div>
 
       {/* MODAL: Add Secondary Goal */}
       {addGoalModalOpen && (

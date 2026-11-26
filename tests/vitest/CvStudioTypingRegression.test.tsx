@@ -215,6 +215,11 @@ function nameField(container: HTMLElement): HTMLInputElement {
 
 /** The executive summary box. */
 function summaryField(container: HTMLElement): HTMLTextAreaElement {
+  // The sections of the editor are folded, so the candidate opens the one
+  // they mean to write in. The box is only on the screen once they have.
+  const toggle = screen.getByRole('button', { name: /Executive Summary/ });
+  if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle);
+
   const textarea = container.querySelector('textarea');
   if (!textarea) throw new Error('the editor has no summary field');
   return textarea as HTMLTextAreaElement;

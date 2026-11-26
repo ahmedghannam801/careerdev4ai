@@ -58,6 +58,7 @@ export const cvAr: Record<string, string> = {
   'Target Role Headline': 'عنوان الدور المستهدف',
   'Executive Summary': 'الملخّص التنفيذي',
   'Save as New Version Snapshot': 'حفظ كنسخة جديدة',
+  'Arrange the sections': 'ترتيب الأقسام',
   'Professional Summary': 'الملخّص المهني',
   'Work Experience': 'الخبرة العملية',
   'Core Skills & Technologies': 'المهارات والتقنيات الأساسية',

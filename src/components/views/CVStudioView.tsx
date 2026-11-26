@@ -12,6 +12,7 @@ import {
   EyeOff,
   ArrowLeft,
   LayoutTemplate,
+  ChevronDown,
   Database,
   History
 } from 'lucide-react';
@@ -394,35 +395,45 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
   return (
     <Reveal className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
-        <div className="flex items-center gap-3.5">
-          <CareerImage
-            src="/images/features/cv-studio.webp"
-            alt="CV Studio"
-            size="sm"
-            aspectRatio="square"
-            rounded="rounded-xl"
-            className="hidden h-14 w-14 shrink-0 border border-[var(--border-subtle)] object-cover shadow-xs sm:block"
-          />
-          <div>
-            <div className="text-xs text-[var(--text-secondary)]">{t('CV WORKSPACE & ATS OPTIMIZER')}</div>
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] mt-0.5">
-              {t('CV Studio for')} {targetRole?.title ?? ''}
-            </h1>
+      {/* The header is two rows: who the document is for, then what can be
+          done to it. In one row the export buttons wrapped into a ragged
+          second line and the title lost its width to them. */}
+      <div className="space-y-3 border-b border-[var(--border-subtle)] pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <CareerImage
+              src="/images/features/cv-studio.webp"
+              alt="CV Studio"
+              size="sm"
+              aspectRatio="square"
+              rounded="rounded-xl"
+              className="hidden h-14 w-14 shrink-0 border border-[var(--border-subtle)] object-cover shadow-xs sm:block"
+            />
+            <div className="min-w-0">
+              <div className="text-xs text-[var(--text-secondary)]">
+                {t('CV WORKSPACE & ATS OPTIMIZER')}
+              </div>
+              <h1 className="mt-0.5 text-balance text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+                {t('CV Studio for')} {targetRole?.title ?? ''}
+              </h1>
+            </div>
+          </div>
+
+          {/* The AI edit allowance is stated in the studio's own header, so a
+              candidate sees what is left before they reach for it rather than
+              meeting a refusal afterwards. */}
+          <div className="shrink-0">
+            <CvStudioAiQuotaBadge
+              onUpgrade={() => {
+                onNavigate?.('pricing');
+                window.history.replaceState(null, '', buildRouteHash('pricing'));
+                refreshRoute();
+              }}
+            />
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* The AI edit allowance is stated in the studio's own header, so a
-              candidate sees what is left before they reach for it rather than
-              meeting a refusal afterwards. */}
-          <CvStudioAiQuotaBadge
-            onUpgrade={() => {
-              onNavigate?.('pricing');
-              window.history.replaceState(null, '', buildRouteHash('pricing'));
-              refreshRoute();
-            }}
-          />
           {/* The template gallery is reachable from every step of the studio.
               It used to live only in the secondary navigation of the "My CV"
               step, which meant a candidate reading their ATS score had to go
@@ -431,21 +442,21 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               a part of the studio, so its door is in the studio's own header. */}
           <button
             onClick={() => setActiveTab('templates')}
-            className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+            className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors ${
               activeTab === 'templates'
                 ? 'border-[var(--accent-primary)]/40 bg-[var(--accent-surface)] text-[var(--color-primary-text)]'
-                : 'border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                : 'border-[var(--border-subtle)] bg-[var(--surface-main)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <LayoutTemplate className="w-3.5 h-3.5" />
+            <LayoutTemplate className="h-3.5 w-3.5" />
             <span>{t('Templates')}</span>
           </button>
 
           <button
             onClick={() => setActiveTab('review')}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
           >
-            <Upload className="w-3.5 h-3.5" />
+            <Upload className="h-3.5 w-3.5" />
             <span>{t('Import / Paste')}</span>
           </button>
 
@@ -460,9 +471,9 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                   ? undefined
                   : t('Enable AI Writing Assistance and Career Graph AI Grounding in Settings.')
               }
-              className="px-3.5 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--accent-surface)] text-[var(--color-primary-text)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 text-xs font-semibold text-[var(--color-primary-text)] transition-colors hover:bg-[var(--accent-surface)] disabled:opacity-50"
             >
-              <Sparkles className={`w-3.5 h-3.5 ${isOptimizingCV ? 'animate-spin' : ''}`} />
+              <Sparkles className={`h-3.5 w-3.5 ${isOptimizingCV ? 'animate-spin' : ''}`} />
               <span>
                 {isOptimizingCV
                   ? t('Analyzing ATS Keywords...')
@@ -474,31 +485,34 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           {/* Printing and the editable Word file are offered only where
               there is a document to export. The print stylesheet keeps the
               paper preview and nothing else, so an export started from
-              another tab would come out blank. */}
+              another tab would come out blank. They sit at the far end, after
+              the controls that change the document. */}
           {activeTab === 'editor' && (
-            <>
+            <div className="ms-auto flex flex-wrap items-center gap-2">
               <button
                 onClick={handleDocxExport}
                 disabled={isExportingDocx}
-                className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
               >
                 {isExportingDocx ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Download className="w-3.5 h-3.5" />
+                  <Download className="h-3.5 w-3.5" />
                 )}
-                <span>{isExportingDocx ? t('Preparing Word file...') : t('Download Word (DOCX)')}</span>
+                <span>
+                  {isExportingDocx ? t('Preparing Word file...') : t('Download Word (DOCX)')}
+                </span>
               </button>
               <button
                 onClick={() => void handlePdfExport()}
                 disabled={isExportingPdf}
                 title={t('Downloads the document you see as a PDF file.')}
-                className="px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-[var(--color-on-primary)] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 text-xs font-semibold text-[var(--color-on-primary)] shadow-xs transition-colors hover:bg-[var(--accent-secondary)] disabled:opacity-50"
               >
                 {isExportingPdf ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Download className="w-3.5 h-3.5" />
+                  <Download className="h-3.5 w-3.5" />
                 )}
                 <span>
                   {isExportingPdf
@@ -510,7 +524,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                     : t('Download as PDF')}
                 </span>
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -524,11 +538,6 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       {/* A draft is offered where the document lives, above the workflow, so
           it is seen before anything else is touched. */}
       <CvDraftRecovery />
-
-      {/* The background jobs of this candidate. The list is read back from the
-          server, so a CV that finished while the tab was closed is still
-          here when the studio is opened again. */}
-      <BackgroundJobsPanel />
 
       {/* What a recruiter would mark down, named before the file is sent.
           It appears on the document tab because that is where the export
@@ -724,6 +733,36 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                   'Brings in your experience, education, projects, volunteering, completed courses, certificates and rated skills. Anything you have already written is kept.'
                 )}
               </p>
+
+              {/* The layout controls belong to the sections they order, so
+                  they close the editing column rather than standing between
+                  the candidate and the paper. Folded: reordering is a job you
+                  come back for, not the first thing you read. */}
+              <details className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)]">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+                    <LayoutTemplate
+                      className="h-3.5 w-3.5 text-[var(--text-muted)]"
+                      aria-hidden="true"
+                    />
+                    {t('Arrange the sections')}
+                  </span>
+                  <ChevronDown
+                    className="h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <div className="border-t border-[var(--border-subtle)] px-4 pb-4 pt-1">
+                  <CvSectionOrderControl
+                    cv={activeCV}
+                    template={studioTemplate}
+                    update={updateCV}
+                    t={t}
+                    language={settings.resumeLanguage}
+                    embedded
+                  />
+                </div>
+              </details>
             </div>
 
             {/* Right Clean Paper Preview (7 cols). On a phone "Preview" turns
@@ -763,15 +802,6 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
                     : ''
                 }
               >
-                <div className={`space-y-4 ${mobilePane === 'preview' ? 'hidden lg:block' : ''}`}>
-                  <CvSectionOrderControl
-                    cv={activeCV}
-                    template={studioTemplate}
-                    update={updateCV}
-                    t={t}
-                    language={settings.resumeLanguage}
-                  />
-                </div>
                 <div
                   ref={paperFrameRef}
                   className="min-w-0"
@@ -1107,6 +1137,12 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           </div>
         </div>
       )}
+
+      {/* The background jobs of this candidate. The list is read back from the
+          server, so a CV that finished while the tab was closed is still here
+          when the studio is opened again. It closes the page: it reports on
+          work already running, and nothing above it depends on it. */}
+      <BackgroundJobsPanel />
 
       {aiProcessingModal}
     </Reveal>

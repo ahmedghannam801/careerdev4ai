@@ -11,6 +11,7 @@ export const appShellAr: Record<string, string> = {
   'My Career': 'مسارتي المهنية',
   'Learn & Practise': 'تعلّم وتدريب',
   'Get Hired': 'احصل على وظيفة',
+  'Insights': 'الرؤى والأرقام',
   'Aionvia sign in': 'تسجيل الدخول إلى Aionvia',
   'Close modal': 'إغلاق النافذة',
   'Secure career state sync': 'مزامنة آمنة لحالة المسار المهني',

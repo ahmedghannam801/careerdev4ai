@@ -6,6 +6,7 @@ import {
   BookOpen,
   BookmarkCheck,
   CheckCircle2,
+  ChevronDown,
   Filter,
   GraduationCap,
   Languages,
@@ -618,35 +619,6 @@ export const LearningCenterView: React.FC = () => {
         </div>
       )}
 
-      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--text-secondary)]">
-        {learningRecommendationMeta.aiUsed ? (
-          <span className="inline-flex items-center gap-1.5">
-            <Sparkles size={13} className="text-[var(--color-accent-strong)]" />
-            {t('AI explanations are active. Candidate courses and scores remain deterministic.')}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5">
-            <AlertCircle size={13} className="text-[var(--text-muted)]" />
-            {t('Deterministic ranking is active.')}
-            {learningRecommendationMeta.aiFallbackReason
-              ? ` ${learningRecommendationMeta.aiFallbackReason}`
-              : ''}
-          </span>
-        )}
-        <span className="mx-2 text-[var(--text-muted)]">•</span>
-        {learningRecommendationMeta.skillGapCount} {t('skill gaps')}
-        <span className="mx-2 text-[var(--text-muted)]">•</span>
-        {learningRecommendationMeta.roadmapSkillCount} {t('roadmap skills')}
-        <span className="mx-2 text-[var(--text-muted)]">•</span>
-        {learningRecommendationMeta.weeklyHours}
-        {t('h/week')}, {t(learningRecommendationMeta.budget.replace('_', ' '))}
-        {aiRequested && !learningRecommendationMeta.aiUsed && (
-          <span className="ms-2 text-[var(--text-muted)]">
-            {t('AI explanations were not available; the deterministic reasons are shown.')}
-          </span>
-        )}
-      </div>
-
       {/* The courses the candidate has started, side by side. It sits above the
           tabs because it is about the courses already in hand, not about the
           catalogue. */}
@@ -734,41 +706,93 @@ export const LearningCenterView: React.FC = () => {
 
       {tab === 'recommended' && (
         <section className="space-y-4">
+          {/* The next step is a decision, so it is written as one: a title, the
+              one thing it changes, and the evidence for it. The long
+              explanation stays, folded, for the reader who wants it. */}
           {top && (
             <div className="rounded-2xl border border-[var(--color-accent)]/25 bg-gradient-to-br from-[var(--color-accent)]/10 via-[var(--bg-surface)] to-[var(--bg-surface)] p-5">
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
-                <Trophy size={14} /> {t('Next best step')}
-              </div>
-              <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-                <div>
-                  <h2 className="text-xl font-bold text-[var(--text-primary)]">
-                    {top.course.title}
-                  </h2>
-                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                    {top.aiExplanation ?? top.reason}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {top.matchedSkills.slice(0, 4).map((skill) => (
-                      <span
-                        key={skill}
-                        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent-strong)]">
+                  <Trophy size={14} /> {t('Next best step')}
                 </div>
-                <div className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
-                  <div className="text-3xl font-bold text-[var(--color-accent-strong)]">
+                <span className="flex shrink-0 items-baseline gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1">
+                  <span className="text-base font-bold leading-none tabular-nums text-[var(--color-accent-strong)]">
                     {Math.round(top.score)}
-                  </div>
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    {t('deterministic')}
-                    <br />
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     {t('match score')}
-                  </div>
-                </div>
+                  </span>
+                </span>
               </div>
+
+              <h2 className="mt-2 text-lg font-bold text-[var(--text-primary)]">
+                {top.course.title}
+              </h2>
+              <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                {top.course.provider}
+                {' · '}
+                {accessTierLabel(top.course.availability)}
+                {top.course.durationHours !== null
+                  ? ` · ${top.course.durationHours} ${t('hours')}`
+                  : ''}
+              </p>
+
+              <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">
+                {top.gapsAddressed.length > 0
+                  ? `${t('Closes')} ${top.gapsAddressed.length} ${t(
+                      top.gapsAddressed.length === 1 ? 'skill gap' : 'skill gaps'
+                    )} ${t('for your target role')}.`
+                  : top.matchedSkills.length > 0
+                    ? t('Builds skills your target role already asks for.')
+                    : t('Adds a new skill area to your profile.')}
+              </p>
+
+              {top.gapsAddressed.length > 0 && (
+                <ul className="mt-2 space-y-1.5">
+                  {top.gapsAddressed.slice(0, 3).map((gap) => (
+                    <li
+                      key={gap.skill}
+                      className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-secondary)]"
+                    >
+                      <CheckCircle2
+                        size={12}
+                        className="shrink-0 text-[var(--color-success-strong)]"
+                      />
+                      <span className="font-medium text-[var(--text-primary)]">{gap.skill}</span>
+                      <span className="tabular-nums text-[11px] text-[var(--text-muted)]">
+                        {gap.currentLevel}/5 → {gap.targetLevel}/5
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {top.matchedSkills.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {top.matchedSkills.slice(0, 4).map((skill) => (
+                    <span
+                      key={skill}
+                      className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <details className="group mt-3 border-t border-[var(--border-subtle)] pt-2.5">
+                <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-semibold text-[var(--color-accent-strong)]">
+                  {t('Why this course')}
+                  <ChevronDown
+                    size={12}
+                    className="transition-transform group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  {top.aiExplanation ?? top.reason}
+                </p>
+              </details>
             </div>
           )}
 
@@ -1288,6 +1312,38 @@ export const LearningCenterView: React.FC = () => {
           </div>
         </section>
       )}
+
+      {/* The ranking note closes the page. It explains how the list was
+          ordered, which the reader only wants once the list itself is behind
+          them — so it is a footnote, not a banner above the work. */}
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--text-secondary)]">
+        {learningRecommendationMeta.aiUsed ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Sparkles size={13} className="text-[var(--color-accent-strong)]" />
+            {t('AI explanations are active. Candidate courses and scores remain deterministic.')}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <AlertCircle size={13} className="text-[var(--text-muted)]" />
+            {t('Deterministic ranking is active.')}
+            {learningRecommendationMeta.aiFallbackReason
+              ? ` ${learningRecommendationMeta.aiFallbackReason}`
+              : ''}
+          </span>
+        )}
+        <span className="mx-2 text-[var(--text-muted)]">•</span>
+        {learningRecommendationMeta.skillGapCount} {t('skill gaps')}
+        <span className="mx-2 text-[var(--text-muted)]">•</span>
+        {learningRecommendationMeta.roadmapSkillCount} {t('roadmap skills')}
+        <span className="mx-2 text-[var(--text-muted)]">•</span>
+        {learningRecommendationMeta.weeklyHours}
+        {t('h/week')}, {t(learningRecommendationMeta.budget.replace('_', ' '))}
+        {aiRequested && !learningRecommendationMeta.aiUsed && (
+          <span className="ms-2 text-[var(--text-muted)]">
+            {t('AI explanations were not available; the deterministic reasons are shown.')}
+          </span>
+        )}
+      </div>
 
       <footer className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--text-secondary)]">
         {t(

@@ -50,6 +50,11 @@ interface CvSectionOrderControlProps {
   update: (updates: Partial<CVProfile>) => void;
   t: (key: string) => string;
   language?: 'ar' | 'en';
+  /**
+   * Whether the control is drawn inside a disclosure of the studio rather than
+   * as a card of its own (its own border and title are then redundant).
+   */
+  embedded?: boolean;
 }
 
 type DropPosition = 'before' | 'after';
@@ -99,6 +104,7 @@ export const CvSectionOrderControl: React.FC<CvSectionOrderControlProps> = ({
   update,
   t,
   language = 'en',
+  embedded = false,
 }) => {
   const [announcement, setAnnouncement] = useState('');
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -517,10 +523,22 @@ export const CvSectionOrderControl: React.FC<CvSectionOrderControlProps> = ({
   );
 
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)] overflow-hidden">
-      <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-[var(--border-subtle)]">
+    <div
+      className={
+        embedded
+          ? 'overflow-hidden'
+          : 'overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-main)]'
+      }
+    >
+      <div
+        className={`flex items-start justify-between gap-3 py-3 ${
+          embedded ? '' : 'border-b border-[var(--border-subtle)] px-4'
+        }`}
+      >
         <div className="min-w-0">
-          <h3 className="text-xs font-semibold text-[var(--text-primary)]">{t('Layout')}</h3>
+          {!embedded && (
+            <h3 className="text-xs font-semibold text-[var(--text-primary)]">{t('Layout')}</h3>
+          )}
           <p className="text-[11px] text-[var(--text-muted)] mt-0.5 leading-relaxed">
             {t(
               'Drag a section, or use the arrows, to change the order your CV is read in. Move a section to the side column, and reorder the entries inside it. The template still decides how each part looks.'

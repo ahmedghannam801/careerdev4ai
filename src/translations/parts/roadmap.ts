@@ -166,8 +166,8 @@ export const roadmapAr: Record<string, string> = {
 
   // ---- The interactive node tree ---------------------------------------
   'View mode': 'طريقة العرض',
-  'Interactive Tree View (roadmap.sh Style)': 'عرض الشجرة التفاعلي (بنمط roadmap.sh)',
-  'Guided Stages View (Classic Card Journey)': 'عرض المراحل الإرشادي (رحلة البطاقات الكلاسيكية)',
+  'Interactive Tree View': 'عرض الشجرة التفاعلي',
+  'Guided Stages View': 'عرض المراحل الإرشادي',
   'Open the topic details': 'افتح تفاصيل الموضوع',
   'Open the stage details': 'افتح تفاصيل المرحلة',
   'Click any node to open its details, its learning links and the level controls.':

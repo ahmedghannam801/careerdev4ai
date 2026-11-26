@@ -94,6 +94,16 @@ export const learningAr: Record<string, string> = {
   'deterministic': 'حتمي',
   'match score': 'درجة المطابقة',
 
+  // The next best step, written as a decision
+  'Closes': 'تُغلق',
+  'skill gap': 'فجوة مهارة',
+  'for your target role': 'في دورك المستهدف',
+  'Builds skills your target role already asks for.':
+    'تبني مهارات يطلبها دورك المستهدف بالفعل.',
+  'Adds a new skill area to your profile.': 'تضيف مجال مهارة جديدًا إلى ملفك.',
+  'Why this course': 'لماذا هذه الدورة؟',
+  'hours': 'ساعة',
+
   // Learning hub tabs
   'Recommended': 'موصى به',
   'In progress': 'قيد التنفيذ',

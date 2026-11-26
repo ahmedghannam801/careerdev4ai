@@ -17,16 +17,15 @@
  * belongs to a step — the version history belongs to "My CV" — highlights that
  * step instead of asking for a sixth destination.
  *
- * The highlight travels between the steps with the same motion as the rest
- * of the product, and collapses to an instant change when the visitor asks
- * for reduced motion. On a narrow screen the steps scroll sideways rather
- * than wrapping into a tall block or breaking out of the card.
+ * Each step is a card of its own: its number, its name, and the state it is
+ * in. The earlier version packed five labels, five two-pixel circles and four
+ * connectors into a fifty-pixel strip, which read as one long sentence rather
+ * than five places. The strip below the cards says how far along the path is,
+ * and the current step is named for a screen reader as well as shown.
  */
 
 import React from 'react';
-import { motion, useReducedMotion } from 'motion/react';
 import { Check } from 'lucide-react';
-import { MOTION_DURATION, MOTION_EASE } from '../../lib/motion';
 import {
   CV_STUDIO_STEPS,
   cvStudioStepForTab,
@@ -48,8 +47,6 @@ export const CvStudioWorkflow: React.FC<CvStudioWorkflowProps> = ({
   onSelectTab,
   t,
 }) => {
-  const reduced = useReducedMotion() ?? false;
-
   // The labels are the studio's own words, so the journey reads the same way
   // in every language the product speaks.
   const labels: Record<CvStudioStepId, string> = {
@@ -66,18 +63,13 @@ export const CvStudioWorkflow: React.FC<CvStudioWorkflowProps> = ({
     CV_STUDIO_STEPS.findIndex((step) => step.id === activeStepId)
   );
 
-  const transition = {
-    duration: reduced ? 0 : MOTION_DURATION.ui,
-    ease: MOTION_EASE.out,
-  };
-
   return (
     <nav
       aria-label={t('CV Studio workflow')}
       data-cv-steps
-      className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 p-3"
+      className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] p-3.5 shadow-xs"
     >
-      <ol className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+      <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-5">
         {CV_STUDIO_STEPS.map((step, index) => {
           const done = index < currentIndex;
           const active = step.id === activeStepId;
@@ -85,57 +77,63 @@ export const CvStudioWorkflow: React.FC<CvStudioWorkflowProps> = ({
           // are reached from inside the step.
           const target = step.tabs[0];
           return (
-            <li key={step.id} className="flex shrink-0 items-center gap-1.5">
+            <li key={step.id} className="min-w-0">
               <button
                 type="button"
                 onClick={() => onSelectTab(target)}
                 aria-current={active ? 'step' : undefined}
                 data-tour={step.id === 'improve' ? 'cv-tailor-tab' : undefined}
-                className={`relative inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] font-medium transition-colors ${
+                className={`flex h-full w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-start transition-colors ${
                   active
-                    ? 'text-[var(--color-on-primary)]'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-main)] hover:text-[var(--text-primary)]'
+                    ? 'border-[var(--accent-primary)]/45 bg-[var(--accent-surface)]'
+                    : 'border-[var(--border-subtle)] bg-[var(--surface-main)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-secondary)]/60'
                 }`}
               >
-                {active && (
-                  <motion.span
-                    aria-hidden="true"
-                    layoutId="cv-studio-step"
-                    className="absolute inset-0 rounded-lg bg-[var(--accent-primary)]"
-                    transition={transition}
-                  />
-                )}
                 <span
                   aria-hidden="true"
-                  className={`relative inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold ${
-                    done || active
-                      ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-                      : 'border-[var(--border-subtle)] text-[var(--text-muted)]'
+                  className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                    active
+                      ? 'bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
+                      : done
+                        ? 'bg-[var(--accent-surface)] text-[var(--color-primary-text)] ring-1 ring-[var(--accent-primary)]/40'
+                        : 'bg-[var(--surface-secondary)] text-[var(--text-muted)]'
                   }`}
                 >
                   {/* A finished step is marked as finished. The number it
-                      carried is in the name of the step for anyone who needs
-                      it, and a tick is a faster read than a digit. */}
-                  {done ? (
-                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
-                  ) : (
-                    <span>{index + 1}</span>
-                  )}
+                      carried is still in the name of the step for anyone who
+                      needs it, and a tick is a faster read than a digit. */}
+                  {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : index + 1}
                 </span>
-                <span className="relative">{labels[step.id]}</span>
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    {t('Step')} {index + 1}
+                  </span>
+                  <span
+                    className={`block truncate text-xs font-semibold ${
+                      active ? 'text-[var(--color-primary-text)]' : 'text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {labels[step.id]}
+                  </span>
+                </span>
               </button>
-              {index < CV_STUDIO_STEPS.length - 1 && (
-                <span
-                  aria-hidden="true"
-                  className={`h-0.5 w-3 shrink-0 rounded-full transition-colors ${
-                    done ? 'bg-[var(--accent-primary)]' : 'bg-[var(--border-subtle)]'
-                  }`}
-                />
-              )}
             </li>
           );
         })}
       </ol>
+
+      {/* How far along the path is, in one line rather than four connectors. */}
+      <div className="mt-3 flex items-center gap-2.5">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+          <div
+            className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300"
+            style={{ width: `${((currentIndex + 1) / CV_STUDIO_STEPS.length) * 100}%` }}
+          />
+        </div>
+        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
+          {currentIndex + 1} / {CV_STUDIO_STEPS.length}
+        </span>
+      </div>
 
       {/* The step that is current is named out loud for a screen reader. */}
       <p className="sr-only" role="status">
