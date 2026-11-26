@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { X, Send, User, ArrowRight, Lightbulb } from 'lucide-react';
+import { X, User, ArrowRight, Lightbulb } from 'lucide-react';
 import { AiMascot } from './AiMascot';
+import { CopilotRobot } from './CopilotRobot';
 import { useCareer } from '../../context/CareerContext';
 import { drawerLeftVariants, drawerVariants, staggerContainer, staggerItemVariants } from '../../lib/motion';
 import { MorphingButton, MorphingOrb } from '../motion/Morph';
@@ -83,7 +84,13 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
       <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-            <AiMascot className="h-9 w-7 object-contain" alt="" />
+            {/* The character leans in while the assistant is working, so the
+                header and the thread show the same state. */}
+            <AiMascot
+              className="h-9 w-7 object-contain"
+              state={isCopilotTyping ? 'thinking' : 'idle'}
+              alt=""
+            />
           </div>
           <div>
             <div className="text-sm font-semibold text-[var(--text-primary)]">{t('Aionvia Copilot')}</div>
@@ -208,7 +215,11 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
               is what makes the drawer feel like it is answering rather than
               like it has stalled.
             */}
-            <MorphingOrb state="thinking" size={28} className="w-7 h-7" />
+            {/* The same character as the composer's mark: while the assistant
+                is working it looks around, so the wait has a subject. */}
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+              <CopilotRobot state="thinking" className="h-7 w-7" />
+            </span>
             <span className="flex items-center gap-2">
               <span aria-live="polite">{t('Aionvia is analyzing your graph')}</span>
               <span className="flex items-center gap-0.5" aria-hidden="true">
@@ -278,7 +289,12 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({ isOpen, onClose, o
           <MorphingButton
             type="submit"
             iconOnly
-            icon={<Send className="h-4 w-4" />}
+            icon={
+              <CopilotRobot
+                className="h-[18px] w-[18px]"
+                state={isCopilotTyping ? 'thinking' : input.trim() ? 'composing' : 'idle'}
+              />
+            }
             state={sendState}
             label={t('Send')}
             loadingLabel={t('Sending…')}
