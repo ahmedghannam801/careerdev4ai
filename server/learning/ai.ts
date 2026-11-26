@@ -19,6 +19,7 @@ import type {
   RecommendationResult,
 } from './recommendation.ts';
 import { aiLanguageInstruction } from '../../shared/aiLanguages.ts';
+import { renderPlatformKnowledge, selectPlatformKnowledge } from '../ai/platformKnowledge.ts';
 
 export interface AiClientLike {
   models: {
@@ -183,6 +184,17 @@ function buildPrompt(
     deterministicReason: candidate.deterministicReason,
   }));
 
+  // What the platform itself is, so the explanation can place a course inside
+  // the product ("this is the step after your roadmap milestone", "the audit is
+  // free") without inventing either. Two entries is enough for this prompt.
+  const platformFacts = renderPlatformKnowledge(
+    selectPlatformKnowledge({
+      feature: 'learning',
+      query: [context.focusSkill, context.targetRole?.title].filter(Boolean).join(' '),
+      limit: 2,
+    }).entries
+  );
+
   const gapMap = new Map<string, { current: number; target: number; gap: number }>();
   for (const skill of context.userSkills) {
     gapMap.set(skill.name, { current: skill.currentLevel, target: skill.targetLevel, gap: skill.gap });
@@ -206,6 +218,8 @@ HARD RULES:
 - reason: 2-4 specific sentences, 20-800 characters.
 - skillGap and roadmapLink are optional short phrases, max 300 characters.
 - ${aiLanguageInstruction(context.aiLanguage)}
+
+${platformFacts}
 
 USER CONTEXT:
 careerGoal: ${context.careerGoal}

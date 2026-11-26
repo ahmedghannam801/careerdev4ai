@@ -91,16 +91,67 @@ export interface AiCurrentSkill {
 }
 
 /**
+ * The parts of the career state a prompt can ask for.
+ *
+ * A feature rarely needs all of them. A CV rewrite needs experience, education
+ * and skills; it does not need the roadmap or the learning history, and reading
+ * them costs four queries and several hundred prompt tokens for nothing. Each
+ * name here maps to one group of reads in `loadAiCareerContext` and one group
+ * of lines in `buildAiContextBlock`.
+ */
+export type AiContextSection =
+  | 'identity'
+  | 'role'
+  | 'skills'
+  | 'experience'
+  | 'education'
+  | 'projects'
+  | 'volunteering'
+  | 'certifications'
+  | 'roadmap'
+  | 'learning'
+  | 'applications'
+  | 'evidence';
+
+/** Every section, in the order a full prompt reads them. */
+export const ALL_CONTEXT_SECTIONS: readonly AiContextSection[] = [
+  'identity',
+  'role',
+  'skills',
+  'experience',
+  'education',
+  'projects',
+  'volunteering',
+  'certifications',
+  'roadmap',
+  'learning',
+  'applications',
+  'evidence',
+];
+
+/**
  * Loads the career context for the verified user id.
  *
  * Every read is scoped to `userId`, so one user can never see another's
  * context. A failure in one optional area degrades that area only — the rest
  * of the context still loads.
+ *
+ * `sections` narrows the reads: a group that was not asked for is not fetched
+ * at all. The returned object still carries every field — the ones outside the
+ * request are simply empty — so callers never have to handle a partial shape.
  */
 export async function loadAiCareerContext(
   userId: string,
-  options: { language?: unknown } = {}
+  options: { language?: unknown; sections?: readonly AiContextSection[] } = {}
 ): Promise<AiCareerContext> {
+  const wanted = options.sections ? new Set(options.sections) : null;
+  const wants = (section: AiContextSection): boolean => !wanted || wanted.has(section);
+
+  // The profile carries the identity AND the target role, so it is read
+  // whenever either is wanted; preferences carry the interface language.
+  const needsProfile = wants('identity') || wants('role') || options.sections === undefined;
+  const empty: never[] = [];
+
   const [
     profile,
     skills,
@@ -115,18 +166,18 @@ export async function loadAiCareerContext(
     preferences,
     evidence,
   ] = await Promise.all([
-    getProfileDto(userId).catch(() => null),
-    getUserSkills(userId).catch(() => []),
-    listExperiences(userId).catch(() => []),
-    listEducations(userId).catch(() => []),
-    listProjects(userId).catch(() => []),
-    listVolunteerExperiences(userId).catch(() => []),
-    listCertifications(userId).catch(() => []),
-    listJobApplications(userId).catch(() => []),
-    listLearningItems(userId).catch(() => []),
-    listRoadmaps(userId).catch(() => []),
+    needsProfile ? getProfileDto(userId).catch(() => null) : Promise.resolve(null),
+    wants('skills') ? getUserSkills(userId).catch(() => []) : Promise.resolve(empty),
+    wants('experience') ? listExperiences(userId).catch(() => []) : Promise.resolve(empty),
+    wants('education') ? listEducations(userId).catch(() => []) : Promise.resolve(empty),
+    wants('projects') ? listProjects(userId).catch(() => []) : Promise.resolve(empty),
+    wants('volunteering') ? listVolunteerExperiences(userId).catch(() => []) : Promise.resolve(empty),
+    wants('certifications') ? listCertifications(userId).catch(() => []) : Promise.resolve(empty),
+    wants('applications') ? listJobApplications(userId).catch(() => []) : Promise.resolve(empty),
+    wants('learning') ? listLearningItems(userId).catch(() => []) : Promise.resolve(empty),
+    wants('roadmap') ? listRoadmaps(userId).catch(() => []) : Promise.resolve(empty),
     getPreferences(userId).catch(() => null),
-    listEvidence(userId).catch(() => []),
+    wants('evidence') ? listEvidence(userId).catch(() => []) : Promise.resolve(empty),
   ]);
 
   const targetRoleTitle = profile?.targetRole ?? null;
@@ -324,26 +375,33 @@ const CAREER_GOAL_LABELS: Record<string, string> = {
  * Only facts that are actually present are included, so the model is never
  * told about a section the user has not filled in.
  */
-export function buildAiContextBlock(context: AiCareerContext): string {
+export function buildAiContextBlock(
+  context: AiCareerContext,
+  options: { sections?: readonly AiContextSection[] } = {}
+): string {
+  const wanted = options.sections ? new Set(options.sections) : null;
+  const wants = (section: AiContextSection): boolean => !wanted || wanted.has(section);
   const lines: string[] = [];
   const role = context.targetRole;
 
   lines.push('Here is the user\'s CURRENT career state, read from their Aionvia account:');
-  lines.push(`- Persona: ${context.careerState ?? 'not set'}`);
+  if (wants('identity')) {
+    lines.push(`- Persona: ${context.careerState ?? 'not set'}`);
+  }
   if (context.careerGoal) {
     const label = CAREER_GOAL_LABELS[context.careerGoal] ?? context.careerGoal;
     lines.push(`- Goal: ${label}`);
   }
-  if (context.targetRoleTitle) {
+  if (wants('role') && context.targetRoleTitle) {
     lines.push(`- Target role: ${context.targetRoleTitle}`);
   }
-  if (context.experienceLevel) {
+  if (wants('role') && context.experienceLevel) {
     lines.push(`- Target experience level: ${context.experienceLevel}`);
   }
-  if (context.targetRoleId) {
+  if (wants('role') && context.targetRoleId) {
     lines.push(`- Target role id: ${context.targetRoleId}`);
   }
-  if (role) {
+  if (wants('role') && role) {
     lines.push(`- Target role domain: ${role.category}`);
     if (context.targetRoleDomain) {
       lines.push(`- Target role domain id: ${context.targetRoleDomain}`);
@@ -358,48 +416,54 @@ export function buildAiContextBlock(context: AiCareerContext): string {
   // treat it as authoritative. It may still point out that another path might
   // suit the user better, but only as a suggestion the user can act on — it
   // must never present the target role as changed.
-  if (context.targetRoleTitle) {
+  if (wants('role') && context.targetRoleTitle) {
     lines.push(
       '- The target role above was explicitly chosen by the user. Treat it as authoritative: plan, recommend and advise for THAT role.',
       '- If another career path would suit the user better, offer it only as an alternative to consider. Never state or imply that their target role has changed.',
     );
   }
-  if (context.skillGaps.length) {
+  if (wants('skills') && context.skillGaps.length) {
     lines.push(
       `- Skill gaps (current -> target): ${context.skillGaps.map((g) => `${g.name} (${g.current}->${g.target})`).join('; ')}`,
     );
   }
-  if (context.currentSkills.length) {
+  if (wants('skills') && context.currentSkills.length) {
     lines.push(
       `- Skills and signal sources: ${context.currentSkills.map((s) => `${s.name} (${s.level}/5; self-reported=${s.selfReportedLevel ?? 'not rated'}, assessed=${s.assessedLevel ?? 'not assessed'}, evidence=${s.evidenceSources.join(', ') || 'none'})`).join('; ')}`,
     );
   }
-  if (context.strengths.length) {
+  if (wants('skills') && context.strengths.length) {
     lines.push(`- Strengths already met: ${context.strengths.join('; ')}`);
   }
-  if (context.experience.length) {
+  if (wants('experience') && context.experience.length) {
     lines.push(`- Work experience: ${context.experience.join('; ')}`);
   }
-  if (context.education.length) {
+  if (wants('education') && context.education.length) {
     lines.push(`- Education: ${context.education.join('; ')}`);
   }
-  if (context.projects.length) {
+  if (wants('projects') && context.projects.length) {
     lines.push(`- Projects: ${context.projects.join('; ')}`);
   }
-  if (context.volunteering.length) {
+  if (wants('volunteering') && context.volunteering.length) {
     lines.push(`- Volunteer experience: ${context.volunteering.join('; ')}`);
   }
-  if (context.certifications.length) {
+  if (wants('certifications') && context.certifications.length) {
     lines.push(`- Certifications: ${context.certifications.join('; ')}`);
   }
-  if (context.roadmapSummary.length) {
+  if (wants('roadmap') && context.roadmapSummary.length) {
     lines.push(`- Current roadmap:\n${context.roadmapSummary.map((entry) => `  ${entry}`).join('\n')}`);
   }
-  if (context.learningSummary.length) {
+  if (wants('learning') && context.learningSummary.length) {
     lines.push(`- Learning in progress: ${context.learningSummary.join('; ')}`);
   }
-  lines.push(`- Job applications tracked: ${context.applicationsCount}`);
-  lines.push(`- Evidence records (${context.evidenceCount} total): ${context.evidenceSummary.join('; ')}`);
+  if (wants('applications')) {
+    lines.push(`- Job applications tracked: ${context.applicationsCount}`);
+  }
+  if (wants('evidence')) {
+    lines.push(
+      `- Evidence records (${context.evidenceCount} total): ${context.evidenceSummary.join('; ')}`,
+    );
+  }
 
   // The user's explicit response language. Without this the model answers an
   // Arabic interface in English whenever the question is typed in English, and

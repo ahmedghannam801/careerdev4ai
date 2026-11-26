@@ -117,6 +117,8 @@ export async function analyzeProjects(input: {
   ai: ProjectAnalysisAiClient | null;
   model: string;
   language?: AiLanguageCode;
+  /** The instruction the context engine composed for this feature. */
+  systemInstruction?: string;
 }): Promise<{ reports: ProjectHealthReport[]; aiUsed: boolean; aiFallbackReason: string | null }> {
   const groundingProfile = await buildGroundingProfileForUser(input.userId);
 
@@ -150,7 +152,10 @@ export async function analyzeProjects(input: {
             context: input.context,
             language: input.language,
           }),
-          config: { responseMimeType: 'application/json' },
+          config: {
+            responseMimeType: 'application/json',
+            ...(input.systemInstruction ? { systemInstruction: input.systemInstruction } : {}),
+          },
         });
 
         const parsed = parseProjectHealthPayload(JSON.parse(response.text || '{}'));

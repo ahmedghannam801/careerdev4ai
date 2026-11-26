@@ -6355,6 +6355,12 @@ Skills: ${activeCV.skillsList.join(', ')}
     }
   };
 
+  // The server keeps the conversation, so the browser only remembers which
+  // thread it is in. A new thread starts when the page reloads or when the
+  // server does not recognise the id any more, and its id is whatever the
+  // server returns — never a value chosen here.
+  const copilotConversationIdRef = useRef<string | null>(null);
+
   const sendCopilotMessage = async (text: string) => {
     const userMsg: CopilotMessage = {
       id: `msg-${Date.now()}`,
@@ -6395,11 +6401,17 @@ Skills: ${activeCV.skillsList.join(', ')}
           userPrompt: text,
           context: { activeView },
           language: aiPreferences.preferredLanguage,
+          ...(copilotConversationIdRef.current
+            ? { conversationId: copilotConversationIdRef.current }
+            : {}),
         })
       });
 
       if (res.ok) {
         const data = await res.json();
+        if (typeof data.conversationId === 'string' && data.conversationId) {
+          copilotConversationIdRef.current = data.conversationId;
+        }
         const assistantMsg: CopilotMessage = {
           id: `msg-${Date.now() + 1}`,
           sender: 'assistant',

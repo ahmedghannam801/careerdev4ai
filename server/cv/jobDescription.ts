@@ -229,6 +229,8 @@ export async function analyzeJobDescription(
     ai: JobDescriptionAiClient | null;
     model: string;
     language?: AiLanguageCode;
+    /** The instruction the context engine composed for this feature. */
+    systemInstruction?: string;
   }
 ): Promise<{ analysis: JobDescriptionAnalysis; aiUsed: boolean; fallbackReason: string | null }> {
   const text = jdText.trim().slice(0, MAX_JOB_DESCRIPTION_CHARS);
@@ -245,7 +247,10 @@ export async function analyzeJobDescription(
     const response = await options.ai.models.generateContent({
       model: options.model,
       contents: buildJobDescriptionPrompt(text, { language: options.language }),
-      config: { responseMimeType: 'application/json' },
+      config: {
+        responseMimeType: 'application/json',
+        ...(options.systemInstruction ? { systemInstruction: options.systemInstruction } : {}),
+      },
     });
 
     let payload: unknown;
@@ -405,6 +410,8 @@ export async function generateAtsCvContent(input: {
   ai: JobDescriptionAiClient | null;
   model: string;
   language?: AiLanguageCode;
+  /** The instruction the context engine composed for this feature. */
+  systemInstruction?: string;
 }): Promise<{ ok: true; content: AtsCvContent } | { ok: false; reason: 'no_model' | 'invalid_response' }> {
   if (!input.ai) {
     return { ok: false, reason: 'no_model' };
@@ -500,7 +507,10 @@ export async function generateAtsCvContent(input: {
     const response = await input.ai.models.generateContent({
       model: input.model,
       contents: prompt,
-      config: { responseMimeType: 'application/json' },
+      config: {
+        responseMimeType: 'application/json',
+        ...(input.systemInstruction ? { systemInstruction: input.systemInstruction } : {}),
+      },
     });
     payload = JSON.parse(response.text || '{}');
   } catch (error) {

@@ -111,6 +111,13 @@ export async function generateCoverLetter(input: {
   candidate: CoverLetterInput;
   ai: JobDescriptionAiClient | null;
   model: string;
+  /**
+   * The instruction the context engine composed for this feature: the
+   * candidate's verified record, the platform facts and the honesty rules.
+   * Optional so the background task can call the same writer before the engine
+   * has a context for it.
+   */
+  systemInstruction?: string;
 }): Promise<CoverLetterResult> {
   if (!input.ai) return { ok: false, reason: 'no_model' };
 
@@ -119,7 +126,10 @@ export async function generateCoverLetter(input: {
     const response = await input.ai.models.generateContent({
       model: input.model,
       contents: buildCoverLetterPrompt(input.candidate),
-      config: { responseMimeType: 'application/json' },
+      config: {
+        responseMimeType: 'application/json',
+        ...(input.systemInstruction ? { systemInstruction: input.systemInstruction } : {}),
+      },
     });
     payload = JSON.parse(response.text || '{}');
   } catch (error) {

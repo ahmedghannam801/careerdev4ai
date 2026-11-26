@@ -336,7 +336,25 @@ import {
   dismissGuide,
   resetAllGuides,
 } from './server/db/guides.ts';
-import { loadAiCareerContext, buildAiContextBlock } from './server/ai/careerContext.ts';
+import { loadAiCareerContext } from './server/ai/careerContext.ts';
+import {
+  runAiTask,
+  buildFeatureInstruction,
+  scopeHint,
+  scopeHintInstruction,
+} from './server/ai/contextEngine.ts';
+import { renderConversationMemory } from './server/ai/conversationMemory.ts';
+import {
+  appendAiMessage,
+  createAiConversation,
+  conversationTitleFrom,
+  deleteAiConversation,
+  getAiConversation,
+  listAiConversations,
+  listAiMessages,
+  loadAiConversationMemory,
+  maintainConversationMemory,
+} from './server/db/aiConversations.ts';
 import {
   aiLanguageInstruction,
   normalizeAiLanguage,
@@ -2160,8 +2178,6 @@ app.post('/api/copilot', requireAuth, (req: Request, res: Response, next) => {
     // from the prompt. It is passed into the context loader so the same
     // instruction appears in every prompt built on this block.
     const language = normalizeAiLanguage(req.body?.language);
-    const careerContext = await loadAiCareerContext(req.authUser!.id, { language });
-    const contextBlock = buildAiContextBlock(careerContext);
 
     // The active view is a UI hint, not a career fact, so it is still taken
     // from the client — but it is length-capped and string-typed.
@@ -2174,22 +2190,46 @@ app.post('/api/copilot', requireAuth, (req: Request, res: Response, next) => {
       return modelUnavailable(res);
     }
 
-    const systemInstruction = `You are Aionvia Copilot, an AI career advisor that works across every career domain — technology, engineering, data, design, product, business, operations, finance, marketing, sales, people and HR, healthcare, education, and legal.
-You are given the user's real career state below, read from their Aionvia account.
-The user is currently looking at the "${activeView}" screen of the app.
+    // The prompt is built by the shared context engine: the candidate's record
+    // for the verified id, the platform facts that apply to the copilot, the
+    // honesty and scope rules, and the response language — once, in one place.
+    // The screen the candidate is on and the scope hint are the only parts
+    // specific to this route.
+    const hint = scopeHint(userPrompt);
 
-${contextBlock}
+    // Conversation memory. The thread belongs to the verified user; an id that
+    // is not theirs is treated exactly like an id that does not exist, so the
+    // endpoint never confirms that somebody else's thread is real.
+    const requestedConversationId = str(req.body?.conversationId, 64);
+    let conversationId: string | null = null;
+    let memoryBlock = '';
+    if (requestedConversationId && isUuid(requestedConversationId)) {
+      try {
+        const memory = await loadAiConversationMemory(req.authUser!.id, requestedConversationId);
+        if (memory) {
+          conversationId = memory.conversationId;
+          memoryBlock = renderConversationMemory({
+            summary: memory.summary,
+            messages: memory.messages,
+          });
+        }
+      } catch (error) {
+        // A thread that cannot be read is a thread that is not there: the
+        // answer is still written, from the career state alone.
+        console.error(
+          'Copilot memory read failed:',
+          error instanceof Error ? error.message : 'unknown error'
+        );
+      }
+    }
 
-Answering rules:
-1. Answer the user's actual question first, in one or two sentences. Then add only the detail that helps them act.
-2. Match the answer length to the question. A simple question gets a short answer; a plan request can use a numbered sequence.
-3. Write in the response language specified in the career state block. Keep industry-standard technical names (SQL, React, CV, ATS) in English. Never mix languages without a reason.
-4. Do not use markdown headers (#), bold asterisks (**), horizontal rules (---), tables, or nested bullets. The interface renders plain text with simple lists only.
-5. Use a short list only when listing steps or options. At most one level of bullets.
-6. When you recommend a learning resource, name it, say why it fits this user, and give the direct link if the state below contains one. Never invent a URL.
-7. Ground every claim in the state above. If the information needed is missing, say exactly what is missing instead of guessing.
-8. Never assume the user is in a technical role. Use their real target role and domain.
-9. End with at most two short follow-up questions or actions, and only when they are genuinely useful.`;
+    const screenInstruction = [
+      `The candidate is currently looking at the "${activeView}" screen of the app.`,
+      scopeHintInstruction(hint),
+      memoryBlock,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     // Arabic prompts get Arabic suggestions; an English prompt gets English
     // ones. The suggestions are navigational prompts, not answers.
@@ -2212,16 +2252,17 @@ Answering rules:
     // already absorbs a provider-side quota failure. A token balance is never
     // consulted here — chatting costs nothing.
     try {
-      const response = await ai.models.generateContent({
-        model: getGeminiModel(),
-        contents: userPrompt,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        },
+      const result = await runAiTask({
+        feature: 'copilot',
+        userId: req.authUser!.id,
+        prompt: userPrompt,
+        language,
+        temperature: 0.7,
+        taskInstructions: screenInstruction,
       });
+      const careerContext = result.careerContext;
 
-      const replyText = response.text?.trim();
+      const replyText = result.text?.trim();
       if (!replyText) {
         // An empty model response is still not an answer. Do not replace it
         // with a sentence that reads as if the model had replied.
@@ -2234,6 +2275,38 @@ Answering rules:
       // A real answer was produced, so the credit is earned.
       markAiCreditCompleted(req as AuthedRequest);
 
+      // Only an exchanged pair is remembered: a failed call leaves no
+      // half-question in the history. A storage failure is logged and does not
+      // cost the candidate the answer they already have.
+      try {
+        if (!conversationId) {
+          const conversation = await createAiConversation({
+            userId: req.authUser!.id,
+            title: conversationTitleFrom(userPrompt),
+            language,
+          });
+          conversationId = conversation.id;
+        }
+        await appendAiMessage({
+          userId: req.authUser!.id,
+          conversationId,
+          role: 'user',
+          content: userPrompt,
+        });
+        await appendAiMessage({
+          userId: req.authUser!.id,
+          conversationId,
+          role: 'assistant',
+          content: replyText,
+        });
+        await maintainConversationMemory(req.authUser!.id, conversationId);
+      } catch (error) {
+        console.error(
+          'Copilot memory write failed:',
+          error instanceof Error ? error.message : 'unknown error'
+        );
+      }
+
       // Intelligent proposed action if user asks to add or change something.
       // The match uses word boundaries: a plain substring check matched
       // "add" inside "already" and "test" inside "contest".
@@ -2241,15 +2314,15 @@ Answering rules:
       const lower = userPrompt.toLowerCase();
       const asksToAdd = /\b(add|create|track|plan|schedule|set up|set-up|start)\b/.test(lower);
       if (asksToAdd) {
-        const focusSkill = careerContext.skillGaps[0]?.name ?? null;
+        const focusSkill = careerContext?.skillGaps[0]?.name ?? null;
         proposedAction = {
           id: `prop-${Date.now()}`,
           title: focusSkill
             ? `Focus on ${focusSkill}`
-            : `Strengthen your ${careerContext.targetRoleTitle ?? 'target role'} profile`,
+            : `Strengthen your ${careerContext?.targetRoleTitle ?? 'target role'} profile`,
           description: focusSkill
-            ? `Add a dedicated milestone to close your primary gap in ${focusSkill} for ${careerContext.targetRoleTitle ?? 'your target role'}.`
-            : `Add a dedicated milestone for the next step towards ${careerContext.targetRoleTitle ?? 'your target role'}.`,
+            ? `Add a dedicated milestone to close your primary gap in ${focusSkill} for ${careerContext?.targetRoleTitle ?? 'your target role'}.`
+            : `Add a dedicated milestone for the next step towards ${careerContext?.targetRoleTitle ?? 'your target role'}.`,
           reason: 'Highest leverage improvement to raise your market fit score.',
           type: 'update_task',
           // The payload carries a real skill name, so a confirmed action
@@ -2263,6 +2336,7 @@ Answering rules:
         text: replyText,
         suggestions,
         proposedAction,
+        conversationId,
       });
     } catch (aiErr: any) {
       // Honesty rule: if the model did not answer, do NOT return canned text
@@ -2286,6 +2360,47 @@ Answering rules:
   } catch (error: any) {
     console.error('Copilot API error:', error);
     return res.status(500).json({ error: 'Failed to process copilot request' });
+  }
+});
+
+// ---- AI conversation history ----
+//
+// The Copilot's memory is server-side, so a candidate can come back to a
+// thread. Every route here is scoped to the verified user: an id that is not
+// theirs answers exactly like an id that does not exist, and the message list
+// is read with the same owner filter as the thread itself.
+app.get('/api/ai/conversations', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const conversations = await listAiConversations(req.authUser!.id, 20);
+    return res.json({ success: true, conversations });
+  } catch (error) {
+    console.error('Failed to list AI conversations:', error);
+    return res.status(500).json({ error: 'Failed to load your conversations' });
+  }
+});
+
+app.get('/api/ai/conversations/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const conversation = await getAiConversation(req.authUser!.id, req.params.id);
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+    const messages = await listAiMessages(req.authUser!.id, req.params.id, 100);
+    return res.json({ success: true, conversation, messages });
+  } catch (error) {
+    console.error('Failed to load the AI conversation:', error);
+    return res.status(500).json({ error: 'Failed to load that conversation' });
+  }
+});
+
+app.delete('/api/ai/conversations/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!isUuid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+    const deleted = await deleteAiConversation(req.authUser!.id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Conversation not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete the AI conversation:', error);
+    return res.status(500).json({ error: 'Failed to delete that conversation' });
   }
 });
 
@@ -2343,12 +2458,14 @@ Return valid JSON schema:
     if (blocked) return blocked;
 
     try {
-      const response = await ai.models.generateContent({
-        model: getGeminiModel(),
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
+      const result = await runAiTask({
+        feature: 'career_analysis',
+        userId: req.authUser!.id,
+        prompt,
+        language,
+        responseMimeType: 'application/json',
       });
-      const payload = JSON.parse(response.text || '{}');
+      const payload = JSON.parse(result.text || '{}');
       const payloadErrors = validateCareerAnalysisPayload(payload);
       if (payloadErrors.length > 0) {
         console.error('Career analysis returned an invalid payload:', payloadErrors);
@@ -2404,12 +2521,14 @@ Return JSON schema:
     if (blocked) return blocked;
 
     try {
-      const response = await ai.models.generateContent({
-        model: getGeminiModel(),
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
+      const result = await runAiTask({
+        feature: 'cv_ats',
+        userId: req.authUser!.id,
+        prompt,
+        language,
+        responseMimeType: 'application/json',
       });
-      const payload = JSON.parse(response.text || '{}');
+      const payload = JSON.parse(result.text || '{}');
       const payloadErrors = validateAtsPayload(payload);
       if (payloadErrors.length > 0) {
         console.error('CV optimization returned an invalid payload:', payloadErrors);
@@ -2493,12 +2612,14 @@ Return JSON schema:
     }
 
     try {
-      const response = await ai.models.generateContent({
-        model: getGeminiModel(),
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
+      const result = await runAiTask({
+        feature: 'interview_mock',
+        userId: req.authUser!.id,
+        prompt,
+        language,
+        responseMimeType: 'application/json',
       });
-      const payload = JSON.parse(response.text || '{}');
+      const payload = JSON.parse(result.text || '{}');
       const payloadErrors = validateInterviewPayload(payload);
       if (payloadErrors.length > 0) {
         console.error('Interview evaluation returned an invalid payload:', payloadErrors);
@@ -2569,12 +2690,14 @@ ${groundingRules()}
     if (blocked) return blocked;
 
     try {
-      const response = await ai.models.generateContent({
-        model: getGeminiModel(),
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
+      const result = await runAiTask({
+        feature: 'cover_letter',
+        userId: req.authUser!.id,
+        prompt,
+        language,
+        responseMimeType: 'application/json',
       });
-      const payload = JSON.parse(response.text || '{}');
+      const payload = JSON.parse(result.text || '{}');
       const payloadErrors = validateSummaryPayload(payload);
       if (payloadErrors.length > 0) {
         console.error('Summary suggestion returned an invalid payload:', payloadErrors);
@@ -2636,6 +2759,14 @@ app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Req
       // The letter is written by the shared module, which is also what the
       // background task uses. One implementation means the letter the button
       // produces and the letter the task produces are the same letter.
+      const instruction = await buildFeatureInstruction({
+        feature: 'cover_letter',
+        userId: req.authUser!.id,
+        language,
+        query: [str(company, 120), str(jobTitle, 120)].filter(Boolean).join(' '),
+        json: true,
+      });
+
       const result = await generateCoverLetter({
         userId: req.authUser!.id,
         candidate: {
@@ -2651,6 +2782,7 @@ app.post('/api/generate-cover-letter', requireAuth, aiRateLimit, async (req: Req
         },
         ai,
         model: getGeminiModel(),
+        systemInstruction: instruction.systemInstruction,
       });
 
       if (!result.ok) {
@@ -3048,11 +3180,23 @@ app.post('/api/cv/ai-assist', requireAuth, aiRateLimit, (req: Request, res: Resp
     }
 
     try {
+      // The field's instruction comes from the shared engine, built for the
+      // verified user, so the writer sees the same record, platform facts and
+      // rules as every other AI feature.
+      const instruction = await buildFeatureInstruction({
+        feature: 'cv_assist',
+        userId: req.authUser!.id,
+        language: request.language,
+        query: request.field ?? '',
+        json: true,
+      });
+
       const outcome = await generateCvAssistText(
         req.authUser!.id,
         request,
         ai,
-        getGeminiModel()
+        getGeminiModel(),
+        instruction.systemInstruction
       );
 
       if (!outcome.ok) {
@@ -3178,10 +3322,24 @@ app.post('/api/cv/job-description/analyze', requireAuth, aiRateLimit, async (req
     const aiBudget = hasModel ? tryConsumeAiBudget(req.authUser!.id) : false;
     const client: JobDescriptionAiClient | null = hasModel && aiBudget ? ai : null;
 
+    // The model's instruction comes from the shared engine: the candidate's
+    // verified record, the platform facts about CV Studio and the honesty
+    // rules. It is only built when there is a model to call.
+    const instruction = client
+      ? await buildFeatureInstruction({
+          feature: 'cv_job_description',
+          userId: req.authUser!.id,
+          language,
+          query: read.text.slice(0, 600),
+          json: true,
+        })
+      : null;
+
     const { analysis, aiUsed, fallbackReason } = await analyzeJobDescription(read.text, {
       ai: client,
       model: getGeminiModel(),
       language,
+      systemInstruction: instruction?.systemInstruction,
     });
 
     // A model that failed before it served the request did not spend the
@@ -3255,10 +3413,21 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireCr
     }
 
     try {
+      // One instruction for both calls: the same verified record, the same
+      // platform facts, the same rules.
+      const instruction = await buildFeatureInstruction({
+        feature: 'cv_job_description',
+        userId: req.authUser!.id,
+        language,
+        query: read.text.slice(0, 600),
+        json: true,
+      });
+
       const { analysis } = await analyzeJobDescription(read.text, {
         ai,
         model: getGeminiModel(),
         language,
+        systemInstruction: instruction.systemInstruction,
       });
       const match = await buildJobDescriptionMatch(req.authUser!.id, analysis, { language });
 
@@ -3270,6 +3439,7 @@ app.post('/api/cv/job-description/generate', requireAuth, aiRateLimit, requireCr
         ai,
         model: getGeminiModel(),
         language,
+        systemInstruction: instruction.systemInstruction,
       });
 
       if (!outcome.ok) {
@@ -3398,12 +3568,23 @@ app.post('/api/projects/analyze', requireAuth, aiRateLimit, requireCredits('proj
 
     const context = await buildProjectRecommendationContext(req.authUser!.id);
 
+    const instruction = client
+      ? await buildFeatureInstruction({
+          feature: 'project_analysis',
+          userId: req.authUser!.id,
+          language,
+          query: context.targetRoleTitle ?? '',
+          json: true,
+        })
+      : null;
+
     const result = await analyzeProjects({
       userId: req.authUser!.id,
       context,
       ai: client,
       model: getGeminiModel(),
       language,
+      systemInstruction: instruction?.systemInstruction,
     });
 
     // The factual reports are always produced. Only the wording the model

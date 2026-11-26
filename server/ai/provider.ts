@@ -184,8 +184,15 @@ async function callGeminiInternal(request: UnifiedAIRequest): Promise<UnifiedAIR
 async function callOpenRouterInternal(request: UnifiedAIRequest): Promise<UnifiedAIResponse> {
   const messages: OpenRouterMessage[] = [];
 
-  if (request.systemInstruction) {
-    messages.push({ role: 'system', content: request.systemInstruction });
+  // The instruction can arrive either as its own field or inside `config`,
+  // which is where the Google SDK expects it. Every caller in this application
+  // uses `config.systemInstruction` (the shape the Gemini SDK takes), so a
+  // fallback request that read only the other field used to reach OpenRouter
+  // with no system instruction at all — no career state, no honesty rules and
+  // no language instruction, exactly when the user most needs them.
+  const systemInstruction = request.systemInstruction ?? (request.config?.systemInstruction as string | undefined);
+  if (systemInstruction) {
+    messages.push({ role: 'system', content: systemInstruction });
   }
 
   // If responseMimeType is json, instruct model clearly in prompt
@@ -220,10 +227,36 @@ async function callOpenRouterInternal(request: UnifiedAIRequest): Promise<Unifie
 }
 
 /**
+ * A short, stable hash of the system instruction.
+ *
+ * The instruction carries the candidate's career state, so it must take part in
+ * the dedupe key: two users who type the same sentence in the same second used
+ * to share one in-flight promise, and one of them received the other's
+ * personalised answer. The text itself is not put in the key — it is personal —
+ * only a fingerprint of it.
+ */
+function hashInstruction(instruction: string): string {
+  let hash = 5381;
+  for (let index = 0; index < instruction.length; index += 1) {
+    hash = ((hash << 5) + hash + instruction.charCodeAt(index)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
  * Computes a cache key for in-flight deduplication.
+ *
+ * Both prompt parts, the response type and the model: two requests may only be
+ * merged when every one of those is identical.
  */
 function requestDedupeKey(request: UnifiedAIRequest): string {
-  return `${request.contents}::${request.config?.responseMimeType ?? ''}::${request.model ?? ''}`;
+  const instruction = request.systemInstruction ?? String(request.config?.systemInstruction ?? '');
+  return [
+    hashInstruction(instruction),
+    request.contents,
+    request.config?.responseMimeType ?? '',
+    request.model ?? '',
+  ].join('::');
 }
 
 /**
@@ -372,6 +405,9 @@ export const universalAi = {
       const response = await generateContentUnified({
         contents: args.contents,
         model: args.model,
+        // A caller that puts the instruction in `config` (the Gemini shape) also
+        // has it lifted to the field the fallback provider reads.
+        systemInstruction: args.config?.systemInstruction as string | undefined,
         config: args.config,
       });
       return {

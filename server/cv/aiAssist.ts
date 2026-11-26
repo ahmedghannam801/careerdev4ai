@@ -414,7 +414,9 @@ export async function generateCvAssistText(
   userId: string,
   request: CvAssistRequest,
   ai: CvAssistAiClient,
-  model: string
+  model: string,
+  /** The instruction the context engine composed for this feature. */
+  systemInstruction?: string
 ): Promise<
   | { ok: true; result: CvAssistResult }
   | { ok: false; reason: 'invalid_response' | 'source_not_found' }
@@ -439,7 +441,10 @@ export async function generateCvAssistText(
   const response = await ai.models.generateContent({
     model,
     contents: prompt,
-    config: { responseMimeType: 'application/json' },
+    config: {
+      responseMimeType: 'application/json',
+      ...(systemInstruction ? { systemInstruction } : {}),
+    },
   });
 
   let payload: unknown;
