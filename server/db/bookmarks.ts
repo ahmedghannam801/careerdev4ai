@@ -12,6 +12,9 @@
 // Ownership: profile_id = auth.users.id; the id is always the verified
 // Supabase user id, never a client-supplied value.
 import { getSupabaseServer } from './supabase';
+import { getPlanByCode } from './subscriptions.ts';
+import { getUserEffectivePlan } from '../subscriptions/entitlements.ts';
+import { savedJobsLimitFromFeatures } from '../../shared/subscriptions.ts';
 
 export interface BookmarkDTO {
   id: string;
@@ -29,6 +32,19 @@ const COLUMNS = 'id, job_id, created_at';
 
 function toDTO(row: BookmarkRow): BookmarkDTO {
   return { id: row.id, jobId: row.job_id, createdAt: row.created_at };
+}
+
+/** The saved-jobs allowance for the candidate's effective plan. */
+export async function getSavedJobsAllowance(profileId: string): Promise<{
+  limit: number;
+  planCode: string;
+}> {
+  const effective = await getUserEffectivePlan(profileId);
+  const plan = await getPlanByCode(effective.planCode);
+  return {
+    limit: savedJobsLimitFromFeatures(plan?.features),
+    planCode: effective.planCode,
+  };
 }
 
 /** Reads every bookmark owned by the given profile. */

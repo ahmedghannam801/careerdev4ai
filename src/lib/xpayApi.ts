@@ -31,6 +31,8 @@ export interface XPaySessionView {
   purchaseKind: 'subscription' | 'credit_pack';
   planCode: string | null;
   billingCycle: 'monthly' | 'annual' | null;
+  /** Aionvia's own order reference for the checkout. */
+  orderId: string | null;
   amountTotal: number;
   currency: string;
   status: string;

@@ -14,10 +14,11 @@
 
 import type { BillingCycle } from '../../shared/subscriptions.ts';
 import { grantAiCredits } from '../credits/grant.ts';
-import { getPlanByCode } from '../db/subscriptions.ts';
+import { activateXPaySubscription, getPlanByCode } from '../db/subscriptions.ts';
 import { redeemBirthdayReward } from '../birthday/service.ts';
 import { enqueueBillingEmail } from '../email/billing.ts';
 import type { XPaySessionResponse } from './checkout.ts';
+import { annualInstallmentKey } from './installments.ts';
 import {
   getXPayPurchaseBySession,
   markXPayEventProcessed,
@@ -52,6 +53,7 @@ export interface XPayFulfillmentDeps {
   upsertSession: typeof upsertXPaySession;
   recordEvent: typeof recordXPayEvent;
   markEventProcessed: typeof markXPayEventProcessed;
+  activateSubscription: typeof activateXPaySubscription;
 }
 
 export const xpayFulfillmentDeps: XPayFulfillmentDeps = {
@@ -62,6 +64,7 @@ export const xpayFulfillmentDeps: XPayFulfillmentDeps = {
   upsertSession: upsertXPaySession,
   recordEvent: recordXPayEvent,
   markEventProcessed: markXPayEventProcessed,
+  activateSubscription: activateXPaySubscription,
 };
 
 /** A year or a month, added to a date without skipping a short month. */
@@ -210,93 +213,132 @@ export async function fulfillPaidSession(
   const stored = await syncSession(session, deps);
   if (!stored) return null;
 
-  const existing = await deps.getPurchaseBySession(session.id);
-  if (existing) return { purchase: existing, created: false };
-
   const metadata = readMetadata(session);
-  const now = new Date();
-  const accessStartsAt = now.toISOString();
-  const accessEndsAt =
-    stored.purchase_kind === 'subscription' && stored.billing_cycle
-      ? addBillingPeriod(now, stored.billing_cycle).toISOString()
-      : null;
 
-  const purchase = await deps.recordPurchase({
-    profileId: stored.profile_id,
-    sessionId: session.id,
-    purchaseKind: stored.purchase_kind,
-    planCode: stored.plan_code,
-    billingCycle: stored.billing_cycle,
-    packId: stored.pack_id,
-    credits: stored.credits,
-    amountTotal: stored.amount_total,
-    currency: stored.currency,
-    paymentMethodType: stored.payment_method_type,
-    livemode: stored.livemode,
-    accessStartsAt,
-    accessEndsAt,
-    metadata: { ...metadata, xpay_session: session.id },
-  });
+  // Another delivery may have recorded the purchase already. The row is the
+  // receipt, and a retry of an event that failed *after* the insert must still
+  // finish the grants and the activation below, so this is not an early return.
+  let purchase = await deps.getPurchaseBySession(session.id);
+  let created = false;
 
-  // Another delivery won the race and already recorded this session.
   if (!purchase) {
-    const already = await deps.getPurchaseBySession(session.id);
-    return already ? { purchase: already, created: false } : null;
+    const now = new Date();
+    const accessStartsAt = now.toISOString();
+    const accessEndsAt =
+      stored.purchase_kind === 'subscription' && stored.billing_cycle
+        ? addBillingPeriod(now, stored.billing_cycle).toISOString()
+        : null;
+
+    purchase = await deps.recordPurchase({
+      profileId: stored.profile_id,
+      sessionId: session.id,
+      purchaseKind: stored.purchase_kind,
+      planCode: stored.plan_code,
+      billingCycle: stored.billing_cycle,
+      packId: stored.pack_id,
+      credits: stored.credits,
+      amountTotal: stored.amount_total,
+      currency: stored.currency,
+      paymentMethodType: stored.payment_method_type,
+      livemode: stored.livemode,
+      accessStartsAt,
+      accessEndsAt,
+      metadata: { ...metadata, xpay_session: session.id },
+    });
+
+    if (purchase) {
+      created = true;
+    } else {
+      // Another delivery won the race and already recorded this session.
+      purchase = await deps.getPurchaseBySession(session.id);
+      if (!purchase) return null;
+    }
   }
 
-  if (stored.purchase_kind === 'credit_pack' && stored.credits > 0) {
+  if (purchase.purchase_kind === 'credit_pack' && purchase.credits > 0) {
     await deps.grantCredits({
-      profileId: stored.profile_id,
-      amount: stored.credits,
+      profileId: purchase.profile_id,
+      amount: purchase.credits,
       // The session id is the idempotency key: a redelivery cannot buy the
       // same pack twice.
       idempotencyKey: `xpay-pack:${session.id}`,
       sourceType: 'payment',
       sourceId: null,
-      description: `Credit pack ${stored.pack_id ?? ''} (${stored.credits} credits) bought through XPay`.trim(),
-      metadata: { pack_id: stored.pack_id, xpay_session: session.id },
+      description: `Credit pack ${purchase.pack_id ?? ''} (${purchase.credits} credits) bought through XPay`.trim(),
+      metadata: { pack_id: purchase.pack_id, xpay_session: session.id },
     });
   }
 
   // The birthday reward is spent only once the money is in. A candidate who
   // abandons the checkout keeps it.
-  if (metadata.birthday_reward === 'applied') {
-    await redeemBirthdayReward(stored.profile_id, null);
+  if (created && metadata.birthday_reward === 'applied') {
+    await redeemBirthdayReward(purchase.profile_id, null);
   }
 
-  if (stored.purchase_kind === 'subscription' && stored.plan_code) {
-    const plan = await deps.getPlanByCode(stored.plan_code);
+  if (purchase.purchase_kind === 'subscription' && purchase.plan_code && purchase.billing_cycle) {
+    const plan = await deps.getPlanByCode(purchase.plan_code);
     const monthlyCredits = plan?.monthlyAiCredits ?? 0;
+
+    // Month one of the period. An annual plan's months two to twelve are
+    // granted by the scheduled sweep, never all at once here.
     if (monthlyCredits > 0) {
       await deps.grantCredits({
-        profileId: stored.profile_id,
+        profileId: purchase.profile_id,
         amount: monthlyCredits,
-        idempotencyKey: `xpay-plan:${session.id}`,
+        idempotencyKey: annualInstallmentKey(session.id, 1),
         sourceType: 'subscription',
-        sourceId: null,
-        description: `Monthly AI tokens for ${stored.plan_code} (XPay)`,
-        metadata: { plan_code: stored.plan_code, xpay_session: session.id },
+        sourceId: purchase.id,
+        description: `AI tokens for month 1 of the ${purchase.plan_code} period (XPay)`,
+        metadata: {
+          plan_code: purchase.plan_code,
+          billing_cycle: purchase.billing_cycle,
+          xpay_session: session.id,
+          installment_month: 1,
+        },
       });
+    }
+
+    // The canonical subscription row is what daily entitlements, expiry and
+    // the screens read. It is written only here, and only for a paid session.
+    if (purchase.access_ends_at) {
+      await deps.activateSubscription({
+        profileId: purchase.profile_id,
+        planCode: purchase.plan_code,
+        billingCycle: purchase.billing_cycle,
+        periodStartsAt: purchase.access_starts_at,
+        periodEndsAt: purchase.access_ends_at,
+        sessionId: purchase.session_id,
+        metadata: {
+          order_id: metadata.order_id ?? null,
+          amount_total: purchase.amount_total,
+          payment_method_type: purchase.payment_method_type,
+        },
+      });
+    } else {
+      console.error(`XPay subscription purchase ${purchase.id} has no access_ends_at; it was not activated.`);
     }
   }
 
   // The money half is committed. The receipt is the notification half and
   // never changes a balance; a failure to queue it must not turn a recorded
   // payment into a retried webhook. The call is idempotent on the session id.
+  // The queue's idempotency key is the session, so a repair run cannot send a
+  // second receipt; calling it every time means a payment whose first
+  // notification failed still gets one on the retry.
   void enqueueBillingEmail({
-    profileId: stored.profile_id,
-    kind: stored.purchase_kind === 'subscription' ? 'subscription_activated' : 'payment_confirmed',
-    planCode: stored.plan_code ?? undefined,
-    billingCycle: stored.billing_cycle ?? undefined,
-    amountTotal: stored.amount_total / 100,
-    currency: stored.currency,
+    profileId: purchase.profile_id,
+    kind: purchase.purchase_kind === 'subscription' ? 'subscription_activated' : 'payment_confirmed',
+    planCode: purchase.plan_code ?? undefined,
+    billingCycle: purchase.billing_cycle ?? undefined,
+    amountTotal: purchase.amount_total / 100,
+    currency: purchase.currency,
     sessionId: session.id,
-    periodEnd: accessEndsAt ?? undefined,
+    periodEnd: purchase.access_ends_at ?? undefined,
   }).catch((error) => {
     console.error(`Billing email for XPay session ${session.id} was not queued:`, error);
   });
 
-  return { purchase, created: true };
+  return { purchase, created };
 }
 
 export interface ProcessXPayResult {

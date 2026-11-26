@@ -339,5 +339,72 @@ export const subscriptionsAr: Record<string, string> = {
   'Our payment account cannot take Egyptian pounds yet, so checkout is paused. Nothing will be charged and your plan stays as it is.': 'حساب الدفع لدينا لا يستطيع التحصيل بالجنيه المصري بعد، لذا الدفع متوقف مؤقتاً. لن يُخصم أي مبلغ وسيظل اشتراكك كما هو.',
   'No payment method is enabled on our payment account yet, so checkout is paused. Nothing will be charged and your plan stays as it is.': 'لم يتم تفعيل أي طريقة دفع على حساب الدفع لدينا بعد، لذا الدفع متوقف مؤقتاً. لن يُخصم أي مبلغ وسيظل اشتراكك كما هو.',
   'We could not reach the payment provider just now, so checkout is paused. Nothing was charged — please try again in a few minutes.': 'تعذّر الوصول إلى مزوّد الدفع حالياً، لذا الدفع متوقف مؤقتاً. لم يُخصم أي مبلغ — يرجى المحاولة بعد دقائق.',
+  // Published pricing catalogue, comparison table and current-plan panel
+  'Most popular': 'الأكثر طلباً',
+  'Best value': 'أفضل قيمة',
+  'one-time': 'لمرة واحدة',
+  'Upgrade to': 'الترقية إلى',
+  'Downgrade to': 'التخفيض إلى',
+  'Choose plan': 'اختر الخطة',
+  'Free forever': 'مجاني للأبد',
+  'Included': 'مشمول',
+  'Not included': 'غير مشمول',
+  'Current plan': 'خطتك الحالية',
+  'Your current plan': 'خطتك الحالية',
+  'Expires': 'ينتهي في',
+  'Last payment': 'آخر دفعة',
+  'Payment status': 'حالة الدفع',
+  'Paid': 'مدفوع',
+  'Awaiting payment': 'بانتظار الدفع',
+  'Order': 'رقم الطلب',
+  'Save': 'توفير',
+  'Feature': 'الميزة',
+  'Free': 'مجاني',
+  '2 months free': 'شهران مجاناً',
+  'Compare plans in detail': 'قارن الخطط بالتفصيل',
+  'Every feature, plan by plan — the same entitlements the platform enforces.':
+    'كل ميزة، خطة بخطة — نفس الصلاحيات التي تطبقها المنصة.',
+  'Monthly AI tokens': 'توكنات الذكاء الاصطناعي الشهرية',
+  'Saved jobs': 'الوظائف المحفوظة',
+  'Your plan has reached its saved-jobs limit. Remove a saved job to save another.':
+    'وصلت خطتك إلى الحد الأقصى للوظائف المحفوظة. احذف وظيفة محفوظة لتتمكن من حفظ أخرى.',
+  'Complete CV builder': 'منشئ السيرة الذاتية الكامل',
+  'AI-tailored CVs': 'سيرة ذاتية مخصصة بالذكاء الاصطناعي',
+  'ATS score & gap analysis': 'تقييم ATS وتحليل الفجوات',
+  'JD keyword extraction': 'استخراج كلمات الوظيفة',
+  'AI cover letters': 'خطابات التقديم بالذكاء الاصطناعي',
+  'Full learning roadmaps': 'خرائط تعلم كاملة',
+  'Unlimited CV versions & storage': 'نسخ سيرة وتخزين غير محدود',
+  'AI mock interviews': 'مقابلات تجريبية بالذكاء الاصطناعي',
+  'AI career mentor': 'مرشد مهني ذكي',
+  'Advanced portfolio & evidence': 'معرض أعمال وإثباتات متقدم',
+  'Career progress reports': 'تقارير التقدم المهني',
+  'Career transition engine': 'محرك التحول المهني',
+  'Multi-role comparative fit': 'مقارنة الملاءمة بين الأدوار',
+  'Deep scenario interviews': 'مقابلات سيناريو متعمقة',
+  'Priority AI processing': 'أولوية معالجة الذكاء الاصطناعي',
+  'Tokens are granted monthly across the 12 months — not all at once.':
+    'تُمنح التوكنات شهرياً على مدار ١٢ شهراً — وليس كلها مقدماً.',
+  'tokens each month for 12 months — granted monthly, not all at once.':
+    'توكن كل شهر لمدة ١٢ شهراً — تُمنح شهرياً وليس كلها مقدماً.',
+  'Your plan is active. Your token allowance and expiration date are shown below.':
+    'خطتك مفعّلة. يظهر رصيد توكناتك وتاريخ الانتهاء أدناه.',
+  'Payment not completed': 'لم تكتمل عملية الدفع',
+  'Checkout expired': 'انتهت صلاحية صفحة الدفع',
+  'The payment was not confirmed, so nothing was charged and no plan changed. You can try again.':
+    'لم يتم تأكيد الدفع، لذا لم يُخصم أي مبلغ ولم تتغير الخطة. يمكنك المحاولة مرة أخرى.',
+  'This checkout expired before the payment was confirmed. Nothing was charged and no plan changed.':
+    'انتهت صلاحية صفحة الدفع قبل تأكيد الدفع. لم يُخصم أي مبلغ ولم تتغير الخطة.',
+  'Change plan': 'غيّر الخطة',
+  'Auto-renewal is off. Your access continues until the expiration date. When it ends, buy the same plan again to renew it.':
+    'التجديد التلقائي متوقف. يستمر وصولك حتى تاريخ الانتهاء. عند انتهائه، اشترِ الخطة نفسها مرة أخرى لتجديدها.',
+  'This is a downgrade': 'هذا تخفيض للخطة',
+  'The new plan starts as soon as this payment is confirmed. Your current plan is replaced immediately, and unused days are not refunded.':
+    'تبدأ الخطة الجديدة فور تأكيد الدفع. تُستبدل خطتك الحالية مباشرةً، ولا تُرد قيمة الأيام غير المستخدمة.',
+  Basic: 'أساسي',
+  'How do I pay?': 'كيف أدفع؟',
+  'Choose a plan and you are taken to XPay’s secure page. The payment methods offered there are the ones enabled on our merchant account; Aionvia never sees or stores your card number, and the plan activates only when the payment is confirmed.':
+    'اختر خطة وستُنقل إلى صفحة XPay الآمنة. طرق الدفع المعروضة هناك هي المفعّلة على حساب التاجر؛ لا يرى Aionvia رقم بطاقتك ولا يخزّنه، ولا تُفعّل الخطة إلا عند تأكيد الدفع.',
+
   'No payment method is available right now.': 'لا توجد طريقة دفع متاحة الآن.',
 };

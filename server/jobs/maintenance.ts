@@ -5,6 +5,7 @@
  */
 
 import { getSupabaseServer } from '../db/supabase.ts';
+import { grantDueAnnualTokenInstallments } from '../xpay/installments.ts';
 
 export interface MaintenanceSweepOutcome {
   expiredSubscriptions: number;
@@ -25,6 +26,14 @@ export interface MaintenanceSweepOutcome {
   dailyEntitlementsEligible: number;
   /** How many accounts the sweep could not reach this time. */
   dailyEntitlementsFailed: number;
+  /** Annual periods that still have a monthly token allowance due. */
+  annualTokenPeriods: number;
+  /** Monthly allowances granted to annual plans by this sweep. */
+  annualTokensGranted: number;
+  /** Allowances that were already granted for their month. */
+  annualTokensSkipped: number;
+  /** Allowances the sweep failed to grant; the next run retries them. */
+  annualTokensFailed: number;
 }
 
 /**
@@ -41,6 +50,10 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
   let dailyEntitlementsGranted = 0;
   let dailyEntitlementsEligible = 0;
   let dailyEntitlementsFailed = 0;
+  let annualTokenPeriods = 0;
+  let annualTokensGranted = 0;
+  let annualTokensSkipped = 0;
+  let annualTokensFailed = 0;
 
   try {
     const { data, error } = await supabase.rpc('expire_subscriptions');
@@ -120,6 +133,23 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
     console.error('Failed to run expire_all_daily_credits:', err);
   }
 
+  // Annual plans, paid monthly in tokens.
+  //
+  // An annual subscription is one payment for twelve months of access, and the
+  // allowance is monthly: the webhook grants month one, and this sweep grants
+  // each later month as it falls due. Each grant is keyed by the session and
+  // the month, so the sweep may run every few minutes without ever doubling an
+  // allowance, and a failure is retried by the next run.
+  try {
+    const outcome = await grantDueAnnualTokenInstallments();
+    annualTokenPeriods = outcome.periods;
+    annualTokensGranted = outcome.granted;
+    annualTokensSkipped = outcome.skipped;
+    annualTokensFailed = outcome.failed;
+  } catch (err) {
+    console.error('Failed to grant due annual token installments:', err);
+  }
+
   return {
     expiredSubscriptions,
     expiredTemporaryAccess,
@@ -129,6 +159,10 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
     dailyEntitlementsGranted,
     dailyEntitlementsEligible,
     dailyEntitlementsFailed,
+    annualTokenPeriods,
+    annualTokensGranted,
+    annualTokensSkipped,
+    annualTokensFailed,
   };
 }
 

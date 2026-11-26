@@ -191,6 +191,7 @@ import {
   listBookmarks,
   createBookmark,
   deleteBookmark,
+  getSavedJobsAllowance,
 } from './server/db/bookmarks.ts';
 import {
   listCourses,
@@ -7177,6 +7178,23 @@ app.post('/api/bookmarks', requireAuth, async (req: Request, res: Response) => {
     const body = req.body ?? {};
     const jobId = str(body.jobId, 100);
     if (!jobId) return res.status(400).json({ error: 'jobId is required' });
+
+    // The limit belongs to the plan, so it is checked against the catalogue
+    // here, not trusted from the browser. Saving a job that is already saved is
+    // idempotent and never counts as a new one.
+    const existing = await listBookmarks(req.authUser!.id);
+    if (!existing.some((bookmark) => bookmark.jobId === jobId)) {
+      const allowance = await getSavedJobsAllowance(req.authUser!.id);
+      if (existing.length >= allowance.limit) {
+        return res.status(409).json({
+          error: 'You have reached the saved-jobs limit for your plan. Remove a saved job, or upgrade to save more.',
+          code: 'SAVED_JOBS_LIMIT_REACHED',
+          limit: allowance.limit,
+          planCode: allowance.planCode,
+        });
+      }
+    }
+
     const bookmark = await createBookmark(req.authUser!.id, jobId);
     return res.status(201).json({ success: true, bookmark });
   } catch (error) {

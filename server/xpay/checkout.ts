@@ -101,6 +101,12 @@ export interface BuildCheckoutInput {
   profileId: string;
   email?: string | null;
   amount: CheckoutAmount;
+  /**
+   * This platform's order reference for the checkout. It is generated here,
+   * carried in the session metadata, and copied onto the purchase, so finance
+   * can trace one payment without reading XPay's dashboard.
+   */
+  orderId: string;
   /** Where the browser returns. `{CHECKOUT_SESSION_ID}` is filled in by XPay. */
   origin: string;
   locale: 'ar' | 'en';
@@ -132,6 +138,7 @@ export function buildCheckoutBody(input: BuildCheckoutInput): XPayCheckoutBody {
   const metadata: Record<string, string> = {
     profile_id: input.profileId,
     purchase_kind: purchase.kind,
+    order_id: input.orderId,
     list_amount: String(amount.listAmount),
   };
   if (entitlement.planCode) metadata.plan_code = entitlement.planCode;
@@ -179,7 +186,9 @@ export function buildCheckoutBody(input: BuildCheckoutInput): XPayCheckoutBody {
     customerDetails: input.email ? { email: input.email } : {},
     metadata,
     locale: input.locale === 'ar' ? 'ar' : 'en',
-    expiresAfterMinutes: Math.max(5, Math.min(input.expiresAfterMinutes ?? 60, 1440)),
+    // XPay documents a 30-minute minimum and a 24-hour default. Keeping the
+    // floor at 30 avoids a request the API rejects for an unusable window.
+    expiresAfterMinutes: Math.max(30, Math.min(input.expiresAfterMinutes ?? 60, 1440)),
   };
 
   if (input.paymentMethodConfigurationId) {

@@ -110,7 +110,11 @@ const FEATURE_LABELS: Record<EntitlementFeature, string> = {
   'interview.mock_simulation': 'Mock interviews',
   'ai_mentor.session': 'AI mentor sessions',
   'portfolio.advanced': 'Advanced portfolio',
+  'career.reports': 'Career progress reports',
   'career.transition_plan': 'Career transition plan',
+  'career.comparative_fit': 'Multi-role comparative fit',
+  'interview.deep_simulation': 'Deep scenario interviews',
+  'ai.priority_processing': 'Priority AI processing',
 };
 
 /**

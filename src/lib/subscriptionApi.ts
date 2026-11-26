@@ -28,6 +28,8 @@ export interface CurrentSubscriptionResponse {
   activeSubscription: SubscriptionDTO | null;
   temporaryPaymentId: string | null;
   expiresAt: string | null;
+  startedAt?: string | null;
+  billingCycle?: 'monthly' | 'annual' | null;
   autoRenew: boolean;
   history: SubscriptionDTO[];
 }

@@ -481,11 +481,11 @@ export const cvAr: Record<string, string> = {
     'احفظ لقطات في استوديو السيرة للاحتفاظ بنسخ مخصصة لكل وظيفة ومتابعة توافق ATS بمرور الوقت.',
   // The AI edit allowance. The studio is where the platform spends the most AI
   // capacity per candidate, so the allowance is stated rather than discovered.
-  'Unlimited AI Edits ✨': 'تعديلات ذكاء اصطناعي غير محدودة ✨',
+  'Unlimited CV AI edits': 'تعديلات ذكاء اصطناعي غير محدودة للسيرة الذاتية',
   'AI edits today: {remaining}/{limit} remaining':
     'تعديلات الذكاء الاصطناعي اليوم: {remaining}/{limit} متبقية',
   'Resets in {time}': 'تتجدد خلال {time}',
-  'Upgrade to Pro for Unlimited Edits': 'اشترك في Pro للحصول على تعديلات غير محدودة',
+  'Upgrade to Pro for unlimited CV edits': 'اشترك في Pro للحصول على تعديلات غير محدودة للسيرة الذاتية',
   'Your AI edits for today are used up. The timer in the studio header shows when they come back.':
     'استنفدت تعديلات الذكاء الاصطناعي اليوم. المؤقت في أعلى الاستوديو يوضّح متى تعود.',
 

@@ -169,6 +169,8 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
   const [trackingId, setTrackingId] = useState<string | null>(null);
   /** The outcome of the last application the user tracked from this screen. */
   const [trackNotice, setTrackNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  /** Set when the plan's saved-jobs allowance refuses another save. */
+  const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
   /** The vacancy that is on its way to the CV Studio. */
   const [tailoringId, setTailoringId] = useState<string | null>(null);
   /** The outcome of the last request for a tailored CV. */
@@ -192,6 +194,18 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
    * nothing to compare, and an unknown is never treated as a match.
    */
   const [readyOnly, setReadyOnly] = useState(false);
+
+  const handleToggleBookmark = async (jobId: string) => {
+    const wasBookmarked = bookmarkedJobIds.includes(jobId);
+    const result = await toggleBookmarkJob(jobId);
+    if (!wasBookmarked && result.limitReached) {
+      setBookmarkNotice(
+        t('Your plan has reached its saved-jobs limit. Remove a saved job to save another.')
+      );
+    } else if (!wasBookmarked || result.saved === false) {
+      setBookmarkNotice(null);
+    }
+  };
 
   /** The first search runs once, after the profile has loaded. */
   const startedRef = useRef(false);
@@ -909,7 +923,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
           onCompare={(jobId) => void toggleCompare(jobId)}
           comparingIds={compareIds}
           bookmarkedJobIds={bookmarkedJobIds}
-          onToggleBookmark={toggleBookmarkJob}
+          onToggleBookmark={(jobId) => void handleToggleBookmark(jobId)}
           onTrackApplication={(entry) => void handleTrackApplication(entry)}
           onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
           trackingId={trackingId}
@@ -929,7 +943,7 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
               key={item.job.id}
               item={item}
               bookmarked={bookmarkedJobIds.includes(item.job.id)}
-              onToggleBookmark={toggleBookmarkJob}
+              onToggleBookmark={(jobId) => void handleToggleBookmark(jobId)}
               onTrackApplication={(entry) => void handleTrackApplication(entry)}
               onCreateTailoredCv={(entry) => handleCreateTailoredCv(entry)}
               onCompare={(entry) => void toggleCompare(entry.job.id)}
@@ -940,6 +954,23 @@ export const JobsView: React.FC<JobsViewProps> = ({ onNavigate }) => {
             />
           ))}
         </AnimatedList>
+      )}
+
+      {/* The saved-jobs allowance refused another save. */}
+      {bookmarkNotice && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--surface-secondary)] px-4 py-2.5 text-xs font-semibold text-[var(--text-primary)]"
+        >
+          <span>{bookmarkNotice}</span>
+          <button
+            type="button"
+            onClick={() => setBookmarkNotice(null)}
+            className="shrink-0 text-[var(--text-muted)] underline hover:text-[var(--text-primary)]"
+          >
+            {t('Dismiss')}
+          </button>
+        </div>
       )}
 
       {/* The outcome of the last tracked application. */}

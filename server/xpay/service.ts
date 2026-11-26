@@ -14,6 +14,8 @@
  *     session, as XPay allows.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { getPlanByCode } from '../db/subscriptions.ts';
 import { validateCoupon } from '../coupons/service.ts';
 import { getActiveBirthdayReward } from '../birthday/service.ts';
@@ -76,6 +78,8 @@ export interface CreateCheckoutInput {
 export interface CreateCheckoutResult {
   url: string;
   sessionId: string;
+  /** The internal order reference carried in the XPay session metadata. */
+  orderId: string;
   amount: { list: number; discount: number; charge: number; currency: 'EGP' };
   entitlement: ReturnType<typeof purchaseEntitlement>;
 }
@@ -195,11 +199,13 @@ export async function createXPayCheckoutForProfile(
   const amount = purchaseAmount(purchase, couponDiscount);
   const entitlement = purchaseEntitlement(purchase);
   const config = getXPayConfig();
+  const orderId = `ord_${randomUUID().replace(/-/g, '')}`;
   const body = buildCheckoutBody({
     purchase,
     profileId: input.profileId,
     email: input.email ?? null,
     amount,
+    orderId,
     origin: input.origin,
     locale: input.locale,
     couponCode,
@@ -245,6 +251,7 @@ export async function createXPayCheckoutForProfile(
   return {
     url: session.url as string,
     sessionId: session.id,
+    orderId,
     amount: {
       list: amount.listAmount,
       discount: amount.discountAmount,
@@ -322,6 +329,8 @@ export interface XPayBillingStatus {
     purchaseKind: 'subscription' | 'credit_pack';
     planCode: string | null;
     billingCycle: BillingCycle | null;
+    /** The internal order reference recorded when the session was opened. */
+    orderId: string | null;
     amountTotal: number;
     currency: string;
     status: string;
@@ -372,6 +381,7 @@ export async function getXPayBillingStatus(profileId: string): Promise<XPayBilli
       purchaseKind: session.purchase_kind,
       planCode: session.plan_code,
       billingCycle: session.billing_cycle,
+      orderId: typeof session.metadata?.order_id === 'string' ? session.metadata.order_id : null,
       amountTotal: session.amount_total,
       currency: session.currency,
       status: session.status,

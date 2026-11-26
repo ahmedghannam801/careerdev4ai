@@ -281,6 +281,55 @@ export async function getXPayPurchaseBySession(sessionId: string): Promise<XPayP
 }
 
 /**
+ * The annual subscription periods that are still running.
+ *
+ * The monthly token sweep reads this: an annual plan receives its allowance
+ * once per month of the twelve, so the sweep needs every period whose end is
+ * still in the future — including periods extended by a manual renewal.
+ */
+/**
+ * True when this purchase is the subscription the account is actually on.
+ *
+ * A candidate who switches annual plans still has the earlier, unexpired
+ * purchase row. The sweep must not keep paying that row's monthly allowance:
+ * only the session recorded on the canonical subscription is current.
+ */
+export async function isCurrentXPaySubscription(
+  profileId: string,
+  sessionId: string
+): Promise<boolean> {
+  const { data, error } = await getSupabaseServer()
+    .from('subscriptions')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('status', 'active')
+    .eq('metadata->>xpay_session', sessionId)
+    .gt('current_period_ends_at', new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error('Failed to read the current subscription: ' + error.message);
+  return Boolean(data);
+}
+
+export async function listActiveAnnualSubscriptionPurchases(): Promise<XPayPurchaseRow[]> {
+  const { data, error } = await getSupabaseServer()
+    .from('xpay_purchases')
+    .select('*')
+    .eq('purchase_kind', 'subscription')
+    .eq('billing_cycle', 'annual')
+    .eq('status', 'active')
+    .not('plan_code', 'is', null)
+    .not('access_ends_at', 'is', null)
+    .gt('access_ends_at', new Date().toISOString())
+    .order('access_starts_at', { ascending: true })
+    .limit(1000);
+
+  if (error) throw new Error('Failed to list annual XPay purchases: ' + error.message);
+  return (data ?? []) as XPayPurchaseRow[];
+}
+
+/**
  * The plan period this candidate's card payments currently grant.
  *
  * Only the payment mode in which the deployment runs is honoured: test data and
@@ -296,7 +345,7 @@ export async function getActiveXPayAccess(profileId: string): Promise<XPayPurcha
     .eq('livemode', !isXPayTestDeployment())
     .not('access_ends_at', 'is', null)
     .gt('access_ends_at', new Date().toISOString())
-    .order('access_ends_at', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 

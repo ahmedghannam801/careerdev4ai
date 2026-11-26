@@ -4,7 +4,8 @@
  * One rail, and only one: XPay's hosted page. The candidate chooses a billing
  * cycle, optionally applies a coupon or the birthday discount, sees exactly
  * what will be charged, and is sent to XPay to pay by whichever methods the
- * merchant account has enabled — cards, Apple Pay, Fawry, ValU.
+ * merchant account has enabled. Nothing is promised here that the account has
+ * not provisioned.
  *
  * Three rules shape this screen:
  *
@@ -49,6 +50,8 @@ interface CheckoutModalProps {
   monthlyPiasters: number;
   annualPiasters: number;
   aiCredits: number;
+  /** True when the candidate is moving to a lower-ranked plan. */
+  isDowngrade?: boolean;
   onSuccess?: () => void;
 }
 
@@ -115,6 +118,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   monthlyPiasters,
   annualPiasters,
   aiCredits,
+  isDowngrade = false,
 }) => {
   const { t, settings } = useCareer();
   const isAr = settings.language === 'ar';
@@ -350,6 +354,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             )}
 
+            {/* A downgrade is allowed, but never silent: the remaining paid
+                time does not survive the switch. */}
+            {!isCreditPack && isDowngrade && (
+              <div className="mb-4 rounded-2xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 p-3 text-[11px] leading-relaxed text-[var(--text-primary)]">
+                <span className="block font-bold">{t('This is a downgrade')}</span>
+                {t(
+                  'The new plan starts as soon as this payment is confirmed. Your current plan is replaced immediately, and unused days are not refunded.'
+                )}
+              </div>
+            )}
+
             {/* What the candidate can pay with, as the account enables it. */}
             <div className="mb-4">
               <span className="mb-2 block text-sm font-semibold text-[var(--text-primary)]">
@@ -484,6 +499,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     {aiCredits} {t('Tokens')} / {t('per month')}
                   </span>
                 </div>
+              )}
+              {!isCreditPack && billingCycle === 'annual' && (
+                <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
+                  {aiCredits} {t('tokens each month for 12 months — granted monthly, not all at once.')}
+                </p>
               )}
               {shownDiscountPiasters > 0 && (
                 <div className="flex justify-between text-sm font-semibold text-[var(--color-success-strong)]">

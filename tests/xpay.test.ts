@@ -135,10 +135,10 @@ const plan = {
   nameAr: 'كارير بلس',
   descriptionEn: null,
   descriptionAr: null,
-  priceMonthlyPiasters: 29900,
-  priceAnnualPiasters: 249900,
+  priceMonthlyPiasters: 17900,
+  priceAnnualPiasters: 179000,
   currency: 'EGP' as const,
-  monthlyAiCredits: 200,
+  monthlyAiCredits: 85,
   features: {},
   sortOrder: 1,
   isActive: true,
@@ -158,7 +158,7 @@ const pack = {
 test('an EGP price is sent as the catalogue stores it, in piasters', () => {
   const purchase = { kind: 'subscription' as const, plan, billingCycle: 'monthly' as const };
   const amount = purchaseAmount(purchase);
-  assert.deepEqual(amount, { listAmount: 29900, discountAmount: 0, chargeAmount: 29900 });
+  assert.deepEqual(amount, { listAmount: 17900, discountAmount: 0, chargeAmount: 17900 });
 
   const body = buildCheckoutBody({
     purchase,
@@ -167,9 +167,10 @@ test('an EGP price is sent as the catalogue stores it, in piasters', () => {
     amount,
     origin: 'https://aionvia.pages.dev/',
     locale: 'ar',
+    orderId: 'ord_test_1001',
   });
 
-  assert.equal(body.lineItems[0].priceData.unitAmount, 29900);
+  assert.equal(body.lineItems[0].priceData.unitAmount, 17900);
   assert.equal(body.lineItems[0].priceData.currency, 'EGP');
   assert.equal(body.mode, 'payment');
   assert.equal(body.submitType, 'PAY');
@@ -177,11 +178,28 @@ test('an EGP price is sent as the catalogue stores it, in piasters', () => {
   assert.deepEqual(body.metadata.plan_code, 'career_plus');
   assert.deepEqual(body.metadata.billing_cycle, 'monthly');
   assert.equal(body.metadata.profile_id, '11111111-1111-4111-8111-111111111111');
+  // The candidate's own reference, not just the provider's session id.
+  assert.equal(body.metadata.order_id, 'ord_test_1001');
   // The candidate id is the customer key, so no mapping table is needed.
   assert.equal(body.externalCustomerId, '11111111-1111-4111-8111-111111111111');
   // XPay fills the session id into the return URL.
   assert.match(body.afterCompletion.redirect.url, /\{CHECKOUT_SESSION_ID\}$/);
   assert.match(body.cancelUrl, /xpay=cancelled$/);
+});
+
+test('never asks XPay for a checkout window below its 30-minute minimum', () => {
+  const purchase = { kind: 'subscription' as const, plan, billingCycle: 'monthly' as const };
+  const body = buildCheckoutBody({
+    purchase,
+    profileId: '11111111-1111-4111-8111-111111111111',
+    amount: purchaseAmount(purchase),
+    origin: 'https://aionvia.pages.dev',
+    locale: 'en',
+    orderId: 'ord_test_window',
+    expiresAfterMinutes: 5,
+  });
+
+  assert.equal(body.expiresAfterMinutes, 30);
 });
 
 test('a discount never exceeds the price and is recorded on the session', () => {
@@ -205,6 +223,7 @@ test('a discount never exceeds the price and is recorded on the session', () => 
     origin: 'https://aionvia.pages.dev',
     locale: 'en',
     couponCode: 'WELCOME25',
+    orderId: 'ord_test_1002',
   });
   assert.equal(body.lineItems[0].priceData.unitAmount, 7400);
   assert.equal(body.metadata.credit_pack_id, 'pack_40');
@@ -222,7 +241,7 @@ function session(overrides: Partial<XPaySessionResponse> = {}): XPaySessionRespo
     paymentStatus: 'paid',
     url: 'https://checkout.xpay.app/c/cs_test_abc123',
     currency: 'EGP',
-    amountTotal: 29900,
+    amountTotal: 17900,
     livemode: false,
     externalCustomerId: '11111111-1111-4111-8111-111111111111',
     paymentIntentId: 'pi_test_1',
@@ -231,7 +250,7 @@ function session(overrides: Partial<XPaySessionResponse> = {}): XPaySessionRespo
       purchase_kind: 'subscription',
       plan_code: 'career_plus',
       billing_cycle: 'monthly',
-      list_amount: '29900',
+      list_amount: '17900',
     },
     ...overrides,
   };
@@ -241,32 +260,60 @@ interface Harness {
   deps: XPayFulfillmentDeps;
   granted: Array<{ amount: number; key: string }>;
   purchases: Array<{ sessionId: string; planCode: string | null }>;
+  activations: Array<{ planCode: string; cycle: string; sessionId: string }>;
   events: Set<string>;
 }
 
 function harness(): Harness {
   const purchases: Harness['purchases'] = [];
   const granted: Harness['granted'] = [];
+  const activations: Harness['activations'] = [];
   const events = new Set<string>();
+  // The store returns database rows in snake case, so the fake does too.
+  const purchaseRows = new Map<string, Record<string, unknown>>();
   let sessionRow: Record<string, unknown> | null = null;
 
   const deps = {
     getPlanByCode: (async () => plan) as unknown as XPayFulfillmentDeps['getPlanByCode'],
+    // The ledger refuses a repeated idempotency key; the fake does the same so
+    // a repaired webhook can be tested for a second grant.
     grantCredits: (async (input: { amount: number; idempotencyKey: string }) => {
-      granted.push({ amount: input.amount, key: input.idempotencyKey });
+      if (!granted.some((entry) => entry.key === input.idempotencyKey)) {
+        granted.push({ amount: input.amount, key: input.idempotencyKey });
+      }
       return { granted: true } as never;
     }) as unknown as XPayFulfillmentDeps['grantCredits'],
     recordPurchase: (async (input: Record<string, unknown>) => {
-      if (purchases.some((entry) => entry.sessionId === input.sessionId)) return null;
+      const sessionId = String(input.sessionId);
+      if (purchaseRows.has(sessionId)) return null;
       purchases.push({
-        sessionId: String(input.sessionId),
+        sessionId,
         planCode: (input.planCode as string | null) ?? null,
       });
-      return { session_id: input.sessionId, ...input } as never;
+      const row = {
+        id: `purchase_${purchaseRows.size + 1}`,
+        profile_id: input.profileId,
+        session_id: sessionId,
+        purchase_kind: input.purchaseKind,
+        plan_code: input.planCode,
+        billing_cycle: input.billingCycle,
+        pack_id: input.packId,
+        credits: input.credits,
+        amount_total: input.amountTotal,
+        currency: input.currency,
+        payment_method_type: input.paymentMethodType,
+        livemode: input.livemode,
+        access_starts_at: input.accessStartsAt,
+        access_ends_at: input.accessEndsAt,
+        status: 'active',
+        metadata: input.metadata,
+        created_at: new Date().toISOString(),
+      };
+      purchaseRows.set(sessionId, row);
+      return row as never;
     }) as unknown as XPayFulfillmentDeps['recordPurchase'],
     getPurchaseBySession: (async (sessionId: string) => {
-      const found = purchases.find((entry) => entry.sessionId === sessionId);
-      return found ? ({ session_id: found.sessionId, plan_code: found.planCode } as never) : null;
+      return (purchaseRows.get(sessionId) ?? null) as never;
     }) as unknown as XPayFulfillmentDeps['getPurchaseBySession'],
     // Mirrors the shape the store returns: the database row, in snake case.
     upsertSession: (async (input: Record<string, unknown>) => {
@@ -300,9 +347,25 @@ function harness(): Harness {
       return 'new' as const;
     }) as unknown as XPayFulfillmentDeps['recordEvent'],
     markEventProcessed: (async () => undefined) as unknown as XPayFulfillmentDeps['markEventProcessed'],
+    // The database function is idempotent on the session id; the fake records
+    // the call so a test can prove activation happened exactly once.
+    activateSubscription: (async (input: {
+      planCode: string;
+      billingCycle: string;
+      sessionId: string;
+    }) => {
+      if (!activations.some((entry) => entry.sessionId === input.sessionId)) {
+        activations.push({
+          planCode: input.planCode,
+          cycle: input.billingCycle,
+          sessionId: input.sessionId,
+        });
+      }
+      return { subscriptionId: 'sub_test_1', created: true } as never;
+    }) as unknown as XPayFulfillmentDeps['activateSubscription'],
   } as XPayFulfillmentDeps;
 
-  return { deps, granted, purchases, events };
+  return { deps, granted, purchases, activations, events };
 }
 
 function event(type: string, object: XPaySessionResponse, id = 'evt_1'): XPayEvent {
@@ -325,12 +388,16 @@ test('a Fawry checkout that completes unpaid grants nothing', async () => {
 });
 
 test('a card payment that completes paid grants one period, once', async () => {
-  const { deps, purchases, granted } = harness();
+  const { deps, purchases, granted, activations } = harness();
 
   await processXPayEvent(event('checkout.session.completed', session()), deps);
   assert.equal(purchases.length, 1);
-  // The plan's monthly AI tokens are granted alongside the period.
-  assert.deepEqual(granted, [{ amount: 200, key: 'xpay-plan:cs_test_abc123' }]);
+  // Month one of the plan's token allowance, never all twelve.
+  assert.deepEqual(granted, [{ amount: 85, key: 'xpay-plan:cs_test_abc123' }]);
+  // The canonical subscription is opened only on a paid session.
+  assert.deepEqual(activations, [
+    { planCode: 'career_plus', cycle: 'monthly', sessionId: 'cs_test_abc123' },
+  ]);
 
   // The same session delivered again under a new event id: the unique purchase
   // row stops a second period, and the credit key stops a second grant.

@@ -83,7 +83,7 @@ export const CvStudioAiQuotaBadge: React.FC<CvStudioAiQuotaBadgeProps> = ({ onUp
         className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--color-ai)]/30 bg-[var(--color-ai-surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-ai)]"
       >
         <Sparkles className="h-3.5 w-3.5" />
-        <span>{t('Unlimited AI Edits ✨')}</span>
+        <span>{t('Unlimited CV AI edits')}</span>
       </span>
     );
   }
@@ -120,7 +120,7 @@ export const CvStudioAiQuotaBadge: React.FC<CvStudioAiQuotaBadgeProps> = ({ onUp
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)]"
         >
           <Sparkles className="h-3 w-3" />
-          <span>{t('Upgrade to Pro for Unlimited Edits')}</span>
+          <span>{t('Upgrade to Pro for unlimited CV edits')}</span>
         </MagnetButton>
       )}
     </div>

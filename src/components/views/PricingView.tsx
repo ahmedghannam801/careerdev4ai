@@ -1,9 +1,12 @@
 /**
- * PricingView — Production SaaS Pricing & Subscription Center.
- * Comprehensive Egyptian-pound tier catalog (Student, Pro, Career Plus), credit packs,
- * billing cycle toggles, and checkout over XPay's hosted page — cards, Apple Pay,
- * Fawry and ValU — where every method shown is one the merchant account has
- * enabled.
+ * PricingView — the published subscription catalogue.
+ *
+ * Four plans in Egyptian pounds. The prices rendered here come from the
+ * catalogue API, and these constants are only the fallback for a page that
+ * cannot reach it: a browser must never be the thing that decides what a plan
+ * costs. Checkout is the single XPay hosted page, and the methods it offers are
+ * the ones the merchant account has actually enabled — never a method this
+ * page promised on the account's behalf.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -24,7 +27,16 @@ import { CheckoutModal } from '../subscription/CheckoutModal';
 import { resolvePaymentAvailability } from '../../lib/paymentAvailability';
 import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
 import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
-import { formatEgpPrice } from '../../../shared/subscriptions';
+import {
+  annualSavingsPiasters,
+  formatEgpPrice,
+  isPlanEntitled,
+  PLAN_RANK,
+  type EntitlementFeature,
+  type SubscriptionPlanCode,
+  type SubscriptionPlanDTO,
+} from '../../../shared/subscriptions';
+import { fetchPublicPlans } from '../../lib/subscriptionApi';
 import { PUBLIC_PATHS } from '../../../shared/contact.ts';
 import { CREDIT_PACKS } from '../../../shared/credits';
 import { CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS } from '../../../shared/cvTemplates';
@@ -42,6 +54,8 @@ interface PlanDefinition {
   monthlyPiasters: number;
   annualPiasters: number;
   monthlyAiCredits: number;
+  /** The free plan's welcome grant. Paid plans use their monthly allowance. */
+  oneTimeCredits?: number;
   featuresEn: string[];
   featuresAr: string[];
   isPopular?: boolean;
@@ -57,21 +71,24 @@ const PLANS: PlanDefinition[] = [
     taglineAr: 'للطلاب والباحثين عن عمل لاستكشاف المسارات المهنية',
     monthlyPiasters: 0,
     annualPiasters: 0,
-    monthlyAiCredits: 5, // One-time trial credits
+    // The free plan has no monthly allowance: its five tokens are a one-time
+    // welcome, and the daily claim is the recurring free allowance.
+    monthlyAiCredits: 0,
+    oneTimeCredits: 5,
     featuresEn: [
       'Basic account & career profile',
-      'Explore live job market & save up to 5 jobs',
+      'Explore live jobs & save up to 5',
       'Browse complete role skill catalogues',
       'Basic career milestone tracker',
       '5 one-time trial tokens',
-      '100% free core platform forever',
+      'Core platform free forever',
     ],
     featuresAr: [
       'حساب شخصي وملف مهني مجاني بالكامل',
       'استكشاف الوظائف وحفظ حتى ٥ وظائف',
       'تصفح كتالوج المهارات والأدوار الوظيفية',
       'تتبع خطوات المسار المهني الأساسية',
-      '٥ توكنات تجريبية مجانية لمرة واحدة',
+      '٥ توكنات تجريبية لمرة واحدة',
       'المنصة الأساسية مجانية بالكامل للأبد',
     ],
   },
@@ -79,97 +96,90 @@ const PLANS: PlanDefinition[] = [
     code: 'student',
     nameEn: 'Student & Early Career',
     nameAr: 'الطلاب والبدايات المهنية',
-    taglineEn: 'Kickstart your career with ATS-ready CVs and targeted job applications',
-    taglineAr: 'انطلاقة قوية لسيرتك الذاتية واجتياز أنظمة التوظيف ATS',
-    monthlyPiasters: 9900, // 99 EGP
-    annualPiasters: 99900, // 999 EGP
-    monthlyAiCredits: 25,
+    taglineEn: 'ATS-ready CVs, tailored applications and a learning plan that fits your target role',
+    taglineAr: 'سيرة جاهزة لأنظمة التوظيف، طلبات مخصصة، وخطة تعلم تناسب وظيفتك المستهدفة',
+    monthlyPiasters: 4900,
+    annualPiasters: 49000,
+    monthlyAiCredits: 15,
     featuresEn: [
       'Complete CV Builder & PDF export',
-      'AI ATS CV score & gap analysis',
-      'Job description keyword extraction & matching',
-      'AI-tailored CVs for specific vacancies',
+      'AI ATS score & gap analysis',
+      'JD keyword extraction & job matching',
+      'AI-tailored CVs for each vacancy',
       'AI cover letter generator',
       'Personalized learning roadmaps',
-      '25 monthly tokens',
+      '15 tokens every month',
     ],
     featuresAr: [
       'منشئ السيرة الذاتية وتصدير PDF احترافي',
-      'تحليل توافق السيرة الذاتية مع أنظمة ATS',
-      'استخراج الكلمات المفتاحية من إعلانات الوظائف',
-      'تخصيص السيرة الذاتية لكل فرصة عمل بالذكاء الاصطناعي',
-      'توليد خطابات التقديم (Cover Letter) مخصصة',
+      'تقييم ATS وتحليل الفجوات المهارية',
+      'استخراج كلمات الوظيفة ومطابقة الفرص',
+      'تخصيص السيرة الذاتية لكل فرصة عمل',
+      'توليد خطابات التقديم المخصصة',
       'خرائط تعلم وتطوير مهارات مخصصة',
-      '٢٥ توكن شهرياً',
+      '١٥ توكن كل شهر',
     ],
   },
   {
     code: 'pro',
     nameEn: 'Professional',
     nameAr: 'المحترف',
-    taglineEn: 'For professionals aiming for promotion, specialization, and top-tier roles',
-    taglineAr: 'للمحترفين الساعين للترقي والتخصص والمقابلات رفيعة المستوى',
-    monthlyPiasters: 17900, // 179 EGP
-    annualPiasters: 179000, // 1,790 EGP
-    monthlyAiCredits: 60,
+    taglineEn: 'For professionals aiming for promotion, specialization and senior roles',
+    taglineAr: 'للمحترفين الساعين للترقي والتخصص والوظائف القيادية',
+    monthlyPiasters: 9900,
+    annualPiasters: 99000,
+    monthlyAiCredits: 40,
     isPopular: true,
     featuresEn: [
-      'Everything in Student tier',
-      'Unlimited CV versions & tailoring',
-      'AI Mock Interview simulation & scoring',
-      '24/7 AI Career Mentor & strategic consultation',
+      'Everything in Student & Early Career',
+      'Unlimited CV versions & storage',
+      'AI mock interviews & scoring',
+      'AI career mentor & strategic guidance',
       'Advanced portfolio & evidence showcase',
-      'Detailed career progress & health reports',
-      '60 monthly tokens',
+      'Career progress reports',
+      '40 tokens every month',
     ],
     featuresAr: [
-      'كل مميزات خطة الطلاب',
-      'إصدارات متعددة وغير محدودة من السيرة الذاتية',
-      'محاكاة المقابلات الشخصية بالذكاء الاصطناعي وتقييم الإجابات',
-      'مستشار مهني ذكي على مدار الساعة للإرشاد والتوجيه',
-      'معرض متقدم للمشاريع والإثباتات المهارية',
-      'تقارير تفصيلية للجاهزية والنمو المهني',
-      '٦٠ توكن شهرياً',
+      'كل ما في خطة الطلاب والبدايات المهنية',
+      'نسخ سيرة ذاتية وتخزين غير محدود',
+      'مقابلات تجريبية بالذكاء الاصطناعي مع تقييم',
+      'مرشد مهني ذكي وإرشاد استراتيجي',
+      'معرض أعمال وإثباتات مهارية متقدم',
+      'تقارير تقدم مهني تفصيلية',
+      '٤٠ توكن كل شهر',
     ],
   },
   {
     code: 'career_plus',
     nameEn: 'Career Plus',
     nameAr: 'المسار المتقدم (Plus)',
-    taglineEn: 'For ambitious switchers and leaders wanting maximum career acceleration',
-    taglineAr: 'للقيادات والراغبين في تغيير المسار المهني بأقصى سرعة وثقة',
-    monthlyPiasters: 29900, // 299 EGP
-    annualPiasters: 299000, // 2,990 EGP
-    monthlyAiCredits: 120,
+    taglineEn: 'For career switchers and leaders who need the deepest analysis and priority processing',
+    taglineAr: 'لمن يغيّر مساره المهني أو يقود فريقاً ويحتاج أعمق تحليل وأولوية معالجة',
+    monthlyPiasters: 17900,
+    annualPiasters: 179000,
+    monthlyAiCredits: 85,
     isBestValue: true,
     featuresEn: [
-      'Everything in Professional tier',
-      'Career Transition & Switch Roadmap Engine',
+      'Everything in Professional',
+      'Career transition engine',
       'Multi-role comparative fit analysis',
       'Deep scenario interview simulations',
-      'Executive career review reports',
-      'Highest priority processing',
-      '120 monthly tokens',
+      'Executive career reports',
+      'Priority AI processing',
+      '85 tokens every month',
     ],
     featuresAr: [
-      'كل مميزات خطة المحترف',
-      'محرك تغيير المسار المهني وسد الفجوات المتقدم',
-      'تحليل مقارن للملاءمة بين عدة وظائف ومجالات',
-      'محاكاة متقدمة للمقابلات القيادية والتقنية العميقة',
-      'تقارير تنفيذية شاملة للمسار والنمو',
-      'أولوية معالجة قصوى لكافة النماذج',
-      '١٢٠ توكن شهرياً',
+      'كل ما في خطة المحترف',
+      'محرك التحول المهني',
+      'تحليل مقارن للملاءمة بين عدة أدوار',
+      'محاكاة مقابلات سيناريو متعمقة',
+      'تقارير مهنية تنفيذية',
+      'أولوية في معالجة الذكاء الاصطناعي',
+      '٨٥ توكن كل شهر',
     ],
   },
 ];
 
-/**
- * The pricing FAQ.
- *
- * The questions are data, and each string is a translation key. The FAQ was
- * once hard-coded Arabic, which left every English speaker on this page
- * reading Arabic in the one section that should have spoken their language.
- */
 const FAQ_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: 'Are the core features of the platform actually free?',
@@ -179,7 +189,7 @@ const FAQ_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: 'Which payment methods can I use?',
     answer:
-      'Payment goes through XPay, Egypt’s payment provider. The methods offered are the ones enabled on our merchant account — cards, Apple Pay, Fawry and ValU — and the checkout shows exactly what is available when you pay. Your plan activates the moment the payment is confirmed, and a Fawry reference activates it the moment the money arrives.',
+      'Payment goes through XPay, Egypt’s payment provider. The methods listed on the checkout are the ones enabled on our merchant account at the moment you pay — nothing else is promised. Your plan activates only when XPay confirms the payment; a cash reference such as Fawry activates it when the money actually arrives.',
   },
   {
     question: 'What happens if the AI call fails? Do I lose my tokens?',
@@ -204,6 +214,52 @@ const paymentMethodLabel = (method: string): string => {
   }
 };
 
+/**
+ * The comparison table.
+ *
+ * It is built from the same entitlement matrix the server enforces, so a row
+ * cannot claim a feature the plan does not actually grant. The token row is the
+ * only value that is not a yes/no.
+ */
+const COMPARISON_ROWS: ReadonlyArray<{ label: string; feature?: EntitlementFeature }> = [
+  { label: 'Monthly AI tokens' },
+  { label: 'Complete CV builder', feature: 'cv.builder' },
+  { label: 'PDF export', feature: 'cv.export_pdf' },
+  { label: 'AI-tailored CVs', feature: 'cv.tailoring' },
+  { label: 'ATS score & gap analysis', feature: 'ats.analysis' },
+  { label: 'Detailed ATS breakdown', feature: 'ats.detailed_breakdown' },
+  { label: 'JD keyword extraction', feature: 'job_description.analysis' },
+  { label: 'AI cover letters', feature: 'cover_letter.generate' },
+  { label: 'Full learning roadmaps', feature: 'roadmap.full_stages' },
+  { label: 'Unlimited CV versions & storage', feature: 'cv.multiple_versions' },
+  { label: 'AI mock interviews', feature: 'interview.mock_simulation' },
+  { label: 'AI career mentor', feature: 'ai_mentor.session' },
+  { label: 'Advanced portfolio & evidence', feature: 'portfolio.advanced' },
+  { label: 'Career progress reports', feature: 'career.reports' },
+  { label: 'Career transition engine', feature: 'career.transition_plan' },
+  { label: 'Multi-role comparative fit', feature: 'career.comparative_fit' },
+  { label: 'Deep scenario interviews', feature: 'interview.deep_simulation' },
+  { label: 'Priority AI processing', feature: 'ai.priority_processing' },
+];
+
+/** The per-month equivalent of an annual price, exact to the piaster. */
+const formatMonthlyEquivalent = (annualPiasters: number): string => {
+  const egp = annualPiasters / 1200;
+  return `${Number.isInteger(egp) ? egp.toFixed(0) : egp.toFixed(2)} EGP`;
+};
+
+/** A date a candidate can read, in their own language. */
+const formatDate = (value: string | null | undefined, isAr: boolean): string => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(isAr ? 'ar-EG' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
 export const PricingView: React.FC = () => {
   const { t, settings, subscription, creditBalance, refreshSubscription, refreshCredits } =
     useCareer();
@@ -218,7 +274,9 @@ export const PricingView: React.FC = () => {
   // `#/pricing?xpay=success&session_id=cs_test_...`. The result is copied into
   // local state and stripped from the URL so a refresh does not replay the
   // banner.
-  const [checkoutNotice, setCheckoutNotice] = useState<'success' | 'cancelled' | 'pending' | null>(null);
+  const [checkoutNotice, setCheckoutNotice] = useState<
+    'success' | 'cancelled' | 'pending' | 'failed' | 'expired' | null
+  >(null);
   // A Fawry payment is complete before it is paid. Until XPay says `paid`, the
   // page says so instead of claiming the plan is active.
   const [pendingReference, setPendingReference] = useState<string | null>(null);
@@ -229,8 +287,14 @@ export const PricingView: React.FC = () => {
   // True until the first answer arrives. "We have not asked yet" and "we asked
   // and there is no answer" are different states and read differently.
   const [xpayLoading, setXpayLoading] = useState(true);
+  // The live catalogue. The page draws these prices when they arrive; a failed
+  // read falls back to the constants above, and checkout still charges the
+  // server's own catalogue price either way.
+  const [catalog, setCatalog] = useState<Record<string, SubscriptionPlanDTO>>({});
 
   const currentPlanCode = subscription?.planCode ?? 'free';
+  const currentRank = PLAN_RANK[currentPlanCode as SubscriptionPlanCode] ?? 0;
+  const lastPayment = xpayStatus?.sessions?.[0] ?? null;
 
   const loadXPayStatus = useCallback(async () => {
     setXpayLoading(true);
@@ -249,6 +313,45 @@ export const PricingView: React.FC = () => {
     void loadXPayStatus();
   }, [loadXPayStatus]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchPublicPlans()
+      .then((plans) => {
+        if (cancelled) return;
+        setCatalog(Object.fromEntries(plans.map((plan) => [plan.code, plan])));
+      })
+      .catch(() => {
+        // The fallback constants are already on screen; a catalogue outage
+        // must not hide the plans.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // One place that answers "what does this plan cost and grant right now".
+  const pricingFor = (plan: PlanDefinition) => {
+    const live = catalog[plan.code];
+    return {
+      monthlyPiasters: live?.priceMonthlyPiasters ?? plan.monthlyPiasters,
+      annualPiasters: live?.priceAnnualPiasters ?? plan.annualPiasters,
+      monthlyAiCredits: live?.monthlyAiCredits ?? plan.monthlyAiCredits,
+      nameEn: live?.nameEn ?? plan.nameEn,
+      nameAr: live?.nameAr ?? plan.nameAr,
+    };
+  };
+
+  // "Upgrade" and "downgrade" are different promises, so they are different
+  // words. The rank comes from the shared catalogue order, not from a second
+  // list that could drift.
+  const actionLabelFor = (plan: PlanDefinition, name: string): string => {
+    if (plan.code === 'free') return t('Free forever');
+    const rank = PLAN_RANK[plan.code as SubscriptionPlanCode] ?? 0;
+    if (rank > currentRank) return `${t('Upgrade to')} ${name}`;
+    if (rank < currentRank) return `${t('Downgrade to')} ${name}`;
+    return t('Choose plan');
+  };
+
   /**
    * The XPay return.
    *
@@ -259,7 +362,14 @@ export const PricingView: React.FC = () => {
    */
   useEffect(() => {
     const result = params.xpay;
-    if (result !== 'success' && result !== 'cancelled') return;
+    if (
+      result !== 'success' &&
+      result !== 'cancelled' &&
+      result !== 'failed' &&
+      result !== 'expired'
+    ) {
+      return;
+    }
 
     const sessionId = params.session_id;
     setCheckoutNotice(result);
@@ -281,6 +391,10 @@ export const PricingView: React.FC = () => {
         if (cancelled) return;
         if (synced.paid) {
           setCheckoutNotice('success');
+          setPendingReference(null);
+        } else if (synced.status === 'expired') {
+          // The checkout closed before the money arrived. Nothing was granted.
+          setCheckoutNotice('expired');
           setPendingReference(null);
         } else {
           setCheckoutNotice('pending');
@@ -314,6 +428,40 @@ export const PricingView: React.FC = () => {
     setCheckoutOpen(true);
   };
 
+  // What the return banner says, in one place, so five states cannot drift.
+  const noticeTone =
+    checkoutNotice === 'success'
+      ? 'success'
+      : checkoutNotice === 'failed' || checkoutNotice === 'expired'
+        ? 'danger'
+        : 'warning';
+  const noticeTitle =
+    checkoutNotice === 'success'
+      ? t('Payment received')
+      : checkoutNotice === 'pending'
+        ? t('Waiting for your payment')
+        : checkoutNotice === 'failed'
+          ? t('Payment not completed')
+          : checkoutNotice === 'expired'
+            ? t('Checkout expired')
+            : t('Card checkout cancelled');
+  const noticeBody =
+    checkoutNotice === 'success'
+      ? t('Your plan is active. Your token allowance and expiration date are shown below.')
+      : checkoutNotice === 'pending'
+        ? pendingReference
+          ? t(
+              'Your payment is not confirmed yet. Pay the reference from your receipt at any Fawry outlet or in the Fawry app, and the plan unlocks the moment the money arrives.'
+            )
+          : t(
+              'This payment is not confirmed yet. If you were charged, the plan unlocks as soon as the provider confirms it — refresh this page in a moment.'
+            )
+        : checkoutNotice === 'failed'
+          ? t('The payment was not confirmed, so nothing was charged and no plan changed. You can try again.')
+          : checkoutNotice === 'expired'
+            ? t('This checkout expired before the payment was confirmed. Nothing was charged and no plan changed.')
+            : t('Nothing was charged. You can try again whenever you are ready.');
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16 animate-fadeIn" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Hero Header */}
@@ -327,8 +475,8 @@ export const PricingView: React.FC = () => {
         </h1>
         <p className="text-base sm:text-lg text-muted leading-relaxed">
           {isAr
-            ? 'خطط عادلة وبسيطة بالجنيه المصري، بدفع آمن عبر XPay: البطاقات وآبل باي وفوري وفاليو.'
-            : 'Fair, simple plans in Egyptian pounds, paid securely through XPay: cards, Apple Pay, Fawry and ValU.'}
+            ? 'خطط واضحة بالجنيه المصري، بدفع آمن عبر XPay. تُعرض في صفحة الدفع طرق الدفع المفعّلة لحسابنا فقط.'
+            : 'Clear plans in Egyptian pounds, paid securely through XPay. Checkout shows only the methods actually enabled on our account.'}
         </p>
 
         {/* Billing Cycle Switcher */}
@@ -356,7 +504,7 @@ export const PricingView: React.FC = () => {
             >
               <span>{t('Annual')}</span>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-extrabold">
-                {t('Save up to 17% with annual billing')}
+                {t('2 months free')}
               </span>
             </button>
           </div>
@@ -433,52 +581,36 @@ export const PricingView: React.FC = () => {
         </div>
       </div>
 
-      {/* Post-checkout banner */}
+      {/* Post-checkout banner: success, waiting, failed, expired, cancelled. */}
       {checkoutNotice && (
         <div
           className={`max-w-3xl mx-auto w-full rounded-2xl border p-4 flex items-start gap-3 ${
-            checkoutNotice === 'success'
+            noticeTone === 'success'
               ? 'border-emerald-500/25 bg-emerald-500/10'
-              : 'border-amber-500/25 bg-amber-500/10'
+              : noticeTone === 'danger'
+                ? 'border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10'
+                : 'border-amber-500/25 bg-amber-500/10'
           }`}
           role="status"
         >
           <div
             className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-              checkoutNotice === 'success'
+              noticeTone === 'success'
                 ? 'bg-emerald-500/15 text-emerald-600'
-                : 'bg-amber-500/15 text-amber-600'
+                : noticeTone === 'danger'
+                  ? 'bg-[var(--color-danger)]/15 text-[var(--color-danger)]'
+                  : 'bg-amber-500/15 text-amber-600'
             }`}
           >
-            {checkoutNotice === 'success' ? (
+            {noticeTone === 'success' ? (
               <Check className="w-5 h-5" />
             ) : (
               <AlertCircle className="w-5 h-5" />
             )}
           </div>
           <div className="flex-1 min-w-0 text-sm leading-relaxed">
-            <div className="font-bold text-foreground">
-              {checkoutNotice === 'success'
-                ? t('Payment received')
-                : checkoutNotice === 'pending'
-                  ? t('Waiting for your payment')
-                  : t('Card checkout cancelled')}
-            </div>
-            <p className="text-xs text-muted mt-0.5">
-              {checkoutNotice === 'success'
-                ? t(
-                    'Your plan and credits activate as soon as the payment is confirmed — usually within a few seconds.'
-                  )
-                : checkoutNotice === 'pending'
-                  ? pendingReference
-                    ? t(
-                        'Your payment is not confirmed yet. Pay the reference from your receipt at any Fawry outlet or in the Fawry app, and the plan unlocks the moment the money arrives.'
-                      )
-                    : t(
-                        'This payment is not confirmed yet. If you were charged, the plan unlocks as soon as the provider confirms it — refresh this page in a moment.'
-                      )
-                  : t('Nothing was charged. You can try again whenever you are ready.')}
-            </p>
+            <div className="font-bold text-foreground">{noticeTitle}</div>
+            <p className="text-xs text-muted mt-0.5">{noticeBody}</p>
             {pendingReference && checkoutNotice === 'pending' && (
               <p className="mt-1 font-mono text-xs font-semibold text-foreground" dir="ltr">
                 {pendingReference}
@@ -520,13 +652,116 @@ export const PricingView: React.FC = () => {
         </div>
       )}
 
+      {/* The candidate's own plan, not just the catalogue.
+          *
+          * An active plan answers three questions without opening a menu: what
+          * it is, when it ends, and whether the last payment went through. The
+          * plan is one fixed period, so a new period is a purchase the
+          * candidate makes, never a charge that happens on its own. */}
+      {subscription && subscription.planCode !== 'free' && (
+        <div
+          className="mx-auto w-full max-w-3xl rounded-3xl border border-border bg-surface-raised p-5 sm:p-6"
+          data-current-subscription={subscription.planCode}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-muted">
+                {t('Your current plan')}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold text-foreground">
+                  {isAr ? subscription.planNameAr : subscription.planNameEn}
+                </h2>
+                <PlanIdentityBadge
+                  planCode={subscription.planCode}
+                  status={subscription.status}
+                  expiresAt={subscription.expiresAt}
+                  size="xs"
+                  language={settings.language}
+                />
+              </div>
+              <p className="text-xs text-muted">
+                {subscription.billingCycle === 'annual' ? t('Annual') : t('Monthly')}
+                {' · '}
+                {t('Expires')}:{' '}
+                <span className="font-semibold text-foreground">
+                  {formatDate(subscription.expiresAt, isAr)}
+                </span>
+              </p>
+              <p className="max-w-md text-[11px] leading-relaxed text-muted">
+                {t('Auto-renewal is off. Your access continues until the expiration date. When it ends, buy the same plan again to renew it.')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById('pricing-plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className="rounded-xl border border-border bg-surface px-3.5 py-2 text-xs font-bold text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              {t('Change plan')}
+            </button>
+          </div>
+
+          {lastPayment && (
+            <dl className="mt-4 grid gap-x-6 gap-y-2 rounded-2xl border border-border bg-surface p-3.5 text-[11px] sm:grid-cols-2">
+              <div className="flex items-baseline justify-between gap-2 sm:justify-start">
+                <dt className="text-muted">{t('Last payment')}</dt>
+                <dd className="font-semibold text-foreground">
+                  {formatEgpPrice(lastPayment.amountTotal)}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 sm:justify-start">
+                <dt className="text-muted">{t('Payment status')}</dt>
+                <dd className="font-semibold text-foreground">
+                  {lastPayment.paymentStatus === 'paid'
+                    ? t('Paid')
+                    : lastPayment.status === 'expired'
+                      ? t('Expired')
+                      : t('Awaiting payment')}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 sm:justify-start">
+                <dt className="text-muted">{t('Method')}</dt>
+                <dd className="text-foreground">
+                  {lastPayment.paymentMethodType
+                    ? paymentMethodLabel(lastPayment.paymentMethodType)
+                    : '—'}
+                </dd>
+              </div>
+              <div className="flex min-w-0 items-baseline justify-between gap-2 sm:justify-start">
+                <dt className="shrink-0 text-muted">{t('Order')}</dt>
+                <dd className="truncate font-mono text-foreground" dir="ltr">
+                  {lastPayment.orderId ?? lastPayment.id}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </div>
+      )}
+
       {/* Pricing Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+      <div
+        id="pricing-plans"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch"
+      >
         {PLANS.map((plan) => {
           const isCurrent = currentPlanCode === plan.code;
-          const piasters = billingCycle === 'annual' ? plan.annualPiasters : plan.monthlyPiasters;
-          const priceDisplay = plan.monthlyPiasters === 0 ? '0 EGP' : formatEgpPrice(piasters);
-          const periodLabel = plan.monthlyPiasters === 0 ? '' : billingCycle === 'annual' ? `/ ${t('year')}` : `/ ${t('month')}`;
+          const live = pricingFor(plan);
+          const isFree = plan.code === 'free';
+          const piasters =
+            billingCycle === 'annual' ? live.annualPiasters : live.monthlyPiasters;
+          const priceDisplay = isFree ? '0 EGP' : formatEgpPrice(piasters);
+          const periodLabel = isFree
+            ? ''
+            : billingCycle === 'annual'
+              ? `/ ${t('year')}`
+              : `/ ${t('month')}`;
+          const savings = annualSavingsPiasters({
+            priceMonthlyPiasters: live.monthlyPiasters,
+            priceAnnualPiasters: live.annualPiasters,
+          });
+          const name = isAr ? live.nameAr : live.nameEn;
 
           return (
             <div
@@ -542,12 +777,12 @@ export const PricingView: React.FC = () => {
               {/* Badges */}
               {plan.isPopular && (
                 <div className="absolute -top-3.5 start-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-white text-xs font-extrabold shadow">
-                  {t('Popular')}
+                  {t('Most popular')}
                 </div>
               )}
               {plan.isBestValue && (
                 <div className="absolute -top-3.5 start-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-extrabold shadow">
-                  {t('Best Value')}
+                  {t('Best value')}
                 </div>
               )}
 
@@ -555,7 +790,7 @@ export const PricingView: React.FC = () => {
                 {/* Plan Header */}
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-[var(--text-primary)]">
-                    {isAr ? plan.nameAr : plan.nameEn}
+                    {name}
                   </h3>
                   <p className="text-xs text-muted min-h-[32px] leading-relaxed">
                     {isAr ? plan.taglineAr : plan.taglineEn}
@@ -570,19 +805,38 @@ export const PricingView: React.FC = () => {
                     </span>
                     <span className="text-xs font-semibold text-muted">{periodLabel}</span>
                   </div>
-                  {plan.monthlyPiasters > 0 && billingCycle === 'annual' && (
-                    <div className="text-[11px] text-emerald-600 font-bold mt-1">
-                      {formatEgpPrice(Math.round(plan.annualPiasters / 12))} / {t('per month')} ({t('Billed annually')})
+                  {!isFree && billingCycle === 'annual' && (
+                    <div className="mt-1 space-y-0.5">
+                      <div className="text-[11px] text-emerald-600 font-bold">
+                        {formatMonthlyEquivalent(live.annualPiasters)} / {t('per month')}{' '}
+                        ({t('Billed annually')})
+                      </div>
+                      <div className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                        {t('Save')} {formatEgpPrice(savings)} · {t('2 months free')}
+                      </div>
                     </div>
                   )}
 
                   <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-xs font-bold text-primary">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>
-                      {plan.monthlyAiCredits} {t('Tokens')}{' '}
-                      {plan.code === 'free' ? '(مرة واحدة)' : `/ ${t('per month')}`}
+                      {isFree ? (
+                        <>
+                          {plan.oneTimeCredits ?? 5} {t('Tokens')}{' '}
+                          <span className="font-semibold">({t('one-time')})</span>
+                        </>
+                      ) : (
+                        <>
+                          {live.monthlyAiCredits} {t('Tokens')} / {t('per month')}
+                        </>
+                      )}
                     </span>
                   </div>
+                  {!isFree && billingCycle === 'annual' && (
+                    <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
+                      {t('Tokens are granted monthly across the 12 months — not all at once.')}
+                    </p>
+                  )}
                 </div>
 
                 {/* Features List */}
@@ -603,14 +857,14 @@ export const PricingView: React.FC = () => {
                     disabled
                     className="w-full py-3 rounded-2xl bg-surface-raised border border-border text-muted text-xs font-bold cursor-default"
                   >
-                    {t('Current Plan')}
+                    {t('Current plan')}
                   </button>
-                ) : plan.code === 'free' ? (
+                ) : isFree ? (
                   <button
                     disabled
                     className="w-full py-3 rounded-2xl bg-surface-raised border border-border text-foreground text-xs font-bold"
                   >
-                    {t('Default Account')}
+                    {currentPlanCode === 'free' ? t('Included') : t('Free forever')}
                   </button>
                 ) : (
                   <button
@@ -630,7 +884,9 @@ export const PricingView: React.FC = () => {
                             : 'bg-foreground text-surface shadow-md hover:opacity-90'
                     }`}
                   >
-                    <span>{canPay ? t('Upgrade Now') : t(availability.actionLabelKey)}</span>
+                    <span>
+                      {canPay ? actionLabelFor(plan, name) : t(availability.actionLabelKey)}
+                    </span>
                     {canPay ? (
                       isAr ? <ArrowLeft className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />
                     ) : (
@@ -642,6 +898,87 @@ export const PricingView: React.FC = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Full comparison. The cards say what each plan adds; this table answers
+          * the question the cards cannot: "is this specific feature in my plan?" */}
+      <div className="space-y-4">
+        <div className="text-center space-y-1">
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">
+            {t('Compare plans in detail')}
+          </h2>
+          <p className="text-xs text-muted">
+            {t('Every feature, plan by plan — the same entitlements the platform enforces.')}
+          </p>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-border bg-surface">
+          <table className="w-full min-w-[720px] border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-border">
+                <th scope="col" className="p-3 text-start font-bold text-muted">
+                  {t('Feature')}
+                </th>
+                {PLANS.map((plan) => {
+                  const live = pricingFor(plan);
+                  const price =
+                    plan.code === 'free'
+                      ? t('Free')
+                      : formatEgpPrice(
+                          billingCycle === 'annual' ? live.annualPiasters : live.monthlyPiasters
+                        );
+                  return (
+                    <th key={plan.code} scope="col" className="p-3 text-center font-bold text-foreground">
+                      <div>{isAr ? live.nameAr : live.nameEn}</div>
+                      <div className="mt-0.5 text-[11px] font-semibold text-primary">{price}</div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARISON_ROWS.map((row) => (
+                <tr key={row.label} className="border-b border-border/60 last:border-b-0">
+                  <th scope="row" className="p-3 text-start font-medium text-foreground">
+                    {t(row.label)}
+                  </th>
+                  {PLANS.map((plan) => {
+                    const live = pricingFor(plan);
+                    let value: React.ReactNode;
+                    if (row.label === 'Monthly AI tokens') {
+                      value =
+                        plan.code === 'free' ? (
+                          <span className="text-muted">
+                            {plan.oneTimeCredits ?? 5} {t('one-time')}
+                          </span>
+                        ) : (
+                          <span className="font-bold text-foreground">{live.monthlyAiCredits}</span>
+                        );
+                    } else if (row.feature === 'cv.builder' && plan.code === 'free') {
+                      // The free tier has the builder, not the complete one.
+                      value = <span className="text-muted">{t('Basic')}</span>;
+                    } else if (row.feature) {
+                      value = isPlanEntitled(plan.code as SubscriptionPlanCode, row.feature) ? (
+                        <Check className="mx-auto h-4 w-4 text-emerald-500" aria-label={t('Included')} />
+                      ) : (
+                        <span className="text-muted" aria-label={t('Not included')}>
+                          —
+                        </span>
+                      );
+                    } else {
+                      value = '—';
+                    }
+                    return (
+                      <td key={plan.code} className="p-3 text-center text-foreground">
+                        {value}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Token Booster Packs */}
@@ -800,11 +1137,11 @@ export const PricingView: React.FC = () => {
           {canPay && (
             <div className="p-4 rounded-2xl bg-surface border border-border space-y-1.5">
               <h4 className="font-bold text-sm text-foreground">
-                {t('Can I pay by bank card?')}
+                {t('How do I pay?')}
               </h4>
               <p className="text-xs text-muted leading-relaxed">
                 {t(
-                  'Yes. Choose a plan and you are taken to XPay’s secure page to pay by card, Apple Pay, Fawry or ValU. Aionvia never sees or stores your card number, and the plan activates as soon as the payment is confirmed.'
+                  'Choose a plan and you are taken to XPay’s secure page. The payment methods offered there are the ones enabled on our merchant account; Aionvia never sees or stores your card number, and the plan activates only when the payment is confirmed.'
                 )}
               </p>
             </div>
@@ -823,9 +1160,16 @@ export const PricingView: React.FC = () => {
           planCode={selectedPlan.code}
           planNameEn={selectedPlan.nameEn}
           planNameAr={selectedPlan.nameAr}
-          monthlyPiasters={selectedPlan.monthlyPiasters}
-          annualPiasters={selectedPlan.annualPiasters}
-          aiCredits={selectedPlan.monthlyAiCredits}
+          monthlyPiasters={
+            catalog[selectedPlan.code]?.priceMonthlyPiasters ?? selectedPlan.monthlyPiasters
+          }
+          annualPiasters={
+            catalog[selectedPlan.code]?.priceAnnualPiasters ?? selectedPlan.annualPiasters
+          }
+          aiCredits={
+            catalog[selectedPlan.code]?.monthlyAiCredits ?? selectedPlan.monthlyAiCredits
+          }
+          isDowngrade={PLAN_RANK[selectedPlan.code as SubscriptionPlanCode] < currentRank}
         />
       )}
     </div>

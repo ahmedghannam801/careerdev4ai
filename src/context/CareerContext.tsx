@@ -234,6 +234,7 @@ import {
   type PreferencesDTO,
 } from '../lib/preferencesApi';
 import { fetchBookmarks, createBookmark, deleteBookmark } from '../lib/bookmarksApi';
+import { ApiRequestError } from '../lib/apiClient';
 import {
   reorderProfileCollection,
   type OrderedCollection,
@@ -411,6 +412,12 @@ const emptyProfile: UserProfile = {
  * candidate, never presented as saved.
  */
 export type CvDraft = CvDraftRecord<CVProfile>;
+
+/** What a bookmark toggle actually did, so the screen can explain a refusal. */
+interface BookmarkToggleResult {
+  saved: boolean;
+  limitReached: boolean;
+}
 
 interface CareerContextType {
   // Authentication
@@ -846,7 +853,7 @@ interface CareerContextType {
   // Jobs & Applications
   jobs: JobListing[];
   bookmarkedJobIds: string[];
-  toggleBookmarkJob: (jobId: string) => void;
+  toggleBookmarkJob: (jobId: string) => Promise<BookmarkToggleResult>;
   applications: JobApplication[];
   addApplication: (application: Omit<JobApplication, 'id' | 'lastUpdated'>) => Promise<boolean>;
   updateApplicationStage: (id: string, stage: ApplicationStage) => Promise<boolean>;
@@ -2909,7 +2916,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // B.4 finding H-5: the bookmarks were seeded with two job ids, so every
   // user started with two "saved" jobs they never saved.
   const [bookmarkedJobIds, setBookmarkedJobIds] = useState<string[]>([]);
-  const toggleBookmarkJob = async (jobId: string) => {
+  const toggleBookmarkJob = async (jobId: string): Promise<BookmarkToggleResult> => {
     const wasBookmarked = bookmarkedJobIds.includes(jobId);
     // The toggle is optimistic, and it is ROLLED BACK when the write fails:
     // the UI must never claim a bookmark the database does not have.
@@ -2922,6 +2929,7 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       } else {
         await createBookmark(jobId);
       }
+      return { saved: !wasBookmarked, limitReached: false };
     } catch (error) {
       console.error('Failed to persist job bookmark:', error);
       setBookmarkedJobIds(prev =>
@@ -2931,6 +2939,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             : [...prev, jobId]
           : prev.filter(id => id !== jobId)
       );
+      return {
+        saved: wasBookmarked,
+        limitReached:
+          error instanceof ApiRequestError && error.code === 'SAVED_JOBS_LIMIT_REACHED',
+      };
     }
   };
 

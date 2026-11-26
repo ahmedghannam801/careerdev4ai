@@ -167,6 +167,42 @@ export async function listSubscriptionsForUser(profileId: string): Promise<Subsc
 }
 
 /**
+ * Opens the one active subscription that a confirmed XPay payment buys.
+ *
+ * The period is the one XPay sold, and the database function closes any
+ * previous active period in the same transaction so the unique index that
+ * allows one active subscription per candidate is never violated. Calling it
+ * twice for the same session returns the row it already opened.
+ */
+export async function activateXPaySubscription(input: {
+  profileId: string;
+  planCode: string;
+  billingCycle: BillingCycle;
+  periodStartsAt: string;
+  periodEndsAt: string;
+  sessionId: string;
+  metadata?: Record<string, unknown>;
+}): Promise<{ subscriptionId: string | null; created: boolean }> {
+  const { data, error } = await getSupabaseServer().rpc('activate_xpay_subscription', {
+    p_profile_id: input.profileId,
+    p_plan_code: input.planCode,
+    p_billing_cycle: input.billingCycle,
+    p_period_starts_at: input.periodStartsAt,
+    p_period_ends_at: input.periodEndsAt,
+    p_xpay_session: input.sessionId,
+    p_metadata: input.metadata ?? {},
+  });
+
+  if (error) throw new Error('Failed to activate the XPay subscription: ' + error.message);
+
+  const result = data as { subscription_id?: string; created?: boolean } | null;
+  return {
+    subscriptionId: result?.subscription_id ?? null,
+    created: Boolean(result?.created),
+  };
+}
+
+/**
  * Cancels auto-renew on the candidate's active subscription.
  */
 export async function cancelSubscription(
