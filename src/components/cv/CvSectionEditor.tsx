@@ -147,7 +147,9 @@ const CvEditorSection: React.FC<{
             aria-hidden="true"
           />
         </button>
-        {action && <div className="shrink-0 pt-1">{action}</div>}
+        {/* A section-level action is only offered while the section is open:
+            "Clear" on a folded section would delete fields nobody can see. */}
+        {open && action && <div className="shrink-0 pt-1">{action}</div>}
       </div>
       {open && (
         <div className="space-y-3 border-t border-[var(--border-subtle)] px-4 pb-5 pt-4 sm:px-5">
