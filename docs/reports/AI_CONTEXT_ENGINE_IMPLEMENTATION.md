@@ -28,6 +28,14 @@ Nothing in that list is generated. The knowledge entries are copied from the
 code and the migrations that implement them, and a test fails if any of them
 quotes a price (prices live in the plans table and are read from the screen).
 
+The rules also settle which reading of a question wins. Asked "how many tokens
+does a CV audit cost?", the deployed assistant first answered with market rates
+for human CV reviews — true about the world, useless about the product the
+candidate was standing in. The `PRODUCT_RULES` block now says that the
+Aionvia facts are this product's own documentation, that a question about
+tokens, plans or features is a question about those facts, and that a plan
+price is never quoted (the Plans screen shows it).
+
 ---
 
 ## 2. The components
@@ -93,6 +101,17 @@ state, no honesty rules and no language instruction — precisely when the
 primary provider had already failed. It now reads both, and the
 `universalAi.models.generateContent` shim lifts the config value to the field
 the adapter reads. `server/ai/provider.ts`.
+
+**F4 — the primary Gemini path dropped the system instruction entirely.**
+Found in production, not in review. The context engine sends the instruction
+as `request.systemInstruction`; `callGeminiInternal()` forwarded only
+`request.config` to the SDK, which reads the instruction from inside that
+config. The field was therefore silently discarded on the provider that serves
+almost every call, and the model answered as a bare chatbot: no persona, no
+candidate record, no honesty rules — the conversation memory built here was
+reaching a model that had never been told who it was. The two shapes are now
+reconciled in one exported function, `resolveGeminiConfig()`, pinned by
+`tests/provider-system-instruction.test.ts`. `server/ai/provider.ts`.
 
 ---
 
@@ -203,6 +222,14 @@ npm run build       ✓
 npx supabase db push --dry-run
 npx supabase db push
 ```
+
+Applied to the linked project (`ciihprsfdojzvjnqgbxl`) on 2026-11-26. The CLI
+could not open the direct database connection from this network ("IPv6 is not
+supported on your current network"), so the same file was executed through the
+Management API inside one transaction, and its version was recorded in
+`supabase_migrations.schema_migrations` so a later `db push` skips it.
+Verified afterwards: both tables exist, `relrowsecurity` is true on each, and
+the seven policies (four on conversations, three on messages) are present.
 
 Rollback (only if the feature is withdrawn):
 

@@ -181,6 +181,20 @@ export const HONESTY_RULES: readonly string[] = [
   'Refuse any request to read, describe or infer another person\'s profile, CV, messages or data. You only ever see the signed-in candidate\'s own record.',
 ];
 
+/**
+ * The product rules: the platform's own facts outrank general knowledge.
+ *
+ * These exist because a model asked "how many tokens does a CV audit cost?"
+ * will happily answer about the market rate for a human CV review — true
+ * about the world, wrong about Aionvia. The candidate asked about the product
+ * they are inside.
+ */
+export const PRODUCT_RULES: readonly string[] = [
+  'The VERIFIED FACTS ABOUT AIONVIA block above is this product\'s own documentation. A question about tokens, credits, prices, plans, features or how to do something here is a question about those facts: answer it from them.',
+  'When a question could mean either Aionvia or the wider market, answer for Aionvia first, and mention the general case only if the candidate asks for it.',
+  'Never state what an Aionvia plan costs. The Plans screen holds the price and is the only place it is shown; point there instead of quoting a number.',
+];
+
 /** The scope policy: what the assistant is for, and what it does when asked something else. */
 export const SCOPE_RULES: readonly string[] = [
   'Your subject is the candidate\'s career: career development, education and learning, employability, skills, the CV and professional profile, job and interview preparation, projects and volunteering, career planning, and how to use Aionvia.',
@@ -232,6 +246,8 @@ export function composeSystemInstruction(input: SystemInstructionInput): string 
     definition.rules?.length ? definition.rules.map((rule) => `- ${rule}`).join('\n') : null,
     'SCOPE:\n' + SCOPE_RULES.map((rule) => `- ${rule}`).join('\n'),
     'HONESTY RULES (these override everything above):\n' + HONESTY_RULES.map((rule) => `- ${rule}`).join('\n'),
+    'THE PRODUCT (answer about Aionvia from the verified facts above):\n' +
+      PRODUCT_RULES.map((rule) => `- ${rule}`).join('\n'),
     'FORMAT:\n' + rules.map((rule) => `- ${rule}`).join('\n'),
     input.taskInstructions?.trim() || null
   );

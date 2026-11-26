@@ -25,6 +25,7 @@ import {
   AI_FEATURES,
   FEATURE_DEFINITIONS,
   HONESTY_RULES,
+  PRODUCT_RULES,
   SCOPE_RULES,
   UnverifiedUserError,
   composeSystemInstruction,
@@ -140,6 +141,7 @@ describe('the instruction composer', () => {
     assert.ok(instruction.includes('CONTEXT-BLOCK'));
     for (const rule of HONESTY_RULES) assert.ok(instruction.includes(rule), `missing rule: ${rule}`);
     for (const rule of SCOPE_RULES) assert.ok(instruction.includes(rule), `missing scope rule: ${rule}`);
+    for (const rule of PRODUCT_RULES) assert.ok(instruction.includes(rule), `missing product rule: ${rule}`);
     // The Arabic instruction is present, so a French or Arabic answer cannot
     // drift into English.
     assert.match(instruction, /Arabic/);
@@ -153,6 +155,23 @@ describe('the instruction composer', () => {
       contextBlock: 'CONTEXT-BLOCK',
     });
     assert.ok(instruction.indexOf('CONTEXT-BLOCK') < instruction.indexOf('HONESTY RULES'));
+  });
+
+  test('a question about the product is answered from the product facts', () => {
+    const instruction = composeSystemInstruction({
+      feature: 'copilot',
+      language: 'en',
+      knowledgeBlock: 'VERIFIED FACTS ABOUT AIONVIA\n- A CV audit costs one token.',
+      contextBlock: 'CONTEXT',
+    });
+    // The rule that a market answer is the wrong answer, and that a plan
+    // price is never quoted by the model.
+    assert.match(instruction, /is a question about those facts/);
+    assert.match(instruction, /Never state what an Aionvia plan costs/);
+    // The product rules come after the facts they govern.
+    assert.ok(
+      instruction.indexOf('VERIFIED FACTS ABOUT AIONVIA') < instruction.indexOf('THE PRODUCT')
+    );
   });
 
   test('a JSON answer gets the JSON rules instead of the prose ones', () => {

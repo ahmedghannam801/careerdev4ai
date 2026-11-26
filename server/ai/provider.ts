@@ -149,6 +149,23 @@ export function extractJsonFromText<T = unknown>(rawText: string): T {
 /**
  * Calls Gemini directly using the official Google GenAI web client.
  */
+/**
+ * Builds the config handed to the Gemini SDK.
+ *
+ * The instruction may arrive as its own field (the shape the context engine
+ * uses) or inside `config` (the shape the Gemini SDK takes). The SDK only
+ * reads the second, so this is the one place that reconciles them — an
+ * instruction passed the other way used to be dropped silently, and the model
+ * answered as a generic chatbot with no persona, no career state and no
+ * honesty rules.
+ */
+export function resolveGeminiConfig(request: UnifiedAIRequest): UnifiedAIRequest['config'] {
+  const inline = request.config?.systemInstruction as string | undefined;
+  const instruction = request.systemInstruction ?? inline;
+  if (!instruction) return request.config;
+  return { ...request.config, systemInstruction: instruction };
+}
+
 async function callGeminiInternal(request: UnifiedAIRequest): Promise<UnifiedAIResponse> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
@@ -168,7 +185,7 @@ async function callGeminiInternal(request: UnifiedAIRequest): Promise<UnifiedAIR
   const response = await client.models.generateContent({
     model,
     contents: request.contents,
-    config: request.config,
+    config: resolveGeminiConfig(request),
   });
 
   return {
