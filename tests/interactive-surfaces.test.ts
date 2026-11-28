@@ -20,9 +20,9 @@
  *     the board now takes a card that is dragged onto another column, writes
  *     the new stage, and puts the card back if the write fails.
  *
- *   * THE PROFILE: the plan badge sat beside the candidate's name. The top
- *     tier is now carried by a frame AROUND the photo, and the badge beside
- *     the name is gone.
+ *   * THE PROFILE: the plan badge sat beside the candidate's name. The
+ *     platform is free now, so there is no tier to badge or to frame the
+ *     photo in: the photo is shown as it is, for every account.
  *
  *   * THE PROJECTS: the same project could be written twice, from two
  *     different places, and both rows were read as two projects. The write
@@ -37,7 +37,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -49,6 +49,17 @@ import {
 const REPO_ROOT = join(import.meta.dirname, '..');
 
 const read = (relative: string) => readFileSync(join(REPO_ROOT, relative), 'utf8');
+
+/** Every source file under a directory, recursively. */
+function collectSourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...collectSourceFiles(full));
+    else out.push(full);
+  }
+  return out;
+}
 
 describe('the learning hub', () => {
   it('opens the course when Start Learning is pressed', () => {
@@ -139,30 +150,27 @@ describe('the application board', () => {
 });
 
 describe('the profile header', () => {
-  it('frames the photo for the top tier instead of badge-ing the name', () => {
+  it('shows the photo without a frame that claims a paid tier', () => {
     const profile = read('src/components/views/ProfileView.tsx');
-    assert.match(profile, /PlanIdentityFrame/);
-    assert.match(profile, /variant="premium"/);
-    // The badge beside the name is gone.
+    // The photo is drawn as it is. There is no tier to draw it in, because
+    // the platform is free and every account is on the same tier.
+    assert.doesNotMatch(profile, /PlanIdentityFrame/);
     assert.doesNotMatch(profile, /<PlanIdentityBadge/);
+    assert.doesNotMatch(profile, /variant="premium"/);
   });
 
-  it('frames the credits in the plan\'s own colour', () => {
-    const panel = read('src/components/subscription/MembershipPanel.tsx');
-    assert.match(panel, /PlanIdentityFrame/);
-    assert.match(panel, /variant="always"/);
-    assert.match(panel, /AI credits left/);
-  });
-
-  it('shows the top tier to nobody else', () => {
-    const frame = read('src/components/subscription/PlanIdentityFrame.tsx');
-    assert.match(frame, /const TOP_TIER: PlanIdentityTier = 'ultra'/);
-    // The premium frame is withdrawn for an expired or inactive plan too:
-    // the frame says the top tier is in force, and an ended plan is not.
-    assert.match(
-      frame,
-      /variant === 'premium' &&\s*\(display\.tier !== TOP_TIER \|\| display\.isExpired \|\| display\.isInactive\)/
-    );
+  it('carries no membership panel anywhere in the interface', () => {
+    // The membership panel used to show the plan, the renewal date and the
+    // token balance. None of those exist any more, so the panel itself is
+    // gone — and no screen may reach for it.
+    const offenders: string[] = [];
+    for (const file of collectSourceFiles(join(REPO_ROOT, 'src'))) {
+      if (!/\.(ts|tsx)$/.test(file)) continue;
+      if (readFileSync(file, 'utf8').includes('MembershipPanel')) {
+        offenders.push(file);
+      }
+    }
+    assert.deepEqual(offenders, [], `these screens still show a membership: ${offenders.join(', ')}`);
   });
 });
 

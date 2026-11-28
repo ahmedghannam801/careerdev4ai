@@ -36,7 +36,7 @@ import {
 } from '../../lib/dashboardCharts';
 import { RecentActivityPanel } from '../career/RecentActivityPanel';
 import { DashboardFeedbackCard } from '../feedback/DashboardFeedbackCard';
-import { DailyTokenClaim } from '../subscription/DailyTokenClaim';
+
 import { AnimatedCounter } from '../react-bits/AnimatedCounter';
 import { AnimatedList } from '../react-bits/AnimatedList';
 import { Stagger, StaggerItem } from '../motion/Motion';
@@ -431,10 +431,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {/* The daily reward sits beside the balance the topbar shows. It is
-              the same widget as the one inside that badge, so the platform
-              never states two different opinions about today's tokens. */}
-          <DailyTokenClaim variant="compact" />
           <button
             type="button"
             onClick={onOpenCopilot}

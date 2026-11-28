@@ -111,9 +111,6 @@ export const emailAr: Record<string, string> = {
   'Roadmap tasks, milestones and generated plans.': 'مهام خارطة الطريق ومحطاتها والخطط المنشأة.',
   'Platform announcements': 'إعلانات المنصة',
   'Important product news and service updates.': 'أخبار المنتج المهمة وتحديثات الخدمة.',
-  'Subscription reminders': 'تذكيرات الاشتراك',
-  'Plan changes and renewal notices. Receipts are always sent.':
-    'تغييرات الخطة وإشعارات التجديد. تُرسل الإيصالات دائمًا.',
   'Email notifications': 'إشعارات البريد الإلكتروني',
   'Choose what Aionvia emails you about. Your choices are saved to your account and apply immediately on every device.':
     'اختر ما يرسله إليك Aionvia بالبريد. تُحفظ اختياراتك في حسابك وتُطبَّق فورًا على كل الأجهزة.',
@@ -122,8 +119,8 @@ export const emailAr: Record<string, string> = {
     'أنت غير مشترك في بريد الفرص والملخصات والإعلانات.',
   'Turn email back on': 'إعادة تشغيل البريد',
   'All optional email': 'كل البريد الاختياري',
-  'The master switch for everything except account, security and payment email.':
-    'المفتاح الرئيسي لكل شيء عدا بريد الحساب والأمان والدفع.',
+  'The master switch for everything except account, security and activity email.':
+    'المفتاح الرئيسي لكل شيء عدا بريد الحساب والأمان والنشاط.',
   'Digests': 'الملخصات',
   'A short summary of what is new and relevant. Sent even when you are not signed in.':
     'ملخص قصير لما هو جديد وذو صلة. يُرسل حتى عندما لا تكون مسجلًا للدخول.',
@@ -134,9 +131,6 @@ export const emailAr: Record<string, string> = {
   'A weekly career summary with progress and next recommendations.':
     'ملخص أسبوعي للمسار المهني مع التقدم والتوصيات التالية.',
   'Delivery hour (UTC)': 'ساعة الإرسال (UTC)',
-  'Account, security and payment email': 'بريد الحساب والأمان والدفع',
-  'Password changes, sign-in email changes, security alerts, subscription status and payment receipts are part of your account and cannot be turned off. They never contain marketing.':
-    'تغييرات كلمة المرور وبريد الدخول وتنبيهات الأمان وحالة الاشتراك وإيصالات الدفع جزء من حسابك ولا يمكن إيقافها. ولا تحتوي على تسويق أبدًا.',
   'Consent recorded': 'تم تسجيل الموافقة',
   'Unsubscribing stops opportunity, digest and announcement email immediately. Account and security email continues.':
     'إلغاء الاشتراك يوقف بريد الفرص والملخصات والإعلانات فورًا، ويستمر بريد الحساب والأمان.',
@@ -147,12 +141,9 @@ export const emailAr: Record<string, string> = {
   'Choose which notification types appear in your Notifications drawer. In-app alerts are stored on this device; email preferences below are stored on your account.':
     'اختر أنواع الإشعارات التي تظهر في درج الإشعارات. تُحفظ تنبيهات التطبيق على هذا الجهاز، وتُحفظ تفضيلات البريد أدناه في حسابك.',
 
-  // Payment states shown while an XPay/Fawry payment settles
-  'Waiting for your payment': 'بانتظار دفعتك',
-  'Your plan and credits activate as soon as the payment is confirmed — usually within a few seconds.':
-    'تُفعَّل خطتك ورموزك بمجرد تأكيد الدفع — عادةً خلال ثوانٍ.',
-  'Your payment is not confirmed yet. Pay the reference from your receipt at any Fawry outlet or in the Fawry app, and the plan unlocks the moment the money arrives.':
-    'لم يتم تأكيد دفعتك بعد. ادفع المرجع الموجود في إيصالك من أي منفذ فوري أو عبر تطبيق فوري، وتُفتح الخطة فور وصول المبلغ.',
-  'This payment is not confirmed yet. If you were charged, the plan unlocks as soon as the provider confirms it — refresh this page in a moment.':
-    'لم يتم تأكيد هذه الدفعة بعد. إذا تم خصم المبلغ، تُفتح الخطة بمجرد تأكيد المزوّد لها — حدّث هذه الصفحة بعد قليل.',
+  // Payment states shown while an XPay/Fawry payment settles,
+  'Account, security and activity email':
+    'بريد الحساب والأمان والنشاط',
+  'Password changes, sign-in email changes and security alerts are part of your account and cannot be turned off. They never contain marketing.':
+    'تغييرات كلمة المرور، وتغييرات بريد تسجيل الدخول، وتنبيهات الأمان جزء من حسابك ولا يمكن إيقافها. وهي لا تحتوي على أي محتوى تسويقي.',
 };

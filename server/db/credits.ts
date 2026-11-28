@@ -13,6 +13,7 @@ import type {
 } from '../../shared/credits.ts';
 import { DAILY_CREDIT_ALLOWANCE } from '../../shared/credits.ts';
 import { getActiveSubscription } from './subscriptions.ts';
+import { isMonetizationEnabled } from '../../shared/platformAccess.ts';
 
 interface CreditLedgerRow {
   id: string;
@@ -251,6 +252,14 @@ export async function readDailyCreditState(
 export async function ensureDailyCreditEntitlement(
   profileId: string
 ): Promise<{ entitled: boolean; granted: number }> {
+  // While the platform is free there is no paid plan whose daily allowance
+  // could be granted, and no balance is read to gate anything. The routine is
+  // skipped rather than called and refused, so a free platform does not pay
+  // for a round trip to a payment-aware procedure on every balance read.
+  if (!isMonetizationEnabled()) {
+    return { entitled: false, granted: 0 };
+  }
+
   const { data, error } = await getSupabaseServer().rpc('ensure_daily_credit_entitlement', {
     p_profile_id: profileId,
   });
@@ -346,7 +355,7 @@ export async function getCreditBalance(profileId: string): Promise<CreditBalance
   const daily = await readDailyCreditState(profileId);
 
   // 5. Get active subscription info
-  const sub = await getActiveSubscription(profileId);
+  const sub = isMonetizationEnabled() ? await getActiveSubscription(profileId) : null;
 
   // 6. Calculate credits consumed this month
   const startOfMonth = new Date();

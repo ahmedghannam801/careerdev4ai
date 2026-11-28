@@ -1,410 +1,112 @@
 /**
- * Arabic translations for Subscriptions, Pricing, Checkout, Tokens, and Billing.
- * Keyed by the exact English source strings.
+ * The Arabic strings for the parts of the interface that used to describe a
+ * subscription.
+ *
+ * WHY MOST OF THIS CATALOGUE IS GONE
+ * ----------------------------------
+ * Aionvia is a free platform at the moment. There is no plan to buy, no
+ * price to show, no renewal to remind anyone about and no token balance to
+ * read, so every string that described one of those things had nothing left
+ * to describe and was removed.
+ *
+ * What is left is the vocabulary of the administration screens, which report
+ * on the payments that were collected BEFORE the platform became free. Those
+ * figures are history, and the words that label them are still needed.
+ *
+ * The keys are the English source strings themselves, which is how the
+ * catalogue works everywhere: a missing key degrades to English rather than
+ * breaking, so removing a string can never break a screen.
  */
 
 export const subscriptionsAr: Record<string, string> = {
-  // Plans & Pricing
-  'Subscriptions & Pricing': 'الاشتراكات والأسعار',
-  'Choose the plan that fits your career ambitions': 'اختر الخطة المناسبة لطموحاتك المهنية',
-  'Monthly': 'شهرياً',
-  'Annual': 'سنوياً',
-  'Billing Cycle': 'دورة الفوترة',
-  'Plan': 'الخطة',
-  'Discount': 'الخصم',
-  'Total Amount': 'المبلغ الإجمالي',
-  'Default Account': 'الحساب الافتراضي',
-  'Save up to 17% with annual billing': 'وفر حتى ١٧٪ مع الاشتراك السنوي',
-  'Current Plan': 'خطتك الحالية',
-  'Upgrade Now': 'ترقية الآن',
-  'Get Started': 'ابدأ الآن',
-  'Free Explorer': 'المستكشف المجاني',
-  'Student & Early Career': 'الطلاب والبدايات المهنية',
-  'Professional': 'المحترف',
-  'Career Plus': 'المسار المتقدم (Plus)',
-  'per month': 'شهرياً',
-  'per year': 'سنوياً',
-  'Billed monthly': 'دفع شهري',
-  'Billed annually': 'دفع سنوي',
-  'Tokens included': 'توكنات مشمولة',
-  'Popular': 'الأكثر طلباً',
-  'Best Value': 'أفضل قيمة',
-  'All core platform features are 100% free': 'جميع مميزات المنصة الأساسية مجانية بالكامل ١٠٠٪',
-  'Provisional Access Active': 'الوصول المؤقت مفعل',
-  'Temporary 24h provisional access is active while your payment is being verified':
-    'الوصول المؤقت لمدة ٢٤ ساعة مفعل بينما يتم التحقق من عملية الدفع',
-
-  // Checkout & Payment Modal
-  'Complete Your Subscription': 'إتمام الاشتراك',
-  'Select Payment Method': 'اختر طريقة الدفع',
-  'Transfer Instructions': 'تعليمات التحويل',
-  'Submit Payment Evidence': 'إرسال إثبات التحويل',
-  'Transaction Reference ID': 'الرقم المرجعي للعملية (Reference ID)',
-  'Sender Phone Number / Handle': 'رقم محفظة أو حساب الراسل',
-  'Upload Transfer Receipt / Screenshot': 'إرفاق صورة إيصال التحويل / لقطة الشاشة',
-  'Drag and drop receipt here, or click to browse': 'اسحب صورة الإيصال هنا، أو انقر للاختيار',
-  'Receipt image uploaded': 'تم إرفاق صورة الإيصال',
-  'Have a promo coupon?': 'هل لديك كود خصم ترويجي؟',
-  'Apply Coupon': 'تطبيق الكود',
-  'Coupon applied successfully!': 'تم تطبيق كود الخصم بنجاح!',
-  'Birthday Reward': 'مكافأة عيد الميلاد',
-  'Claim 30% Birthday Discount': 'الحصول على خصم عيد الميلاد ٣٠٪',
-  'Confirm and Submit Evidence': 'تأكيد وإرسال الإثبات',
-  'Payment Under Review': 'الدفعة قيد المراجعة',
-  'Your payment proof has been submitted. A provisional 24-hour access has been unlocked.':
-    'تم إرسال إثبات الدفع بنجاح. تم تفعيل وصول تجريبي مؤقت لمدة ٢٤ ساعة.',
-  'Amount to Transfer': 'المبلغ المطلوب تحويله',
-  'I Have Transferred the Money': 'لقد قمت بالتحويل بالفعل',
-  'Payment Proof Submitted!': 'تم إرسال إثبات الدفع بنجاح!',
-  'Your payment evidence has been submitted and is currently being verified by an administrator.':
-    'تم إرسال إثبات الدفع وجاري التحقق منه بواسطة المشرف.',
-  'Done': 'تم',
-  'Cancel': 'إلغاء',
-  'Back': 'رجوع',
-  'Next': 'التالي',
-  'Copy': 'نسخ',
-  'Copied!': 'تم النسخ!',
-
-  // Tokens Badge & Modal
-  //
-  // The currency is called TOKENS in the interface. The ledger underneath
-  // still calls it a credit, but a candidate never sees the ledger, and two
-  // names for one currency is one name too many.
-  'Tokens': 'توكن',
-  // The singular, for the cost a button shows: "(1 Token)".
-  'Token': 'توكن',
-  'Your balance': 'رصيدك الحالي',
-  'Monthly Allowance': 'الرصيد الشهري المخصص',
-  'Used this cycle': 'المستخدم في هذه الدورة',
-  'Daily tokens': 'التوكنات اليومية',
-  'Remaining today': 'المتاح اليوم',
-  'Next claim in': 'الاستلام التالي بعد',
-  'Daily free tokens': 'التوكنات المجانية اليومية',
-  'Top up tokens': 'شحن توكنات إضافية',
-  'Token Packs': 'باقات التوكنات',
-  'Top up extra tokens without changing your current plan. Extra tokens never expire and stay in your wallet.':
-    'اشحن توكنات إضافية دون تغيير خطتك الحالية. التوكنات الإضافية لا تنتهي صلاحيتها وتبقى في محفظتك.',
-  'Premium CV template': 'قالب السيرة الذاتية المميز',
-  'Insufficient tokens': 'التوكنات غير كافية',
-  'You need more tokens to run this AI model. Top up or upgrade your plan.':
-    'تحتاج إلى توكنات إضافية لتشغيل هذا النموذج الذكي. اشحن رصيدك أو قم بترقية خطتك.',
-
-  // The pricing FAQ.
-  //
-  // This section used to be hard-coded Arabic inside an otherwise bilingual
-  // page, so an English speaker read Arabic in the one place on the Token Hub
-  // that should have spoken their language.
-  'Frequently asked questions about plans and payments':
-    'الأسئلة الشائعة حول الاشتراكات والمدفوعات',
-  'Everything you need to know about pricing and how a subscription is activated in Egypt.':
-    'كل ما تحتاج معرفته عن سياسة الأسعار وتفعيل الاشتراكات في مصر.',
-  'Are the core features of the platform actually free?':
-    'هل الميزات الأساسية للمنصة مجانية بالفعل؟',
-  'Yes — the core platform is completely free: job discovery, goal tracking and the basic learning maps. Paid plans exist to cover the running cost of the advanced AI models (Gemini), document processing and interview simulation.':
-    'نعم — المنصة الأساسية مجانية بالكامل: استكشاف الوظائف وتتبع الأهداف وخرائط التعلم الأساسية. باقات الاشتراك مخصصة لتغطية تكاليف نماذج الذكاء الاصطناعي المتقدمة (Gemini) ومعالجة الوثائق ومحاكاة المقابلات.',
-  'As soon as you enter the transfer reference and upload a screenshot of the receipt, the system gives you temporary access for 24 hours so you can carry on straight away, while an administrator makes the final confirmation during working hours.':
-    'بمجرد إدخال الرقم المرجعي للتحويل ورفع لقطة الشاشة للإيصال، يمنحك النظام وصولاً مؤقتاً لمدة ٢٤ ساعة لمتابعة مهامك على الفور، بينما يقوم المشرف بالتأكيد النهائي خلال ساعات العمل.',
-  'What happens if the AI call fails? Do I lose my tokens?':
-    'ماذا يحدث إذا فشل استدعاء الذكاء الاصطناعي؟ هل أخسر توكناتي؟',
-  'Never. The platform runs a secure double-entry ledger. If there is any network interruption or a model error, the tokens that were held are automatically refunded to your account straight away.':
-    'مستحيل. المنصة تطبّق نظام دفتر الأستاذ المزدوج الآمن. إذا حدث أي انقطاع للشبكة أو خطأ في النموذج، تُسترد التوكنات المخصومة تلقائياً إلى حسابك فوراً.',
-  'Can I pay by bank card?': 'هل يمكنني الدفع بالبطاقة البنكية؟',
-
-  // The daily claim.
-  //
-  // The reward is CLAIMED, so the wording is about an action the candidate
-  // takes — "Claim", "Claimed today" — rather than about a grant that arrives
-  // on its own.
-  'Claim': 'استلم',
-  'Claiming...': 'جارٍ الاستلام...',
-  'Claim daily tokens': 'استلم التوكنات اليومية',
-  'Claimed today': 'تم الاستلام اليوم',
-  'Already claimed today': 'تم الاستلام اليوم بالفعل',
-  'Your daily tokens are already waiting for you.': 'توجد توكناتك اليومية في انتظارك بالفعل.',
-  'Daily tokens claimed': 'تم استلام التوكنات اليومية',
-  'You received': 'لقد استلمت',
-  'tokens': 'توكن',
-  'Free tokens every day': 'توكنات مجانية كل يوم',
-  'Could not claim the daily tokens': 'تعذّر استلام التوكنات اليومية',
-  'Nothing was taken. Please try again.': 'لم يُخصم شيء. يُرجى المحاولة مرة أخرى.',
-
-  // Admin Panels
-  'Subscriptions': 'الاشتراكات',
-  'Payments': 'المدفوعات',
-  'Subscription Management': 'إدارة الاشتراكات',
-  'Payment Requests': 'طلبات الدفع',
-  'Revenue & Finance': 'الإيرادات والمالية',
-  'Pending Review': 'قيد المراجعة',
-  'Provisional Access': 'وصول مؤقت',
-  'Confirmed & Paid': 'مؤكد ومدفوع',
-  'Rejected': 'مرفوض',
-  'Confirm Payment': 'تأكيد الدفعة',
-  'Reject Payment': 'رفض الدفعة',
-  'Restore Payment': 'استعادة الدفعة',
-  'View Receipt': 'عرض الإيصال',
-  'Risk Score': 'درجة المخاطرة',
-  'Fraud Risk': 'مخاطر الاحتيال',
-  'Total Collected Revenue': 'إجمالي الإيرادات المحصلة',
-  'Transactions': 'المعاملات',
-  'Manual Token Grant': 'منح توكنات يدوي',
-  'Grant Tokens': 'منح التوكنات',
-  'Amount (Tokens)': 'الكمية (توكن)',
-  'Reason for Grant': 'سبب المنح',
-
-  // Payments
-  'Card': 'بطاقة بنكية',
-  'Continue to secure card payment': 'المتابعة إلى الدفع الآمن بالبطاقة',
-  'Failed to start card checkout': 'تعذر بدء الدفع بالبطاقة',
-  'Payment received': 'تم استلام الدفع',
-  'Card checkout cancelled': 'تم إلغاء الدفع بالبطاقة',
-  'Card subscription': 'اشتراك البطاقة',
-  'Cancels on': 'يُلغى في',
-  'Renews on': 'يتجدد في',
-
-  // ---- The membership, shown beside the profile ----------------------------
-  'Membership': 'العضوية',
-  'Manage plan': 'إدارة الباقة',
-  'Renew plan': 'تجديد الباقة',
-  'Inactive': 'غير مفعّل',
-  'Upgrade': 'ترقية',
-  'Upgrade to {tier}': 'ترقية إلى {tier}',
-  'AI credits left': 'الرصيد الذكي المتبقي',
-  'Your AI credits': 'رصيدك الذكي',
-  'Your membership frames your profile photo': 'عضويتك تُزيّن صورتك الشخصية بإطار',
-  'tokens available': 'رموز متاحة',
-  'Unlock tailored CVs, detailed ATS analysis and interview practice.':
-    'افتح السيرة الذاتية المخصصة، وتحليل ATS التفصيلي، وتدرّب المقابلات.',
-  'Everything in your plan, with the credits that go with it.':
-    'كل ما في باقتك، مع الرصيد الذي يرافقها.',
-
-  // Plan benefit labels (read from the shared entitlement matrix)
-  'CV builder': 'منشئ السيرة الذاتية',
-  'Tailored CVs': 'سير ذاتية مخصصة',
-  'Multiple CV versions': 'نسخ متعددة من السيرة',
-  'PDF export': 'تصدير PDF',
-  'ATS analysis': 'تحليل ATS',
-  'Detailed ATS breakdown': 'تحليل ATS تفصيلي',
-  'Job description analysis': 'تحليل الوصف الوظيفي',
-  'Cover letter generation': 'إنشاء خطاب التقديم',
-  'Career roadmap': 'خارطة الطريق المهنية',
-  'Full roadmap stages': 'جميع مراحل خارطة الطريق',
-  'Mock interviews': 'مقابلات تجريبية',
-  'AI mentor sessions': 'جلسات مع المرشد الذكي',
-  'Advanced portfolio': 'ملف أعمال متقدم',
-  'Career transition plan': 'خطة التحول المهني',
-  'Test mode': 'وضع الاختبار',
-  'Manage billing': 'إدارة الفواتير',
-  'Failed to open the billing portal': 'تعذر فتح بوابة إدارة الفواتير',
-  'Card invoices (previous gateway)': 'فواتير البطاقات (المزوّد السابق)',
-  'paid invoices': 'فواتير مدفوعة',
-  'test-mode invoices are excluded from revenue': 'فاتورة اختبار مستبعدة من الإيرادات',
+  'Monthly':
+    'شهرياً',
+  'Annual':
+    'سنوياً',
+  'Tokens':
+    'توكن',
+  'Token':
+    'توكن',
+  'Subscriptions':
+    'الاشتراكات',
+  'Subscription Management':
+    'إدارة الاشتراكات',
+  'Revenue & Finance':
+    'الإيرادات والمالية',
+  'Transactions':
+    'المعاملات',
+  'Test mode':
+    'وضع الاختبار',
+  'Card invoices (previous gateway)':
+    'فواتير البطاقات (المزوّد السابق)',
+  'paid invoices':
+    'فواتير مدفوعة',
+  'test-mode invoices are excluded from revenue':
+    'فاتورة اختبار مستبعدة من الإيرادات',
   'No card invoice history is available on this deployment.':
     'لا يوجد سجل فواتير بطاقات متاح على هذا الإصدار.',
   'No card invoices yet. Test-mode invoices are listed here but excluded from revenue.':
     'لا توجد فواتير بطاقات بعد. تُعرض فواتير وضع الاختبار هنا لكنها مستبعدة من الإيرادات.',
-  'Test': 'اختبار',
-  'Open invoice': 'فتح الفاتورة',
-
-  // Card subscription states and portal return
-  'Card billing': 'فواتير البطاقة',
-  'Payment failed': 'فشل الدفع',
-  'Unpaid': 'غير مدفوع',
-  'Payment incomplete': 'الدفع غير مكتمل',
-  'Expired': 'منتهي',
-  'Cancelled': 'ملغي',
-  'Paused': 'متوقف مؤقتاً',
-  'Ended on': 'انتهى في',
-  'Current period ends': 'تنتهي الفترة الحالية في',
-  'Your saved card can be reused for future purchases.':
-    'يمكن إعادة استخدام بطاقتك المحفوظة للمشتريات القادمة.',
-  'Billing updated': 'تم تحديث الفواتير',
-  'Update payment method': 'تحديث طريقة الدفع',
-  'Secure local payment methods': 'طرق دفع محلية آمنة',
-
-  // Admin revenue additions
-  'Refresh': 'تحديث',
-  'From date': 'من تاريخ',
-  'To date': 'إلى تاريخ',
-  'Apply': 'تطبيق',
-  'All time': 'كل الفترات',
-  'Net collected revenue': 'صافي الإيرادات المحصلة',
-  'After refunds': 'بعد خصم المبالغ المستردة',
-  'Gross collected': 'إجمالي التحصيل',
-  'Before refunds': 'قبل المبالغ المستردة',
-  'Refunds': 'المبالغ المستردة',
-  'refunds': 'عملية استرداد',
-  'pending': 'قيد الانتظار',
-  'failed': 'فاشلة',
-  'refunded': 'مستردة',
-  'Revenue by payment method': 'الإيرادات حسب طريقة الدفع',
-  'Subscription revenue': 'إيرادات الاشتراكات',
-  'Credit pack revenue': 'إيرادات حزم النقاط',
-  'Credit packs': 'حزم النقاط',
-  'Credit pack': 'حزمة نقاط',
-  'Pending': 'قيد الانتظار',
-  'Failed': 'فاشلة',
-  'Disputes': 'النزاعات',
-  'Recent card refunds': 'أحدث عمليات استرداد البطاقات',
-  'Manual wallet transfers (historical)':
-    'معاملات المحافظ (فودافون كاش / إنستاباي)',
-  'No wallet transactions in this period.': 'لا توجد معاملات محافظ في هذه الفترة.',
-  'No reference': 'بدون رقم مرجعي',
-
-  // Checkout state machine & premium checkout surface
-  'Method': 'الطريقة',
-  'Instructions': 'التعليمات',
-  'Checkout progress': 'مراحل الدفع',
-  'Select a payment method to continue': 'اختر طريقة الدفع للمتابعة',
-  'Secure checkout': 'صفحة دفع آمنة',
-  'Checking…': 'جارٍ التحقق…',
-  'Preparing checkout…': 'جارٍ تجهيز الدفع…',
-  'Please wait…': 'يرجى الانتظار…',
-  'Invalid coupon': 'كود خصم غير صالح',
-  'Validation failed': 'فشل التحقق',
-  'Failed to initialize payment': 'تعذر بدء عملية الدفع',
-  'Failed to submit payment evidence': 'تعذر إرسال إثبات الدفع',
-  'Wallet number': 'رقم المحفظة',
-  'Account holder': 'اسم المستلم',
-  'Copy the account details and complete the transfer from your banking app.':
-    'انسخ بيانات الحساب وأكمل التحويل من تطبيق البنك.',
-  'The reference number shown in the confirmation message or the transfer receipt':
-    'الرقم المرجعي الظاهر في رسالة تأكيد العملية أو في إيصال التحويل',
-  'Receipt preview': 'معاينة الإيصال',
-  'PNG, JPG up to 5 MB': 'صيغة PNG أو JPG حتى ٥ ميجابايت',
-  'Receipt file size must be less than 5 MB': 'يجب أن يكون حجم ملف الإيصال أقل من ٥ ميجابايت',
-  'Transaction reference is required': 'الرقم المرجعي للعملية مطلوب',
-  'Sender phone or handle is required': 'رقم أو حساب الراسل مطلوب',
-  'Please upload a screenshot or photo of your transfer receipt':
-    'يرجى رفع لقطة شاشة أو صورة لإيصال التحويل',
-  'Submitting the receipt unlocks provisional access for 24 hours while the team confirms the transfer.':
-    'إرسال الإيصال يفعّل الوصول المؤقت لمدة ٢٤ ساعة بينما يؤكد الفريق عملية التحويل.',
-  'Submitting your payment evidence…': 'جارٍ إرسال إثبات الدفع…',
-  'Please keep this window open for a moment.': 'يرجى إبقاء هذه النافذة مفتوحة لفترة وجيزة.',
-  'Your payment has been confirmed and your subscription is now active.':
-    'تم تأكيد الدفع الخاص بك وأصبح اشتراكك فعالاً الآن.',
-  'The payment could not be confirmed. Nothing was charged — you can try again or contact support.':
-    'لم يتم تأكيد الدفع. لم يتم خصم أي مبلغ — يمكنك المحاولة مرة أخرى أو التواصل مع الدعم.',
-  'Payment request expired': 'انتهت صلاحية طلب الدفع',
-  'This payment request expired before it was completed. Please start a new checkout.':
-    'انتهت صلاحية طلب الدفع قبل اكتماله. يرجى بدء عملية دفع جديدة.',
-  'Payment refunded': 'تم استرداد المبلغ',
-  'The payment was refunded, so nothing was charged for your subscription.':
-    'تم استرداد مبلغ الدفع، لذلك لم يتم خصم أي مبلغ لاشتراكك.',
-  'Start a new checkout': 'ابدأ عملية دفع جديدة',
-  'Complete your payment': 'أكمل عملية الدفع',
-  'Payment methods': 'طرق الدفع',
-  'Checking which payment methods are available…': 'جارٍ التحقق من طرق الدفع المتاحة…',
-  'No payment method is enabled yet.': 'لم يتم تفعيل أي طريقة دفع بعد.',
-  'No payment method is enabled on this account yet, so payment is unavailable.': 'لم يتم تفعيل أي طريقة دفع على هذا الحساب بعد، لذا الدفع غير متاح.',
-  'This account cannot charge in Egyptian pounds yet, so payment is unavailable.': 'هذا الحساب لا يستطيع التحصيل بالجنيه المصري بعد، لذا الدفع غير متاح.',
-  'You pay on XPay’s secure page. Aionvia never sees your card number.': 'تدفع على صفحة XPay الآمنة. لا يرى Aionvia رقم بطاقتك أبداً.',
-  'Test mode: no real money is charged and a test plan is granted.': 'الوضع التجريبي: لا يُخصم أي مبلغ حقيقي ويُمنح اشتراك تجريبي.',
-  'Promo code': 'كود الخصم',
-  'Enter a promo code': 'أدخل كود الخصم',
-  'Use my 30% birthday discount': 'استخدم خصم عيد الميلاد ٣٠٪',
-  'Applied only on your birthday. It cannot be combined with a promo code.': 'يُطبّق في يوم عيد ميلادك فقط، ولا يمكن جمعه مع كود خصم.',
-  'Birthday discount': 'خصم عيد الميلاد',
-  'The discount is confirmed by the server when the payment starts, and only if today is your birthday.': 'يتم تأكيد الخصم من الخادم عند بدء الدفع، وفقط إذا كان اليوم هو عيد ميلادك.',
-  'Pay with XPay': 'ادفع عبر XPay',
-  'Your plan activates as soon as the payment is confirmed — not before.': 'يُفعّل اشتراكك بمجرد تأكيد الدفع — وليس قبل ذلك.',
-  'One-time': 'دفعة واحدة',
-  'Pay at any Fawry outlet or in the app. Your plan activates when the payment arrives.': 'ادفع من أي منفذ فوري أو من تطبيق فوري. يُفعّل اشتراكك عند وصول المبلغ.',
-  'Split the payment into instalments with ValU.': 'قسّم المبلغ على أقساط مع فاليو.',
-  'Pay with a card saved in your Apple Wallet.': 'ادفع ببطاقة محفوظة في محفظة Apple.',
-  'Pay with your Visa or Mastercard, protected by 3-D Secure.': 'ادفع ببطاقة فيزا أو ماستركارد محمية بـ 3-D Secure.',
-  'Card payment is not available right now. Nothing was charged.': 'الدفع بالبطاقة غير متاح الآن. لم يتم خصم أي مبلغ.',
-  'This plan is already active on your account.': 'هذا الاشتراك مفعّل بالفعل على حسابك.',
-  'Subscriptions are sold for one fixed period and are not renewed automatically.':
-    'تُباع الاشتراكات لفترة ثابتة واحدة ولا تتجدد تلقائيًا.',
-  'The free plan needs no payment.': 'الخطة المجانية لا تحتاج إلى دفع.',
-  'Failed to start the payment': 'تعذّر بدء عملية الدفع',
-  'Secure payments through XPay': 'دفع آمن عبر XPay',
-  'Card payment is not enabled for this account yet, so checkout is unavailable. Nothing is charged and no plan changes.': 'الدفع بالبطاقة غير مفعّل لهذا الحساب بعد، لذا الدفع غير متاح. لا يُخصم مبلغ ولا تتغير أي خطة.',
-  'You pay on XPay’s secure page; Aionvia never sees or stores your card number. Your plan activates as soon as the payment is confirmed, and a Fawry reference activates it when the money arrives.': 'تدفع على صفحة XPay الآمنة؛ لا يرى Aionvia رقم بطاقتك ولا يخزّنه. يُفعّل اشتراكك بمجرد تأكيد الدفع، ويُفعّل رقم فوري عند وصول المبلغ.',
-  'Checking available payment methods…': 'جارٍ التحقق من طرق الدفع المتاحة…',
-  'Waiting for your payment': 'بانتظار دفعك',
-  'Your payment is not confirmed yet. Pay the reference from your receipt at any Fawry outlet or in the Fawry app, and the plan unlocks the moment the money arrives.': 'لم يتم تأكيد دفعك بعد. ادفع الرقم المرجعي الموجود في إيصالك من أي منفذ فوري أو من تطبيق فوري، ويُفتح الاشتراك بمجرد وصول المبلغ.',
-  'This payment is not confirmed yet. If you were charged, the plan unlocks as soon as the provider confirms it — refresh this page in a moment.': 'لم يتم تأكيد هذا الدفع بعد. إذا تم خصم المبلغ، يُفتح الاشتراك بمجرد أن يؤكده مزوّد الدفع — حدّث الصفحة بعد لحظات.',
-  'Which payment methods can I use?': 'ما طرق الدفع المتاحة؟',
-  'Payment goes through XPay, Egypt’s payment provider. The methods offered are the ones enabled on our merchant account — cards, Apple Pay, Fawry and ValU — and the checkout shows exactly what is available when you pay. Your plan activates the moment the payment is confirmed, and a Fawry reference activates it the moment the money arrives.': 'الدفع يتم عبر XPay، مزوّد الدفع المصري. الطرق المعروضة هي المفعّلة على حساب التاجر — البطاقات وآبل باي وفوري وفاليو — وتُظهر صفحة الدفع ما هو متاح فعلاً عند الدفع. يُفعّل اشتراكك لحظة تأكيد الدفع، ويُفعّله رقم فوري لحظة وصول المبلغ.',
-  'Yes. Choose a plan and you are taken to XPay’s secure page to pay by card, Apple Pay, Fawry or ValU. Aionvia never sees or stores your card number, and the plan activates as soon as the payment is confirmed.': 'نعم. اختر خطة وستُنقل إلى صفحة XPay الآمنة للدفع بالبطاقة أو آبل باي أو فوري أو فاليو. لا يرى Aionvia رقم بطاقتك ولا يخزّنه، ويُفعّل الاشتراك بمجرد تأكيد الدفع.',
-  'Nothing was charged. You can try again whenever you are ready.': 'لم يتم خصم أي مبلغ. يمكنك المحاولة مرة أخرى وقتما تشاء.',
-  'Your plan and credits activate as soon as the payment is confirmed — usually within a few seconds.':
-    'يُفعّل اشتراكك ونقاطك بمجرد تأكيد الدفع — عادةً في خلال ثوانٍ.',
-  'Card (previous gateway)': 'البطاقات (المزوّد السابق)',
-  'Payments are temporarily unavailable': 'الدفع غير متاح مؤقتاً',
-  'Payments temporarily unavailable': 'الدفع غير متاح مؤقتاً',
-  'Checking the payment provider. This takes a moment.': 'جارٍ التحقق من مزوّد الدفع. الأمر يستغرق لحظة.',
-  'We are finishing the setup of our payment provider. Plans, prices and your current access are unchanged, and nothing can be charged until checkout is live again.': 'نستكمل الآن إعداد مزوّد الدفع. الخطط والأسعار ووصولك الحالي كما هي، ولن يُخصم أي مبلغ حتى تعود صفحة الدفع للعمل.',
-  'Our payment account cannot take Egyptian pounds yet, so checkout is paused. Nothing will be charged and your plan stays as it is.': 'حساب الدفع لدينا لا يستطيع التحصيل بالجنيه المصري بعد، لذا الدفع متوقف مؤقتاً. لن يُخصم أي مبلغ وسيظل اشتراكك كما هو.',
-  'No payment method is enabled on our payment account yet, so checkout is paused. Nothing will be charged and your plan stays as it is.': 'لم يتم تفعيل أي طريقة دفع على حساب الدفع لدينا بعد، لذا الدفع متوقف مؤقتاً. لن يُخصم أي مبلغ وسيظل اشتراكك كما هو.',
-  'We could not reach the payment provider just now, so checkout is paused. Nothing was charged — please try again in a few minutes.': 'تعذّر الوصول إلى مزوّد الدفع حالياً، لذا الدفع متوقف مؤقتاً. لم يُخصم أي مبلغ — يرجى المحاولة بعد دقائق.',
-  // Published pricing catalogue, comparison table and current-plan panel
-  'Most popular': 'الأكثر طلباً',
-  'Best value': 'أفضل قيمة',
-  'one-time': 'لمرة واحدة',
-  'Upgrade to': 'الترقية إلى',
-  'Downgrade to': 'التخفيض إلى',
-  'Choose plan': 'اختر الخطة',
-  'Free forever': 'مجاني للأبد',
-  'Included': 'مشمول',
-  'Not included': 'غير مشمول',
-  'Current plan': 'خطتك الحالية',
-  'Your current plan': 'خطتك الحالية',
-  'Expires': 'ينتهي في',
-  'Last payment': 'آخر دفعة',
-  'Payment status': 'حالة الدفع',
-  'Paid': 'مدفوع',
-  'Awaiting payment': 'بانتظار الدفع',
-  'Order': 'رقم الطلب',
-  'Save': 'توفير',
-  'Feature': 'الميزة',
-  'Free': 'مجاني',
-  '2 months free': 'شهران مجاناً',
-  'Compare plans in detail': 'قارن الخطط بالتفصيل',
-  'Every feature, plan by plan — the same entitlements the platform enforces.':
-    'كل ميزة، خطة بخطة — نفس الصلاحيات التي تطبقها المنصة.',
-  'Monthly AI tokens': 'توكنات الذكاء الاصطناعي الشهرية',
-  'Saved jobs': 'الوظائف المحفوظة',
+  'Test':
+    'اختبار',
+  'Open invoice':
+    'فتح الفاتورة',
+  'Expired':
+    'منتهي',
+  'From date':
+    'من تاريخ',
+  'To date':
+    'إلى تاريخ',
+  'All time':
+    'كل الفترات',
+  'Net collected revenue':
+    'صافي الإيرادات المحصلة',
+  'After refunds':
+    'بعد خصم المبالغ المستردة',
+  'Gross collected':
+    'إجمالي التحصيل',
+  'Before refunds':
+    'قبل المبالغ المستردة',
+  'Refunds':
+    'المبالغ المستردة',
+  'refunds':
+    'عملية استرداد',
+  'pending':
+    'قيد الانتظار',
+  'refunded':
+    'مستردة',
+  'Revenue by payment method':
+    'الإيرادات حسب طريقة الدفع',
+  'Subscription revenue':
+    'إيرادات الاشتراكات',
+  'Credit pack revenue':
+    'إيرادات حزم النقاط',
+  'Credit packs':
+    'حزم النقاط',
+  'Credit pack':
+    'حزمة نقاط',
+  'Pending':
+    'قيد الانتظار',
+  'Disputes':
+    'النزاعات',
+  'Recent card refunds':
+    'أحدث عمليات استرداد البطاقات',
+  'No reference':
+    'بدون رقم مرجعي',
+  'Card (previous gateway)':
+    'البطاقات (المزوّد السابق)',
   'Your plan has reached its saved-jobs limit. Remove a saved job to save another.':
     'وصلت خطتك إلى الحد الأقصى للوظائف المحفوظة. احذف وظيفة محفوظة لتتمكن من حفظ أخرى.',
-  'Complete CV builder': 'منشئ السيرة الذاتية الكامل',
-  'AI-tailored CVs': 'سيرة ذاتية مخصصة بالذكاء الاصطناعي',
-  'ATS score & gap analysis': 'تقييم ATS وتحليل الفجوات',
-  'JD keyword extraction': 'استخراج كلمات الوظيفة',
-  'AI cover letters': 'خطابات التقديم بالذكاء الاصطناعي',
-  'Full learning roadmaps': 'خرائط تعلم كاملة',
-  'Unlimited CV versions & storage': 'نسخ سيرة وتخزين غير محدود',
-  'AI mock interviews': 'مقابلات تجريبية بالذكاء الاصطناعي',
-  'AI career mentor': 'مرشد مهني ذكي',
-  'Advanced portfolio & evidence': 'معرض أعمال وإثباتات متقدم',
-  'Career progress reports': 'تقارير التقدم المهني',
-  'Career transition engine': 'محرك التحول المهني',
-  'Multi-role comparative fit': 'مقارنة الملاءمة بين الأدوار',
-  'Deep scenario interviews': 'مقابلات سيناريو متعمقة',
-  'Priority AI processing': 'أولوية معالجة الذكاء الاصطناعي',
-  'Tokens are granted monthly across the 12 months — not all at once.':
-    'تُمنح التوكنات شهرياً على مدار ١٢ شهراً — وليس كلها مقدماً.',
-  'tokens each month for 12 months — granted monthly, not all at once.':
-    'توكن كل شهر لمدة ١٢ شهراً — تُمنح شهرياً وليس كلها مقدماً.',
-  'Your plan is active. Your token allowance and expiration date are shown below.':
-    'خطتك مفعّلة. يظهر رصيد توكناتك وتاريخ الانتهاء أدناه.',
-  'Payment not completed': 'لم تكتمل عملية الدفع',
-  'Checkout expired': 'انتهت صلاحية صفحة الدفع',
-  'The payment was not confirmed, so nothing was charged and no plan changed. You can try again.':
-    'لم يتم تأكيد الدفع، لذا لم يُخصم أي مبلغ ولم تتغير الخطة. يمكنك المحاولة مرة أخرى.',
-  'This checkout expired before the payment was confirmed. Nothing was charged and no plan changed.':
-    'انتهت صلاحية صفحة الدفع قبل تأكيد الدفع. لم يُخصم أي مبلغ ولم تتغير الخطة.',
-  'Change plan': 'غيّر الخطة',
-  'Auto-renewal is off. Your access continues until the expiration date. When it ends, buy the same plan again to renew it.':
-    'التجديد التلقائي متوقف. يستمر وصولك حتى تاريخ الانتهاء. عند انتهائه، اشترِ الخطة نفسها مرة أخرى لتجديدها.',
-  'This is a downgrade': 'هذا تخفيض للخطة',
-  'The new plan starts as soon as this payment is confirmed. Your current plan is replaced immediately, and unused days are not refunded.':
-    'تبدأ الخطة الجديدة فور تأكيد الدفع. تُستبدل خطتك الحالية مباشرةً، ولا تُرد قيمة الأيام غير المستخدمة.',
-  Basic: 'أساسي',
-  'How do I pay?': 'كيف أدفع؟',
-  'Choose a plan and you are taken to XPay’s secure page. The payment methods offered there are the ones enabled on our merchant account; Aionvia never sees or stores your card number, and the plan activates only when the payment is confirmed.':
-    'اختر خطة وستُنقل إلى صفحة XPay الآمنة. طرق الدفع المعروضة هناك هي المفعّلة على حساب التاجر؛ لا يرى Aionvia رقم بطاقتك ولا يخزّنه، ولا تُفعّل الخطة إلا عند تأكيد الدفع.',
-
-  'No payment method is available right now.': 'لا توجد طريقة دفع متاحة الآن.',
+  'Everything is free right now':
+    'كل شيء مجاني في الوقت الحالي',
+  'CV Builder, ATS Analysis and AI Career Mentor':
+    'منشئ السيرة الذاتية، تحليل ATS، والمرشد المهني بالذكاء الاصطناعي',
+  'Job Matching, Cover Letters and Learning Hub':
+    'مطابقة الوظائف، رسائل التقديم، ومركز التعلّم',
+  'Roadmaps, Assessments, Mock and Voice Interviews':
+    'الخرائط المهنية، التقييمات، والمقابلات التجريبية والصوتية',
+  'Projects and Volunteering':
+    'المشاريع والتطوع',
+  'Daily usage limits still apply so that one person cannot use up the platform’s AI capacity, but they are the same for everyone and no payment is involved.':
+    'لا تزال حدود الاستخدام اليومي سارية حتى لا يستهلك شخص واحد كامل طاقة الذكاء الاصطناعي في المنصة، لكنها واحدة للجميع ولا تتضمن أي دفع.',
 };

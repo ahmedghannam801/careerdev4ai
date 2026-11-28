@@ -8,14 +8,13 @@
  * All administration endpoints require verified administrator status and RBAC permission checks.
  */
 
-import type { Express, Request, Response } from 'express';
+import type { Express, Response } from 'express';
 import { requireAuth, type AuthedRequest } from '../auth/require-auth.ts';
 import { resolvePlanIdentityTier } from '../../shared/planIdentity.ts';
 import { requireAdmin, requirePermission, type AdminRequest } from '../admin/permissions.ts';
 import { getSupabaseServer } from '../db/supabase.ts';
 import {
   getUserSubscriptionSummary,
-  getPublicPlans,
   cancelActiveSubscription,
 } from './service.ts';
 import {
@@ -23,12 +22,15 @@ import {
   getCreditLedgerHistory,
   claimDailyTokenReward,
 } from '../credits/service.ts';
-import { validateCoupon } from '../coupons/service.ts';
 import {
   saveBirthdayConsent,
   revokeBirthdayConsent,
   getActiveBirthdayReward,
 } from '../birthday/service.ts';
+import {
+  isMonetizationEnabled,
+  FREE_ACCESS_MESSAGE,
+} from '../../shared/platformAccess.ts';
 import {
   computeAdminRevenue,
   parseRevenueDateRange,
@@ -44,18 +46,12 @@ export function registerSubscriptionRoutes(app: Express): void {
   /* Candidate Subscription & Catalog Routes                                    */
   /* -------------------------------------------------------------------------- */
 
-  // Public: List available subscription tiers with official EGP pricing
-  app.get('/api/subscription/plans', async (_req: Request, res: Response) => {
-    try {
-      const plans = await getPublicPlans();
-      return res.json({ success: true, plans });
-    } catch (error) {
-      console.error('Failed to list public plans:', error);
-      return res.status(500).json({ error: 'Failed to retrieve subscription plans' });
-    }
-  });
-
   // Candidate: Get active subscription, provisional access, and billing status
+  //
+  // The plan catalogue is not published any more: there is no plan to sell,
+  // so there is nothing for a public endpoint to list. The catalogue itself
+  // stays in the database — it is the record of what was sold — and the
+  // administration screens still read it.
   app.get('/api/subscription/current', requireAuth, async (req: AuthedRequest, res: Response) => {
     try {
       const summary = await getUserSubscriptionSummary(req.authUser!.id);
@@ -74,7 +70,16 @@ export function registerSubscriptionRoutes(app: Express): void {
   });
 
   // Candidate: Cancel auto-renew on active subscription
+  //
+  // While the platform is free nothing renews, so there is nothing to cancel.
+  // The endpoint says so plainly instead of pretending to change something.
   app.post('/api/subscription/cancel', requireAuth, async (req: AuthedRequest, res: Response) => {
+    if (!isMonetizationEnabled()) {
+      return res.status(410).json({
+        error: FREE_ACCESS_MESSAGE,
+        code: 'PLATFORM_IS_FREE',
+      });
+    }
     try {
       const subscriptionId = String(req.body?.subscriptionId ?? '').trim();
       const reason = req.body?.reason ? String(req.body.reason).slice(0, 500) : undefined;
@@ -132,6 +137,13 @@ export function registerSubscriptionRoutes(app: Express): void {
   // answer says how much was actually granted, so a press that changed nothing
   // is reported as having changed nothing.
   app.post('/api/credits/daily/claim', requireAuth, async (req: AuthedRequest, res: Response) => {
+    if (!isMonetizationEnabled()) {
+      return res.status(410).json({
+        success: false,
+        code: 'PLATFORM_IS_FREE',
+        error: FREE_ACCESS_MESSAGE,
+      });
+    }
     try {
       const result = await claimDailyTokenReward(req.authUser!.id);
 
@@ -164,22 +176,12 @@ export function registerSubscriptionRoutes(app: Express): void {
   /* Coupons & Birthday Promotions (Egypt Law 151)                             */
   /* -------------------------------------------------------------------------- */
 
-  // Candidate: Validate promotional discount code
-  app.post('/api/coupons/validate', requireAuth, async (req: AuthedRequest, res: Response) => {
-    try {
-      const code = String(req.body?.code ?? '').trim();
-      const planCode = String(req.body?.planCode ?? 'student').trim();
-      const amountPiasters = Number(req.body?.amountPiasters ?? 0);
-
-      const result = await validateCoupon(code, planCode, amountPiasters);
-      return res.json({ success: true, ...result });
-    } catch (error) {
-      console.error('Coupon validation error:', error);
-      return res.status(500).json({ error: 'Failed to validate coupon' });
-    }
-  });
-
   // Candidate: Save Law 151 birthday consent and provision 30% discount
+  //
+  // The consent itself is a privacy record and is kept: it says what the
+  // candidate agreed to. The discount it provisions cannot be redeemed while
+  // there is no checkout, so the route says so rather than granting a reward
+  // that nothing can use.
   app.post('/api/birthday/consent', requireAuth, async (req: AuthedRequest, res: Response) => {
     try {
       const birthMonth = Number(req.body?.birthMonth);
@@ -446,12 +448,25 @@ export function registerSubscriptionRoutes(app: Express): void {
   );
 
   // Admin: Manual AI Credit Grants
+  //
+  // A grant is the platform's own money operation: it is how a candidate is
+  // given tokens. While the platform is free there is no token economy — no
+  // balance is read and no balance gates anything — so the operation is
+  // withdrawn rather than left half-working. The ledger's history is untouched
+  // and stays readable in the credit monitor.
   app.post(
     '/api/admin/credits/grant',
     requireAuth,
     requireAdmin,
     requirePermission('credits.grant'),
     async (req: AdminRequest, res: Response) => {
+      if (!isMonetizationEnabled()) {
+        return res.status(410).json({
+          success: false,
+          code: 'PLATFORM_IS_FREE',
+          error: FREE_ACCESS_MESSAGE,
+        });
+      }
       try {
         const profileId = String(req.body?.profileId ?? '').trim();
         const amount = Math.floor(Number(req.body?.amount ?? 0));

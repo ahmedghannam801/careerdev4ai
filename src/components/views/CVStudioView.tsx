@@ -30,8 +30,7 @@ import { CvStudioWorkflow } from '../cv/CvStudioWorkflow';
 import { formatRetryDelay, resolveAtsAnalysisRole } from '../../../shared/atsAnalysis';
 import type { CvAnalysisReport } from '../../../shared/cvAnalysis';
 import { CV_STUDIO_TABS, cvStudioStepForTab, type CvStudioTab } from '../../lib/routing';
-import { useRouteParam, refreshRoute } from '../../lib/useRouteParams';
-import { buildRouteHash } from '../../lib/routing';
+import { useRouteParam } from '../../lib/useRouteParams';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { BackgroundJobsPanel } from '../background/BackgroundJobsPanel';
@@ -423,13 +422,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
               candidate sees what is left before they reach for it rather than
               meeting a refusal afterwards. */}
           <div className="shrink-0">
-            <CvStudioAiQuotaBadge
-              onUpgrade={() => {
-                onNavigate?.('pricing');
-                window.history.replaceState(null, '', buildRouteHash('pricing'));
-                refreshRoute();
-              }}
-            />
+            <CvStudioAiQuotaBadge />
           </div>
         </div>
 
@@ -437,9 +430,9 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
           {/* The template gallery is reachable from every step of the studio.
               It used to live only in the secondary navigation of the "My CV"
               step, which meant a candidate reading their ATS score had to go
-              back a step to discover that the library — and the premium
-              layout the token balance buys — was there at all. The library is
-              a part of the studio, so its door is in the studio's own header. */}
+              back a step to discover that the library was there at all. The
+              library is a part of the studio, so its door is in the studio's
+              own header. */}
           <button
             onClick={() => setActiveTab('templates')}
             className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors ${
@@ -625,10 +618,7 @@ export const CVStudioView: React.FC<{ onNavigate?: (view: string) => void }> = (
       {/* The structure of the document. Choosing a template changes the
           presentation only; the content is rebuilt from the same records. */}
       {activeTab === 'templates' && (
-        <CvTemplateLibrary
-          onOpenEditor={() => setActiveTab('editor')}
-          onUpgrade={() => onNavigate?.('pricing')}
-        />
+        <CvTemplateLibrary onOpenEditor={() => setActiveTab('editor')} />
       )}
 
       {/* The import that is also a review. The document is read first and

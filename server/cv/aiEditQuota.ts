@@ -29,7 +29,7 @@
  */
 
 import type { Response } from 'express';
-import { getUserEffectivePlan } from '../subscriptions/entitlements.ts';
+import { getAccessPlanCode } from '../subscriptions/entitlements.ts';
 import {
   consumeCvAiEditQuota,
   readCvAiEditQuota,
@@ -54,12 +54,16 @@ export const CV_AI_EDIT_LIMIT_CODE = 'CV_AI_EDIT_LIMIT_REACHED';
  *
  * A paid plan reads as unlimited and never touches the counter. A free
  * account reads the counter as it stands.
+ *
+ * While the platform is free every account reads the counter the same way:
+ * the allowance is a global rate limit, not a paid tier, so it is resolved
+ * against the free plan for everybody — including an account that still
+ * holds an old subscription.
  */
 export async function getCvAiQuotaState(profileId: string): Promise<CvAiQuotaState> {
   let planCode: string;
   try {
-    const plan = await getUserEffectivePlan(profileId);
-    planCode = plan.planCode;
+    planCode = await getAccessPlanCode(profileId);
   } catch {
     throw new CvAiQuotaUnavailableError();
   }
@@ -77,8 +81,7 @@ export async function getCvAiQuotaState(profileId: string): Promise<CvAiQuotaSta
 export async function claimCvAiEdit(profileId: string): Promise<CvAiEditClaim> {
   let planCode: string;
   try {
-    const plan = await getUserEffectivePlan(profileId);
-    planCode = plan.planCode;
+    planCode = await getAccessPlanCode(profileId);
   } catch {
     throw new CvAiQuotaUnavailableError();
   }

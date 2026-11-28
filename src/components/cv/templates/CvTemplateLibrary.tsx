@@ -15,13 +15,11 @@
  * server call, and a refused apply leaves the candidate's current document
  * untouched.
  *
- * LOOKING AT A TEMPLATE IS FREE. A premium template is drawn in full, exactly
- * like a free one: no lock over the document, no blur, no dimming, no crop. A
- * candidate who cannot see the layout cannot judge it, and a placeholder is
- * not a preview. What the lock decides is whether the candidate may USE the
- * template — and even then it is not a dead end, because a premium template
- * can be unlocked with tokens, and the price is on the card before
- * anything is spent.
+ * LOOKING AT A TEMPLATE IS FREE, AND SO IS USING IT. The platform is free at
+ * the moment: every template is drawn in full, exactly like any other, and
+ * every template may be used. There is no lock, no price, no plan and no
+ * currency in this library — the server decides which templates exist, and
+ * the candidate chooses between them.
  *
  * Switching a template is presentation only: the document is rebuilt from the
  * same CV data, so no fact can be lost by changing the layout.
@@ -29,27 +27,21 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowUpRight,
   Check,
-  Coins,
-  Crown,
   LayoutTemplate,
   Loader2,
   Maximize2,
   RefreshCw,
   Search,
-  ShieldCheck,
   Sparkles,
   Star,
   X,
-  Zap,
 } from 'lucide-react';
 import { useCareer } from '../../../context/CareerContext';
 import {
   applyCvTemplate,
   fetchCvTemplateCatalog,
   fetchCvTemplatePreview,
-  unlockCvTemplateWithCredits,
   type CvTemplateCatalogResponse,
   type CvTemplateWithAccess,
 } from '../../../lib/cvTemplatesApi';
@@ -59,17 +51,12 @@ import {
   recommendCvTemplates,
   type CvTemplateCategoryFilter,
   type CvTemplateStructure,
-  type CvTemplateTierFilter,
 } from '../../../../shared/cvTemplates';
 import { CvTemplatePreview } from './CvTemplatePreview';
-import { DailyTokenClaim } from '../../subscription/DailyTokenClaim';
-import { patchCreditBalance } from '../../../lib/creditsStore';
 
 interface CvTemplateLibraryProps {
   /** Opens the editor, so the candidate can see the new layout on their CV. */
   onOpenEditor?: () => void;
-  /** Opens the plans, so the candidate can buy one instead of the template. */
-  onUpgrade?: () => void;
 }
 
 function categoryLabel(id: CvTemplateWithAccess['category'], arabic: boolean): string {
@@ -78,43 +65,16 @@ function categoryLabel(id: CvTemplateWithAccess['category'], arabic: boolean): s
   return arabic ? category.labelAr : category.label;
 }
 
-/**
- * The tier of a template, as a small label.
- *
- * It sits beside the template's name rather than over its document: the
- * document itself is never covered by anything.
- */
-function TierBadge({ template }: { template: CvTemplateWithAccess }) {
-  const { t } = useCareer();
-  if (template.tier === 'free') {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-        <Check className="h-2.5 w-2.5" aria-hidden="true" /> {t('Free')}
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--color-accent-strong)]/30 bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-text)]">
-      <Crown className="h-2.5 w-2.5" aria-hidden="true" /> {t('Premium')}
-    </span>
-  );
-}
-
 const CARD =
   'group flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] transition-colors hover:border-[var(--color-accent-strong)]/40';
 
 const PRIMARY_BUTTON =
   'inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-[11px] font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)] disabled:cursor-not-allowed disabled:opacity-50';
 
-const SECONDARY_BUTTON =
-  'inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50';
-
 export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
   onOpenEditor,
-  onUpgrade,
 }) => {
-  const { settings, updateSettings, t, profile, targetRole, creditBalance, refreshCredits } =
-    useCareer();
+  const { settings, updateSettings, t, profile, targetRole } = useCareer();
   const arabic = settings.language === 'ar';
 
   const [catalog, setCatalog] = useState<CvTemplateCatalogResponse | null>(null);
@@ -122,7 +82,6 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CvTemplateCategoryFilter>('all');
-  const [tier, setTier] = useState<CvTemplateTierFilter>('all');
   const [preview, setPreview] = useState<CvTemplateWithAccess | null>(null);
   /**
    * The layout of the template being previewed.
@@ -136,8 +95,6 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
-  /** The premium template whose unlock is being offered. */
-  const [unlockTarget, setUnlockTarget] = useState<CvTemplateWithAccess | null>(null);
 
   /**
    * Opens the preview of a template.
@@ -187,11 +144,10 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
   // The preview dialog is a dialog: Escape closes it and the page behind it
   // does not scroll while it is open.
   useEffect(() => {
-    if (!preview && !unlockTarget) return;
+    if (!preview) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       setPreview(null);
-      setUnlockTarget(null);
     };
     document.addEventListener('keydown', onKeyDown);
     const previousOverflow = document.body.style.overflow;
@@ -200,19 +156,19 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [preview, unlockTarget]);
+  }, [preview]);
 
   const templates = catalog?.templates ?? [];
   const currentTemplateId = catalog?.currentTemplateId ?? settings.cvTemplateId;
 
   const filtered = useMemo(() => {
     const visible = new Set(
-      filterCvTemplates(templates, { query, category, tier }).map((entry) => entry.id)
+      filterCvTemplates(templates, { query, category }).map((entry) => entry.id)
     );
     return templates.filter((entry) => visible.has(entry.id));
-  }, [templates, query, category, tier]);
+  }, [templates, query, category]);
 
-  const showHighlights = !query.trim() && category === 'all' && tier === 'all';
+  const showHighlights = !query.trim() && category === 'all';
 
   const recommended = useMemo(() => {
     if (!showHighlights) return [];
@@ -278,11 +234,8 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
   /**
    * The action row of a card.
    *
-   * A template the candidate may use gets one button. A premium template gets
-   * the two ways to obtain it: the price in credits, and the plan. Both are
-   * shown side by side, because one of them is right for a candidate who wants
-   * this template and the other is right for a candidate who wants the whole
-   * library.
+   * Every template is available to every candidate, so there is exactly one
+   * button: use it. There is no price to show and no second way to obtain it.
    */
   const actions = (template: CvTemplateWithAccess) => {
     const isCurrent = template.id === currentTemplateId;
@@ -296,47 +249,20 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
       );
     }
 
-    if (template.access.allowed) {
-      return (
-        <button
-          type="button"
-          onClick={() => void apply(template)}
-          disabled={applyingId !== null}
-          className={PRIMARY_BUTTON}
-        >
-          {busy ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-          ) : (
-            <LayoutTemplate className="h-3.5 w-3.5" aria-hidden="true" />
-          )}
-          {busy ? t('Applying...') : t('Use Template')}
-        </button>
-      );
-    }
-
-    const price = template.access.unlockCredits;
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setUnlockTarget(template)}
-          disabled={applyingId !== null}
-          className={PRIMARY_BUTTON}
-        >
-          <Coins className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('Unlock with {count} Tokens').replace('{count}', String(price))}
-        </button>
-        {onUpgrade && (
-          <button
-            type="button"
-            onClick={onUpgrade}
-            disabled={applyingId !== null}
-            className={SECONDARY_BUTTON}
-          >
-            {t('Upgrade Plan')}
-          </button>
+      <button
+        type="button"
+        onClick={() => void apply(template)}
+        disabled={applyingId !== null}
+        className={PRIMARY_BUTTON}
+      >
+        {busy ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <LayoutTemplate className="h-3.5 w-3.5" aria-hidden="true" />
         )}
-      </div>
+        {busy ? t('Applying...') : t('Use Template')}
+      </button>
     );
   };
 
@@ -384,21 +310,6 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
                 <Star className="h-2.5 w-2.5" aria-hidden="true" /> {t('Featured')}
               </span>
             )}
-            <TierBadge template={template} />
-
-            {/* The price, on the card. A locked template that does not say
-                what it costs is a locked template the candidate cannot
-                decide about, and the price is the one fact that lets them
-                decide: they have a balance, they know what it buys. */}
-            {template.tier === 'premium' && !template.access.allowed && template.access.unlockCredits > 0 ? (
-              <span
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--color-accent-strong)]/30 bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--color-primary-text)]"
-                title={t('Unlock price')}
-              >
-                <Coins className="h-2.5 w-2.5" aria-hidden="true" />
-                {template.access.unlockCredits} {t('Tokens')}
-              </span>
-            ) : null}
           </div>
 
           <div className="flex items-start justify-between gap-2">
@@ -451,18 +362,10 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
         </p>
       </div>
 
-      {catalog?.enforcementEnabled ? (
-        <p className="rounded-xl border border-[var(--color-accent-strong)]/20 bg-[var(--accent-surface)] px-3 py-2 text-[11px] text-[var(--color-primary-text)]">
-          {t(
-            'Every template can be previewed for free. Unlock a premium template with tokens, or get every template with a paid plan.'
-          )}
+      {catalog && (
+        <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-3 py-2 text-[11px] text-[var(--text-secondary)]">
+          {t('Every template is available to every candidate, at no cost.')}
         </p>
-      ) : (
-        catalog && (
-          <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-3 py-2 text-[11px] text-[var(--text-secondary)]">
-            {t('All templates are available on every plan today.')}
-          </p>
-        )
       )}
 
       {notice && (
@@ -494,7 +397,7 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
       )}
 
       {/* The filters. Every one of them narrows the same catalogue, so the
-          search, the category and the tier can be combined. */}
+          search and the category can be combined. */}
       <div className="space-y-3">
         <label className="relative block">
           <span className="sr-only">{t('Search templates')}</span>
@@ -537,30 +440,6 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
               }`}
             >
               {arabic ? entry.labelAr : entry.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t('Plan')}>
-          {(
-            [
-              { id: 'all', label: t('All templates') },
-              { id: 'free', label: t('Free') },
-              { id: 'premium', label: t('Premium') },
-            ] as Array<{ id: CvTemplateTierFilter; label: string }>
-          ).map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              aria-pressed={tier === entry.id}
-              onClick={() => setTier(entry.id)}
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                tier === entry.id
-                  ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-[var(--color-on-primary)]'
-                  : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              {entry.label}
             </button>
           ))}
         </div>
@@ -632,13 +511,12 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
           <section className="space-y-3" aria-label={t('All templates')}>
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('All templates')}</h3>
-              {(query || category !== 'all' || tier !== 'all') && (
+              {(query || category !== 'all') && (
                 <button
                   type="button"
                   onClick={() => {
                     setQuery('');
                     setCategory('all');
-                    setTier('all');
                   }}
                   className="text-[11px] font-semibold text-[var(--color-primary-text)] hover:underline"
                 >
@@ -678,7 +556,6 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
                   <h3 className="truncate text-base font-bold text-[var(--text-primary)]">
                     {displayName(preview)}
                   </h3>
-                  <TierBadge template={preview} />
                   {preview.featured && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--color-primary-text)]">
                       <Star className="h-2.5 w-2.5" aria-hidden="true" /> {t('Featured')}
@@ -756,283 +633,6 @@ export const CvTemplateLibrary: React.FC<CvTemplateLibraryProps> = ({
         </div>
       )}
 
-      {unlockTarget && (
-        <UnlockDialog
-          template={unlockTarget}
-          language={settings.resumeLanguage}
-          balance={creditBalance?.balance ?? null}
-          onClose={() => setUnlockTarget(null)}
-          onUpgrade={onUpgrade}
-          onUnlocked={async (templateId, creditsCharged, remainingBalance) => {
-            setUnlockTarget(null);
-            setCatalog((previous) =>
-              previous
-                ? {
-                    ...previous,
-                    currentTemplateId: templateId,
-                    templates: previous.templates.map((entry) =>
-                      entry.id === templateId
-                        ? {
-                            ...entry,
-                            access: {
-                              ...entry.access,
-                              allowed: true,
-                              access: 'premium',
-                              canUnlockWithCredits: false,
-                              unlockCredits: 0,
-                              unlockMethod: 'credits',
-                              reason: 'You unlocked this template with tokens.',
-                            },
-                          }
-                        : entry
-                    ),
-                  }
-                : previous
-            );
-            updateSettings({ cvTemplateId: templateId });
-            // The unlock answer already carries the balance the ledger holds,
-            // so the header moves on the same tick; the read afterwards is the
-            // safety net that keeps the monthly figures in step too.
-            if (remainingBalance !== null) {
-              patchCreditBalance({ balance: remainingBalance });
-            }
-            await refreshCredits();
-            setNotice(
-              creditsCharged > 0
-                ? t('Template unlocked. {spent} tokens were spent — {remaining} left.')
-                    .replace('{spent}', String(creditsCharged))
-                    .replace(
-                      '{remaining}',
-                      remainingBalance === null ? '—' : String(remainingBalance)
-                    )
-                : t('Template applied. Your content has not changed.')
-            );
-          }}
-        />
-      )}
     </div>
   );
 };
-
-/**
- * The offer for a premium template.
- *
- * The candidate sees the document they would be buying, what the unlock gives
- * them, what it costs, and what they have. Nothing is spent until they press
- * the button, and the button says what it will spend.
- */
-function UnlockDialog({
-  template,
-  language,
-  balance,
-  onClose,
-  onUpgrade,
-  onUnlocked,
-}: {
-  template: CvTemplateWithAccess;
-  language: 'en' | 'ar';
-  balance: number | null;
-  onClose: () => void;
-  onUpgrade?: () => void;
-  onUnlocked: (
-    templateId: string,
-    creditsCharged: number,
-    remainingBalance: number | null
-  ) => Promise<void> | void;
-}) {
-  const { t } = useCareer();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const price = template.access.unlockCredits;
-  const affordable = balance === null ? true : balance >= price;
-
-  const unlock = async () => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await unlockCvTemplateWithCredits(template.id);
-      await onUnlocked(result.templateId, result.creditsCharged, result.remainingBalance);
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t('The template could not be unlocked.')
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('Unlock template')}
-    >
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-main)] shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-base font-bold text-[var(--text-primary)]">
-                {template.name}
-              </h3>
-              <TierBadge template={template} />
-            </div>
-            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-              {t('Unlock this template for your CV.')}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-[var(--border-subtle)] p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            aria-label={t('Close')}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] sm:p-5">
-          {/* The document the candidate is buying. It is drawn in full: the
-              same renderer, the same paper, the same proportions. */}
-          <div className="flex justify-center">
-            <div className="w-full max-w-[280px] overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white shadow-sm">
-              <CvTemplatePreview
-                template={template}
-                language={language}
-                loadingLabel={t('Loading preview')}
-                lockedLabel={t('This preview could not be loaded.')}
-                pageCountLabel={(pages) =>
-                  pages === 1 ? t('1 page') : t('{count} pages').replace('{count}', String(pages))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
-              {template.description}
-            </p>
-
-            <ul className="space-y-2 text-[11px] text-[var(--text-secondary)]">
-              <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
-                {t('This layout applied to your CV, with your own content.')}
-              </li>
-              <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
-                {t('Export to PDF and to an editable Word document.')}
-              </li>
-              <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
-                {t('Unlocked for your account — you pay once, not on every export.')}
-              </li>
-            </ul>
-
-            {/* The price, stated plainly, before anything is spent. */}
-            <div className="rounded-xl border border-[var(--color-accent-strong)]/25 bg-[var(--accent-surface)] p-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary-text)]">
-                  <Coins className="h-4 w-4" aria-hidden="true" />
-                  {t('Unlock price')}
-                </span>
-                <span className="text-base font-bold tabular-nums text-[var(--color-primary-text)]">
-                  {price} {t('Tokens')}
-                </span>
-              </div>
-              {balance !== null && (
-                <p className="mt-1.5 text-[11px] text-[var(--color-primary-text)]">
-                  {t('Your balance:')} {balance} {t('Tokens')}
-                </p>
-              )}
-              {!affordable && (
-                <div className="mt-2 rounded-lg border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 px-2.5 py-2 text-[11px] text-[var(--color-danger)]">
-                  <p className="flex items-start gap-1.5">
-                    <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {t('You do not have enough tokens for this template yet.')}
-                  </p>
-                  {balance !== null && (
-                    <p className="mt-1 ps-5 font-semibold tabular-nums">
-                      {t('You need {count} more tokens').replace('{count}', String(price - balance))}
-                    </p>
-                  )}
-
-                  {/* A shortfall is not a dead end, so the way out is offered
-                      here rather than left for the candidate to find. The
-                      daily claim is the SAME widget the dashboard shows, and
-                      it only appears when there are tokens to claim today. */}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 ps-5">
-                    <DailyTokenClaim variant="compact" />
-                    {onUpgrade && (
-                      <button
-                        type="button"
-                        onClick={onUpgrade}
-                        className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-main)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-                      >
-                        <Coins className="h-3 w-3" aria-hidden="true" />
-                        {t('Top up tokens')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-[var(--text-muted)]">
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              {t(
-                'Tokens are only taken when the unlock succeeds. If it fails, nothing is charged.'
-              )}
-            </p>
-
-            {error && (
-              <p
-                role="alert"
-                className="rounded-lg border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-[11px] text-[var(--color-danger)]"
-              >
-                {error}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 border-t border-[var(--border-subtle)] p-4 sm:flex-row sm:items-center sm:justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-[var(--border-subtle)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)]"
-          >
-            {t('Not now')}
-          </button>
-          {onUpgrade && (
-            <button
-              type="button"
-              onClick={onUpgrade}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            >
-              {t('Upgrade Plan')}
-              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void unlock()}
-            disabled={busy || !affordable}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-2 text-xs font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {busy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            ) : (
-              <Coins className="h-3.5 w-3.5" aria-hidden="true" />
-            )}
-            {busy
-              ? t('Unlocking...')
-              : t('Unlock with {count} Tokens').replace('{count}', String(price))}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -19,8 +19,7 @@ import {
   Linkedin,
   Github,
   ExternalLink,
-  MessageSquare,
-  CreditCard
+  MessageSquare
 } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
 import { useFeedback } from '../../context/FeedbackContext';
@@ -32,8 +31,8 @@ import { getAccessToken, getBrowserSupabase, isSupabaseConfigured } from '../../
 import { apiUrl } from '../../lib/native';
 import { Reveal } from '../motion/Motion';
 import { TabButtons } from '../ui/TabButtons';
-import { MembershipPanel } from '../subscription/MembershipPanel';
 import { EmailNotificationSettings } from '../settings/EmailNotificationSettings';
+import { FREE_ACCESS_MESSAGE } from '../../../shared/platformAccess';
 import { SUPPORT_EMAIL, SUPPORT_PHONE } from '../../../shared/contact.ts';
 
 /**
@@ -342,7 +341,7 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
         ariaLabel={t('Settings sections')}
         tabs={[
           { id: 'account', label: t('Account'), icon: User },
-          { id: 'subscription', label: t('Subscription'), icon: CreditCard },
+          { id: 'subscription', label: t('Access'), icon: Sparkles },
           { id: 'security', label: t('Security'), icon: Shield },
           { id: 'privacy', label: t('Privacy Center'), icon: Lock },
           { id: 'ai', label: t('AI Preferences'), icon: Sparkles },
@@ -446,15 +445,28 @@ export const SettingsView: React.FC<{ onNavigate?: (view: string) => void }> = (
         </div>
       )}
 
-      {/* TAB 2: SUBSCRIPTION */}
+      {/* TAB 2: ACCESS */}
       {activeTab === 'subscription' && (
         <div className="space-y-4">
-          <MembershipPanel onManagePlan={() => onNavigate?.('pricing')} />
-          <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
-            {t(
-              'Your plan, its renewal date and the tokens it includes are read from your subscription. Changing or cancelling a plan happens on the pricing page.'
-            )}
-          </p>
+          <div className="p-4 sm:p-6 rounded-2xl bg-[var(--surface-main)] border border-[var(--border-subtle)] space-y-3 shadow-xs">
+            <h2 className="text-base font-bold text-[var(--text-primary)]">
+              {t('Everything is free right now')}
+            </h2>
+            <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+              {FREE_ACCESS_MESSAGE}
+            </p>
+            <ul className="space-y-1.5 text-xs leading-relaxed text-[var(--text-secondary)]">
+              <li>· {t('CV Builder, ATS Analysis and AI Career Mentor')}</li>
+              <li>· {t('Job Matching, Cover Letters and Learning Hub')}</li>
+              <li>· {t('Roadmaps, Assessments, Mock and Voice Interviews')}</li>
+              <li>· {t('Projects and Volunteering')}</li>
+            </ul>
+            <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+              {t(
+                'Daily usage limits still apply so that one person cannot use up the platform’s AI capacity, but they are the same for everyone and no payment is involved.'
+              )}
+            </p>
+          </div>
         </div>
       )}
 

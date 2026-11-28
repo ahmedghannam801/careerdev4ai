@@ -4,17 +4,23 @@
  * WHY THIS IS IN THE HEADER
  * -------------------------
  * The studio is where the platform spends the most AI capacity per candidate,
- * so the allowance is metered: three AI writes in a twenty-four hour window
- * for a free account, and no limit at all for a paid plan. A limit the
- * candidate cannot see is a limit they meet as a refusal, so the allowance is
- * stated before it is reached, and the state it is in is stated plainly.
+ * so the allowance is metered: three AI writes in a twenty-four hour window.
+ * A limit the candidate cannot see is a limit they meet as a refusal, so the
+ * allowance is stated before it is reached, and the state it is in is stated
+ * plainly.
+ *
+ * THE ALLOWANCE IS THE SAME FOR EVERYONE
+ * --------------------------------------
+ * It used to differ: a paid plan had no limit at all. The platform is free
+ * now, so there is no plan to buy and the allowance is one global rate limit
+ * — a capacity guard, not a purchase. There is therefore nothing to upgrade
+ * to and no button that offers it.
  *
  * WHAT IT SHOWS
  * -------------
- *   * A paid plan: the allowance is unlimited, and the badge says so.
- *   * A free account with edits left: how many are left.
- *   * A free account with none left: a live countdown to the moment the
- *     allowance comes back, and the way to stop needing it.
+ *   * How many edits are left in the current window.
+ *   * When the allowance is spent: a live countdown to the moment it comes
+ *     back.
  *
  * WHAT IT DOES NOT TOUCH
  * ----------------------
@@ -25,21 +31,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Sparkles, Timer, Zap } from 'lucide-react';
 import { useCareer } from '../../context/CareerContext';
-import { MagnetButton } from '../react-bits/MagnetButton';
 import {
   cvAiResetMillisecondsRemaining,
   formatCvAiResetCountdown,
 } from '../../../shared/cvAiQuota';
 
 interface CvStudioAiQuotaBadgeProps {
-  /** Takes the candidate to the page where the plan can be chosen. */
+  /** Kept for compatibility with the call site; the allowance is global now. */
   onUpgrade?: () => void;
 }
 
 /** How often the countdown is redrawn. */
 const TICK_MS = 1000;
 
-export const CvStudioAiQuotaBadge: React.FC<CvStudioAiQuotaBadgeProps> = ({ onUpgrade }) => {
+export const CvStudioAiQuotaBadge: React.FC<CvStudioAiQuotaBadgeProps> = () => {
   const { t, cvAiQuota, refreshCvAiQuota } = useCareer();
 
   // The clock the countdown is read against. It is state rather than a value
@@ -113,16 +118,6 @@ export const CvStudioAiQuotaBadge: React.FC<CvStudioAiQuotaBadgeProps> = ({ onUp
         <Timer className="h-3.5 w-3.5" />
         <span>{t('Resets in {time}').replace('{time}', formatCvAiResetCountdown(millisecondsLeft))}</span>
       </span>
-      {onUpgrade && (
-        <MagnetButton
-          type="button"
-          onClick={onUpgrade}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-on-primary)] transition-colors hover:bg-[var(--accent-secondary)]"
-        >
-          <Sparkles className="h-3 w-3" />
-          <span>{t('Upgrade to Pro for unlimited CV edits')}</span>
-        </MagnetButton>
-      )}
     </div>
   );
 };

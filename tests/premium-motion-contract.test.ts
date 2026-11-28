@@ -1,7 +1,8 @@
-/** Regression checks for the premium-motion integrations and their guardrails. */
+/** Regression checks for the motion integrations and their guardrails. */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -13,8 +14,19 @@ const skills = source('../src/components/views/SkillsCenterView.tsx');
 const skillBar = source('../src/components/skills/SkillLevelBar.tsx');
 const animatedList = source('../src/components/react-bits/AnimatedList.tsx');
 const smoothScroll = source('../src/providers/SmoothScrollProvider.tsx');
-const credits = source('../src/components/subscription/CreditBalanceBadge.tsx');
 const magnet = source('../src/components/react-bits/MagnetButton.tsx');
+
+const REPO_ROOT = join(import.meta.dirname, '..');
+
+function collectSourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...collectSourceFiles(full));
+    else out.push(full);
+  }
+  return out;
+}
 
 describe('premium motion integration', () => {
   it('stagger-animates Dashboard, job cards, and roadmap topic branches with GSAP', () => {
@@ -43,13 +55,31 @@ describe('premium motion integration', () => {
     assert.match(smoothScroll, /ScrollTrigger\.refresh\(\)/);
   });
 
-  it('animates dashboard metrics, token balances, and optimistic skill levels', () => {
+  it('animates dashboard metrics and optimistic skill levels', () => {
     assert.match(dashboard, /<AnimatedCounter value=\{metrics\.roleReadinessPct\}/);
-    assert.match(credits, /<AnimatedCounter value=\{balance\}/);
     assert.match(skills, /key=\{skill\.id\}/);
     assert.match(skills, /updateSkillLevel\(skill\.id, level\)/);
     assert.match(skillBar, /gsap\.fromTo\(/);
     assert.match(skillBar, /onLevelChange\(nextSkillLevel\(level\)\)/);
+  });
+
+  it('animates no token balance, because there is no balance to animate', () => {
+    // The header chip used to count a token balance up to its new value. The
+    // platform is free, so there is no balance and no chip: a counter that
+    // animates a currency the candidate cannot spend is a lie with a
+    // transition.
+    const offenders: string[] = [];
+    for (const file of collectSourceFiles(join(REPO_ROOT, 'src'))) {
+      if (!/\.(ts|tsx)$/.test(file)) continue;
+      if (readFileSync(file, 'utf8').includes('CreditBalanceBadge')) {
+        offenders.push(file);
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      `these screens still show a token balance: ${offenders.join(', ')}`
+    );
   });
 
   it('persists the tree/stages view and opens a topic drawer from a node click', () => {

@@ -1,7 +1,11 @@
 /**
- * Credits & Promotional API Client
- * Manages user balance, ledger transactions, coupon validation,
- * and Law 151 compliant birthday reward claims.
+ * Credits API Client
+ *
+ * Reads the caller's balance and claims the daily allowance.
+ *
+ * The promotional half of this client — coupon validation and the birthday
+ * reward — is gone: a discount is a price, and the platform does not sell
+ * anything at the moment.
  */
 
 import { apiRequest } from './apiClient';
@@ -32,28 +36,6 @@ export interface DailyTokenClaimResponse {
   balance: number;
   /** The state of the allowance after the claim. */
   daily: DailyCreditState | null;
-}
-
-export interface CouponValidationResponse {
-  success: boolean;
-  valid: boolean;
-  couponId?: string;
-  code?: string;
-  discountAmountPiasters: number;
-  reason?: string;
-}
-
-export interface BirthdayRewardDTO {
-  id: string;
-  profileId: string;
-  birthMonth: number;
-  birthDay: number;
-  rewardYear: number;
-  discountPercentage: number;
-  maxDiscountPiasters: number;
-  validFrom: string;
-  validUntil: string;
-  status: 'available' | 'redeemed' | 'expired' | 'revoked';
 }
 
 /**
@@ -95,38 +77,4 @@ export async function claimDailyTokens(): Promise<DailyTokenClaimResponse> {
   return apiRequest<DailyTokenClaimResponse>('/api/credits/daily/claim', {
     method: 'POST',
   });
-}
-
-export async function validateCoupon(
-  code: string,
-  planCode: string,
-  amountPiasters: number
-): Promise<CouponValidationResponse> {
-  return apiRequest<CouponValidationResponse>('/api/coupons/validate', {
-    method: 'POST',
-    body: JSON.stringify({ code, planCode, amountPiasters }),
-  });
-}
-
-export async function saveBirthdayConsent(
-  birthMonth: number,
-  birthDay: number
-): Promise<{ success: boolean; reward?: BirthdayRewardDTO }> {
-  return apiRequest<{ success: boolean; reward?: BirthdayRewardDTO }>('/api/birthday/consent', {
-    method: 'POST',
-    body: JSON.stringify({ birthMonth, birthDay }),
-  });
-}
-
-export async function revokeBirthdayConsent(): Promise<{ success: boolean; message: string }> {
-  return apiRequest<{ success: boolean; message: string }>('/api/birthday/consent', {
-    method: 'DELETE',
-  });
-}
-
-export async function fetchBirthdayReward(): Promise<BirthdayRewardDTO | null> {
-  const res = await apiRequest<{ success: boolean; reward: BirthdayRewardDTO | null }>(
-    '/api/birthday/reward'
-  );
-  return res.reward;
 }

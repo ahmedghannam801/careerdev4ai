@@ -45,7 +45,6 @@ import { tabButtonClassName } from '../ui/TabButtons';
 import { useAIProcessing } from '../../lib/useAIProcessing';
 import { aiButtonLabel } from '../../lib/aiTokenCosts';
 import { CareerGoalRolePanel } from '../career/CareerGoalRolePanel';
-import { PlanIdentityFrame } from '../subscription/PlanIdentityFrame';
 import { ReferralPanel } from '../referral/ReferralPanel';
 
 /** The sections of the profile, in the order they are read. */
@@ -78,7 +77,6 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     deleteVolunteerExperience,
     careerIdentity,
     identity,
-    subscription,
     t
   } = useCareer();
 
@@ -748,29 +746,16 @@ export const ProfileView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
             <div className="relative group">
               {/*
-                The premium treatment.
+                The profile photo.
 
-                The highest tier is framed AROUND the photo, in the tier's own
-                colour. The separate badge that used to sit beside the name is
-                gone: the frame says it, without a second indicator next to
-                the candidate's face, and a candidate on any other tier sees
-                the photo exactly as it was.
-
-                The tier is read from the plan the server resolved, so the
-                frame can never claim a plan the candidate does not hold.
+                It used to sit inside a frame that was drawn in the colour of
+                the candidate's paid tier. The platform is free now, so there
+                is no tier to draw: the photo is shown as it is, for everyone.
               */}
-              <PlanIdentityFrame
-                planCode={subscription?.planCode ?? 'free'}
-                status={subscription?.status}
-                expiresAt={subscription?.expiresAt}
-                variant="premium"
-                label={t('Your membership frames your profile photo')}
-              >
-                <AionviaAvatar
-                  avatarId={profile.avatarUrl}
-                  className="w-24 h-24 rounded-2xl border-2 border-[var(--border-subtle)] shadow-xs group-hover:border-[var(--accent-primary)] transition-colors cursor-pointer"
-                />
-              </PlanIdentityFrame>
+              <AionviaAvatar
+                avatarId={profile.avatarUrl}
+                className="w-24 h-24 rounded-2xl border-2 border-[var(--border-subtle)] shadow-xs group-hover:border-[var(--accent-primary)] transition-colors cursor-pointer"
+              />
               <button
                 type="button"
                 onClick={() => {

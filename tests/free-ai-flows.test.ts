@@ -6,15 +6,14 @@
  * file proves the promise where it is actually enforced: on the server, for a
  * candidate whose balance is exactly zero.
  *
- * It also proves the other side of the same economy: a premium CV template
- * still costs five tokens, so making the chat free did not quietly make the
- * template free as well.
+ * The platform as a whole is now free, so it also proves the other side of the
+ * same promise: a CV template that used to cost five tokens costs nothing at
+ * all, and the manual daily claim is gone rather than quietly paying out.
  */
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS } from '../shared/cvTemplates.ts';
 import {
   admin,
   api,
@@ -182,17 +181,13 @@ describe('free AI flows on a zero balance', () => {
     }
   });
 
-  test('a premium CV template still costs five tokens', async () => {
+  test('a CV template costs nothing at all', async () => {
     const user = await createTestUser('free-template', { subscription: false });
     try {
       await drainToZero(user);
-      assert.equal(
-        CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS,
-        5,
-        'the product price of a premium template is five tokens'
-      );
 
       await grantCredits(user.id, 5, `free-flow-template-${user.id}`);
+      const before = await apiBalance(user.token);
 
       const res = await api('POST', '/api/cv-templates/modern-gradient/unlock', {
         token: user.token,
@@ -201,30 +196,48 @@ describe('free AI flows on a zero balance', () => {
       assert.equal(res.status, 200, `the unlock must succeed: ${JSON.stringify(res.body)}`);
       assert.equal(
         res.body?.creditsCharged,
-        5,
-        'unlocking a premium template must still take exactly five tokens'
+        0,
+        'the platform is free: unlocking a template must not take any tokens'
       );
       assert.equal(
         await apiBalance(user.token),
-        0,
-        'five tokens were granted and five were spent'
+        before,
+        'the balance must not have moved'
       );
     } finally {
       await deleteTestUser(user);
     }
   });
 
-  test('the manual daily claim still grants two tokens', async () => {
+  test('a candidate with no tokens can still apply a template', async () => {
+    const user = await createTestUser('free-template-zero', { subscription: false });
+    try {
+      await drainToZero(user);
+
+      const res = await api('POST', '/api/cv-templates/apply', {
+        token: user.token,
+        body: { templateId: 'modern-gradient' },
+      });
+
+      assert.equal(res.status, 200, `the template must be available: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body?.access?.allowed, true);
+    } finally {
+      await deleteTestUser(user);
+    }
+  });
+
+  test('the manual daily claim is gone, because the platform is free', async () => {
     const user = await createTestUser('free-daily-claim', { subscription: false });
     try {
       await drainToZero(user);
 
       const res = await api('POST', '/api/credits/daily/claim', { token: user.token });
-      assert.equal(res.status, 200, `the daily claim must work: ${JSON.stringify(res.body)}`);
+      assert.equal(res.status, 410, 'the daily claim must be retired, not silently pay out');
+      assert.equal(res.body?.code, 'PLATFORM_IS_FREE');
       assert.equal(
         await apiBalance(user.token),
-        2,
-        'the manual daily claim is still worth two tokens'
+        0,
+        'a retired claim must not have granted anything'
       );
     } finally {
       await deleteTestUser(user);

@@ -37,10 +37,7 @@ export const referralsAr: Record<string, string> = {
   // 'Next reset' lived here as well as in the subscriptions catalogue, with a
   // different Arabic wording in each. One key owns it now.
   'of your daily allowance': 'من رصيدك اليومي',
-  'Daily tokens reset at midnight.': 'يتجدد الرصيد اليومي عند منتصف الليل.',
-  'tokens today': 'توكنات اليوم',
 
   // The notifications
-  'Your daily tokens are ready': 'توكناتك اليومية جاهزة',
   'A referral reward arrived': 'وصلت مكافأة إحالة',
 };

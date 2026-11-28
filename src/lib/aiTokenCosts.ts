@@ -12,9 +12,17 @@
  * runs a credit check on the server. Those routes are what a candidate can use
  * with a balance of zero, so a "(0 Tokens)" badge on them would be misleading
  * in the opposite direction.
+ *
+ * WHILE THE PLATFORM IS FREE
+ * --------------------------
+ * There is no currency, so no label carries a price. The table is still read,
+ * so the two sides cannot drift: the server's own weights and the interface's
+ * labels come from the same place, and the same one place decides whether a
+ * price is shown at all.
  */
 
 import { CREDIT_WEIGHTS, type AICreditAction } from '../../shared/credits';
+import { isMonetizationEnabled } from '../../shared/platformAccess';
 
 /** The translation function the interface uses. */
 export type Translate = (key: string) => string;
@@ -37,6 +45,7 @@ export function aiTokenCost(action: AICreditAction): number {
  * label of a free action.
  */
 export function aiTokenCostLabel(action: AICreditAction, t: Translate): string {
+  if (!isMonetizationEnabled()) return '';
   const cost = aiTokenCost(action);
   if (cost <= 0) return '';
   const unit = cost === 1 ? t('Token') : t('Tokens');

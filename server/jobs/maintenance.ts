@@ -2,10 +2,27 @@
  * Subscription & Payment Lifecycle Maintenance Sweeps.
  * Runs on scheduled intervals (Cloudflare Worker cron or local test runner).
  * Calls atomic database stored procedures to expire ended subscriptions and 24-hr provisional access.
+ *
+ * WHILE THE PLATFORM IS FREE
+ * --------------------------
+ * Two of the sweeps are withdrawn, because they exist to serve a sale:
+ *
+ *   - the daily ENTITLEMENT sweep grants a paid plan's daily allowance, and
+ *     there is no paid plan while the platform is free;
+ *   - the annual INSTALMENT sweep grants the monthly allowance of an annual
+ *     period that was bought through the payment gateway, and there is no
+ *     gateway any more.
+ *
+ * The expiry sweeps are KEPT. They do not grant anything: they mark a lapsed
+ * subscription as expired, which keeps the historical record truthful — a
+ * subscription whose period has ended must say so, whether or not the platform
+ * still sells periods. Stopping them would leave paid history claiming to be
+ * active, which is a worse lie than the one they prevent.
  */
 
 import { getSupabaseServer } from '../db/supabase.ts';
 import { grantDueAnnualTokenInstallments } from '../xpay/installments.ts';
+import { isMonetizationEnabled } from '../../shared/platformAccess.ts';
 
 export interface MaintenanceSweepOutcome {
   expiredSubscriptions: number;
@@ -87,22 +104,27 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
   // The grant is idempotent — one bucket per account per Africa/Cairo day —
   // so the sweep may run as often as the scheduler likes, and an account
   // that was missed by one run is picked up by the next one.
-  try {
-    const { data, error } = await supabase.rpc('grant_daily_entitlements_to_all');
-    if (error) {
-      console.error('Error in grant_daily_entitlements_to_all RPC:', error);
-    } else if (data) {
-      const outcome = data as {
-        granted?: number;
-        eligible?: number;
-        failed?: number;
-      };
-      dailyEntitlementsGranted = Number(outcome?.granted ?? 0);
-      dailyEntitlementsEligible = Number(outcome?.eligible ?? 0);
-      dailyEntitlementsFailed = Number(outcome?.failed ?? 0);
+  //
+  // While the platform is free there is no paid plan to promise anything to,
+  // so the sweep is skipped.
+  if (isMonetizationEnabled()) {
+    try {
+      const { data, error } = await supabase.rpc('grant_daily_entitlements_to_all');
+      if (error) {
+        console.error('Error in grant_daily_entitlements_to_all RPC:', error);
+      } else if (data) {
+        const outcome = data as {
+          granted?: number;
+          eligible?: number;
+          failed?: number;
+        };
+        dailyEntitlementsGranted = Number(outcome?.granted ?? 0);
+        dailyEntitlementsEligible = Number(outcome?.eligible ?? 0);
+        dailyEntitlementsFailed = Number(outcome?.failed ?? 0);
+      }
+    } catch (err) {
+      console.error('Failed to run grant_daily_entitlements_to_all:', err);
     }
-  } catch (err) {
-    console.error('Failed to run grant_daily_entitlements_to_all:', err);
   }
 
   // The daily free-token allowance.
@@ -140,14 +162,19 @@ export async function runSubscriptionMaintenanceSweeps(): Promise<MaintenanceSwe
   // each later month as it falls due. Each grant is keyed by the session and
   // the month, so the sweep may run every few minutes without ever doubling an
   // allowance, and a failure is retried by the next run.
-  try {
-    const outcome = await grantDueAnnualTokenInstallments();
-    annualTokenPeriods = outcome.periods;
-    annualTokensGranted = outcome.granted;
-    annualTokensSkipped = outcome.skipped;
-    annualTokensFailed = outcome.failed;
-  } catch (err) {
-    console.error('Failed to grant due annual token installments:', err);
+  //
+  // While the platform is free there is no gateway to have bought an annual
+  // period from, so there is nothing to instal.
+  if (isMonetizationEnabled()) {
+    try {
+      const outcome = await grantDueAnnualTokenInstallments();
+      annualTokenPeriods = outcome.periods;
+      annualTokensGranted = outcome.granted;
+      annualTokensSkipped = outcome.skipped;
+      annualTokensFailed = outcome.failed;
+    } catch (err) {
+      console.error('Failed to grant due annual token installments:', err);
+    }
   }
 
   return {

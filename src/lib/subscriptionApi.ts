@@ -1,13 +1,16 @@
 /**
  * Subscription API Client
- * Facilitates client-side interaction with subscription plans, current plan status,
- * and cancellation requests.
+ *
+ * Reads the candidate's own subscription record.
+ *
+ * The platform is free at the moment, so there is no plan to fetch and no
+ * renewal to cancel: those endpoints are gone. What is left is a read of the
+ * account's history, which the administration screens use.
  */
 
 import { apiRequest } from './apiClient';
 import type {
   SubscriptionDTO,
-  SubscriptionPlanDTO,
   SubscriptionPlanCode,
 } from '../../shared/subscriptions';
 import type { PlanIdentityTier } from '../../shared/planIdentity';
@@ -34,27 +37,7 @@ export interface CurrentSubscriptionResponse {
   history: SubscriptionDTO[];
 }
 
-export async function fetchPublicPlans(): Promise<SubscriptionPlanDTO[]> {
-  const res = await apiRequest<{ success: boolean; plans: SubscriptionPlanDTO[] }>(
-    '/api/subscription/plans'
-  );
-  return res.plans;
-}
-
 export async function fetchCurrentSubscription(): Promise<CurrentSubscriptionResponse> {
   return apiRequest<CurrentSubscriptionResponse>('/api/subscription/current');
-}
-
-export async function cancelSubscriptionAutoRenew(
-  subscriptionId: string,
-  reason?: string
-): Promise<{ success: boolean; subscription: SubscriptionDTO }> {
-  return apiRequest<{ success: boolean; subscription: SubscriptionDTO }>(
-    '/api/subscription/cancel',
-    {
-      method: 'POST',
-      body: JSON.stringify({ subscriptionId, reason }),
-    }
-  );
 }
 

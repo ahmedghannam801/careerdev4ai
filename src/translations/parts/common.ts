@@ -176,5 +176,4 @@ export const commonAr: Record<string, string> = {
   'Close menu': 'إغلاق القائمة',
   'Previous step': 'الخطوة السابقة',
   'Next step': 'الخطوة التالية',
-  'Low token balance': 'رصيد التوكنات منخفض',
 };

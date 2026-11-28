@@ -136,7 +136,6 @@ export const EmailNotificationSettings: React.FC = () => {
         ['interviewUpdates', t('Interview feedback'), t('When interview feedback or a report is ready.')],
         ['roadmapUpdates', t('Roadmap milestones'), t('Roadmap tasks, milestones and generated plans.')],
         ['announcements', t('Platform announcements'), t('Important product news and service updates.')],
-        ['billingUpdates', t('Subscription reminders'), t('Plan changes and renewal notices. Receipts are always sent.')],
       ] as Array<[EmailPreferenceKey, string, string]>,
     [t],
   );
@@ -214,7 +213,7 @@ export const EmailNotificationSettings: React.FC = () => {
                   {t('All optional email')}
                 </div>
                 <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                  {t('The master switch for everything except account, security and payment email.')}
+                  {t('The master switch for everything except account, security and activity email.')}
                 </p>
               </div>
               <Toggle
@@ -311,11 +310,11 @@ export const EmailNotificationSettings: React.FC = () => {
             <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/30 p-3.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-primary)]">
                 <ShieldCheck className="h-4 w-4 text-[var(--color-success-strong)]" />
-                {t('Account, security and payment email')}
+                {t('Account, security and activity email')}
               </div>
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
                 {t(
-                  'Password changes, sign-in email changes, security alerts, subscription status and payment receipts are part of your account and cannot be turned off. They never contain marketing.',
+                  'Password changes, sign-in email changes and security alerts are part of your account and cannot be turned off. They never contain marketing.',
                 )}
               </p>
               <p className="mt-2 text-[10px] text-[var(--text-muted)]">

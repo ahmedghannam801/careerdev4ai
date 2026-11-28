@@ -68,9 +68,12 @@ export const learningAr: Record<string, string> = {
   'Free': 'مجاني',
   'Free with limitations': 'مجاني مع قيود',
   'Free to audit': 'مجاني للتدقيق',
-  'Free course, paid certificate': 'دورة مجانية بشهادة مدفوعة',
-  'Paid': 'مدفوع',
   'Free on YouTube': 'مجاني على YouTube',
+  // The cost of a course at the provider that sells it (a Coursera
+  // certificate, for example). This is not a price the platform charges, so
+  // it is not a paid surface of the product: the badge tells the candidate
+  // the truth about what they would have to pay somebody else.
+  'Paid': 'مدفوع',
 
   // Course card
   'role fit': 'ملاءمة للدور',

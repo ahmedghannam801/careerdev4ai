@@ -60,7 +60,6 @@ const ProfileView = lazy(() => import('./components/views/ProfileView').then((m)
 const DocumentsView = lazy(() => import('./components/views/DocumentsView').then((m) => ({ default: m.DocumentsView })));
 const ActivityView = lazy(() => import('./components/views/ActivityView').then((m) => ({ default: m.ActivityView })));
 const AdminCenterView = lazy(() => import('./components/views/AdminCenterView').then((m) => ({ default: m.AdminCenterView })));
-const PricingView = lazy(() => import('./components/views/PricingView').then((m) => ({ default: m.PricingView })));
 
 /**
  * Extracts the username from `#/profile/<username>`. A plain `#/profile` is
@@ -444,8 +443,6 @@ function AppRoutes() {
             <AdminCenterView />
           </AdminRouteGuard>
         );
-      case 'pricing':
-        return <PricingView />;
       default:
         return <DashboardView onNavigate={navigateTo} onOpenCopilot={() => setCopilotOpen(true)} />;
     }

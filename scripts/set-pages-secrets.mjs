@@ -49,12 +49,12 @@ const SECRET_KEYS = [
  * a secret with an empty value is worse than an absent one, because the server
  * would refuse every request that needs it instead of reporting that the
  * feature is not configured.
+ *
+ * The payment gateway's credentials are deliberately absent. The platform does
+ * not sell anything at the moment, so there is no gateway for a deployment to
+ * hold a key for, and an unused live key in a project is a liability.
  */
 const OPTIONAL_SECRET_KEYS = [
-  'XPAY_SECRET_KEY',
-  'XPAY_WEBHOOK_SECRET',
-  'XPAY_ALLOW_LIVE',
-  'XPAY_PAYMENT_METHOD_CONFIGURATION_ID',
   'RESEND_API_KEY',
   'RESEND_FROM',
   'RESEND_TEST_RECIPIENT',

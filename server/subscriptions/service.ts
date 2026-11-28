@@ -4,17 +4,16 @@
  */
 
 import {
-  listActivePlans,
   getPlanByCode,
   getActiveSubscription,
   listSubscriptionsForUser,
   cancelSubscription,
 } from '../db/subscriptions.ts';
 import { getActiveXPayAccess } from '../xpay/store.ts';
+import { isMonetizationEnabled } from '../../shared/platformAccess.ts';
 import type {
   BillingCycle,
   SubscriptionDTO,
-  SubscriptionPlanDTO,
   SubscriptionPlanCode,
 } from '../../shared/subscriptions.ts';
 
@@ -36,23 +35,32 @@ export interface UserSubscriptionSummary {
 
 /**
  * Returns comprehensive subscription status for the candidate.
+ *
+ * WHILE THE PLATFORM IS FREE
+ * --------------------------
+ * The candidate is on the free tier, and the answer is reached without asking
+ * the payment tables anything: the platform does not sell periods, so it does
+ * not read them. The subscription history is still read — it is the candidate's
+ * own record, and it is what the administration screens show.
  */
 export async function getUserSubscriptionSummary(
   profileId: string
 ): Promise<UserSubscriptionSummary> {
+  const monetizationEnabled = isMonetizationEnabled();
+
   const [activeSub, history, xpayPurchase] = await Promise.all([
     getActiveSubscription(profileId),
     listSubscriptionsForUser(profileId),
     // A period bought through XPay behaves the same way from the candidate's
     // side: it is active until a date, and it is renewed by hand.
-    getActiveXPayAccess(profileId).catch(() => null),
+    monetizationEnabled ? getActiveXPayAccess(profileId).catch(() => null) : Promise.resolve(null),
   ]);
 
   // The canonical row is the answer when it exists: it carries the plan, the
   // billing cycle and the exact period that the daily entitlement and the
   // expiry sweep also read. A confirmed XPay payment writes it, so the two
   // cannot disagree.
-  if (activeSub && activeSub.status === 'active') {
+  if (monetizationEnabled && activeSub && activeSub.status === 'active') {
     return {
       planCode: activeSub.planCode,
       planNameEn: activeSub.planNameEn,
@@ -71,7 +79,7 @@ export async function getUserSubscriptionSummary(
   // A period bought before this deployment linked XPay purchases to
   // subscriptions, or a purchase whose canonical row could not be written yet.
   // The money is still real, so the screen still shows the paid period.
-  if (xpayPurchase?.plan_code) {
+  if (monetizationEnabled && xpayPurchase?.plan_code) {
     const plan = await getPlanByCode(xpayPurchase.plan_code);
     return {
       planCode: xpayPurchase.plan_code as SubscriptionPlanCode,
@@ -101,17 +109,6 @@ export async function getUserSubscriptionSummary(
     autoRenew: false,
     history,
   };
-}
-
-export async function getPlanDetails(code: string): Promise<SubscriptionPlanDTO | null> {
-  return getPlanByCode(code);
-}
-
-/**
- * Returns all available public plans.
- */
-export async function getPublicPlans(): Promise<SubscriptionPlanDTO[]> {
-  return listActivePlans();
 }
 
 /**

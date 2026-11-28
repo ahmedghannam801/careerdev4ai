@@ -65,29 +65,6 @@ export async function applyCvTemplate(
   });
 }
 
-/**
- * Buys a premium template with tokens.
- *
- * The server decides whether this candidate may buy it, what it costs, and
- * whether the balance covers it; it takes the credits and records the unlock
- * in the same request. The answer reports what was actually spent so the
- * interface can show it.
- */
-export async function unlockCvTemplateWithCredits(
-  templateId: string
-): Promise<{
-  success: boolean;
-  templateId: string;
-  creditsCharged: number;
-  remainingBalance: number | null;
-  access: CvTemplateAccessResult;
-}> {
-  return apiRequest(`/api/cv-templates/${encodeURIComponent(templateId)}/unlock`, {
-    method: 'POST',
-    body: JSON.stringify({ templateId }),
-  });
-}
-
 export async function authorizeCvTemplateExport(
   templateId: string
 ): Promise<{ success: boolean; allowed: boolean; access: CvTemplateAccessResult }> {

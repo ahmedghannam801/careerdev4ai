@@ -44,7 +44,6 @@ export const APP_ROUTES = [
   'referrals',
   'settings',
   'admin',
-  'pricing',
 ] as const;
 
 /** A view the signed-in application can show. */
@@ -73,7 +72,7 @@ export const SESSION_ROUTES = ['landing', 'onboarding'] as const;
  *   `isKnownRoute('cv-analyzer')` is true — the platform still recognises the
  *   legacy address and redirects it to where the work lives now.
  */
-export const LEGACY_ALIASED_ROUTES = ['cv-analyzer'] as const;
+export const LEGACY_ALIASED_ROUTES = ['cv-analyzer', 'pricing'] as const;
 
 /**
  * Addresses that are not views of their own but are still linked to directly.
@@ -126,6 +125,11 @@ export const ROUTE_ALIASES: Readonly<
   Record<string, { route: string; params?: Record<string, string> }>
 > = {
   'cv-analyzer': { route: 'cv-studio', params: { tab: 'ats' } },
+  // The pricing page is gone: the platform is free and there is nothing to
+  // price. The address still works and lands on the dashboard, because a link
+  // to it exists in the wild — in shared profiles, in support messages and in
+  // the browser history — and it must not dead-end.
+  pricing: { route: 'dashboard' },
   // Referrals are no longer a page of their own. The old address still works
   // and lands on the referrals section inside the profile, which is where the
   // referral link, its counters and the history now live.

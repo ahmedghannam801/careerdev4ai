@@ -22,6 +22,7 @@ import {
   type AICreditAction,
   CREDIT_WEIGHTS,
 } from '../../shared/credits.ts';
+import { isMonetizationEnabled } from '../../shared/platformAccess.ts';
 import {
   canPerformAiAction,
   chargeAiAction,
@@ -203,6 +204,17 @@ export async function refundAiCreditReservation(
  * A credit is spent on a result, not on an attempt: any response that is not
  * a success returns the reservation, whether the request was refused by
  * validation, failed, timed out or was rejected by the model.
+ *
+ * WHILE THE PLATFORM IS FREE
+ * --------------------------
+ * There is no currency while the platform is free, so there is nothing to
+ * check and nothing to deduct: the request goes straight through. The route
+ * keeps its own guard — the per-minute limiter, the daily AI budget and the CV
+ * Studio edit allowance — and those are global rate limits, not purchases.
+ *
+ * The ledger is left untouched for the same reason: a row that records an
+ * operation nobody paid for would say something the platform does not do. The
+ * ledger's history stays exactly as it is.
  */
 export function requireCredits(action: AICreditAction) {
   return async (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -210,6 +222,10 @@ export function requireCredits(action: AICreditAction) {
     const profileId = req.authUser?.id;
     if (!profileId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!isMonetizationEnabled()) {
+      return next();
     }
 
     const required = CREDIT_WEIGHTS[action] ?? 1;

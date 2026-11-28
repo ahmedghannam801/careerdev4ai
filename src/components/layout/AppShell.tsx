@@ -42,9 +42,6 @@ import { backdropVariants, drawerLeftVariants, drawerVariants } from '../../lib/
 import { useRouteParam } from '../../lib/useRouteParams';
 import { AionviaAvatar } from '../ui/AionviaAvatars';
 import { useAdminAccess } from '../../lib/useAdminAccess';
-import { CreditBalanceBadge } from '../subscription/CreditBalanceBadge';
-import { PlanIdentityBadge } from '../subscription/PlanIdentityBadge';
-import { MembershipPanel } from '../subscription/MembershipPanel';
 
 const GlobalSearchModal = lazy(() =>
   import('./GlobalSearchModal').then((module) => ({ default: module.GlobalSearchModal }))
@@ -75,7 +72,7 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, children }) => {
-  const { profile, targetRole, settings, updateSettings, visibleNotifications, currentUser, identity, avatarId, logout, t, copilotOpen, setCopilotOpen, subscription } = useCareer();
+  const { profile, targetRole, settings, updateSettings, visibleNotifications, currentUser, identity, avatarId, logout, t, copilotOpen, setCopilotOpen } = useCareer();
   // The feedback form is a permanent destination. Both the account menu and
   // the mobile drawer open the same address and report the same source, so
   // the entry point is never lost when the dashboard card is dismissed.
@@ -350,19 +347,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                   <span className="text-xs font-bold text-[var(--text-primary)] truncate">
                     {identity.displayName}
                   </span>
-                  {/* The tier, beside the name it belongs to. It is drawn from
-                      the plan the server resolved, and it reads the
-                      subscription status too, so an ended plan cannot keep a
-                      paid colour in the sidebar. */}
-                  <PlanIdentityBadge
-                    planCode={subscription?.planCode ?? 'free'}
-                    status={subscription?.status}
-                    expiresAt={subscription?.expiresAt}
-                    variant="solid"
-                    size="sm"
-                    language={settings.language}
-                    className="shrink-0"
-                  />
                 </div>
                 <div className="text-[10px] text-[var(--text-muted)] truncate">
                   @{profile.username || 'user'}
@@ -451,15 +435,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
 
             {/* Notifications & Account Controls */}
             <div data-tour="notifications-account" className="flex items-center gap-1.5 sm:gap-2">
-              {/* The subscription identity lives inside the tokens chip,
-                  beside the balance it belongs to. There is no standalone
-                  plan label in the header any more: the plan and the tokens
-                  are one control, and the sidebar repeats the same identity
-                  beside the candidate's name. */}
-              <div className="hidden min-[360px]:flex">
-                <CreditBalanceBadge onOpenPricing={() => onNavigate('pricing')} />
-              </div>
-
               {/* Notifications */}
               <button
                 onClick={() => setNotificationsOpen(true)}
@@ -515,17 +490,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                           @{profile.username || t('no username set')}
                         </div>
                       </div>
-                      {/* The membership, in the place the candidate looks when
-                          they ask what they are on. The tier, the plan and the
-                          way to change it are one row above the menu items. */}
-                      <MembershipPanel
-                        variant="row"
-                        onManagePlan={() => {
-                          setUserMenuOpen(false);
-                          onNavigate('pricing');
-                        }}
-                        className="border-b border-[var(--border-subtle)]"
-                      />
                       <button
                         onClick={() => { setUserMenuOpen(false); onNavigate('profile'); }}
                         className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
@@ -539,13 +503,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
                       >
                         <Settings className="w-3.5 h-3.5" />
                         <span>{t('Settings')}</span>
-                      </button>
-                      <button
-                        onClick={() => { setUserMenuOpen(false); onNavigate('pricing'); }}
-                        className="w-full px-4 py-2.5 text-start text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary)]" />
-                        <span>{t('Subscriptions & Pricing')}</span>
                       </button>
                       <a
                         href={FEEDBACK_FORM_URL}
@@ -702,16 +659,6 @@ export const AppShell: React.FC<AppShellProps> = ({ currentView, onNavigate, chi
               </div>
 
             <div className="space-y-2 border-t border-[var(--border-subtle)] px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              {/* The membership, on a phone as well. The tier and the plan are
-                  one row; the way to change them is the row itself. */}
-              <MembershipPanel
-                variant="row"
-                onManagePlan={() => {
-                  setMobileMenuOpen(false);
-                  onNavigate('pricing');
-                }}
-                className="rounded-xl border border-[var(--border-subtle)]"
-              />
               <div className="flex items-center justify-between gap-2 pb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   {t('Display')}

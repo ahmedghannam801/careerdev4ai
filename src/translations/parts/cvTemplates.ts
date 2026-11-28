@@ -30,22 +30,17 @@ export const cvTemplatesAr: Record<string, string> = {
   'Template preview': 'معاينة القالب',
   'Close preview': 'إغلاق المعاينة',
   'Use this template': 'استخدام هذا القالب',
-  'Upgrade to use': 'الترقية للاستخدام',
   'Applying...': 'جارٍ التطبيق...',
   'ATS friendly': 'متوافق مع ATS',
   'Template applied. Your content has not changed.':
     'تم تطبيق القالب. لم يتغيّر محتواك.',
   'The template could not be applied.': 'تعذّر تطبيق القالب.',
-  'Premium templates require an active paid plan.':
-    'تتطلب القوالب المميزة خطة مدفوعة نشطة.',
   'All templates are available on every plan today.':
     'جميع القوالب متاحة على كل الخطط اليوم.',
 
   // The gallery: looking at a template is free, and a premium one can be
   // bought with tokens.
   'Use Template': 'استخدام القالب',
-  'Unlock with {count} Tokens': 'فتحه بـ {count} توكن',
-  'Upgrade Plan': 'ترقية الخطة',
   'Full preview': 'معاينة كاملة',
   'This preview could not be loaded.': 'تعذّر تحميل هذه المعاينة.',
   'Please close this and try again.': 'يُرجى الإغلاق والمحاولة مرة أخرى.',
@@ -53,11 +48,6 @@ export const cvTemplatesAr: Record<string, string> = {
   'Unlock this template for your CV.': 'افتح هذا القالب لسيرتك الذاتية.',
   'Unlock price': 'سعر الفتح',
   'Your balance:': 'رصيدك:',
-  'You do not have enough tokens for this template yet.':
-    'توكناتك غير كافية لفتح هذا القالب بعد.',
-  'You need {count} more tokens': 'تحتاج إلى {count} توكن إضافية',
-  'Tokens are only taken when the unlock succeeds. If it fails, nothing is charged.':
-    'لا تُخصم التوكنات إلا إذا نجح الفتح. وإذا فشل، لا يُخصم شيء.',
   'This layout applied to your CV, with your own content.':
     'هذا التخطيط مطبَّق على سيرتك الذاتية بمحتواك الخاص.',
   'Export to PDF and to an editable Word document.':
@@ -67,10 +57,6 @@ export const cvTemplatesAr: Record<string, string> = {
   'Not now': 'ليس الآن',
   'Unlocking...': 'جارٍ الفتح...',
   'The template could not be unlocked.': 'تعذّر فتح القالب.',
-  'Template unlocked. {spent} tokens were spent — {remaining} left.':
-    'تم فتح القالب. خُصم {spent} توكن — والباقي {remaining}.',
-  'Every template can be previewed for free. Unlock a premium template with tokens, or get every template with a paid plan.':
-    'يمكن معاينة كل قالب مجانًا. افتح قالبًا مميزًا بتوكنات، أو احصل على كل القوالب بخطة مدفوعة.',
 
   // The server's access reasons, shown as the honest explanation of a lock.
   'This template is free for everyone.': 'هذا القالب مجاني للجميع.',
@@ -140,12 +126,8 @@ export const cvTemplatesAr: Record<string, string> = {
     'تعذّر إكمال تصدير Word. يُرجى المحاولة مرة أخرى.',
   'This template is not available on your plan.':
     'هذا القالب غير متاح في خطتك.',
-  'This template is part of a paid plan.':
-    'هذا القالب ضمن خطة مدفوعة.',
   'The preview of this template is not available on your plan.':
     'معاينة هذا القالب غير متاحة في خطتك.',
-  'Upgrade to see the layout of this template.':
-    'اشترك لرؤية تخطيط هذا القالب.',
   '{count} pages': '{count} صفحات',
   '1 page': 'صفحة واحدة',
 
@@ -185,4 +167,6 @@ export const cvTemplatesAr: Record<string, string> = {
   'Template featured.': 'تم تمييز القالب.',
   'The template could not be saved.': 'تعذّر حفظ القالب.',
   'The template could not be updated.': 'تعذّر تحديث القالب.',
+  'Every template is available to every candidate, at no cost.':
+    'كل قالب متاح لكل مرشح، ودون أي تكلفة.',
 };

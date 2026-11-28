@@ -28,6 +28,7 @@ import {
   type CvTemplateDefinition,
   type CvTemplateStructure,
 } from '../../shared/cvTemplates.ts';
+import { isMonetizationEnabled } from '../../shared/platformAccess.ts';
 
 export interface CvTemplateCatalogResult {
   /**
@@ -177,9 +178,19 @@ export async function recordCvTemplateUnlock(params: {
 export async function getCvTemplateAccessContext(
   profileId: string | null
 ): Promise<CvTemplateAccessContext> {
-  const enforcementEnabled = isCvTemplatePremiumEnforcementEnabled(
-    process.env as Record<string, string | undefined>
-  );
+  // While the platform is free, every template is open to every account.
+  //
+  // The rule below is the product's own escape hatch: enforcement off means the
+  // whole catalogue is available. It used to be reachable only through the
+  // `CV_TEMPLATE_PREMIUM_ENFORCEMENT` environment variable, which meant a
+  // free launch had to be configured in two places — the server's
+  // configuration and the platform's own switch. Now the platform's switch
+  // decides on its own, and the environment variable still works for anyone
+  // who wants to be stricter than the platform is.
+  const enforcementEnabled =
+    isMonetizationEnabled() &&
+    isCvTemplatePremiumEnforcementEnabled(process.env as Record<string, string | undefined>);
+
   if (!profileId || !enforcementEnabled) {
     return { enforcementEnabled, planCode: 'free', subscriptionStatus: 'free' };
   }

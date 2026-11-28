@@ -13,7 +13,7 @@
 // Supabase user id, never a client-supplied value.
 import { getSupabaseServer } from './supabase';
 import { getPlanByCode } from './subscriptions.ts';
-import { getUserEffectivePlan } from '../subscriptions/entitlements.ts';
+import { getAccessPlanCode } from '../subscriptions/entitlements.ts';
 import { savedJobsLimitFromFeatures } from '../../shared/subscriptions.ts';
 
 export interface BookmarkDTO {
@@ -34,16 +34,23 @@ function toDTO(row: BookmarkRow): BookmarkDTO {
   return { id: row.id, jobId: row.job_id, createdAt: row.created_at };
 }
 
-/** The saved-jobs allowance for the candidate's effective plan. */
+/**
+ * The saved-jobs allowance for the candidate's effective plan.
+ *
+ * While the platform is free the allowance is the same for everybody: it is
+ * resolved against the free plan, so an account that still holds an old
+ * subscription does not get a larger allowance than one that does not. It is a
+ * capacity limit, not a purchase.
+ */
 export async function getSavedJobsAllowance(profileId: string): Promise<{
   limit: number;
   planCode: string;
 }> {
-  const effective = await getUserEffectivePlan(profileId);
-  const plan = await getPlanByCode(effective.planCode);
+  const planCode = await getAccessPlanCode(profileId);
+  const plan = await getPlanByCode(planCode);
   return {
     limit: savedJobsLimitFromFeatures(plan?.features),
-    planCode: effective.planCode,
+    planCode,
   };
 }
 

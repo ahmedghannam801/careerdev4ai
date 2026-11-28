@@ -486,34 +486,31 @@ describe('the token deduction contract', () => {
       }
     });
 
-    test('a paid action reads as a cost, a free action reads as nothing', () => {
+    test('no action carries a price label, because there is no currency', () => {
+      // The platform is free. Nothing is bought, so nothing has a price and no
+      // button may say what something costs: a label that quotes a token on a
+      // platform that charges no tokens is a small lie that the candidate
+      // reads as a demand.
       const t = (key: string) => key;
 
-      assert.equal(aiTokenCostLabel('cv_ats_analysis', t), '(1 Token)');
-      assert.equal(aiTokenCostLabel('cv_tailoring', t), '(1 Token)');
-      assert.equal(aiTokenCostLabel('project_analysis', t), '(1 Token)');
-      assert.equal(aiTokenCostLabel('premium_template_unlock', t), '(5 Tokens)');
-      assert.equal(
-        aiButtonLabel('Run ATS Audit', 'cv_ats_analysis', t),
-        'Run ATS Audit (1 Token)'
-      );
-
-      // The free flows must carry no token label at all.
-      for (const action of [
-        'career_consultation_chat',
-        'interview_mock_session',
-        'ai_assist_inline',
-        'learning_recommendation',
-        'job_description_analysis',
-        'cover_letter_generation',
-      ] as AICreditAction[]) {
-        assert.equal(aiTokenCostLabel(action, t), '', `${action} must have no price label`);
+      for (const action of Object.keys(CREDIT_WEIGHTS) as AICreditAction[]) {
+        assert.equal(
+          aiTokenCostLabel(action, t),
+          '',
+          `${action} must carry no price label while the platform is free`
+        );
         assert.equal(
           aiButtonLabel('Send', action, t),
           'Send',
           `${action} must leave the button label untouched`
         );
       }
+
+      // The price table itself is untouched: it is what the server would
+      // charge if the platform started selling again, and turning
+      // monetization back on must not require rebuilding it.
+      assert.equal(CREDIT_WEIGHTS.cv_ats_analysis, 1);
+      assert.equal(CREDIT_WEIGHTS.premium_template_unlock, 5);
     });
 
     test('every paid action has a positive price, and every free action is zero', () => {
@@ -537,42 +534,26 @@ describe('the token deduction contract', () => {
       }
     });
 
-    test('every paid action shows its cost in the interface', () => {
-      // A token must never be spent without the candidate knowing what it
-      // costs. Every action the server can charge therefore has to appear as
-      // a cost label somewhere in the interface.
-      //
-      // The premium template is excluded because the template library draws
-      // its price from the product constant and already showed it.
+    test('the interface quotes no price anywhere', () => {
+      // The mirror of the rule above, checked against the source rather than
+      // against the helper: no screen may carry a token price of its own,
+      // wherever it came from.
       const interfaceFiles = collectSourceFiles(join(REPO_ROOT, 'src')).filter((file) =>
         /\.(ts|tsx)$/.test(file)
       );
 
-      const quoted = new Set<string>();
+      const offenders: string[] = [];
       for (const file of interfaceFiles) {
         const contents = readFileSync(file, 'utf8');
-        for (const match of contents.matchAll(
-          /ai(?:ButtonLabel|TokenCostLabel)\(\s*(?:t\([^)]*\)|'[^']*'|"[^"]*")\s*,\s*'([a-z_]+)'/g
-        )) {
-          quoted.add(match[1]);
-        }
-        // The template library shows the price of the premium template from
-        // the product constant, so it is quoted without a cost action.
         if (contents.includes('CV_TEMPLATE_PREMIUM_UNLOCK_CREDITS')) {
-          quoted.add('premium_template_unlock');
+          offenders.push(file);
         }
       }
 
-      const paidActions = (Object.keys(CREDIT_WEIGHTS) as AICreditAction[]).filter(
-        (action) => CREDIT_WEIGHTS[action] > 0
-      );
-
-      const missing = paidActions.filter((action) => !quoted.has(action));
-
       assert.deepEqual(
-        missing,
+        offenders,
         [],
-        `these actions spend a token but the interface never says what they cost: ${missing.join(', ')}`
+        `these screens still carry a token price: ${offenders.join(', ')}`
       );
     });
   });

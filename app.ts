@@ -68,7 +68,6 @@ import { registerCvTemplateRoutes } from './server/cvTemplates/routes.ts';
 import { currentCvTemplateRecord } from './server/cvTemplates/service.ts';
 import { registerCreditMonitorRoutes } from './server/admin/creditMonitor.ts';
 import { registerReferralRoutes } from './server/referrals/routes.ts';
-import { registerXPayRoutes } from './server/xpay/routes.ts';
 import {
   requireCredits,
   markAiCreditCompleted,
@@ -8620,7 +8619,13 @@ registerCvTemplateRoutes(app);
 registerCreditMonitorRoutes(app);
 
 /* -------------------------------------------------------------------------- */
-/* Subscriptions, Payments & Credits Routes                                   */
+/* Subscriptions & Credits                                                     */
+/*                                                                             */
+/* The payment gateway is not mounted here. While the platform is free there  */
+/* is no checkout, no webhook and no way to start a purchase, so the          */
+/* gateway's routes are absent from the application entirely rather than      */
+/* present and refusing. The subscription records and the credit ledger stay  */
+/* readable through the administration endpoints below.                       */
 /* -------------------------------------------------------------------------- */
 registerSubscriptionRoutes(app);
 
@@ -8633,11 +8638,6 @@ registerReferralRoutes(app);
 /* Email delivery: preferences, unsubscribe, webhook and administration      */
 /* -------------------------------------------------------------------------- */
 registerEmailRoutes(app);
-
-/* -------------------------------------------------------------------------- */
-/* XPay card payments (Egypt) and their webhook                               */
-/* -------------------------------------------------------------------------- */
-registerXPayRoutes(app);
 
 /* -------------------------------------------------------------------------- */
 /* Public SEO pages                                                           */

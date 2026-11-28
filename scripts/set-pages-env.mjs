@@ -80,14 +80,17 @@ const OPTIONAL_SECRET_KEYS = [
 const OPTIONAL_EMAIL_SECRET_KEYS = ['RESEND_API_KEY', 'RESEND_FROM', 'RESEND_TEST_RECIPIENT'];
 
 /**
- * The XPay secrets. Optional in the same way: an absent key means card
- * payments through XPay are not offered, not that the deployment is broken.
+ * The XPay secrets.
+ *
+ * The platform does not sell anything at the moment, so the payment gateway's
+ * credentials are no longer part of the deployment workflow: they are not sent
+ * to the project, and a deployment cannot be given one by running this script.
+ *
+ * The list is kept — empty — rather than deleted, so that turning
+ * monetization back on is a matter of listing the keys again instead of
+ * reconstructing this file.
  */
 const OPTIONAL_XPAY_SECRET_KEYS = [
-  'XPAY_SECRET_KEY',
-  'XPAY_WEBHOOK_SECRET',
-  'XPAY_ALLOW_LIVE',
-  'XPAY_PAYMENT_METHOD_CONFIGURATION_ID',
 ];
 
 /**

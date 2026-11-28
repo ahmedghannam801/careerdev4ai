@@ -485,7 +485,6 @@ export const cvAr: Record<string, string> = {
   'AI edits today: {remaining}/{limit} remaining':
     'تعديلات الذكاء الاصطناعي اليوم: {remaining}/{limit} متبقية',
   'Resets in {time}': 'تتجدد خلال {time}',
-  'Upgrade to Pro for unlimited CV edits': 'اشترك في Pro للحصول على تعديلات غير محدودة للسيرة الذاتية',
   'Your AI edits for today are used up. The timer in the studio header shows when they come back.':
     'استنفدت تعديلات الذكاء الاصطناعي اليوم. المؤقت في أعلى الاستوديو يوضّح متى تعود.',
 

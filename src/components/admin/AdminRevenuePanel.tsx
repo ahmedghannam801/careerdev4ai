@@ -17,10 +17,7 @@ import {
   TrendingUp,
   Smartphone,
   CreditCard,
-  Sparkles,
   RefreshCw,
-  Plus,
-  Check,
   ExternalLink,
   History,
   Calendar,
@@ -31,7 +28,6 @@ import {
 import { useCareer } from '../../context/CareerContext';
 import {
   fetchAdminRevenue,
-  grantAdminCredits,
   type AdminRevenueMetrics,
 } from '../../lib/adminApi';
 import { formatEgpPrice } from '../../../shared/subscriptions';
@@ -57,13 +53,6 @@ export const AdminRevenuePanel: React.FC = () => {
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-
-  // Manual grant state
-  const [grantProfileId, setGrantProfileId] = useState('');
-  const [grantAmount, setGrantAmount] = useState<number>(10);
-  const [grantReason, setGrantReason] = useState('');
-  const [grantBusy, setGrantBusy] = useState(false);
-  const [grantNotice, setGrantNotice] = useState<string | null>(null);
 
   const loadMetrics = async (filter?: { from?: string; to?: string }) => {
     setLoading(true);
@@ -91,29 +80,6 @@ export const AdminRevenuePanel: React.FC = () => {
     setFromDate('');
     setToDate('');
     void loadMetrics();
-  };
-
-  const handleGrantCredits = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!grantProfileId.trim()) return;
-    setGrantBusy(true);
-    setGrantNotice(null);
-    try {
-      const res = await grantAdminCredits(
-        grantProfileId.trim(),
-        grantAmount,
-        grantReason.trim() || 'Manual administrative bonus'
-      );
-      if (res.success) {
-        setGrantNotice(`تم منح ${res.grantedCredits} نقطة بنجاح إلى حساب المرشح.`);
-        setGrantProfileId('');
-        setGrantReason('');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to grant credits');
-    } finally {
-      setGrantBusy(false);
-    }
   };
 
   // The live gateway, and the two historical rails. The names say which is
@@ -355,75 +321,15 @@ export const AdminRevenuePanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Manual Token Grant Tool */}
-        <div className={`${CARD} p-5 space-y-4`}>
-          <h3 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[var(--color-primary)]" />
-            <span>{t('Manual Token Grant')}</span>
-          </h3>
+        {/*
+          The manual token grant is gone.
 
-          {grantNotice && (
-            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 flex items-center gap-2 font-medium">
-              <Check className="w-4 h-4" />
-              <span>{grantNotice}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleGrantCredits} className="space-y-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-[var(--text-muted)] mb-1">
-                معرف المرشح (Profile UUID) *
-              </label>
-              <input
-                type="text"
-                required
-                value={grantProfileId}
-                onChange={(e) => setGrantProfileId(e.target.value)}
-                placeholder="UUID: 00000000-0000-0000-0000-000000000000"
-                className="w-full px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-[var(--text-muted)] mb-1">
-                  {t('Amount (Tokens)')} *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  required
-                  value={grantAmount}
-                  onChange={(e) => setGrantAmount(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-xs text-[var(--text-primary)] font-bold focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-[var(--text-muted)] mb-1">
-                  سبب المنح (Audit Note)
-                </label>
-                <input
-                  type="text"
-                  value={grantReason}
-                  onChange={(e) => setGrantReason(e.target.value)}
-                  placeholder="مكافأة مسابقة، تعويض..."
-                  className="w-full px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={grantBusy}
-              className="w-full py-2 rounded-xl bg-[var(--color-primary)] text-white text-xs font-bold hover:bg-[var(--color-primary-hover)] shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{grantBusy ? 'جاري المنح...' : t('Grant Tokens')}</span>
-            </button>
-          </form>
-        </div>
+          A grant is the platform's own money operation, and the platform does
+          not sell tokens at the moment: there is no balance to read and no
+          balance that gates anything. The ledger's history stays where it
+          was, in the token monitor, and the revenue figures below stay
+          exactly as they were.
+        */}
       </div>
 
       {/* What XPay collected, newest first. This is the only payment list that

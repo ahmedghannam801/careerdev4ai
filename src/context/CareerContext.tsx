@@ -283,6 +283,7 @@ import {
   subscribeCredits,
 } from '../lib/creditsStore';
 import { emitCreditActivity } from '../lib/creditActivity';
+import { isMonetizationEnabled } from '../../shared/platformAccess';
 import type { CreditBalanceDTO } from '../../shared/credits';
 import {
   captureReferralCodeFromUrl,
@@ -1526,6 +1527,10 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [creditIdentityId]);
 
   const refreshSubscription = useCallback(async () => {
+    // While the platform is free there is no subscription to read. The
+    // endpoint still answers — the history stays readable — but the interface
+    // never asks, because nothing it shows depends on the answer.
+    if (!isMonetizationEnabled()) return;
     try {
       const data = await fetchCurrentSubscription();
       setSubscription(data);
@@ -1536,7 +1541,11 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Re-reads the authoritative balance. The store coalesces concurrent calls,
   // so several surfaces asking at once produce one request.
+  //
+  // While the platform is free no balance gates anything, so nothing is asked
+  // for: there is no currency to keep in step.
   const refreshCredits = useCallback(async () => {
+    if (!isMonetizationEnabled()) return;
     await refreshCreditsFromStore('manual-refresh');
   }, []);
 
@@ -1550,6 +1559,9 @@ export const CareerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // store is updated straight away and every surface moves on the same tick —
   // the badge in the header, the dashboard widget and the token hub included.
   const claimDailyTokens = useCallback(async (): Promise<number | null> => {
+    // While the platform is free there are no tokens to claim: the daily
+    // allowance funded a currency that no longer exists.
+    if (!isMonetizationEnabled()) return null;
     try {
       const result = await claimDailyTokensRequest();
 
