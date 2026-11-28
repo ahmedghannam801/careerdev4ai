@@ -146,9 +146,14 @@ export async function checkUserEntitlement(
   feature: EntitlementFeature
 ): Promise<EntitlementCheckResult> {
   if (!isMonetizationEnabled()) {
-    // The account's own plan is still resolved, so the administration screens
-    // and the audit trail keep reading the history correctly. It simply no
-    // longer decides anything.
+    // The free tier is the answer for every account, and it is answered
+    // without reading the payment tables: a free platform must not depend on
+    // the payment system it no longer has.
+    //
+    // The history is not lost — the administration screens read it through
+    // their own routes (`/api/admin/subscriptions`, `/api/admin/revenue`), and
+    // `getUserSubscriptionSummary` still returns the candidate's own
+    // subscription list. It simply no longer decides anything.
     const effective = await getUserEffectivePlan(profileId);
     return {
       allowed: true,
