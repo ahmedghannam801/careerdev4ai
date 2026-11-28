@@ -164,10 +164,11 @@ describe('the instruction composer', () => {
       knowledgeBlock: 'VERIFIED FACTS ABOUT AIONVIA\n- A CV audit costs one token.',
       contextBlock: 'CONTEXT',
     });
-    // The rule that a market answer is the wrong answer, and that a plan
-    // price is never quoted by the model.
+    // The rule that a market answer is the wrong answer, and that the model
+    // never tells a candidate that something has to be paid for.
     assert.match(instruction, /is a question about those facts/);
-    assert.match(instruction, /Never state what an Aionvia plan costs/);
+    assert.match(instruction, /Never state that anything costs a token/);
+    assert.match(instruction, /Aionvia is free right now/);
     // The product rules come after the facts they govern.
     assert.ok(
       instruction.indexOf('VERIFIED FACTS ABOUT AIONVIA') < instruction.indexOf('THE PRODUCT')

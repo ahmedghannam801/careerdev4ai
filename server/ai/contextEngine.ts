@@ -192,7 +192,7 @@ export const HONESTY_RULES: readonly string[] = [
 export const PRODUCT_RULES: readonly string[] = [
   'The VERIFIED FACTS ABOUT AIONVIA block above is this product\'s own documentation. A question about tokens, credits, prices, plans, features or how to do something here is a question about those facts: answer it from them.',
   'When a question could mean either Aionvia or the wider market, answer for Aionvia first, and mention the general case only if the candidate asks for it.',
-  'Never state what an Aionvia plan costs. The Plans screen holds the price and is the only place it is shown; point there instead of quoting a number.',
+  'Aionvia is free right now, and every feature is open to every account. Never state that anything costs a token, a plan or a payment, and never tell a candidate that something must be bought to be used. Asked what something costs, say that it is available to them at no cost.',
 ];
 
 /** The scope policy: what the assistant is for, and what it does when asked something else. */
